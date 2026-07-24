@@ -44,7 +44,7 @@ O sistema foi desenvolvido para operar em conexões instáveis. Mensagens de err
 
 O banco de dados possui estrutura robusta com tabelas, visões analíticas e índices para consultas eficientes. Funções serverless executam operações administrativas. O projeto conta com testes automatizados em múltiplas camadas, integração contínua e deploy automatizado.
 
-Funcionalidades em andamento incluem gamificação entre turmas, sistema de registro de comportamento, armazenamento de documentos anexados às justificativas, persistência do histórico de conversas no chat e notificações push.
+Funcionalidades em andamento incluem gamificação entre turmas, sistema de registro de comportamento, persistência do histórico de conversas no chat e notificações push.
 
 ## Status do Projeto
 
@@ -65,10 +65,10 @@ Projeto em desenvolvimento ativo. A infraestrutura central está concluída e os
 - Registro de ocorrências graves com bloqueio de retorno
 - CRUD de usuários, alunos, turmas, disciplinas e atribuições
 - Sistema de código de redefinição de senha (geração, solicitação, validação, revogação, expiração em 1h)
-- Justificativas com validação (aceitar/recusar)
+- Justificativas com validação (aceitar/recusar), anexo (upload com compressão e otimização serverless), suporte a múltiplos dias (data_fim) e auto-justify de frequências via trigger
 - Ranking de priorização de risco com filtros e busca em tempo real
 - Termômetro visual de atenção (verde/amarelo/vermelho)
-- Alertas de ausência para responsáveis (portão e aula)
+- Alertas para responsáveis (ausência e ocorrências) com status de justificativa, visualização de anexos e modal de detalhes
 - Chat com horário protegido (seg-sex, 7h-17h)
 - Indicador de status de conexão com Supabase
 - Tratamento e tradução de erros do Supabase Auth para português
@@ -81,7 +81,6 @@ Projeto em desenvolvimento ativo. A infraestrutura central está concluída e os
 
 - Gamificação entre turmas (estrutura de dados e views prontas, frontend não conectado)
 - Sistema de comportamento com tags (schema do banco e tipos definidos, frontend não conectado)
-- Upload de anexos em justificativas (interface de upload pronta, backend de storage não implementado)
 - Persistência de mensagens do chat (interface de chat pronta, tabelas `conversas` e `mensagens` definidas, persistência não implementada)
 - Notificações push
 
@@ -167,7 +166,7 @@ Projeto em desenvolvimento ativo. A infraestrutura central está concluída e os
 | Painel de monitoramento | Página central com cartões de navegação para todos os módulos administrativos |
 | Ranking de risco | Lista priorizada de alunos organizados do caso mais crítico ao mais leve. Filtros por nível de risco (crítico, atenção, estável). Busca em tempo real por nome. Atualização por subscription Realtime. |
 | Central de ocorrências | Lista de todas as ocorrências graves e suspensões com indicadores visuais de tipo, status e bloqueio. Alternância de bloqueio/desbloqueio de retorno em tempo real. |
-| Validação de justificativas | Fila de justificativas pendentes com opção de aceitar ou recusar. Indicador de contagem de pendentes. Atualização em tempo real. |
+| Validação de justificativas | Fila de justificativas pendentes com exibição de anexos, intervalo de datas e opção de aceitar ou recusar. Ao aceitar, as frequências no período são auto-justificadas via trigger no banco. Atualização em tempo real. |
 | CRUD de usuários | Cadastro, edição, ativação e inativação de usuários. Geração automática de código de redefinição de senha ao criar usuário. Criação sincronizada no auth.users e perfil. |
 | CRUD de alunos | Cadastro e edição de alunos com dados pseudonimizados. Criação simultânea de vínculo com responsável existente ou novo. |
 | CRUD de turmas | Cadastro, edição, ativação e inativação de turmas com série e letra. |
@@ -180,9 +179,9 @@ Projeto em desenvolvimento ativo. A infraestrutura central está concluída e os
 
 | Funcionalidade | Descrição |
 |----------------|-----------|
-| Alertas de ausência | Lista de alertas de ausência na escola (portão) e ausência em aula específica, com distinção visual entre os tipos. Botão para enviar justificativa diretamente do alerta. |
+| Alertas | Lista de alertas de ausência (portão e aula) e ocorrências (grave e suspensão), com distinção visual por tipo e badge de urgência. Botão para enviar justificativa diretamente do alerta. Modal de detalhes com status da justificativa, motivo, anexo e tags de comportamento. Indicador "Aguardando validação", "Aceita" ou "Recusada" conforme o andamento. |
 | Termômetro de atenção | Indicador visual com barra de progresso colorida (verde/amarelo/vermelho) que mostra o nível de risco acumulado do estudante. Cálculo baseado em ausências e ocorrências. Suporte a múltiplos filhos com seletor. |
-| Justificativas | Envio de justificativa de falta com seleção de motivo e campo de descrição. Interface de upload de arquivo com arrastar-e-soltar, validação de tipo (imagens e PDF) e limite de 5MB. |
+| Justificativas | Envio de justificativa de falta com suporte a múltiplos dias (checkbox "Justificativa para múltiplos dias"). Upload de anexo com compressão automática via Canvas API (redimensionamento para 1600px, qualidade JPEG 0.6) e otimização serverless via Edge Function. Envio fire-and-forget sem bloqueio da interface. Formulário permanece na tela após envio. |
 | Aviso de presença obrigatória | Badge urgente em alertas quando uma ocorrência exige a presença física do responsável na escola para liberar o retorno do estudante. |
 | Chat com horário protegido | Interface de chat com a coordenação escolar. Indicador de horário comercial (online/offline). Envio de mensagens desabilitado fora do horário letivo (segunda a sexta, 7h às 17h). Auto-scroll para novas mensagens. Horários configurados via `configuracoes_escola`. |
 
@@ -230,8 +229,8 @@ buscapp/
 │   │   ├── CartaoAlunoRisco.vue         # Cartão de aluno no ranking de risco
 │   │   ├── CartaoNavegacao.vue          # Cartão de navegação para módulos
 │   │   ├── ChatHorarioProtegido.vue     # Componente de chat com controle de horário
-│   │   ├── FilaJustificativas.vue       # Fila de justificativas para validação
-│   │   ├── FormularioJustificativa.vue  # Formulário de envio de justificativa
+│   │   ├── FilaJustificativas.vue       # Fila de justificativas para validação com exibição de anexos
+│   │   ├── FormularioJustificativa.vue  # Formulário de envio de justificativa com suporte a múltiplos dias
 │   │   ├── IndicadorConexao.vue         # Indicador de status da conexão (verde/amarelo/vermelho)
 │   │   ├── ListaOcorrencias.vue         # Lista de ocorrências graves
 │   │   └── TermometroRisco.vue          # Termômetro visual de risco
@@ -290,7 +289,8 @@ buscapp/
 │   │   ├── bootstrap.d.ts              # Declarações de tipos do Bootstrap JS
 │   │   └── index.ts                    # Re-exportações
 │   └── utils/
-│       └── traduzirErro.ts             # Tradução de erros do Supabase Auth para português
+│       ├── traduzirErro.ts             # Tradução de erros do Supabase Auth para português
+│       └── comprimirImagem.ts          # Compressão de imagens via Canvas API (1600px, JPEG q0.6)
 ├── supabase/
 │   ├── config.toml                     # Configuração local do Supabase (portas, auth, storage, edge)
 │   ├── seed.sql                        # Dados de teste (7 usuários, 3 turmas, 9 alunos, 3 disciplinas)
@@ -302,7 +302,8 @@ buscapp/
 │   ├── functions/                      # Edge Functions (Deno)
 │   │   ├── solicitar-codigo/           # Notifica admins sobre solicitação de código
 │   │   ├── redefinir-senha-codigo/     # Valida código e atualiza senha
-│   │   └── criar-usuario/             # Cria usuário com senha temporária e código automático
+│   │   ├── criar-usuario/             # Cria usuário com senha temporária e código automático
+│   │   └── processar-anexo/           # Otimiza anexos de justificativas (Imagemagick WASM + pdf-lib)
 │   ├── templates/                      # Templates de email
 │   │   ├── recuperacao.html
 │   │   └── senha_alterada_notificacao.html
@@ -354,12 +355,13 @@ Navegador (SPA Vue 3 + TypeScript + Vite)
        |               +--> Supabase Realtime
        |               |       +--> postgres_changes (notificações, ranking)
        |               |
-       |               +--> Supabase Edge Functions
-       |                       +--> /functions/v1/solicitar-codigo
-       |                       +--> /functions/v1/redefinir-senha-codigo
-       |                       +--> /functions/v1/criar-usuario
-       |
-       v
+        |               +--> Supabase Edge Functions
+        |                       +--> /functions/v1/solicitar-codigo
+        |                       +--> /functions/v1/redefinir-senha-codigo
+        |                       +--> /functions/v1/criar-usuario
+        |                       +--> /functions/v1/processar-anexo
+        |
+        v
 PostgreSQL 17 (gerenciado pelo Supabase)
        +--> auth schema (GoTrue: usuários, sessões)
        +--> public schema (27 tabelas, 5 views, 22 enums, 40+ índices)
@@ -409,7 +411,7 @@ O banco de dados é gerenciado pelo Supabase (PostgreSQL 17) com 27 tabelas, 5 v
 | `frequencias` | Registro unificado de frequência (portão, chamada, saída). Soft delete via `deleted_at`. Idempotência via `client_request_id`. |
 | `registros_comportamento` | Registros de comportamento com vínculo N:N a tags. |
 | `ocorrencias` | Ocorrências graves e suspensões. Workflow de status e opção `exige_presenca_responsavel`. |
-| `justificativas_faltas` | Justificativas de falta. Status: pendente, aceita, recusada. |
+| `justificativas_faltas` | Justificativas de falta. Status: pendente, aceita, recusada. Suporte a múltiplos dias via `data_fim`. Auto-justify de frequências via trigger `fn_auto_justificar_frequencias`. |
 | `monitoramento_acoes` | Log de ações de monitoramento. |
 | `notificacoes` | Fila de notificações. |
 
@@ -426,7 +428,7 @@ O banco de dados é gerenciado pelo Supabase (PostgreSQL 17) com 27 tabelas, 5 v
 |--------|-----------|
 | `tags_comportamento` | Catálogo de tags de comportamento com peso para gamificação. |
 | `pontuacao_turmas` | Pontuação mensal de turmas. Coluna gerada para total. |
-| `anexos` | Metadados de anexos (limite de 150KB, expiração de 30 dias). |
+| `anexos` | Metadados de anexos (limite de 10MB, expiração de 30 dias, coluna `processado_em` para rastrear otimização serverless). |
 | `ocorrencia_anexos` | Join N:N ocorrência-anexo. |
 | `justificativa_anexos` | Join N:N justificativa-anexo. |
 | `codigos_redefinicao` | Códigos de 6 dígitos para redefinição de senha (expiração 1h, revogável). |
@@ -466,18 +468,22 @@ Todas as views utilizam `security_invoker = true` para respeitar as políticas R
 - Funções auxiliares para políticas: `get_user_papel()`, `is_professor_da_turma()`, `is_responsavel_do_aluno()`.
 - Trigger `requisicao_exige_jwt()` no gancho `request.jwt.claim` do PostgREST para rejeitar requisições sem JWT válido.
 - Trigger de criação automática de perfil ao inserir usuário em `auth.users`.
+- Trigger `fn_auto_justificar_frequencias` que atualiza o status das frequências para `'justificado'` quando uma justificativa é aceita.
+- RLS em `storage.objects` para o bucket `justificativas`: gestão tem acesso total, responsável insere e lê apenas seus próprios anexos.
+- Políticas `"JustAnexos: responsavel le proprio"` e `"Anexos: responsavel le proprio"` que permitem ao responsável visualizar os anexos de suas próprias justificativas.
 - Soft delete em `frequencias` para preservação de dados históricos.
 - Índices parciais para dados ativos (otimização de consultas frequentes).
 
 ## Edge Functions
 
-Três funções serverless implementadas em Deno, utilizadas para operações que exigem a chave `service_role` do Supabase.
+Quatro funções serverless implementadas em Deno, utilizadas para operações que exigem a chave `service_role` do Supabase ou processamento pesado de mídia.
 
 | Função | Rota | Método | Autenticação | Descrição |
 |--------|------|--------|--------------|-----------|
 | `solicitar-codigo` | `/functions/v1/solicitar-codigo` | POST | Usuário autenticado | Responsável solicita um código de redefinição de senha. A função notifica os admins registrando uma solicitação na tabela. |
 | `redefinir-senha-codigo` | `/functions/v1/redefinir-senha-codigo` | POST | Nenhuma (código como autenticação) | Valida o código de 6 dígitos (existência, expiração, revogação), atualiza a senha no auth.users e ativa o perfil se estiver pendente. |
 | `criar-usuario` | `/functions/v1/criar-usuario` | POST | Usuário autenticado (papel gestão) | Cria usuário no `auth.users` com senha temporária, insere perfil, gera código de redefinição automaticamente. |
+| `processar-anexo` | `/functions/v1/processar-anexo` | POST | Usuário autenticado | Otimiza anexos de justificativas: converte imagens para JPEG com quality 50 e redimensiona para no máximo 2000px (via magick-wasm) e compacta metadados de PDFs (via pdf-lib). Atualiza `tamanho_bytes`, `mime_type` e `processado_em` na tabela `anexos`. Fire-and-forget a partir do frontend. |
 
 ### Exemplo de Payload
 
@@ -633,15 +639,18 @@ O projeto possui quatro camadas de teste independentes.
 
 ### Testes de API (Bash + curl)
 
-- **Arquivo:** `scripts/test-api.sh`
-- **Cobertura:** 62+ asserts em 7 seções:
+- **Arquivo:** `scripts/test-api.sh` (178 asserts em 14 seções)
+- **Cobertura:** 178 asserts em 14 seções:
   - Autenticação (login, logout, claims do JWT)
-  - Edge Functions (solicitar-codigo, redefinir-senha-codigo, criar-usuario)
+  - Edge Functions (solicitar-codigo, redefinir-senha-codigo, criar-usuario, processar-anexo)
   - Funções RPC (gerar código, revogar código)
   - Operações CRUD (criar, ler, atualizar, deletar registros)
   - Casos extremos (tabelas inexistentes, permissão negada, payloads inválidos)
   - Idempotência de frequência
   - Ciclo de vida completo de códigos
+  - Novos campos de ocorrências, frequências, perfis e alunos
+  - Ciclo completo de justificativas com anexos (upload, RLS, auto-justify via trigger)
+  - Compressão de anexos via Edge Function (upload, processamento, verificação de metadados)
 - **Execução:** `npm run test:api` (requer Supabase local + seed executado)
 
 ### Testes E2E (Playwright)

@@ -43,7 +43,12 @@ const rotuloStatus: Record<JustificativaPendente['status'], string> = {
           <span class="badge" :class="classeStatus[just.status]">{{
             rotuloStatus[just.status]
           }}</span>
-          <small class="text-body-secondary">{{ just.dataAusencia }}</small>
+          <small class="text-body-secondary">
+            {{ just.dataAusencia
+            }}<span v-if="just.dataFim && just.dataFim !== just.dataAusencia">
+              — {{ just.dataFim }}</span
+            >
+          </small>
         </div>
       </div>
 

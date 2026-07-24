@@ -251,7 +251,9 @@ export interface Anexo {
   criado_por: string | null;
   expurgo_em: string;
   expurgado_em: string | null;
+  processado_em: string | null;
   created_at: string;
+  updated_at: string;
 }
 
 export interface OcorrenciaAnexo {
@@ -266,6 +268,7 @@ export interface JustificativaFalta {
   aluno_id: string;
   frequencia_id: string | null;
   data_falta: string;
+  data_fim: string | null;
   motivo: string;
   status: StatusJustificativa;
   avaliado_por: string | null;
@@ -480,7 +483,7 @@ export interface Database {
       };
       anexos: {
         Row: Anexo;
-        Insert: Omit<Anexo, 'id' | 'expurgo_em' | 'created_at'>;
+        Insert: Omit<Anexo, 'id' | 'expurgo_em' | 'processado_em' | 'created_at' | 'updated_at'>;
         Update: Partial<Omit<Anexo, 'id'>>;
       };
       ocorrencia_anexos: {

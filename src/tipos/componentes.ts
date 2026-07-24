@@ -1,5 +1,15 @@
 import type { PapelPerfil, StatusPerfil, StatusAluno } from './database';
 
+export const TAGS_COMPORTAMENTO: Record<string, { rotulo: string; icone: string }> = {
+  agressao_verbal: { rotulo: 'Agressão verbal', icone: 'chat-quote' },
+  agressao_fisica: { rotulo: 'Agressão física', icone: 'hand-index' },
+  desacato: { rotulo: 'Desacato', icone: 'person-fill-exclamation' },
+  dano_patrimonio: { rotulo: 'Dano ao patrimônio', icone: 'building-dash' },
+  bullying: { rotulo: 'Bullying', icone: 'people-fill' },
+  descumprimento_regras: { rotulo: 'Descumprimento de regras', icone: 'file-earmark-x' },
+  saida_nao_autorizada: { rotulo: 'Saída não autorizada', icone: 'door-open' },
+};
+
 export interface LinkNav {
   rotulo: string;
   url: string;
@@ -182,9 +192,12 @@ export interface JustificativaPendente {
   alunoNome: string;
   responsavelNome: string;
   dataAusencia: string;
+  dataFim: string | null;
   motivo: string;
-  anexoUrl?: string | null;
+  anexoUrl?: string;
   anexoNome?: string;
+  anexoId?: string;
+  processadoEm?: string;
   status: 'pendente' | 'aceita' | 'recusada';
 }
 
@@ -210,6 +223,14 @@ export interface AlertaResponsavel {
   descricao: string;
   data: string;
   periodo?: string;
+  frequenciaId?: string;
+  justificativaStatus?: 'pendente' | 'aceita' | 'recusada';
+  justificativaMotivo?: string;
+  anexoUrl?: string;
+  anexoNome?: string;
+  ocorrenciaTipo?: string[];
+  tagsComportamento?: string[];
+  exigePresencaResponsavel?: boolean;
   urgente: boolean;
 }
 

@@ -7,6 +7,7 @@ import CampoFormulario from '@/componentes/CampoFormulario.vue';
 import GrupoCheckbox from '@/componentes/GrupoCheckbox.vue';
 import CartaoSelecao from '@/componentes/CartaoSelecao.vue';
 import type { AlunoFrequencia } from '@/tipos/componentes';
+import { TAGS_COMPORTAMENTO } from '@/tipos/componentes';
 
 const router = useRouter();
 const { usuario } = useAutenticacao();
@@ -28,15 +29,11 @@ const opcoesTipo = [
   { valor: 'suspensao', rotulo: 'Suspensão', icone: 'shield-exclamation' },
 ];
 
-const opcoesTags = [
-  { valor: 'agressao_verbal', rotulo: 'Agressão verbal', icone: 'chat-quote' },
-  { valor: 'agressao_fisica', rotulo: 'Agressão física', icone: 'hand-index' },
-  { valor: 'desacato', rotulo: 'Desacato', icone: 'person-fill-exclamation' },
-  { valor: 'dano_patrimonio', rotulo: 'Dano ao patrimônio', icone: 'building-dash' },
-  { valor: 'bullying', rotulo: 'Bullying', icone: 'people-fill' },
-  { valor: 'descumprimento_regras', rotulo: 'Descumprimento de regras', icone: 'file-earmark-x' },
-  { valor: 'saida_nao_autorizada', rotulo: 'Saída não autorizada', icone: 'door-open' },
-];
+const opcoesTags = Object.entries(TAGS_COMPORTAMENTO).map(([valor, info]) => ({
+  valor,
+  rotulo: info.rotulo,
+  icone: info.icone,
+}));
 
 const rotuloTipo = computed(() => {
   if (tipos.value.includes('suspensao')) return 'suspensão';

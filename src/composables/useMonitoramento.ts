@@ -1,5 +1,6 @@
 import { ref, type Ref } from 'vue';
 import { supabaseClient } from '@/servicos/supabase';
+import { comprimirImagem } from '@/utils/comprimirImagem';
 import type {
   Aluno,
   Frequencia,
@@ -30,9 +31,10 @@ function calcularNivelRisco(totalAusencias: number, totalOcorrencias: number): N
 
 function formatarData(iso: string): string {
   if (!iso) return '';
+  const partes = iso.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (partes) return `${partes[3]}/${partes[2]}/${partes[1]}`;
   try {
-    const data = new Date(iso);
-    return data.toLocaleDateString('pt-BR', {
+    return new Date(iso).toLocaleDateString('pt-BR', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
@@ -44,14 +46,12 @@ function formatarData(iso: string): string {
 
 function formatarDataHorario(iso: string): { data: string; horario: string } {
   if (!iso) return { data: '', horario: '' };
+  const partes = iso.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (partes) return { data: `${partes[3]}/${partes[2]}/${partes[1]}`, horario: '' };
   try {
     const d = new Date(iso);
     return {
-      data: d.toLocaleDateString('pt-BR', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-      }),
+      data: d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }),
       horario: d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
     };
   } catch {
@@ -499,18 +499,86 @@ export function useMonitoramento() {
       const { data: respData } = await supabaseClient.from('perfis').select('*').in('id', respIds);
       const responsaveis = (respData ?? []) as unknown as Perfil[];
 
-      return justificativas.map((j) => {
+      const justIds = justificativas.map((j) => j.id);
+      const { data: jaData } = await supabaseClient
+        .from('justificativa_anexos')
+        .select('justificativa_id, anexo_id')
+        .in('justificativa_id', justIds);
+
+      const jaList = (jaData ?? []) as unknown as Array<{
+        justificativa_id: string;
+        anexo_id: string;
+      }>;
+
+      const anexoIds = [...new Set(jaList.map((ja) => ja.anexo_id))];
+      const anexoMap = new Map<
+        string,
+        { nome_arquivo: string; storage_path: string; processado_em: string | null }
+      >();
+
+      if (anexoIds.length) {
+        const { data: anexosData } = await supabaseClient
+          .from('anexos')
+          .select('id, nome_arquivo, storage_path, processado_em')
+          .in('id', anexoIds);
+
+        const anexos = (anexosData ?? []) as unknown as Array<{
+          id: string;
+          nome_arquivo: string;
+          storage_path: string;
+          processado_em: string | null;
+        }>;
+        for (const a of anexos) {
+          anexoMap.set(a.id, a);
+        }
+      }
+
+      const justAnexoMap = new Map<
+        string,
+        { anexoId: string; nome: string; storagePath: string; processadoEm: string | null }
+      >();
+      for (const ja of jaList) {
+        const a = anexoMap.get(ja.anexo_id);
+        if (a) {
+          justAnexoMap.set(ja.justificativa_id, {
+            anexoId: ja.anexo_id,
+            nome: a.nome_arquivo,
+            storagePath: a.storage_path,
+            processadoEm: a.processado_em,
+          });
+        }
+      }
+
+      const result: JustificativaPendente[] = [];
+      for (const j of justificativas) {
         const aluno = alunos.find((a) => a.id === j.aluno_id);
         const responsavel = responsaveis.find((r) => r.id === j.responsavel_id);
-        return {
+        const anexo = justAnexoMap.get(j.id);
+
+        let anexoUrl: string | undefined;
+        if (anexo?.storagePath) {
+          const { data: signedData } = await supabaseClient.storage
+            .from('justificativas')
+            .createSignedUrl(anexo.storagePath, 3600);
+          anexoUrl = signedData?.signedUrl ?? undefined;
+        }
+
+        result.push({
           id: j.id,
           alunoNome: aluno?.nome ?? 'Aluno não encontrado',
           responsavelNome: responsavel?.nome ?? 'Responsável não vinculado',
           dataAusencia: formatarData(j.data_falta),
+          dataFim: j.data_fim ? formatarData(j.data_fim) : null,
           motivo: j.motivo,
+          anexoUrl,
+          anexoNome: anexo?.nome,
+          anexoId: anexo?.anexoId ?? undefined,
+          processadoEm: anexo?.processadoEm ?? undefined,
           status: j.status as JustificativaPendente['status'],
-        };
-      });
+        });
+      }
+
+      return result;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       console.error('[useMonitoramento] Erro ao buscar justificativas:', msg);
@@ -524,18 +592,48 @@ export function useMonitoramento() {
   async function validarJustificativa(
     justificativaId: string,
     acao: 'aceitar' | 'recusar',
+    gestaoId?: string,
   ): Promise<boolean> {
     try {
       const status = acao === 'aceitar' ? 'aceita' : 'recusada';
+      const updateData: Record<string, unknown> = {
+        status,
+        avaliado_em: new Date().toISOString(),
+      };
+      if (gestaoId) updateData.avaliado_por = gestaoId;
+
       const { error: err } = await supabaseClient
         .from('justificativas_faltas')
-        .update({
-          status,
-          avaliado_em: new Date().toISOString(),
-        })
+        .update(updateData)
         .eq('id', justificativaId);
 
       if (err) throw err;
+
+      if (acao === 'aceitar') {
+        const { data: justData } = await supabaseClient
+          .from('justificativas_faltas')
+          .select('aluno_id, data_falta, data_fim')
+          .eq('id', justificativaId)
+          .single();
+
+        if (justData) {
+          const j = justData as unknown as {
+            aluno_id: string;
+            data_falta: string;
+            data_fim: string | null;
+          };
+          const dataFim = j.data_fim ?? j.data_falta;
+
+          await supabaseClient
+            .from('frequencias')
+            .update({ status: 'justificado' })
+            .eq('aluno_id', j.aluno_id)
+            .eq('status', 'ausente')
+            .gte('data_aula', j.data_falta)
+            .lte('data_aula', dataFim);
+        }
+      }
+
       return true;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -698,6 +796,76 @@ export function useMonitoramento() {
       const filhos = await buscarFilhosDoResponsavel(responsavelId);
       if (!filhos.length) return [];
 
+      const alunoIds = filhos.map((f) => f.id);
+      const { data: justsData } = await supabaseClient
+        .from('justificativas_faltas')
+        .select('id, aluno_id, data_falta, data_fim, status, motivo')
+        .in('aluno_id', alunoIds)
+        .in('status', ['pendente', 'aceita', 'recusada']);
+
+      const justs = (justsData ?? []) as unknown as Array<{
+        id: string;
+        aluno_id: string;
+        data_falta: string;
+        data_fim: string | null;
+        status: string;
+        motivo: string;
+      }>;
+
+      const justMap = new Map<string, { status: string; motivo: string }>();
+      for (const j of justs) {
+        const start = new Date(j.data_falta);
+        const end = new Date(j.data_fim ?? j.data_falta);
+        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+          justMap.set(`${j.aluno_id}:${d.toISOString().slice(0, 10)}`, {
+            status: j.status,
+            motivo: j.motivo,
+          });
+        }
+      }
+
+      const justIds = justs.map((j) => j.id).filter(Boolean);
+      const { data: jaData } = await supabaseClient
+        .from('justificativa_anexos')
+        .select('justificativa_id, anexo_id')
+        .in('justificativa_id', justIds as string[]);
+      const jaList = (jaData ?? []) as unknown as Array<{
+        justificativa_id: string;
+        anexo_id: string;
+      }>;
+
+      const anexoIds = [...new Set(jaList.map((ja) => ja.anexo_id))];
+      const { data: anexosData } = await supabaseClient
+        .from('anexos')
+        .select('id, nome_arquivo, storage_path')
+        .in('id', anexoIds);
+      const anexos = (anexosData ?? []) as unknown as Array<{
+        id: string;
+        nome_arquivo: string;
+        storage_path: string;
+      }>;
+      const anexoMap = new Map(anexos.map((a) => [a.id, a]));
+
+      const anexoPorJustKey = new Map<string, { nome: string; anexoUrl: string }>();
+      for (const ja of jaList) {
+        const j = justs.find((x) => x.id === ja.justificativa_id);
+        if (!j) continue;
+        const a = anexoMap.get(ja.anexo_id);
+        if (!a?.storage_path) continue;
+        const { data: signedData } = await supabaseClient.storage
+          .from('justificativas')
+          .createSignedUrl(a.storage_path, 7200);
+        if (!signedData?.signedUrl) continue;
+        const start = new Date(j.data_falta);
+        const end = new Date(j.data_fim ?? j.data_falta);
+        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+          anexoPorJustKey.set(`${j.aluno_id}:${d.toISOString().slice(0, 10)}`, {
+            nome: a.nome_arquivo,
+            anexoUrl: signedData.signedUrl,
+          });
+        }
+      }
+
       const alertas: AlertaResponsavel[] = [];
 
       for (const filho of filhos) {
@@ -706,20 +874,43 @@ export function useMonitoramento() {
           .select('*')
           .eq('aluno_id', filho.id)
           .eq('status', 'ausente')
-          .order('data_aula', { ascending: false })
-          .limit(5);
+          .order('data_aula', { ascending: false });
 
         const ausencias = (freqs ?? []) as unknown as Frequencia[];
         for (const aus of ausencias) {
           const { data: dataFormatada } = formatarDataHorario(aus.data_aula);
+          const justKey = `${filho.id}:${aus.data_aula}`;
+          const justInfo = justMap.get(justKey);
+          const anexoInfo = anexoPorJustKey.get(justKey);
+
+          let descricao = 'Sem justificativa enviada.';
+          let justificativaStatus: AlertaResponsavel['justificativaStatus'] | undefined;
+          let justificativaMotivo: string | undefined;
+
+          if (justInfo) {
+            justificativaStatus = justInfo.status as AlertaResponsavel['justificativaStatus'];
+            justificativaMotivo = justInfo.motivo;
+            descricao =
+              justInfo.status === 'aceita'
+                ? 'Justificativa aceita.'
+                : justInfo.status === 'recusada'
+                  ? 'Justificativa recusada.'
+                  : 'Justificativa enviada — aguardando validação.';
+          }
+
           alertas.push({
             id: `freq-${aus.id}`,
             tipo:
               aus.periodo === 'Dia completo' || !aus.periodo ? 'ausencia_escola' : 'ausencia_aula',
-            titulo: `Falta registrada — ${filho.nome}`,
-            descricao: 'Sem justificativa enviada.',
+            titulo: filho.nome,
+            descricao,
             data: dataFormatada,
             periodo: aus.periodo,
+            frequenciaId: aus.id,
+            justificativaStatus,
+            justificativaMotivo,
+            anexoUrl: anexoInfo?.anexoUrl,
+            anexoNome: anexoInfo?.nome,
             urgente: false,
           });
         }
@@ -728,8 +919,7 @@ export function useMonitoramento() {
           .from('ocorrencias')
           .select('*')
           .eq('aluno_id', filho.id)
-          .order('created_at', { ascending: false })
-          .limit(5);
+          .order('created_at', { ascending: false });
 
         const ocorrencias = (ocos ?? []) as unknown as Ocorrencia[];
         for (const oc of ocorrencias) {
@@ -737,11 +927,12 @@ export function useMonitoramento() {
           alertas.push({
             id: `oc-${oc.id}`,
             tipo: oc.tipo.includes('suspensao') ? 'suspensao' : 'comunicado',
-            titulo: oc.tipo.includes('suspensao')
-              ? `Suspensão — ${filho.nome}`
-              : `Ocorrência grave — ${filho.nome}`,
+            titulo: filho.nome,
             descricao: oc.descricao,
             data: dataFormatada,
+            ocorrenciaTipo: oc.tipo,
+            tagsComportamento: oc.tags_comportamento ?? [],
+            exigePresencaResponsavel: oc.exige_presenca_responsavel,
             urgente: oc.exige_presenca_responsavel,
           });
         }
@@ -758,32 +949,77 @@ export function useMonitoramento() {
 
   async function enviarJustificativa(
     alunoId: string,
-    _professorId: string,
-    dataAusencia: string,
-    motivo: string,
-    _arquivo: File | null,
     responsavelId: string,
-  ): Promise<boolean> {
-    carregando.value = true;
+    dataInicio: string,
+    dataFim: string | null,
+    motivo: string,
+  ): Promise<{ success: boolean; justificativaId: string | null }> {
     erro.value = null;
     try {
-      const { error: err } = await supabaseClient.from('justificativas_faltas').insert({
+      const dataFimNormalized = dataFim && dataFim.trim() ? dataFim : null;
+      const justificativaId = crypto.randomUUID();
+      const { error: justErr } = await supabaseClient.from('justificativas_faltas').insert({
+        id: justificativaId,
         aluno_id: alunoId,
         responsavel_id: responsavelId,
-        data_falta: dataAusencia,
+        data_falta: dataInicio,
+        data_fim: dataFimNormalized,
         motivo,
       });
 
-      if (err) throw err;
-      return true;
+      if (justErr) throw justErr;
+      return { success: true, justificativaId };
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       console.error('[useMonitoramento] Erro ao enviar justificativa:', msg);
       erro.value = 'Falha ao enviar justificativa. Tente novamente.';
-      return false;
-    } finally {
-      carregando.value = false;
+      return { success: false, justificativaId: null };
     }
+  }
+
+  function processarAnexoAsync(justificativaId: string, responsavelId: string, arquivo: File) {
+    const edgeFunctionUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/processar-anexo`;
+    const ext = arquivo.type === 'image/jpeg' ? 'jpg' : (arquivo.name.split('.').pop() ?? 'bin');
+    const storagePath = `${responsavelId}/${justificativaId}/${Date.now()}-${justificativaId.slice(0, 8)}.${ext}`;
+
+    comprimirImagem(arquivo)
+      .then(({ blob, mimeType, tamanhoComprimido }) =>
+        supabaseClient.storage
+          .from('justificativas')
+          .upload(storagePath, blob, { contentType: mimeType, upsert: false })
+          .then(() => ({ blob, mimeType, tamanhoComprimido })),
+      )
+      .then(({ mimeType, tamanhoComprimido }) => {
+        const anexoId = crypto.randomUUID();
+        return supabaseClient
+          .from('anexos')
+          .insert({
+            id: anexoId,
+            storage_path: storagePath,
+            nome_arquivo: arquivo.name,
+            mime_type: mimeType,
+            tamanho_bytes: tamanhoComprimido,
+            criado_por: responsavelId,
+          })
+          .then(() => anexoId);
+      })
+      .then((anexoId) =>
+        supabaseClient
+          .from('justificativa_anexos')
+          .insert({
+            justificativa_id: justificativaId,
+            anexo_id: anexoId,
+          })
+          .then(() => anexoId),
+      )
+      .then((anexoId) => {
+        fetch(edgeFunctionUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ storagePath, mimeType: arquivo.type, anexoId }),
+        }).catch(() => {});
+      })
+      .catch((e) => console.error('[useMonitoramento] Anexo async processing failed:', e));
   }
 
   async function buscarMensagensChat(_responsavelId: string): Promise<MensagemChat[]> {
@@ -829,6 +1065,7 @@ export function useMonitoramento() {
     buscarTermometroAluno,
     buscarAlertasResponsavel,
     enviarJustificativa,
+    processarAnexoAsync,
     buscarMensagensChat,
     horarioProtegidoAtivo,
     obterHorarioProtegido,

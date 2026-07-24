@@ -1,30 +1,52 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import CampoFormulario from '@/componentes/CampoFormulario.vue';
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     alunoNome?: string;
     alunoTurma?: string;
     enviando?: boolean;
+    dataPreenchida?: string;
+    dataDesabilitada?: boolean;
   }>(),
   {
     alunoNome: '',
     alunoTurma: '',
     enviando: false,
+    dataPreenchida: '',
+    dataDesabilitada: false,
   },
 );
 
 const router = useRouter();
 const emit = defineEmits<{
-  enviar: [payload: { motivo: string; dataAusencia: string; arquivo: File | null }];
+  enviar: [payload: { motivo: string; dataInicio: string; dataFim: string; arquivo: File | null }];
 }>();
 
 const motivo = ref('');
-const dataAusencia = ref('');
+const dataInicio = ref(props.dataPreenchida);
+const dataFim = ref(props.dataPreenchida);
 const arquivo = ref<File | null>(null);
 const erroValidacao = ref<string | null>(null);
+const multiplosDias = ref(false);
+
+watch(
+  () => props.dataPreenchida,
+  (nova) => {
+    if (nova) {
+      dataInicio.value = nova;
+      dataFim.value = nova;
+    }
+  },
+);
+
+watch(multiplosDias, (ativo) => {
+  if (!ativo) {
+    dataFim.value = dataInicio.value;
+  }
+});
 
 const nomeArquivo = computed(() => (arquivo.value ? arquivo.value.name : ''));
 const contadorMotivo = computed(() => motivo.value.length);
@@ -40,8 +62,8 @@ function aoSelecionarArquivo(event: Event) {
   if (alvo.files && alvo.files.length > 0) {
     const file = alvo.files[0];
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
-      erroValidacao.value = 'O arquivo é maior que 5 MB. Envie uma imagem menor.';
+    if (file.size > 10 * 1024 * 1024) {
+      erroValidacao.value = 'O arquivo é maior que 10 MB. Envie um arquivo menor.';
       arquivo.value = null;
       alvo.value = '';
       return;
@@ -62,19 +84,20 @@ function submeter() {
     erroValidacao.value = 'Descreva o motivo da ausência.';
     return;
   }
-  if (!dataAusencia.value) {
+  if (!dataInicio.value) {
     erroValidacao.value = 'Informe a data da ausência.';
     return;
+  }
+  if (!dataFim.value) {
+    dataFim.value = dataInicio.value;
   }
   erroValidacao.value = null;
   emit('enviar', {
     motivo: motivo.value.trim(),
-    dataAusencia: dataAusencia.value,
+    dataInicio: dataInicio.value,
+    dataFim: dataFim.value,
     arquivo: arquivo.value,
   });
-  motivo.value = '';
-  dataAusencia.value = '';
-  limparArquivo();
 }
 </script>
 
@@ -97,15 +120,39 @@ function submeter() {
       <span>{{ erroValidacao }}</span>
     </div>
 
-    <CampoFormulario id="dataAusencia" label="Data da ausência" :obrigatorio="true">
+    <CampoFormulario id="dataInicio" label="Data da ausência" :obrigatorio="true">
       <input
-        id="dataAusencia"
-        v-model="dataAusencia"
+        id="dataInicio"
+        v-model="dataInicio"
         type="date"
         class="form-control form-control-sm"
-        :class="{ 'is-invalid': erroValidacao && !dataAusencia }"
-        :disabled="enviando"
+        :class="{ 'is-invalid': erroValidacao && !dataInicio }"
+        :disabled="enviando || dataDesabilitada"
         required
+      />
+    </CampoFormulario>
+
+    <div class="form-check mb-3">
+      <input
+        id="chkMultiplosDias"
+        v-model="multiplosDias"
+        type="checkbox"
+        class="form-check-input"
+        :disabled="enviando || dataDesabilitada"
+      />
+      <label class="form-check-label small" for="chkMultiplosDias">
+        Justificativa para múltiplos dias
+      </label>
+    </div>
+
+    <CampoFormulario v-if="multiplosDias" id="dataFim" label="Data final">
+      <input
+        id="dataFim"
+        v-model="dataFim"
+        type="date"
+        class="form-control form-control-sm"
+        :min="dataInicio"
+        :disabled="enviando || dataDesabilitada"
       />
     </CampoFormulario>
 
@@ -153,7 +200,7 @@ function submeter() {
           :disabled="enviando"
           @change="aoSelecionarArquivo"
         />
-        <small class="d-block mt-2">Aceita imagem ou PDF até 5 MB.</small>
+        <small class="d-block mt-2">Aceita imagem ou PDF até 10 MB.</small>
       </div>
 
       <div v-else class="alert alert-success d-flex align-items-center gap-2 mb-0 py-2 small">
@@ -175,18 +222,17 @@ function submeter() {
     </div>
 
     <div class="d-flex gap-2 justify-content-end">
-      <button type="button" class="btn btn-sm btn-outline-secondary" @click="router.back()">
+      <button
+        type="button"
+        class="btn btn-sm btn-outline-secondary"
+        :disabled="enviando"
+        @click="router.back()"
+      >
         Cancelar
       </button>
       <button type="submit" class="btn btn-sm btn-success" :disabled="enviando">
-        <span
-          v-if="enviando"
-          class="spinner-border spinner-border-sm me-1"
-          role="status"
-          aria-hidden="true"
-        ></span>
-        <i v-else class="bi bi-send me-1" aria-hidden="true"></i>
-        {{ enviando ? 'Enviando...' : 'Enviar' }}
+        <i class="bi bi-send me-1" aria-hidden="true"></i>
+        Enviar
       </button>
     </div>
   </form>

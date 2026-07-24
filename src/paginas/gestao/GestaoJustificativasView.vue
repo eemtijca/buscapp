@@ -3,11 +3,13 @@ import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useMonitoramento } from '@/composables/useMonitoramento';
 import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh';
+import { useAutenticacao } from '@/composables/useAutenticacao';
 import { supabaseClient } from '@/servicos/supabase';
 import FilaJustificativas from '@/componentes/FilaJustificativas.vue';
 import type { JustificativaPendente } from '@/tipos/componentes';
 
 const router = useRouter();
+const { usuario } = useAutenticacao();
 const { buscarJustificativasPendentes, validarJustificativa } = useMonitoramento();
 const {
   ultimaAtualizacao,
@@ -47,27 +49,21 @@ function verAnexoJustificativa(justId: string) {
 }
 
 async function aceitarJustificativa(justId: string) {
-  const ok = await validarJustificativa(justId, 'aceitar');
+  const ok = await validarJustificativa(justId, 'aceitar', usuario.value?.id);
   if (ok) {
     const j = justificativas.value.find((x) => x.id === justId);
-    if (j) {
-      j.status = 'aceita';
-      j.motivo = '[ACEITA] ' + j.motivo;
-    }
-    mostrarSucesso('Justificativa aceita.');
+    if (j) j.status = 'aceita';
+    mostrarSucesso('Justificativa aceita. Frequências atualizadas.');
   } else {
     mostrarErro('Falha ao aceitar justificativa.');
   }
 }
 
 async function recusarJustificativa(justId: string) {
-  const ok = await validarJustificativa(justId, 'recusar');
+  const ok = await validarJustificativa(justId, 'recusar', usuario.value?.id);
   if (ok) {
     const j = justificativas.value.find((x) => x.id === justId);
-    if (j) {
-      j.status = 'recusada';
-      j.motivo = '[RECUSADA] ' + j.motivo;
-    }
+    if (j) j.status = 'recusada';
     mostrarSucesso('Justificativa recusada.');
   } else {
     mostrarErro('Falha ao recusar justificativa.');
@@ -76,13 +72,7 @@ async function recusarJustificativa(justId: string) {
 
 async function processarJustificativas() {
   const j = await buscarJustificativasPendentes();
-  justificativas.value = j.map((just) => {
-    const texto = just.motivo ?? '';
-    let status: JustificativaPendente['status'] = 'pendente';
-    if (texto.startsWith('[ACEITA]')) status = 'aceita';
-    else if (texto.startsWith('[RECUSADA]')) status = 'recusada';
-    return { ...just, status };
-  });
+  justificativas.value = j;
 }
 
 async function atualizarManual() {

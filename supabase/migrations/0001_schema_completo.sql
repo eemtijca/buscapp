@@ -363,7 +363,8 @@ create table public.anexos (
   expurgado_em    timestamptz,
   created_at      timestamptz   not null default now(),
   updated_at      timestamptz   not null default now(),
-  constraint chk_anexo_tamanho check (tamanho_bytes <= 153600)
+  processado_em    timestamptz,
+  constraint chk_anexo_tamanho check (tamanho_bytes <= 10485760)
 );
 
 comment on table public.anexos is 'RNF04/RNF07: Metadados de arquivos no Storage. expurgo_em = created_at + 30 dias. Limite de 150KB.';
@@ -387,6 +388,7 @@ create table public.justificativas_faltas (
   aluno_id        uuid                not null references public.alunos(id) on delete cascade,
   frequencia_id   uuid                references public.frequencias(id) on delete set null,
   data_falta      date                not null,
+  data_fim        date,
   motivo          text                not null,
   status          status_justificativa not null default 'pendente',
   avaliado_por    uuid                references public.perfis(id) on delete set null,
@@ -1187,10 +1189,10 @@ create policy "Anexos: gestao tudo"
   using (public.get_user_papel() = 'gestao')
   with check (public.get_user_papel() = 'gestao');
 
-create policy "Anexos: criador ve"
+create policy "Anexos: gestao ve"
   on public.anexos for select
   to authenticated
-  using (criado_por = auth.uid());
+  using (public.get_user_papel() = 'gestao');
 
 create policy "Anexos: cria proprio"
   on public.anexos for insert
@@ -1273,22 +1275,22 @@ create policy "JustAnexos: gestao tudo"
   using (public.get_user_papel() = 'gestao')
   with check (public.get_user_papel() = 'gestao');
 
-create policy "JustAnexos: leitura vinculada"
-  on public.justificativa_anexos for select
+create policy "JustAnexos: responsavel insere"
+  on public.justificativa_anexos for insert
   to authenticated
-  using (
-    exists (
+  with check (
+    public.get_user_papel() = 'responsavel'
+    and exists (
       select 1 from public.justificativas_faltas j
       where j.id = justificativa_id
-        and (j.responsavel_id = auth.uid()
-          or public.get_user_papel() = 'gestao'
-          or exists (
-            select 1 from public.frequencias f
-            where f.id = j.frequencia_id
-              and public.is_professor_da_turma(f.turma_id)
-          ))
+        and j.responsavel_id = auth.uid()
     )
   );
+
+create policy "JustAnexos: gestao le"
+  on public.justificativa_anexos for select
+  to authenticated
+  using (public.get_user_papel() = 'gestao');
 
 -- ============================================================================
 -- 18.20 CONVERSAS
@@ -2302,3 +2304,100 @@ from public.ocorrencias o
 order by data_evento desc, created_at desc;
 
 comment on view public.v_feed_aluno is 'RF22: Timeline unificada do aluno. Consolida frequências, comportamentos e ocorrências.';
+
+-- ============================================================================
+-- Storage: justificativas bucket
+-- ============================================================================
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'justificativas',
+  'justificativas',
+  false,
+  10485760,
+  array['image/jpeg', 'image/png', 'image/webp', 'application/pdf']
+)
+on conflict (id) do nothing;
+
+create policy "JustBucket: gestao tudo"
+  on storage.objects for all
+  to authenticated
+  using (bucket_id = 'justificativas' and public.get_user_papel() = 'gestao')
+  with check (bucket_id = 'justificativas' and public.get_user_papel() = 'gestao');
+
+create policy "JustBucket: responsavel insere proprio"
+  on storage.objects for insert
+  to authenticated
+  with check (
+    bucket_id = 'justificativas'
+    and public.get_user_papel() = 'responsavel'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+create policy "JustBucket: responsavel le proprio"
+  on storage.objects for select
+  to authenticated
+  using (
+    bucket_id = 'justificativas'
+    and public.get_user_papel() = 'responsavel'
+    and owner_id = auth.uid()::text
+  );
+
+create policy "JustBucket: gestao update"
+  on storage.objects for update
+  to authenticated
+  using (bucket_id = 'justificativas' and public.get_user_papel() = 'gestao')
+  with check (bucket_id = 'justificativas' and public.get_user_papel() = 'gestao');
+
+-- ============================================================================
+-- RLS: Guardian attachment read access
+-- ============================================================================
+
+create policy "JustAnexos: responsavel le proprio"
+  on public.justificativa_anexos for select
+  to authenticated
+  using (
+    public.get_user_papel() = 'responsavel'
+    and exists (
+      select 1 from public.justificativas_faltas j
+      where j.id = justificativa_id
+        and j.responsavel_id = auth.uid()
+    )
+  );
+
+create policy "Anexos: responsavel le proprio"
+  on public.anexos for select
+  to authenticated
+  using (
+    public.get_user_papel() = 'responsavel'
+    and criado_por = auth.uid()
+  );
+
+-- ============================================================================
+-- Trigger: auto-justify frequencies on justification acceptance
+-- ============================================================================
+
+create or replace function public.fn_auto_justificar_frequencias()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if new.status = 'aceita' and old.status = 'pendente' then
+    update public.frequencias
+    set status = 'justificado'
+    where aluno_id = new.aluno_id
+      and status = 'ausente'
+      and data_aula >= new.data_falta
+      and data_aula <= coalesce(new.data_fim, new.data_falta)
+      and deleted_at is null;
+  end if;
+  return new;
+end;
+$$;
+
+create trigger trg_auto_justificar_frequencias
+  after update of status on public.justificativas_faltas
+  for each row
+  when (new.status = 'aceita' and old.status = 'pendente')
+  execute function public.fn_auto_justificar_frequencias();

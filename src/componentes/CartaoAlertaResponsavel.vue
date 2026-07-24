@@ -8,7 +8,8 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'ver-detalhes': [alertaId: string];
-  'enviar-justificativa': [alertaId: string];
+  'enviar-justificativa': [{ alertaId: string; frequenciaId?: string }];
+  'ver-anexo': [anexoUrl: string];
 }>();
 
 const configTipo: Record<
@@ -74,6 +75,12 @@ const classeBordaEspecifica = computed(() => {
       <div class="min-w-0 flex-grow-1">
         <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
           <span class="badge" :class="config.classe">{{ config.rotulo }}</span>
+          <span v-if="alerta.justificativaStatus === 'aceita'" class="badge text-bg-success">
+            <i class="bi bi-check-circle me-1" aria-hidden="true"></i>Justificativa aceita
+          </span>
+          <span v-else-if="alerta.justificativaStatus === 'pendente'" class="badge text-bg-info">
+            <i class="bi bi-clock me-1" aria-hidden="true"></i>Aguardando validação
+          </span>
           <span v-if="alerta.urgente" class="badge text-bg-danger-subtle text-danger-emphasis">
             <i class="bi bi-exclamation-circle me-1" aria-hidden="true"></i>Urgente
           </span>
@@ -95,13 +102,33 @@ const classeBordaEspecifica = computed(() => {
             Ver detalhes
           </button>
           <button
-            v-if="alerta.tipo === 'ausencia_escola' || alerta.tipo === 'ausencia_aula'"
+            v-if="
+              !alerta.justificativaStatus &&
+              (alerta.tipo === 'ausencia_escola' || alerta.tipo === 'ausencia_aula')
+            "
             type="button"
             class="btn btn-sm btn-success"
-            @click="emit('enviar-justificativa', alerta.id)"
+            @click="
+              emit('enviar-justificativa', {
+                alertaId: alerta.id,
+                frequenciaId: alerta.frequenciaId,
+              })
+            "
           >
             <i class="bi bi-paperclip me-1" aria-hidden="true"></i>
             Enviar justificativa
+          </button>
+          <button
+            v-if="alerta.anexoUrl"
+            type="button"
+            class="btn btn-sm btn-outline-secondary"
+            @click="emit('ver-anexo', alerta.anexoUrl!)"
+          >
+            <i class="bi bi-paperclip me-1" aria-hidden="true"></i>
+            Ver anexo
+            <span v-if="alerta.anexoNome" class="text-body-secondary"
+              >({{ alerta.anexoNome }})</span
+            >
           </button>
         </div>
       </div>

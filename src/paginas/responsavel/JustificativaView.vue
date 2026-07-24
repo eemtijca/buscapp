@@ -1,24 +1,31 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRouter, useRoute } from 'vue-router';
 import { useAutenticacao } from '@/composables/useAutenticacao';
 import { useMonitoramento } from '@/composables/useMonitoramento';
+import { supabaseClient } from '@/servicos/supabase';
 import FormularioJustificativa from '@/componentes/FormularioJustificativa.vue';
 import type { Aluno } from '@/tipos/database';
 
 const router = useRouter();
+const route = useRoute();
 const { usuario } = useAutenticacao();
-const { buscarFilhosDoResponsavel, enviarJustificativa } = useMonitoramento();
+const { buscarFilhosDoResponsavel, enviarJustificativa, processarAnexoAsync } = useMonitoramento();
 
 const filhos = ref<Aluno[]>([]);
 const filhoSelecionado = ref<Aluno | null>(null);
 const enviando = ref(false);
 const mensagemSucesso = ref<string | null>(null);
 const mensagemErro = ref<string | null>(null);
+const dataPrefill = ref('');
+const formKey = ref(0);
+const dataDesabilitada = ref(false);
+const detalhesAusencia = ref<string | null>(null);
 
 async function handleEnviarJustificativa(payload: {
   motivo: string;
-  dataAusencia: string;
+  dataInicio: string;
+  dataFim: string;
   arquivo: File | null;
 }) {
   if (!usuario.value || !filhoSelecionado.value) {
@@ -26,29 +33,51 @@ async function handleEnviarJustificativa(payload: {
     return;
   }
   enviando.value = true;
-  try {
-    const ok = await enviarJustificativa(
-      filhoSelecionado.value.id,
-      usuario.value.id,
-      payload.dataAusencia,
-      payload.motivo,
-      payload.arquivo,
-      usuario.value.id,
-    );
-    if (ok) {
-      mensagemSucesso.value = 'Justificativa enviada com sucesso.';
-      setTimeout(() => router.back(), 1500);
-    } else {
-      mensagemErro.value = 'Falha ao enviar justificativa. Tente novamente.';
+
+  const result = await enviarJustificativa(
+    filhoSelecionado.value.id,
+    usuario.value.id,
+    payload.dataInicio,
+    payload.dataFim,
+    payload.motivo,
+  );
+
+  if (result.success) {
+    mensagemSucesso.value = 'Justificativa enviada com sucesso.';
+    formKey.value++;
+    if (payload.arquivo && result.justificativaId) {
+      processarAnexoAsync(result.justificativaId, usuario.value.id, payload.arquivo);
     }
-  } finally {
-    enviando.value = false;
+  } else {
+    mensagemErro.value = 'Falha ao enviar justificativa. Tente novamente.';
   }
+  enviando.value = false;
 }
 
 onMounted(async () => {
-  if (usuario.value) {
-    filhos.value = await buscarFilhosDoResponsavel(usuario.value.id);
+  if (!usuario.value) return;
+
+  const frequenciaId = route.query.frequenciaId as string | undefined;
+  filhos.value = await buscarFilhosDoResponsavel(usuario.value.id);
+
+  if (frequenciaId) {
+    const { data: freqData } = await supabaseClient
+      .from('frequencias')
+      .select('aluno_id, data_aula, periodo')
+      .eq('id', frequenciaId)
+      .single();
+
+    if (freqData) {
+      const f = freqData as unknown as { aluno_id: string; data_aula: string; periodo: string };
+      dataPrefill.value = f.data_aula;
+      dataDesabilitada.value = !!f.data_aula;
+      const aluno = filhos.value.find((a) => a.id === f.aluno_id);
+      if (aluno) filhoSelecionado.value = aluno;
+      detalhesAusencia.value = `Período: ${f.periodo}`;
+    }
+  }
+
+  if (!filhoSelecionado.value) {
     filhoSelecionado.value = filhos.value[0] || null;
   }
 });
@@ -90,12 +119,20 @@ onMounted(async () => {
       {{ mensagemErro }}
     </div>
 
+    <div v-if="detalhesAusencia" class="alert alert-info py-2 small mb-3">
+      <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
+      Justificativa vinculada a uma falta registrada. {{ detalhesAusencia }}
+    </div>
+
     <div class="card border">
       <div class="card-body">
         <FormularioJustificativa
+          :key="formKey"
           :aluno-nome="filhoSelecionado?.nome || ''"
           :aluno-turma="''"
           :enviando="enviando"
+          :data-preenchida="dataPrefill"
+          :data-desabilitada="dataDesabilitada"
           @enviar="handleEnviarJustificativa"
         />
       </div>

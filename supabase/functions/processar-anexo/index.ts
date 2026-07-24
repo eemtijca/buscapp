@@ -47,7 +47,8 @@ Deno.serve(async (req) => {
       .download(path)
 
     if (dlError || !fileData) {
-      throw new Error(`Download failed: ${dlError?.message ?? 'no data'}`)
+      console.error('Download failed:', dlError?.message ?? 'no data')
+      throw new Error('Download failed')
     }
 
     const originalBytes = new Uint8Array(await fileData.arrayBuffer())
@@ -99,7 +100,8 @@ Deno.serve(async (req) => {
       })
 
     if (upError) {
-      throw new Error(`Upload failed: ${upError.message}`)
+      console.error('Upload failed:', upError.message)
+      throw new Error('Upload failed')
     }
 
     const compressedSize = processedBytes.length
@@ -130,7 +132,7 @@ Deno.serve(async (req) => {
   } catch (err) {
     console.error('processar-anexo error:', err)
     return new Response(
-      JSON.stringify({ success: false, error: err instanceof Error ? err.message : String(err) }),
+      JSON.stringify({ success: false, error: 'Erro interno ao processar anexo.' }),
       { status: 500, headers: { 'Content-Type': 'application/json' } },
     )
   }

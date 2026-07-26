@@ -87,10 +87,7 @@ async function marcarTodasComoLidas() {
 
 async function limparTodas() {
   if (!usuarioId) return;
-  await supabaseClient
-    .from('notificacoes')
-    .delete()
-    .eq('destinatario_id', usuarioId);
+  await supabaseClient.from('notificacoes').delete().eq('destinatario_id', usuarioId);
   await carregar();
 }
 

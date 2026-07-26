@@ -37,19 +37,15 @@ const rotaInicio = () => {
 };
 
 const papelChat = () => {
-  if (usuario.value?.papel === 'gestao' || usuario.value?.papel === 'responsavel') return usuario.value.papel;
+  if (usuario.value?.papel === 'gestao' || usuario.value?.papel === 'responsavel')
+    return usuario.value.papel;
   return null;
 };
 </script>
 
 <template>
   <div class="d-flex flex-column overflow-hidden" style="height: 100dvh">
-    <CabecalhoNavegacao
-      variante="dashboard"
-      :itens="[]"
-      marca="BuscApp"
-      :rotaMarca="rotaInicio()"
-    >
+    <CabecalhoNavegacao variante="dashboard" :itens="[]" marca="BuscApp" :rotaMarca="rotaInicio()">
       <template #usuario>
         <!-- Chat button (apenas responsavel e gestao) -->
         <router-link

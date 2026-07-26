@@ -7,11 +7,7 @@ import type { UsuarioItem } from '@/tipos/componentes';
 
 const router = useRouter();
 const { buscarUsuarios, ativarUsuario, desativarUsuario, carregando } = useGestaoUsuarios();
-const {
-  ultimaAtualizacao,
-  estaAtualizando,
-  atualizar: refresh,
-} = useRealtimeRefresh();
+const { ultimaAtualizacao, estaAtualizando, atualizar: refresh } = useRealtimeRefresh();
 
 const usuarios = ref<UsuarioItem[]>([]);
 const busca = ref('');
@@ -19,8 +15,6 @@ const filtroPapel = ref<'todos' | 'professor' | 'responsavel'>('todos');
 const filtroStatus = ref<'todos' | 'ativo' | 'pendente' | 'inativo'>('todos');
 const mensagemSucesso = ref<string | null>(null);
 const mensagemErro = ref<string | null>(null);
-
-
 
 function mostrarSucesso(msg: string) {
   mensagemSucesso.value = msg;
@@ -146,10 +140,7 @@ onMounted(async () => {
           <i v-else class="bi bi-arrow-clockwise me-1" aria-hidden="true"></i>
           Atualizar
         </button>
-        <span
-          class="rounded-circle d-inline-block"
-          style="width: 8px; height: 8px"
-        ></span>
+        <span class="rounded-circle d-inline-block" style="width: 8px; height: 8px"></span>
       </div>
     </div>
 

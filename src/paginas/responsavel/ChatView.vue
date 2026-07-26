@@ -42,7 +42,10 @@ async function carregarContatos() {
   }
   carregandoContatos.value = false;
 
-  if (conversaAtivaId.value && !contatos.value.find(c => c.conversaId === conversaAtivaId.value)) {
+  if (
+    conversaAtivaId.value &&
+    !contatos.value.find((c) => c.conversaId === conversaAtivaId.value)
+  ) {
     conversaAtivaId.value = null;
     contatoAtivo.value = null;
     mensagens.value = [];
@@ -85,7 +88,7 @@ async function handleEnviarMensagem(texto: string) {
 }
 
 function mergeMensagens(novas: MensagemChat[]) {
-  const existentes = new Set(mensagens.value.map(m => m.id));
+  const existentes = new Set(mensagens.value.map((m) => m.id));
   for (const msg of novas) {
     if (!existentes.has(msg.id)) {
       mensagens.value.push(msg);
@@ -100,25 +103,33 @@ function inscreverCanalMensagens(conversaId: string) {
 
   canalMensagens = supabaseClient
     .channel(`chat-msg-${conversaId}`)
-    .on('postgres_changes', {
-      event: 'INSERT',
-      schema: 'public',
-      table: 'mensagens',
-      filter: `conversa_id=eq.${conversaId}`,
-    }, async () => {
-      if (!usuario.value) return;
-      const det = await buscarConversaDetalhe(conversaId, usuario.value.id);
-      mergeMensagens(det.mensagens);
-    })
-    .on('postgres_changes', {
-      event: 'UPDATE',
-      schema: 'public',
-      table: 'mensagens',
-      filter: `conversa_id=eq.${conversaId}`,
-    }, (payload) => {
-      const msg = mensagens.value.find(m => m.id === payload.new.id);
-      if (msg) msg.lida = payload.new.lida_em !== null;
-    })
+    .on(
+      'postgres_changes',
+      {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'mensagens',
+        filter: `conversa_id=eq.${conversaId}`,
+      },
+      async () => {
+        if (!usuario.value) return;
+        const det = await buscarConversaDetalhe(conversaId, usuario.value.id);
+        mergeMensagens(det.mensagens);
+      },
+    )
+    .on(
+      'postgres_changes',
+      {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'mensagens',
+        filter: `conversa_id=eq.${conversaId}`,
+      },
+      (payload) => {
+        const msg = mensagens.value.find((m) => m.id === payload.new.id);
+        if (msg) msg.lida = payload.new.lida_em !== null;
+      },
+    )
     .subscribe();
 }
 
@@ -174,17 +185,27 @@ onUnmounted(() => {
 
 <template>
   <div class="d-flex flex-column h-100 overflow-hidden">
-    <div class="d-flex align-items-center gap-2 px-3 py-1 border-bottom bg-body-tertiary flex-shrink-0">
+    <div
+      class="d-flex align-items-center gap-2 px-3 py-1 border-bottom bg-body-tertiary flex-shrink-0"
+    >
       <router-link :to="rotaInicio()" class="btn btn-sm btn-outline-success">
         <i class="bi bi-house me-1"></i>Início
       </router-link>
-      <button type="button" class="btn btn-sm btn-outline-secondary d-none d-md-inline-block" @click="router.back()">
+      <button
+        type="button"
+        class="btn btn-sm btn-outline-secondary d-none d-md-inline-block"
+        @click="router.back()"
+      >
         <i class="bi bi-arrow-left me-1"></i>Voltar
       </button>
       <span class="fw-semibold small flex-grow-1">Falar com a coordenação</span>
     </div>
 
-    <div v-if="erro" class="alert alert-danger py-2 small mb-0 rounded-0 flex-shrink-0" role="alert">
+    <div
+      v-if="erro"
+      class="alert alert-danger py-2 small mb-0 rounded-0 flex-shrink-0"
+      role="alert"
+    >
       <i class="bi bi-exclamation-triangle me-1"></i>
       {{ erro }}
     </div>
@@ -199,7 +220,9 @@ onUnmounted(() => {
       :carregando-contatos="carregandoContatos"
       :papel-usuario="usuario?.papel ?? 'responsavel'"
       :titulo-chat="contatoAtivo?.nomeContato ?? 'Coordenação escolar'"
-      :subtitulo-chat="'Coordenação Escolar' + (horarioAtivo ? ' · Online agora' : ' · Fora do horário')"
+      :subtitulo-chat="
+        'Coordenação Escolar' + (horarioAtivo ? ' · Online agora' : ' · Fora do horário')
+      "
       :contato-selecionado="contatoAtivo"
       @selecionar-conversa="selecionarConversa"
       @enviar-mensagem="handleEnviarMensagem"

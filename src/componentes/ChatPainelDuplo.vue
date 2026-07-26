@@ -106,9 +106,7 @@ function handleVoltar() {
           <i class="bi bi-chat-dots fs-1 opacity-50"></i>
         </span>
         <h2 class="h6 fw-normal mb-1">Canal de diálogo</h2>
-        <p class="small mb-0">
-          Selecione uma conversa para visualizar as mensagens.
-        </p>
+        <p class="small mb-0">Selecione uma conversa para visualizar as mensagens.</p>
       </div>
     </div>
   </div>

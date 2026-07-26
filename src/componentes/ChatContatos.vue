@@ -21,16 +21,14 @@ const busca = ref('');
 const menuAbertoId = ref<string | null>(null);
 
 const contatosFiltrados = computed(() => {
-  let lista = props.papelUsuario === 'responsavel'
-    ? props.contatos
-    : props.contatos.filter((c) => c.ativa);
+  let lista =
+    props.papelUsuario === 'responsavel' ? props.contatos : props.contatos.filter((c) => c.ativa);
 
   const termo = busca.value.toLowerCase().trim();
   if (termo) {
     lista = lista.filter(
       (c) =>
-        c.nomeContato.toLowerCase().includes(termo) ||
-        c.subtitulo.toLowerCase().includes(termo),
+        c.nomeContato.toLowerCase().includes(termo) || c.subtitulo.toLowerCase().includes(termo),
     );
   }
 
@@ -52,7 +50,6 @@ function selecionar(id: string) {
         placeholder="Buscar conversa..."
         aria-label="Buscar conversa"
       />
-
     </div>
 
     <div v-if="carregando" class="d-flex justify-content-center py-4">
@@ -83,24 +80,29 @@ function selecionar(id: string) {
         type="button"
         class="btn border-0 rounded-0 d-flex align-items-start gap-2 p-2 w-100 text-start"
         :class="{
-          'bg-primary bg-opacity-10 border-start border-3 border-primary': contato.conversaId === conversaAtivaId,
+          'bg-primary bg-opacity-10 border-start border-3 border-primary':
+            contato.conversaId === conversaAtivaId,
           'bg-white': contato.conversaId !== conversaAtivaId,
         }"
         @click="selecionar(contato.conversaId)"
       >
         <span
           class="d-inline-flex align-items-center justify-content-center rounded-circle text-white flex-shrink-0 small"
-          :style="{ width: '40px', height: '40px', backgroundColor: contato.avatarCor, fontSize: contato.naoLidas > 0 ? '0.8rem' : '0.7rem' }"
+          :style="{
+            width: '40px',
+            height: '40px',
+            backgroundColor: contato.avatarCor,
+            fontSize: contato.naoLidas > 0 ? '0.8rem' : '0.7rem',
+          }"
           :title="contato.nomeContato"
         >
           <span :class="{ 'fw-bold': false }">{{ contato.avatarIniciais }}</span>
         </span>
         <div class="flex-grow-1 min-w-0 overflow-hidden">
           <div class="d-flex justify-content-between align-items-baseline">
-            <span
-              class="small text-truncate"
-              :class="{ 'fw-bold': contato.naoLidas > 0 }"
-            >{{ contato.nomeContato }}</span>
+            <span class="small text-truncate" :class="{ 'fw-bold': contato.naoLidas > 0 }">{{
+              contato.nomeContato
+            }}</span>
             <span class="small text-body-secondary flex-shrink-0 ms-1">{{
               contato.ultimaData
             }}</span>
@@ -126,7 +128,9 @@ function selecionar(id: string) {
             type="button"
             class="btn btn-sm btn-link p-0 text-body-secondary"
             style="line-height: 1"
-            @click.stop="menuAbertoId = menuAbertoId === contato.conversaId ? null : contato.conversaId"
+            @click.stop="
+              menuAbertoId = menuAbertoId === contato.conversaId ? null : contato.conversaId
+            "
           >
             <i class="bi bi-three-dots-vertical"></i>
           </button>
@@ -138,7 +142,10 @@ function selecionar(id: string) {
             <button
               type="button"
               class="btn btn-sm btn-light d-flex align-items-center gap-2 w-100 text-start"
-              @click.stop="menuAbertoId = null; emit('ocultar', contato.conversaId)"
+              @click.stop="
+                menuAbertoId = null;
+                emit('ocultar', contato.conversaId);
+              "
             >
               <i class="bi bi-eye-slash small"></i>
               <span class="small">Ocultar</span>

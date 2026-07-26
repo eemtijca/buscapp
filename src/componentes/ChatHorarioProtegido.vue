@@ -72,7 +72,6 @@ watch(
   () => rolarParaBaixo(),
   { immediate: true },
 );
-
 </script>
 
 <template>
@@ -160,11 +159,7 @@ watch(
           <div
             v-else
             class="rounded-3 px-3 py-2 shadow-sm"
-            :class="
-              msg.minha
-                ? 'bg-primary text-white'
-                : 'bg-white text-body'
-            "
+            :class="msg.minha ? 'bg-primary text-white' : 'bg-white text-body'"
             style="max-width: 80%"
           >
             <div
@@ -213,7 +208,12 @@ watch(
             :disabled="enviando"
             @input="autoResize"
             @keydown.enter.prevent="submeter"
-            style="resize: none; min-height: 31px; max-height: calc(1.5em * 5 + 8px); overflow-y: hidden;"
+            style="
+              resize: none;
+              min-height: 31px;
+              max-height: calc(1.5em * 5 + 8px);
+              overflow-y: hidden;
+            "
           ></textarea>
           <button
             type="submit"

@@ -5,8 +5,16 @@ export function safeDate(iso: string | null | undefined): Date {
 }
 
 const CORES_AVATAR = [
-  '#008241', '#1a73e8', '#d93025', '#f9ab00', '#129eaf',
-  '#9334e6', '#e8710a', '#0d652d', '#1967d2', '#c5221f',
+  '#008241',
+  '#1a73e8',
+  '#d93025',
+  '#f9ab00',
+  '#129eaf',
+  '#9334e6',
+  '#e8710a',
+  '#0d652d',
+  '#1967d2',
+  '#c5221f',
 ];
 
 export function avatarIniciais(nome: string): string {
@@ -104,7 +112,9 @@ export interface GrupoMensagem {
   mensagens: import('@/tipos/componentes').MensagemChat[];
 }
 
-export function agruparPorData(mensagens: import('@/tipos/componentes').MensagemChat[]): GrupoMensagem[] {
+export function agruparPorData(
+  mensagens: import('@/tipos/componentes').MensagemChat[],
+): GrupoMensagem[] {
   const grupos: GrupoMensagem[] = [];
   let rotuloAtual = '';
 
@@ -126,7 +136,15 @@ export interface InfoAutor {
 }
 
 export function mapearMensagemParaChat(
-  msg: { id: string; conversa_id: string; remetente_id: string; conteudo: string; is_system_message: boolean; lida_em: string | null; created_at: string },
+  msg: {
+    id: string;
+    conversa_id: string;
+    remetente_id: string;
+    conteudo: string;
+    is_system_message: boolean;
+    lida_em: string | null;
+    created_at: string;
+  },
   autores: Map<string, InfoAutor>,
   userId: string,
 ): import('@/tipos/componentes').MensagemChat {

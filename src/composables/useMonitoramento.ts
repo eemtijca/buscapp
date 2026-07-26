@@ -1064,10 +1064,7 @@ export function useMonitoramento() {
         created_at: agora,
       });
 
-      await supabaseClient
-        .from('conversas')
-        .update({ ultima_mensagem_em: agora })
-        .eq('id', convId);
+      await supabaseClient.from('conversas').update({ ultima_mensagem_em: agora }).eq('id', convId);
 
       return convId;
     } catch (e) {
@@ -1092,7 +1089,9 @@ export function useMonitoramento() {
     try {
       const { data: convData } = await supabaseClient
         .from('conversas')
-        .select('*, responsavel:perfis!conversas_responsavel_id_fkey(nome), aluno:alunos!conversas_aluno_id_fkey(nome), turma:turmas!conversas_turma_id_fkey(nome_completo)')
+        .select(
+          '*, responsavel:perfis!conversas_responsavel_id_fkey(nome), aluno:alunos!conversas_aluno_id_fkey(nome), turma:turmas!conversas_turma_id_fkey(nome_completo)',
+        )
         .eq('id', conversaId)
         .single();
 
@@ -1112,7 +1111,11 @@ export function useMonitoramento() {
         .is('deleted_at', null)
         .order('created_at', { ascending: true });
 
-      const remetenteIds = [...new Set((msgsData ?? []).map((m: unknown) => (m as { remetente_id: string }).remetente_id))];
+      const remetenteIds = [
+        ...new Set(
+          (msgsData ?? []).map((m: unknown) => (m as { remetente_id: string }).remetente_id),
+        ),
+      ];
 
       const { data: perfisData } = await supabaseClient
         .from('perfis')
@@ -1122,38 +1125,55 @@ export function useMonitoramento() {
       const autores = new Map(
         (perfisData ?? []).map((p: unknown) => [
           (p as { id: string }).id,
-          { nome: (p as { nome: string }).nome, tipo: (p as { papel: string }).papel as 'responsavel' | 'gestao' | 'professor' },
+          {
+            nome: (p as { nome: string }).nome,
+            tipo: (p as { papel: string }).papel as 'responsavel' | 'gestao' | 'professor',
+          },
         ]),
       );
 
       const mensagens: MensagemChat[] = (msgsData ?? [])
         .filter((m: unknown) => !(m as { is_system_message: boolean }).is_system_message)
         .map((m: unknown) => {
-        const msg = m as { id: string; conversa_id: string; remetente_id: string; conteudo: string; is_system_message: boolean; lida_em: string | null; created_at: string };
-        const autor = autores.get(msg.remetente_id);
-        const raw = msg.created_at;
-        const d = safeDate(raw);
-        return {
-          id: msg.id,
-          conversaId: msg.conversa_id,
-          remetenteId: msg.remetente_id,
-          autor: autor?.tipo ?? 'gestao',
-          nomeAutor: autor?.nome ?? (msg.is_system_message ? 'Sistema' : 'Equipe escolar'),
-          texto: msg.conteudo,
-          horario: d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-          data: d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }),
-          dataIso: raw,
-          isSistema: msg.is_system_message,
-          minha: msg.remetente_id === userId,
-          lida: msg.lida_em !== null,
-        };
-      });
+          const msg = m as {
+            id: string;
+            conversa_id: string;
+            remetente_id: string;
+            conteudo: string;
+            is_system_message: boolean;
+            lida_em: string | null;
+            created_at: string;
+          };
+          const autor = autores.get(msg.remetente_id);
+          const raw = msg.created_at;
+          const d = safeDate(raw);
+          return {
+            id: msg.id,
+            conversaId: msg.conversa_id,
+            remetenteId: msg.remetente_id,
+            autor: autor?.tipo ?? 'gestao',
+            nomeAutor: autor?.nome ?? (msg.is_system_message ? 'Sistema' : 'Equipe escolar'),
+            texto: msg.conteudo,
+            horario: d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+            data: d.toLocaleDateString('pt-BR', {
+              day: '2-digit',
+              month: '2-digit',
+              year: 'numeric',
+            }),
+            dataIso: raw,
+            isSistema: msg.is_system_message,
+            minha: msg.remetente_id === userId,
+            lida: msg.lida_em !== null,
+          };
+        });
 
       return {
         contato: {
           conversaId: conversaId,
           nomeContato: conv.responsavel?.nome ?? 'Responsável',
-          subtitulo: (conv.aluno?.nome ?? '') + (conv.turma?.nome_completo ? ' · ' + conv.turma.nome_completo : ''),
+          subtitulo:
+            (conv.aluno?.nome ?? '') +
+            (conv.turma?.nome_completo ? ' · ' + conv.turma.nome_completo : ''),
           avatarIniciais: '',
           avatarCor: '#008241',
           ultimaMensagem: '',
@@ -1234,13 +1254,22 @@ export function useMonitoramento() {
           conversaId: convId,
           nomeContato: aluno.nome,
           subtitulo: 'Coordenação Escolar',
-          avatarIniciais: aluno.nome.split(' ').slice(0, 2).map((p: string) => p[0]).join('').toUpperCase(),
+          avatarIniciais: aluno.nome
+            .split(' ')
+            .slice(0, 2)
+            .map((p: string) => p[0])
+            .join('')
+            .toUpperCase(),
           avatarCor: '',
-          ultimaMensagem: ultMsg?.conteudo ? ultMsg.conteudo.replace(/\n/g, ' ').slice(0, 40) : 'Nenhuma mensagem ainda',
-          ultimaData: ultMsg?.created_at ? (() => {
-            const d = safeDate(ultMsg.created_at);
-            return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
-          })() : '',
+          ultimaMensagem: ultMsg?.conteudo
+            ? ultMsg.conteudo.replace(/\n/g, ' ').slice(0, 40)
+            : 'Nenhuma mensagem ainda',
+          ultimaData: ultMsg?.created_at
+            ? (() => {
+                const d = safeDate(ultMsg.created_at);
+                return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+              })()
+            : '',
           naoLidas: naoLidas ?? 0,
           ativa: true,
           alunoId: aluno.id,
@@ -1267,7 +1296,9 @@ export function useMonitoramento() {
     try {
       let query = supabaseClient
         .from('conversas')
-        .select('id, responsavel_id, aluno_id, turma_id, ativa, ultima_mensagem_em, responsavel:perfis!conversas_responsavel_id_fkey(nome), aluno:alunos!conversas_aluno_id_fkey(nome), turma:turmas!conversas_turma_id_fkey(nome_completo)');
+        .select(
+          'id, responsavel_id, aluno_id, turma_id, ativa, ultima_mensagem_em, responsavel:perfis!conversas_responsavel_id_fkey(nome), aluno:alunos!conversas_aluno_id_fkey(nome), turma:turmas!conversas_turma_id_fkey(nome_completo)',
+        );
 
       if (apenasSuasTurmas) {
         const { data: turmas } = await supabaseClient
@@ -1282,8 +1313,7 @@ export function useMonitoramento() {
         query = query.in('turma_id', turmaIds);
       }
 
-      const { data: convs } = await query
-        .order('ultima_mensagem_em', { ascending: false });
+      const { data: convs } = await query.order('ultima_mensagem_em', { ascending: false });
 
       if (!convs) return [];
 
@@ -1326,19 +1356,28 @@ export function useMonitoramento() {
           conversaId: conv.id,
           nomeContato: nomeResp,
           subtitulo: nomeAluno + (nomeTurma ? ' · ' + nomeTurma : ''),
-          avatarIniciais: nomeResp.split(' ').slice(0, 2).map((p: string) => p[0]).join('').toUpperCase(),
+          avatarIniciais: nomeResp
+            .split(' ')
+            .slice(0, 2)
+            .map((p: string) => p[0])
+            .join('')
+            .toUpperCase(),
           avatarCor: '',
-          ultimaMensagem: ultMsg?.conteudo ? ultMsg.conteudo.replace(/\n/g, ' ').slice(0, 40) : 'Nenhuma mensagem ainda',
-          ultimaData: ultMsg?.created_at ? (() => {
-            const d = safeDate(ultMsg.created_at);
-            return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
-          })() : '',
+          ultimaMensagem: ultMsg?.conteudo
+            ? ultMsg.conteudo.replace(/\n/g, ' ').slice(0, 40)
+            : 'Nenhuma mensagem ainda',
+          ultimaData: ultMsg?.created_at
+            ? (() => {
+                const d = safeDate(ultMsg.created_at);
+                return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+              })()
+            : '',
           naoLidas: naoLidas ?? 0,
           ativa: conv.ativa,
         });
       }
 
-      return contatos.filter(c => c.ultimaMensagem !== 'Nenhuma mensagem ainda');
+      return contatos.filter((c) => c.ultimaMensagem !== 'Nenhuma mensagem ainda');
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       console.error('[useMonitoramento] Erro ao buscar contatos staff:', msg);

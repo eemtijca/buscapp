@@ -8,11 +8,7 @@ import type { OcorrenciaGrave } from '@/tipos/componentes';
 
 const router = useRouter();
 const { buscarOcorrenciasGraves, alternarBloqueioRetorno } = useMonitoramento();
-const {
-  ultimaAtualizacao,
-  estaAtualizando,
-  atualizar: refresh,
-} = useRealtimeRefresh();
+const { ultimaAtualizacao, estaAtualizando, atualizar: refresh } = useRealtimeRefresh();
 
 const ocorrencias = ref<OcorrenciaGrave[]>([]);
 const mensagemSucesso = ref<string | null>(null);
@@ -102,10 +98,7 @@ onMounted(async () => {
           <i v-else class="bi bi-arrow-clockwise me-1" aria-hidden="true"></i>
           Atualizar
         </button>
-        <span
-          class="rounded-circle d-inline-block"
-          style="width: 8px; height: 8px"
-        ></span>
+        <span class="rounded-circle d-inline-block" style="width: 8px; height: 8px"></span>
       </div>
     </div>
 

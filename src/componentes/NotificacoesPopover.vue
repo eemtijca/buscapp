@@ -4,14 +4,8 @@ import { useRouter } from 'vue-router';
 import { useNotificacoes } from '@/composables/useNotificacoes';
 
 const router = useRouter();
-const {
-  naoLidasOutros,
-  notificacoes,
-  marcarTodasComoLidas,
-  limparTodas,
-  marcarLida,
-  ICONE_TIPO,
-} = useNotificacoes();
+const { naoLidasOutros, notificacoes, marcarTodasComoLidas, limparTodas, marcarLida, ICONE_TIPO } =
+  useNotificacoes();
 
 const aberto = ref(false);
 const confirmandoLimpar = ref(false);
@@ -67,7 +61,9 @@ if (typeof document !== 'undefined') {
         class="notif-menu shadow rounded-1 bg-body border overflow-y-auto"
         @mousedown.prevent
       >
-        <div class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom flex-wrap gap-1">
+        <div
+          class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom flex-wrap gap-1"
+        >
           <span class="fw-semibold small">Notificações</span>
           <div class="d-flex gap-2">
             <button
@@ -136,11 +132,19 @@ if (typeof document !== 'undefined') {
         class="notif-confirm-overlay d-flex align-items-center justify-content-center"
         @mousedown.prevent
       >
-        <div class="bg-white rounded-3 shadow-lg p-3 text-center" style="max-width: 280px;">
+        <div class="bg-white rounded-3 shadow-lg p-3 text-center" style="max-width: 280px">
           <p class="small mb-2">Tem certeza que deseja limpar todas as notificações?</p>
           <div class="d-flex gap-2 justify-content-center">
-            <button type="button" class="btn btn-sm btn-secondary" @click="confirmandoLimpar = false">Cancelar</button>
-            <button type="button" class="btn btn-sm btn-danger" @click="handleLimparTodas">Limpar</button>
+            <button
+              type="button"
+              class="btn btn-sm btn-secondary"
+              @click="confirmandoLimpar = false"
+            >
+              Cancelar
+            </button>
+            <button type="button" class="btn btn-sm btn-danger" @click="handleLimparTodas">
+              Limpar
+            </button>
           </div>
         </div>
       </div>
@@ -149,7 +153,9 @@ if (typeof document !== 'undefined') {
 </template>
 
 <style scoped>
-.min-w-0 { min-width: 0; }
+.min-w-0 {
+  min-width: 0;
+}
 
 .notif-menu {
   position: fixed;
@@ -162,8 +168,11 @@ if (typeof document !== 'undefined') {
 
 .notif-confirm-overlay {
   position: fixed;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(0,0,0,0.3);
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.3);
   z-index: 1060;
 }
 

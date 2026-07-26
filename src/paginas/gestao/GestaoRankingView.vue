@@ -1,9 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useMonitoramento } from '@/composables/useMonitoramento';
 import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh';
-import { supabaseClient } from '@/servicos/supabase';
 import CartaoAlunoRisco from '@/componentes/CartaoAlunoRisco.vue';
 import type { AlunoRisco } from '@/tipos/componentes';
 
@@ -12,16 +11,12 @@ const { buscarRankingRisco, carregando } = useMonitoramento();
 const {
   ultimaAtualizacao,
   estaAtualizando,
-  statusConexao,
-  aoConectar,
   atualizar: refresh,
 } = useRealtimeRefresh();
 
 const ranking = ref<AlunoRisco[]>([]);
 const filtroRisco = ref<'todos' | 'alto' | 'medio' | 'baixo'>('todos');
 const buscaAluno = ref('');
-
-let canalRanking: ReturnType<typeof supabaseClient.channel>;
 
 const rankingFiltrado = computed(() => {
   let lista = ranking.value;
@@ -56,16 +51,6 @@ async function atualizarManual() {
 
 onMounted(async () => {
   await carregarRanking();
-  canalRanking = supabaseClient
-    .channel('ranking')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'frequencias' }, () =>
-      buscarRankingRisco().then((r) => (ranking.value = r)),
-    )
-    .subscribe(aoConectar(carregarRanking));
-});
-
-onUnmounted(() => {
-  if (canalRanking) supabaseClient.removeChannel(canalRanking);
 });
 </script>
 
@@ -104,9 +89,7 @@ onUnmounted(() => {
         </button>
         <span
           class="rounded-circle d-inline-block"
-          :class="statusConexao === 'conectado' ? 'bg-success' : 'bg-danger'"
           style="width: 8px; height: 8px"
-          :title="statusConexao === 'conectado' ? 'Conectado' : 'Desconectado'"
         ></span>
       </div>
     </div>

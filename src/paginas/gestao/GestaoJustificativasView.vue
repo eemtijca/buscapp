@@ -1,10 +1,9 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useMonitoramento } from '@/composables/useMonitoramento';
 import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh';
 import { useAutenticacao } from '@/composables/useAutenticacao';
-import { supabaseClient } from '@/servicos/supabase';
 import FilaJustificativas from '@/componentes/FilaJustificativas.vue';
 import type { JustificativaPendente } from '@/tipos/componentes';
 
@@ -14,12 +13,8 @@ const { buscarJustificativasPendentes, validarJustificativa } = useMonitoramento
 const {
   ultimaAtualizacao,
   estaAtualizando,
-  statusConexao,
-  aoConectar,
   atualizar: refresh,
 } = useRealtimeRefresh();
-
-let canalJustificativas: ReturnType<typeof supabaseClient.channel>;
 
 const justificativas = ref<JustificativaPendente[]>([]);
 const mensagemSucesso = ref<string | null>(null);
@@ -81,16 +76,6 @@ async function atualizarManual() {
 
 onMounted(async () => {
   await processarJustificativas();
-  canalJustificativas = supabaseClient
-    .channel('justificativas-gestao')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'justificativas_faltas' }, () =>
-      processarJustificativas(),
-    )
-    .subscribe(aoConectar(processarJustificativas));
-});
-
-onUnmounted(() => {
-  if (canalJustificativas) supabaseClient.removeChannel(canalJustificativas);
 });
 </script>
 
@@ -130,9 +115,7 @@ onUnmounted(() => {
         </button>
         <span
           class="rounded-circle d-inline-block"
-          :class="statusConexao === 'conectado' ? 'bg-success' : 'bg-danger'"
           style="width: 8px; height: 8px"
-          :title="statusConexao === 'conectado' ? 'Conectado' : 'Desconectado'"
         ></span>
       </div>
     </div>

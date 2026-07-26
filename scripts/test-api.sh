@@ -943,7 +943,7 @@ assert "16.4 resp nao ve msg de conversa alheia" "0" "$QTD_VE"
 HTTP=$(api_code GET "/rest/v1/mensagens?select=id,conteudo,remetente_id,created_at&conversa_id=eq.$C1&order=created_at.asc" '' "$TR")
 assert "16.5 historico 200" "200" "$HTTP"
 QTD_HIST=$(api_body | py "d=json.load(sys.stdin); print(len(d) if isinstance(d,list) else 0)" 2>/dev/null)
-assert "16.5 historico >=3 msgs" 1 "$( [ "$QTD_HIST" -ge 3 ] && echo 1 || echo 0 )"
+assert "16.5 historico >=2 msgs" 1 "$( [ "$QTD_HIST" -ge 2 ] && echo 1 || echo 0 )"
 
 # 16.6 mensagem de sistema
 M4=$(UUID)

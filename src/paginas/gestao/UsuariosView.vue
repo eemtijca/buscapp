@@ -1,9 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useGestaoUsuarios } from '@/composables/useGestaoUsuarios';
 import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh';
-import { supabaseClient } from '@/servicos/supabase';
 import type { UsuarioItem } from '@/tipos/componentes';
 
 const router = useRouter();
@@ -11,8 +10,6 @@ const { buscarUsuarios, ativarUsuario, desativarUsuario, carregando } = useGesta
 const {
   ultimaAtualizacao,
   estaAtualizando,
-  statusConexao,
-  aoConectar,
   atualizar: refresh,
 } = useRealtimeRefresh();
 
@@ -23,7 +20,7 @@ const filtroStatus = ref<'todos' | 'ativo' | 'pendente' | 'inativo'>('todos');
 const mensagemSucesso = ref<string | null>(null);
 const mensagemErro = ref<string | null>(null);
 
-let canalUsuarios: ReturnType<typeof supabaseClient.channel>;
+
 
 function mostrarSucesso(msg: string) {
   mensagemSucesso.value = msg;
@@ -109,16 +106,6 @@ async function atualizarManual() {
 
 onMounted(async () => {
   await carregarUsuarios();
-  canalUsuarios = supabaseClient
-    .channel('usuarios-gestao')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'perfis' }, () =>
-      buscarUsuarios().then((r) => (usuarios.value = r)),
-    )
-    .subscribe(aoConectar(carregarUsuarios));
-});
-
-onUnmounted(() => {
-  if (canalUsuarios) supabaseClient.removeChannel(canalUsuarios);
 });
 </script>
 
@@ -161,9 +148,7 @@ onUnmounted(() => {
         </button>
         <span
           class="rounded-circle d-inline-block"
-          :class="statusConexao === 'conectado' ? 'bg-success' : 'bg-danger'"
           style="width: 8px; height: 8px"
-          :title="statusConexao === 'conectado' ? 'Conectado' : 'Desconectado'"
         ></span>
       </div>
     </div>

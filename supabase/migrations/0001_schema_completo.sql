@@ -1995,7 +1995,7 @@ grant select, insert, update on public.codigos_redefinicao to authenticated, ser
 grant delete on public.frequencias to authenticated;
 
 -- Permissao UPDATE para notificacoes (marcar como lida)
-grant update on public.notificacoes to authenticated;
+grant update, delete on public.notificacoes to authenticated;
 
 -- Permissao INSERT para justificativas (gestao inserir manualmente)
 grant insert on public.justificativas_faltas to authenticated;
@@ -2028,6 +2028,11 @@ create policy "Notif: destinatario atualiza lida"
   to authenticated
   using (destinatario_id = auth.uid())
   with check (destinatario_id = auth.uid() and (lida = true or lida_em is not null));
+
+create policy "Notif: destinatario deleta proprias"
+  on public.notificacoes for delete
+  to authenticated
+  using (destinatario_id = auth.uid());
 -- ============================================================================
 -- Migration: codigos_lifecycle
 -- Descricao: Aprimora o ciclo de vida dos codigos de redefinicao:

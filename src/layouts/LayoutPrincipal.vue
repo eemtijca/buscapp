@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAutenticacao } from '@/composables/useAutenticacao';
 import { useStatusConexao } from '@/composables/useStatusConexao';
+import { useNotificacoes } from '@/composables/useNotificacoes';
 import IndicadorConexao from '@/componentes/IndicadorConexao.vue';
 import CabecalhoNavegacao from '@/componentes/CabecalhoNavegacao.vue';
 import NotificacoesPopover from '@/componentes/NotificacoesPopover.vue';
@@ -10,8 +11,17 @@ import NotificacoesPopover from '@/componentes/NotificacoesPopover.vue';
 const router = useRouter();
 const { usuario, logout } = useAutenticacao();
 const { status } = useStatusConexao();
+const { naoLidasMensagens, iniciar, parar } = useNotificacoes();
 
-const notificacoesRef = ref<InstanceType<typeof NotificacoesPopover> | null>(null);
+onMounted(() => {
+  if (usuario.value) {
+    iniciar(usuario.value.id);
+  }
+});
+
+onUnmounted(() => {
+  parar();
+});
 
 async function handleLogout(): Promise<void> {
   await logout();
@@ -25,6 +35,11 @@ const rotaInicio = () => {
   if (usuario.value.papel === 'responsavel') return '/responsavel';
   return '/';
 };
+
+const papelChat = () => {
+  if (usuario.value?.papel === 'gestao' || usuario.value?.papel === 'responsavel') return usuario.value.papel;
+  return null;
+};
 </script>
 
 <template>
@@ -36,16 +51,26 @@ const rotaInicio = () => {
       :rotaMarca="rotaInicio()"
     >
       <template #usuario>
-        <NotificacoesPopover ref="notificacoesRef" />
-
+        <!-- Chat button (apenas responsavel e gestao) -->
         <router-link
-          v-if="usuario?.papel === 'responsavel'"
-          :to="'/responsavel/chat'"
+          v-if="papelChat()"
+          :to="`/${papelChat()}/chat`"
           class="btn btn-outline-light btn-sm position-relative me-1"
-          aria-label="Chat com coordenação"
+          aria-label="Chat"
         >
           <i class="bi bi-chat-dots" aria-hidden="true"></i>
+          <span
+            v-if="naoLidasMensagens > 0"
+            class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
+            style="font-size: 0.6rem"
+          >
+            {{ naoLidasMensagens > 9 ? '9+' : naoLidasMensagens }}
+            <span class="visually-hidden">mensagens não lidas</span>
+          </span>
         </router-link>
+
+        <!-- Notificacoes (outros tipos) -->
+        <NotificacoesPopover />
 
         <div class="dropdown">
           <button

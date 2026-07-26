@@ -1,9 +1,8 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue';
+import { onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useMonitoramento } from '@/composables/useMonitoramento';
 import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh';
-import { supabaseClient } from '@/servicos/supabase';
 import ListaOcorrencias from '@/componentes/ListaOcorrencias.vue';
 import type { OcorrenciaGrave } from '@/tipos/componentes';
 
@@ -12,12 +11,8 @@ const { buscarOcorrenciasGraves, alternarBloqueioRetorno } = useMonitoramento();
 const {
   ultimaAtualizacao,
   estaAtualizando,
-  statusConexao,
-  aoConectar,
   atualizar: refresh,
 } = useRealtimeRefresh();
-
-let canalOcorrencias: ReturnType<typeof supabaseClient.channel>;
 
 const ocorrencias = ref<OcorrenciaGrave[]>([]);
 const mensagemSucesso = ref<string | null>(null);
@@ -70,16 +65,6 @@ async function atualizarManual() {
 
 onMounted(async () => {
   await carregarOcorrencias();
-  canalOcorrencias = supabaseClient
-    .channel('ocorrencias-gestao')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'ocorrencias' }, () =>
-      buscarOcorrenciasGraves().then((r) => (ocorrencias.value = r)),
-    )
-    .subscribe(aoConectar(carregarOcorrencias));
-});
-
-onUnmounted(() => {
-  if (canalOcorrencias) supabaseClient.removeChannel(canalOcorrencias);
 });
 </script>
 
@@ -119,9 +104,7 @@ onUnmounted(() => {
         </button>
         <span
           class="rounded-circle d-inline-block"
-          :class="statusConexao === 'conectado' ? 'bg-success' : 'bg-danger'"
           style="width: 8px; height: 8px"
-          :title="statusConexao === 'conectado' ? 'Conectado' : 'Desconectado'"
         ></span>
       </div>
     </div>

@@ -103,6 +103,15 @@ const nomeGestor = usuario.value?.nome || 'Gestor';
           cor="success"
         />
       </div>
+      <div class="col-12 col-md-6 col-lg-4">
+        <CartaoNavegacao
+          icone="chat-dots"
+          titulo="Chat com pais"
+          descricao="Converse com responsáveis sobre alunos monitorados."
+          rota="/gestao/chat"
+          cor="success"
+        />
+      </div>
     </div>
   </div>
 </template>

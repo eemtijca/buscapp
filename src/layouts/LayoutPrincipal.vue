@@ -1,69 +1,30 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAutenticacao } from '@/composables/useAutenticacao';
 import { useStatusConexao } from '@/composables/useStatusConexao';
-import { supabaseClient } from '@/servicos/supabase';
 import IndicadorConexao from '@/componentes/IndicadorConexao.vue';
 import CabecalhoNavegacao from '@/componentes/CabecalhoNavegacao.vue';
+import NotificacoesPopover from '@/componentes/NotificacoesPopover.vue';
 
 const router = useRouter();
-
 const { usuario, logout } = useAutenticacao();
 const { status } = useStatusConexao();
 
-const notificacoesNaoLidas = ref(0);
-
-let canalNotificacoes: ReturnType<typeof supabaseClient.channel>;
-
-async function carregarContagemNotificacoes() {
-  if (usuario.value?.papel !== 'gestao') return;
-  const { count } = await supabaseClient
-    .from('notificacoes')
-    .select('*', { count: 'exact', head: true })
-    .eq('destinatario_id', usuario.value.id)
-    .eq('lida', false);
-  notificacoesNaoLidas.value = count ?? 0;
-}
-
-onMounted(() => {
-  carregarContagemNotificacoes();
-  if (usuario.value?.papel === 'gestao') {
-    canalNotificacoes = supabaseClient
-      .channel('notificacoes-layout')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'notificacoes',
-          filter: `destinatario_id=eq.${usuario.value.id}`,
-        },
-        () => carregarContagemNotificacoes(),
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'notificacoes',
-          filter: `destinatario_id=eq.${usuario.value.id}`,
-        },
-        () => carregarContagemNotificacoes(),
-      )
-      .subscribe();
-  }
-});
-
-onUnmounted(() => {
-  if (canalNotificacoes) supabaseClient.removeChannel(canalNotificacoes);
-});
+const notificacoesRef = ref<InstanceType<typeof NotificacoesPopover> | null>(null);
 
 async function handleLogout(): Promise<void> {
   await logout();
-  notificacoesNaoLidas.value = 0;
   await router.push('/');
 }
+
+const rotaInicio = () => {
+  if (!usuario.value?.papel) return '/';
+  if (usuario.value.papel === 'professor') return '/professor';
+  if (usuario.value.papel === 'gestao') return '/gestao';
+  if (usuario.value.papel === 'responsavel') return '/responsavel';
+  return '/';
+};
 </script>
 
 <template>
@@ -72,25 +33,20 @@ async function handleLogout(): Promise<void> {
       variante="dashboard"
       :itens="[]"
       marca="BuscApp"
-      :rotaMarca="usuario?.papel ? '/' + usuario.papel : '/'"
+      :rotaMarca="rotaInicio()"
     >
       <template #usuario>
+        <NotificacoesPopover ref="notificacoesRef" />
+
         <router-link
-          v-if="usuario?.papel === 'gestao'"
-          to="/gestao/codigos"
+          v-if="usuario?.papel === 'responsavel'"
+          :to="'/responsavel/chat'"
           class="btn btn-outline-light btn-sm position-relative me-1"
-          aria-label="Notificações de código"
+          aria-label="Chat com coordenação"
         >
-          <i class="bi bi-bell" aria-hidden="true"></i>
-          <span
-            v-if="notificacoesNaoLidas > 0"
-            class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
-            style="font-size: 0.6rem"
-          >
-            {{ notificacoesNaoLidas > 9 ? '9+' : notificacoesNaoLidas }}
-            <span class="visually-hidden">notificações não lidas</span>
-          </span>
+          <i class="bi bi-chat-dots" aria-hidden="true"></i>
         </router-link>
+
         <div class="dropdown">
           <button
             type="button"

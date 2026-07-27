@@ -1,6 +1,7 @@
 import { ref, type Ref } from 'vue';
 import { supabaseClient } from '@/servicos/supabase';
 import { comprimirImagem } from '@/utils/comprimirImagem';
+import { safeDate } from '@/utils/chatUtils';
 import type {
   Aluno,
   Frequencia,
@@ -17,6 +18,7 @@ import type {
   EstatisticaPainel,
   JustificativaPendente,
   MensagemChat,
+  ContatoChat,
   NivelRisco,
   OcorrenciaGrave,
   TermometroAtencao,
@@ -1022,8 +1024,421 @@ export function useMonitoramento() {
       .catch((e) => console.error('[useMonitoramento] Anexo async processing failed:', e));
   }
 
-  async function buscarMensagensChat(_responsavelId: string): Promise<MensagemChat[]> {
+  async function criarOuObterConversa(
+    responsavelId: string,
+    alunoId: string,
+    turmaId: string,
+  ): Promise<string | null> {
+    try {
+      const { data: existing } = await supabaseClient
+        .from('conversas')
+        .select('id')
+        .eq('responsavel_id', responsavelId)
+        .eq('aluno_id', alunoId)
+        .maybeSingle();
+
+      if (existing) {
+        return (existing as unknown as { id: string }).id;
+      }
+
+      const { data, error } = await supabaseClient
+        .from('conversas')
+        .insert({
+          responsavel_id: responsavelId,
+          aluno_id: alunoId,
+          turma_id: turmaId,
+          ativa: true,
+        })
+        .select('id')
+        .single();
+
+      if (error) throw error;
+      const convId = (data as unknown as { id: string }).id;
+
+      const agora = new Date().toISOString();
+      await supabaseClient.from('mensagens').insert({
+        conversa_id: convId,
+        remetente_id: responsavelId,
+        conteudo: 'Conversa iniciada para acompanhamento escolar.',
+        is_system_message: true,
+        created_at: agora,
+      });
+
+      await supabaseClient.from('conversas').update({ ultima_mensagem_em: agora }).eq('id', convId);
+
+      return convId;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error('[useMonitoramento] Erro ao criar/obter conversa:', msg);
+      erro.value = 'Falha ao iniciar conversa.';
+      return null;
+    }
+  }
+
+  async function buscarMensagensChat(
+    _responsavelId: string,
+    _alunoId?: string,
+  ): Promise<MensagemChat[]> {
     return [];
+  }
+
+  async function buscarConversaDetalhe(
+    conversaId: string,
+    userId: string,
+  ): Promise<{ contato: ContatoChat | null; mensagens: MensagemChat[] }> {
+    try {
+      const { data: convData } = await supabaseClient
+        .from('conversas')
+        .select(
+          '*, responsavel:perfis!conversas_responsavel_id_fkey(nome), aluno:alunos!conversas_aluno_id_fkey(nome), turma:turmas!conversas_turma_id_fkey(nome_completo)',
+        )
+        .eq('id', conversaId)
+        .single();
+
+      if (!convData) return { contato: null, mensagens: [] };
+
+      const conv = convData as unknown as {
+        id: string;
+        responsavel: { nome: string };
+        aluno: { nome: string };
+        turma: { nome_completo: string };
+      };
+
+      const { data: msgsData } = await supabaseClient
+        .from('mensagens')
+        .select('*')
+        .eq('conversa_id', conversaId)
+        .is('deleted_at', null)
+        .order('created_at', { ascending: true });
+
+      const remetenteIds = [
+        ...new Set(
+          (msgsData ?? []).map((m: unknown) => (m as { remetente_id: string }).remetente_id),
+        ),
+      ];
+
+      const { data: perfisData } = await supabaseClient
+        .from('perfis')
+        .select('id, nome, papel')
+        .in('id', remetenteIds);
+
+      const autores = new Map(
+        (perfisData ?? []).map((p: unknown) => [
+          (p as { id: string }).id,
+          {
+            nome: (p as { nome: string }).nome,
+            tipo: (p as { papel: string }).papel as 'responsavel' | 'gestao' | 'professor',
+          },
+        ]),
+      );
+
+      const mensagens: MensagemChat[] = (msgsData ?? [])
+        .filter((m: unknown) => !(m as { is_system_message: boolean }).is_system_message)
+        .map((m: unknown) => {
+          const msg = m as {
+            id: string;
+            conversa_id: string;
+            remetente_id: string;
+            conteudo: string;
+            is_system_message: boolean;
+            lida_em: string | null;
+            created_at: string;
+          };
+          const autor = autores.get(msg.remetente_id);
+          const raw = msg.created_at;
+          const d = safeDate(raw);
+          return {
+            id: msg.id,
+            conversaId: msg.conversa_id,
+            remetenteId: msg.remetente_id,
+            autor: autor?.tipo ?? 'gestao',
+            nomeAutor: autor?.nome ?? (msg.is_system_message ? 'Sistema' : 'Equipe escolar'),
+            texto: msg.conteudo,
+            horario: d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+            data: d.toLocaleDateString('pt-BR', {
+              day: '2-digit',
+              month: '2-digit',
+              year: 'numeric',
+            }),
+            dataIso: raw,
+            isSistema: msg.is_system_message,
+            minha: msg.remetente_id === userId,
+            lida: msg.lida_em !== null,
+          };
+        });
+
+      return {
+        contato: {
+          conversaId: conversaId,
+          nomeContato: conv.responsavel?.nome ?? 'Responsável',
+          subtitulo:
+            (conv.aluno?.nome ?? '') +
+            (conv.turma?.nome_completo ? ' · ' + conv.turma.nome_completo : ''),
+          avatarIniciais: '',
+          avatarCor: '#008241',
+          ultimaMensagem: '',
+          ultimaData: '',
+          naoLidas: 0,
+          ativa: true,
+        },
+        mensagens,
+      };
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error('[useMonitoramento] Erro ao buscar detalhe da conversa:', msg);
+      return { contato: null, mensagens: [] };
+    }
+  }
+
+  async function buscarContatosResponsavel(userId: string): Promise<ContatoChat[]> {
+    try {
+      const { data: vinculos } = await supabaseClient
+        .from('vinculos_responsaveis')
+        .select('aluno_id')
+        .eq('responsavel_id', userId);
+
+      if (!vinculos || !vinculos.length) return [];
+
+      const alunoIds = (vinculos as unknown as { aluno_id: string }[]).map((v) => v.aluno_id);
+
+      const { data: alunos } = await supabaseClient
+        .from('alunos')
+        .select('id, nome')
+        .in('id', alunoIds);
+
+      if (!alunos) return [];
+
+      const { data: enturmacoes } = await supabaseClient
+        .from('enturmacoes')
+        .select('aluno_id, turma_id')
+        .in('aluno_id', alunoIds)
+        .eq('status', 'matriculado');
+
+      const turmaPorAluno = new Map(
+        (enturmacoes ?? []).map((e: unknown) => {
+          const ent = e as { aluno_id: string; turma_id: string };
+          return [ent.aluno_id, ent.turma_id];
+        }),
+      );
+
+      const contatos: ContatoChat[] = [];
+
+      for (const aluno of alunos as unknown as { id: string; nome: string }[]) {
+        const turmaId = turmaPorAluno.get(aluno.id);
+        if (!turmaId) continue;
+
+        const convId = await criarOuObterConversa(userId, aluno.id, turmaId);
+        if (!convId) continue;
+
+        const { data: ultima } = await supabaseClient
+          .from('mensagens')
+          .select('conteudo, created_at')
+          .eq('conversa_id', convId)
+          .eq('is_system_message', false)
+          .is('deleted_at', null)
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        const { count: naoLidas } = await supabaseClient
+          .from('mensagens')
+          .select('*', { count: 'exact', head: true })
+          .eq('conversa_id', convId)
+          .eq('is_system_message', false)
+          .is('deleted_at', null)
+          .is('lida_em', null)
+          .neq('remetente_id', userId);
+
+        const ultMsg = (ultima ?? [])[0] as { conteudo: string; created_at: string } | undefined;
+
+        contatos.push({
+          conversaId: convId,
+          nomeContato: aluno.nome,
+          subtitulo: 'Coordenação Escolar',
+          avatarIniciais: aluno.nome
+            .split(' ')
+            .slice(0, 2)
+            .map((p: string) => p[0])
+            .join('')
+            .toUpperCase(),
+          avatarCor: '',
+          ultimaMensagem: ultMsg?.conteudo
+            ? ultMsg.conteudo.replace(/\n/g, ' ').slice(0, 40)
+            : 'Nenhuma mensagem ainda',
+          ultimaData: ultMsg?.created_at
+            ? (() => {
+                const d = safeDate(ultMsg.created_at);
+                return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+              })()
+            : '',
+          naoLidas: naoLidas ?? 0,
+          ativa: true,
+          alunoId: aluno.id,
+          turmaId,
+        });
+      }
+
+      return contatos;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error('[useMonitoramento] Erro ao buscar contatos do responsavel:', msg);
+      return [];
+    }
+  }
+
+  async function buscarContatosGestao(userId: string): Promise<ContatoChat[]> {
+    return buscarContatosStaff(userId, false);
+  }
+
+  async function buscarContatosStaff(
+    userId: string,
+    apenasSuasTurmas: boolean,
+  ): Promise<ContatoChat[]> {
+    try {
+      let query = supabaseClient
+        .from('conversas')
+        .select(
+          'id, responsavel_id, aluno_id, turma_id, ativa, ultima_mensagem_em, responsavel:perfis!conversas_responsavel_id_fkey(nome), aluno:alunos!conversas_aluno_id_fkey(nome), turma:turmas!conversas_turma_id_fkey(nome_completo)',
+        );
+
+      if (apenasSuasTurmas) {
+        const { data: turmas } = await supabaseClient
+          .from('atribuicoes_professores')
+          .select('turma_id')
+          .eq('professor_id', userId)
+          .eq('ativo', true);
+
+        if (!turmas?.length) return [];
+
+        const turmaIds = (turmas as unknown as { turma_id: string }[]).map((t) => t.turma_id);
+        query = query.in('turma_id', turmaIds);
+      }
+
+      const { data: convs } = await query.order('ultima_mensagem_em', { ascending: false });
+
+      if (!convs) return [];
+
+      const contatos: ContatoChat[] = [];
+
+      for (const conv of convs as unknown as Array<{
+        id: string;
+        responsavel_id: string;
+        aluno_id: string;
+        turma_id: string;
+        ativa: boolean;
+        responsavel: { nome: string };
+        aluno: { nome: string };
+        turma: { nome_completo: string };
+      }>) {
+        const { data: ultima } = await supabaseClient
+          .from('mensagens')
+          .select('conteudo, created_at')
+          .eq('conversa_id', conv.id)
+          .eq('is_system_message', false)
+          .is('deleted_at', null)
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        const { count: naoLidas } = await supabaseClient
+          .from('mensagens')
+          .select('*', { count: 'exact', head: true })
+          .eq('conversa_id', conv.id)
+          .eq('is_system_message', false)
+          .is('deleted_at', null)
+          .is('lida_em', null)
+          .neq('remetente_id', userId);
+
+        const ultMsg = (ultima ?? [])[0] as { conteudo: string; created_at: string } | undefined;
+        const nomeResp = conv.responsavel?.nome ?? 'Responsável';
+        const nomeAluno = conv.aluno?.nome ?? '';
+        const nomeTurma = conv.turma?.nome_completo ?? '';
+
+        contatos.push({
+          conversaId: conv.id,
+          nomeContato: nomeResp,
+          subtitulo: nomeAluno + (nomeTurma ? ' · ' + nomeTurma : ''),
+          avatarIniciais: nomeResp
+            .split(' ')
+            .slice(0, 2)
+            .map((p: string) => p[0])
+            .join('')
+            .toUpperCase(),
+          avatarCor: '',
+          ultimaMensagem: ultMsg?.conteudo
+            ? ultMsg.conteudo.replace(/\n/g, ' ').slice(0, 40)
+            : 'Nenhuma mensagem ainda',
+          ultimaData: ultMsg?.created_at
+            ? (() => {
+                const d = safeDate(ultMsg.created_at);
+                return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+              })()
+            : '',
+          naoLidas: naoLidas ?? 0,
+          ativa: conv.ativa,
+        });
+      }
+
+      return contatos.filter((c) => c.ultimaMensagem !== 'Nenhuma mensagem ainda');
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error('[useMonitoramento] Erro ao buscar contatos staff:', msg);
+      return [];
+    }
+  }
+
+  async function enviarMensagem(conversaId: string, conteudo: string): Promise<boolean> {
+    try {
+      const user = (await supabaseClient.auth.getUser()).data.user;
+      if (!user) throw new Error('Usuário não autenticado');
+
+      const { error } = await supabaseClient.from('mensagens').insert({
+        conversa_id: conversaId,
+        remetente_id: user.id,
+        conteudo,
+      });
+
+      if (error) throw error;
+
+      await supabaseClient
+        .from('conversas')
+        .update({ ultima_mensagem_em: new Date().toISOString() })
+        .eq('id', conversaId);
+
+      return true;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error('[useMonitoramento] Erro ao enviar mensagem:', msg);
+      erro.value = 'Falha ao enviar mensagem. Tente novamente.';
+      return false;
+    }
+  }
+
+  async function marcarMensagensComoLidas(conversaId: string, userId: string): Promise<void> {
+    try {
+      await supabaseClient
+        .from('mensagens')
+        .update({ lida_em: new Date().toISOString() })
+        .eq('conversa_id', conversaId)
+        .neq('remetente_id', userId)
+        .is('lida_em', null);
+    } catch (e) {
+      console.error('[useMonitoramento] Erro ao marcar mensagens como lidas:', e);
+    }
+  }
+
+  async function ocultarConversa(conversaId: string): Promise<boolean> {
+    try {
+      const { error } = await supabaseClient
+        .from('conversas')
+        .update({ ativa: false })
+        .eq('id', conversaId);
+
+      if (error) throw error;
+      return true;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error('[useMonitoramento] Erro ao ocultar conversa:', msg);
+      return false;
+    }
   }
 
   function horarioProtegidoAtivo(agora: Date = new Date()): boolean {
@@ -1044,7 +1459,7 @@ export function useMonitoramento() {
       diasSemana: [1, 2, 3, 4, 5],
       mensagemForaHorario:
         'O canal de diálogo está fora do horário escolar (segunda a sexta, das 7h às 17h). ' +
-        'Mensagens enviadas agora não serão recebidas pela coordenação. Em emergências, ligue para a escola.',
+        'Mensagens enviadas agora serão respondidas quando a coordenação estiver disponível.',
     };
   }
 
@@ -1067,6 +1482,13 @@ export function useMonitoramento() {
     enviarJustificativa,
     processarAnexoAsync,
     buscarMensagensChat,
+    buscarConversaDetalhe,
+    buscarContatosResponsavel,
+    buscarContatosGestao,
+    criarOuObterConversa,
+    enviarMensagem,
+    marcarMensagensComoLidas,
+    ocultarConversa,
     horarioProtegidoAtivo,
     obterHorarioProtegido,
   };

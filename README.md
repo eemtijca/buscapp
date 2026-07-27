@@ -44,7 +44,7 @@ O sistema foi desenvolvido para operar em conexões instáveis. Mensagens de err
 
 O banco de dados possui estrutura robusta com tabelas, visões analíticas e índices para consultas eficientes. Funções serverless executam operações administrativas. O projeto conta com testes automatizados em múltiplas camadas, integração contínua e deploy automatizado.
 
-Funcionalidades em andamento incluem gamificação entre turmas, sistema de registro de comportamento, persistência do histórico de conversas no chat e notificações push.
+Funcionalidades em andamento incluem gamificação entre turmas, sistema de registro de comportamento e notificações push.
 
 ## Status do Projeto
 
@@ -69,7 +69,14 @@ Projeto em desenvolvimento ativo. A infraestrutura central está concluída e os
 - Ranking de priorização de risco com filtros e busca em tempo real
 - Termômetro visual de atenção (verde/amarelo/vermelho)
 - Alertas para responsáveis (ausência e ocorrências) com status de justificativa, visualização de anexos e modal de detalhes
-- Chat com horário protegido (seg-sex, 7h-17h)
+- Chat integrado com três papéis (gestão e responsável) e layout responsivo de dois painéis
+- Sistema de notificações em tempo real: sino com tipos separados (mensagens vs administrativas)
+- Chat com auto-resize de textarea, indicador de leitura (✓✓), merge incremental em tempo real
+- Notificações: marcar como lidas ao clicar, "Limpar todas" com confirmação, distinção visual lidas/não lidas
+- Exclusão suave de conversas com ocultação e reaparecimento automático via trigger
+- Presença em tempo real via Supabase Realtime (canais seletivos por necessidade)
+- Botão manual "Atualizar" com timestamp em páginas administrativas sem realtime
+- Modal de confirmação para ações destrutivas
 - Indicador de status de conexão com Supabase
 - Tratamento e tradução de erros do Supabase Auth para português
 - Páginas de erro personalizadas (403, 404, 500) com redirecionamento automático
@@ -81,7 +88,6 @@ Projeto em desenvolvimento ativo. A infraestrutura central está concluída e os
 
 - Gamificação entre turmas (estrutura de dados e views prontas, frontend não conectado)
 - Sistema de comportamento com tags (schema do banco e tipos definidos, frontend não conectado)
-- Persistência de mensagens do chat (interface de chat pronta, tabelas `conversas` e `mensagens` definidas, persistência não implementada)
 - Notificações push
 
 ## Stack Tecnológico
@@ -639,8 +645,8 @@ O projeto possui quatro camadas de teste independentes.
 
 ### Testes de API (Bash + curl)
 
-- **Arquivo:** `scripts/test-api.sh` (178 asserts em 14 seções)
-- **Cobertura:** 178 asserts em 14 seções:
+- **Arquivo:** `scripts/test-api.sh` (~245 asserts em 25 seções)
+- **Cobertura:** 245 asserts distribuídos em:
   - Autenticação (login, logout, claims do JWT)
   - Edge Functions (solicitar-codigo, redefinir-senha-codigo, criar-usuario, processar-anexo)
   - Funções RPC (gerar código, revogar código)
@@ -651,16 +657,17 @@ O projeto possui quatro camadas de teste independentes.
   - Novos campos de ocorrências, frequências, perfis e alunos
   - Ciclo completo de justificativas com anexos (upload, RLS, auto-justify via trigger)
   - Compressão de anexos via Edge Function (upload, processamento, verificação de metadados)
+  - Chat: CRUD de conversas, envio de mensagens, RLS, trigger de notificação, integridade (unicode, SQL injection, 10k caracteres), cascade, concorrência
 - **Execução:** `npm run test:api` (requer Supabase local + seed executado)
 
 ### Testes E2E (Playwright)
 
 - **Arquivo:** `tests/app.spec.ts`
-- **Cobertura:** 55+ casos de teste em 5 ambientes de navegador:
-  - Chromium, Firefox, WebKit, Mobile Chrome, Mobile Safari
-  - Fluxos testados: login, logout, credenciais inválidas, gestão (home, usuários, alunos, códigos), professor (frequência), responsável (home, alertas), layout responsivo
+- **Cobertura:** 88 casos de teste em 3 ambientes de navegador:
+  - Chromium, Firefox, WebKit
+  - Fluxos testados: login, logout, credenciais inválidas, gestão (home, usuários, alunos, códigos), professor (frequência, ocorrências), responsável (chat, home, alertas, justificativas), notificações (popover, marcar lidas, limpar todas), chat completo (sidebar, mensagens, busca, header), resiliência, casos extremos
 - **Execução:** `npm run test:e2e` (requer Supabase local + seed + servidor dev em execução)
-- **Configuração:** `playwright.config.ts` com 5 projetos, dev server auto-start, CI detection
+- **Configuração:** `playwright.config.ts` com 3 projetos, dev server auto-start, CI detection
 
 ## CI/CD e Deploy
 

@@ -1,26 +1,17 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useGestaoUsuarios } from '@/composables/useGestaoUsuarios';
 import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh';
-import { supabaseClient } from '@/servicos/supabase';
 import type { AlunoItem } from '@/tipos/componentes';
 
 const router = useRouter();
 const { buscarAlunos, carregando } = useGestaoUsuarios();
-const {
-  ultimaAtualizacao,
-  estaAtualizando,
-  statusConexao,
-  aoConectar,
-  atualizar: refresh,
-} = useRealtimeRefresh();
+const { ultimaAtualizacao, estaAtualizando, atualizar: refresh } = useRealtimeRefresh();
 
 const alunos = ref<AlunoItem[]>([]);
 const busca = ref('');
 const filtroStatus = ref<'todos' | 'ativo' | 'egresso' | 'transferido' | 'inativo'>('todos');
-
-let canalAlunos: ReturnType<typeof supabaseClient.channel>;
 
 const alunosFiltrados = computed(() => {
   let lista = alunos.value;
@@ -56,16 +47,6 @@ async function atualizarManual() {
 
 onMounted(async () => {
   await carregarAlunos();
-  canalAlunos = supabaseClient
-    .channel('alunos-gestao')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'alunos' }, () =>
-      buscarAlunos().then((r) => (alunos.value = r)),
-    )
-    .subscribe(aoConectar(carregarAlunos));
-});
-
-onUnmounted(() => {
-  if (canalAlunos) supabaseClient.removeChannel(canalAlunos);
 });
 </script>
 
@@ -106,12 +87,7 @@ onUnmounted(() => {
           <i v-else class="bi bi-arrow-clockwise me-1" aria-hidden="true"></i>
           Atualizar
         </button>
-        <span
-          class="rounded-circle d-inline-block"
-          :class="statusConexao === 'conectado' ? 'bg-success' : 'bg-danger'"
-          style="width: 8px; height: 8px"
-          :title="statusConexao === 'conectado' ? 'Conectado' : 'Desconectado'"
-        ></span>
+        <span class="rounded-circle d-inline-block" style="width: 8px; height: 8px"></span>
       </div>
     </div>
 

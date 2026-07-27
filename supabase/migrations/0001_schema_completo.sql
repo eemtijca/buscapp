@@ -635,47 +635,6 @@ create trigger trg_on_auth_user_created
 comment on function public.fn_handle_new_user is 'Cria perfil automaticamente ao registrar em auth.users. Usa raw_user_meta_data apenas no signup inicial (único momento confiável).';
 
 -- ============================================================================
--- 16. TRIGGER — ANTI-BURNOUT DO CHAT (RF27)
--- ============================================================================
-
-create or replace function public.fn_chk_horario_mensagem()
-returns trigger
-language plpgsql
-as $$
-declare
-  dia_atual    smallint;
-  hora_atual   time;
-  dentro_janela boolean;
-begin
-  if new.is_system_message then
-    return new;
-  end if;
-
-  dia_atual := extract(dow from now());
-  hora_atual := now()::time;
-
-  select exists(
-    select 1
-    from public.horarios_letivos h
-    where h.ativo
-      and h.dia_semana = dia_atual
-      and hora_atual between h.hora_inicio and h.hora_fim
-  ) into dentro_janela;
-
-  if not dentro_janela then
-    raise exception 'Chat bloqueado fora do horario letivo (RF27). Horario de atendimento: dias uteis em periodo escolar.';
-  end if;
-
-  return new;
-end;
-$$;
-
-create trigger trg_chk_horario_mensagem
-  before insert on public.mensagens
-  for each row
-  execute function public.fn_chk_horario_mensagem();
-
--- ============================================================================
 -- 17. FUNÇÕES AUXILIARES — RLS
 -- ============================================================================
 
@@ -1313,11 +1272,11 @@ create policy "Conv: participante cria"
   to authenticated
   with check (responsavel_id = auth.uid());
 
-create policy "Conv: gestao encerra"
+create policy "Conv: gestao oculta"
   on public.conversas for update
   to authenticated
   using (public.get_user_papel() = 'gestao')
-  with check (public.get_user_papel() = 'gestao');
+  with check (public.get_user_papel() = 'gestao' and ativa = false);
 
 -- ============================================================================
 -- 18.21 MENSAGENS
@@ -1356,6 +1315,12 @@ create policy "Msg: marca lida"
           ))
     )
   )
+  with check (lida_em is not null);
+
+create policy "Msg: gestao marca lida"
+  on public.mensagens for update
+  to authenticated
+  using (public.get_user_papel() = 'gestao')
   with check (lida_em is not null);
 
 -- ============================================================================
@@ -2030,7 +1995,7 @@ grant select, insert, update on public.codigos_redefinicao to authenticated, ser
 grant delete on public.frequencias to authenticated;
 
 -- Permissao UPDATE para notificacoes (marcar como lida)
-grant update on public.notificacoes to authenticated;
+grant update, delete on public.notificacoes to authenticated;
 
 -- Permissao INSERT para justificativas (gestao inserir manualmente)
 grant insert on public.justificativas_faltas to authenticated;
@@ -2063,6 +2028,11 @@ create policy "Notif: destinatario atualiza lida"
   to authenticated
   using (destinatario_id = auth.uid())
   with check (destinatario_id = auth.uid() and (lida = true or lida_em is not null));
+
+create policy "Notif: destinatario deleta proprias"
+  on public.notificacoes for delete
+  to authenticated
+  using (destinatario_id = auth.uid());
 -- ============================================================================
 -- Migration: codigos_lifecycle
 -- Descricao: Aprimora o ciclo de vida dos codigos de redefinicao:
@@ -2190,6 +2160,8 @@ alter publication supabase_realtime add table public.perfis;
 alter publication supabase_realtime add table public.ocorrencias;
 alter publication supabase_realtime add table public.justificativas_faltas;
 alter publication supabase_realtime add table public.frequencias;
+alter publication supabase_realtime add table public.conversas;
+alter publication supabase_realtime add table public.mensagens;
 -- ============================================================================
 -- Migration: Campos extras para formulários da gestão
 -- Adiciona colunas de módulos de acesso, permissões, documentos e
@@ -2401,3 +2373,56 @@ create trigger trg_auto_justificar_frequencias
   for each row
   when (new.status = 'aceita' and old.status = 'pendente')
   execute function public.fn_auto_justificar_frequencias();
+
+-- ============================================================================
+-- Migration: chat_notificacoes
+-- Descricao: Trigger que cria notificacao automatica ao receber mensagem no chat.
+-- ============================================================================
+
+create or replace function public.fn_notificar_nova_mensagem()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_responsavel_id uuid;
+  v_turma_id      uuid;
+  v_nome_remetente text;
+begin
+  if new.is_system_message then return new; end if;
+
+  select c.responsavel_id, c.turma_id into v_responsavel_id, v_turma_id
+  from public.conversas c where c.id = new.conversa_id;
+
+  select nome into v_nome_remetente from public.perfis where id = new.remetente_id;
+
+  -- Reabrir conversa se estava oculta (responsavel enviou)
+  update public.conversas
+  set ativa = true
+  where id = new.conversa_id and ativa = false;
+
+  if new.remetente_id = v_responsavel_id then
+    insert into public.notificacoes (destinatario_id, tipo, titulo, corpo, metadados)
+    select p.id, 'mensagem',
+           'Nova mensagem de ' || v_nome_remetente,
+           left(new.conteudo, 120),
+           jsonb_build_object('conversa_id', new.conversa_id::text)
+    from public.perfis p
+    where p.papel = 'gestao' and p.id != new.remetente_id and p.status = 'ativo';
+  else
+    insert into public.notificacoes (destinatario_id, tipo, titulo, corpo, metadados)
+    values (v_responsavel_id, 'mensagem',
+            'Nova mensagem de ' || v_nome_remetente,
+            left(new.conteudo, 120),
+            jsonb_build_object('conversa_id', new.conversa_id::text));
+  end if;
+
+  return new;
+end;
+$$;
+
+create trigger trg_notificar_nova_mensagem
+  after insert on public.mensagens
+  for each row
+  execute function public.fn_notificar_nova_mensagem();

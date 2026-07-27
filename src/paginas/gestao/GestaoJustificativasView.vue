@@ -1,25 +1,16 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useMonitoramento } from '@/composables/useMonitoramento';
 import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh';
 import { useAutenticacao } from '@/composables/useAutenticacao';
-import { supabaseClient } from '@/servicos/supabase';
 import FilaJustificativas from '@/componentes/FilaJustificativas.vue';
 import type { JustificativaPendente } from '@/tipos/componentes';
 
 const router = useRouter();
 const { usuario } = useAutenticacao();
 const { buscarJustificativasPendentes, validarJustificativa } = useMonitoramento();
-const {
-  ultimaAtualizacao,
-  estaAtualizando,
-  statusConexao,
-  aoConectar,
-  atualizar: refresh,
-} = useRealtimeRefresh();
-
-let canalJustificativas: ReturnType<typeof supabaseClient.channel>;
+const { ultimaAtualizacao, estaAtualizando, atualizar: refresh } = useRealtimeRefresh();
 
 const justificativas = ref<JustificativaPendente[]>([]);
 const mensagemSucesso = ref<string | null>(null);
@@ -81,16 +72,6 @@ async function atualizarManual() {
 
 onMounted(async () => {
   await processarJustificativas();
-  canalJustificativas = supabaseClient
-    .channel('justificativas-gestao')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'justificativas_faltas' }, () =>
-      processarJustificativas(),
-    )
-    .subscribe(aoConectar(processarJustificativas));
-});
-
-onUnmounted(() => {
-  if (canalJustificativas) supabaseClient.removeChannel(canalJustificativas);
 });
 </script>
 
@@ -128,12 +109,7 @@ onUnmounted(() => {
           <i v-else class="bi bi-arrow-clockwise me-1" aria-hidden="true"></i>
           Atualizar
         </button>
-        <span
-          class="rounded-circle d-inline-block"
-          :class="statusConexao === 'conectado' ? 'bg-success' : 'bg-danger'"
-          style="width: 8px; height: 8px"
-          :title="statusConexao === 'conectado' ? 'Conectado' : 'Desconectado'"
-        ></span>
+        <span class="rounded-circle d-inline-block" style="width: 8px; height: 8px"></span>
       </div>
     </div>
 

@@ -22,6 +22,7 @@ import GestaoCodigosView from '@/paginas/gestao/CodigosView.vue';
 import GestaoTurmasView from '@/paginas/gestao/TurmasView.vue';
 import GestaoDisciplinasView from '@/paginas/gestao/DisciplinasView.vue';
 import GestaoAtribuicoesView from '@/paginas/gestao/AtribuicoesView.vue';
+import GestaoChatView from '@/paginas/gestao/GestaoChatView.vue';
 import ResponsavelHomeView from '@/paginas/responsavel/HomeView.vue';
 import ResponsavelAlertasView from '@/paginas/responsavel/AlertasView.vue';
 import ResponsavelTermometroView from '@/paginas/responsavel/TermometroView.vue';
@@ -202,6 +203,12 @@ const router = createRouter({
           name: 'gestao-atribuicoes',
           meta: { requerAutenticacao: true, papeisPermitidos: ['gestao'] },
           component: GestaoAtribuicoesView,
+        },
+        {
+          path: 'chat',
+          name: 'gestao-chat',
+          meta: { requerAutenticacao: true, papeisPermitidos: ['gestao'] },
+          component: GestaoChatView,
         },
       ],
     },

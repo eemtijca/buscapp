@@ -247,15 +247,51 @@ export interface TermometroAtencao {
 }
 
 /**
+ * Item da lista de conversas (sidebar do chat).
+ */
+export interface ContatoChat {
+  conversaId: string;
+  nomeContato: string;
+  subtitulo: string;
+  avatarIniciais: string;
+  avatarCor: string;
+  ultimaMensagem: string;
+  ultimaData: string;
+  naoLidas: number;
+  ativa: boolean;
+  alunoId?: string;
+  turmaId?: string;
+}
+
+/**
  * Mensagem do canal de diálogo com horário protegido.
  */
 export interface MensagemChat {
   id: string;
-  autor: 'responsavel' | 'gestao';
+  conversaId: string;
+  remetenteId: string;
+  autor: 'responsavel' | 'gestao' | 'professor';
   nomeAutor: string;
   texto: string;
   horario: string;
   data: string;
+  dataIso: string;
+  isSistema: boolean;
+  minha: boolean;
+  lida: boolean;
+}
+
+/**
+ * Notificação renderizada no popover do header.
+ */
+export interface NotificacaoItem {
+  id: string;
+  tipo: string;
+  titulo: string;
+  corpo: string | null;
+  tempoRelativo: string;
+  lida: boolean;
+  rota: string;
 }
 
 /**

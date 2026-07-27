@@ -1,10 +1,9 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue';
+import { onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAutenticacao } from '@/composables/useAutenticacao';
 import { useMonitoramento } from '@/composables/useMonitoramento';
 import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh';
-import { supabaseClient } from '@/servicos/supabase';
 import CartaoAlertaResponsavel from '@/componentes/CartaoAlertaResponsavel.vue';
 import type { AlertaResponsavel } from '@/tipos/componentes';
 import { TAGS_COMPORTAMENTO } from '@/tipos/componentes';
@@ -12,15 +11,7 @@ import { TAGS_COMPORTAMENTO } from '@/tipos/componentes';
 const router = useRouter();
 const { usuario } = useAutenticacao();
 const { buscarAlertasResponsavel } = useMonitoramento();
-const {
-  ultimaAtualizacao,
-  estaAtualizando,
-  statusConexao,
-  aoConectar,
-  atualizar: refresh,
-} = useRealtimeRefresh();
-
-let canalAlertas: ReturnType<typeof supabaseClient.channel>;
+const { ultimaAtualizacao, estaAtualizando, atualizar: refresh } = useRealtimeRefresh();
 
 const alertas = ref<AlertaResponsavel[]>([]);
 const alertaSelecionado = ref<AlertaResponsavel | null>(null);
@@ -61,17 +52,6 @@ async function atualizarManual() {
 
 onMounted(async () => {
   await carregarAlertas();
-  canalAlertas = supabaseClient
-    .channel('alertas-responsavel')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'frequencias' }, () => {
-      if (usuario.value)
-        buscarAlertasResponsavel(usuario.value.id).then((r) => (alertas.value = r));
-    })
-    .subscribe(aoConectar(carregarAlertas));
-});
-
-onUnmounted(() => {
-  if (canalAlertas) supabaseClient.removeChannel(canalAlertas);
 });
 </script>
 
@@ -110,12 +90,7 @@ onUnmounted(() => {
           <i v-else class="bi bi-arrow-clockwise me-1" aria-hidden="true"></i>
           Atualizar
         </button>
-        <span
-          class="rounded-circle d-inline-block"
-          :class="statusConexao === 'conectado' ? 'bg-success' : 'bg-danger'"
-          style="width: 8px; height: 8px"
-          :title="statusConexao === 'conectado' ? 'Conectado' : 'Desconectado'"
-        ></span>
+        <span class="rounded-circle d-inline-block" style="width: 8px; height: 8px"></span>
       </div>
     </div>
 

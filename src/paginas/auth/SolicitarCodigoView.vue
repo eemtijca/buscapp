@@ -115,7 +115,7 @@ async function handleSolicitarCodigo(): Promise<void> {
         <div class="text-center mt-3">
           <router-link to="/redefinir-senha-codigo" class="btn btn-outline-primary btn-sm w-100">
             <i class="bi bi-shield-lock me-1" aria-hidden="true"></i>
-            Já tenho um código — redefinir senha
+            Já tenho um código
           </router-link>
         </div>
 

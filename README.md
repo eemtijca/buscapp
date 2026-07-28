@@ -44,7 +44,7 @@ O sistema foi desenvolvido para operar em conexões instáveis. Mensagens de err
 
 O banco de dados possui estrutura robusta com tabelas, visões analíticas e índices para consultas eficientes. Funções serverless executam operações administrativas. O projeto conta com testes automatizados em múltiplas camadas, integração contínua e deploy automatizado.
 
-Funcionalidades em andamento incluem gamificação entre turmas, sistema de registro de comportamento e notificações push.
+Funcionalidades em andamento incluem gamificação entre turmas e notificações push.
 
 ## Status do Projeto
 
@@ -87,7 +87,7 @@ Projeto em desenvolvimento ativo. A infraestrutura central está concluída e os
 ### Em Andamento
 
 - Gamificação entre turmas (estrutura de dados e views prontas, frontend não conectado)
-- Sistema de comportamento com tags (schema do banco e tipos definidos, frontend não conectado)
+- Sistema de comportamento com tags (schema do banco e tipos definidos, tags integradas ao registro de ocorrências e exibição de alertas, sem interface dedicada de gerenciamento)
 - Notificações push
 
 ## Stack Tecnológico
@@ -189,33 +189,8 @@ Projeto em desenvolvimento ativo. A infraestrutura central está concluída e os
 | Termômetro de atenção | Indicador visual com barra de progresso colorida (verde/amarelo/vermelho) que mostra o nível de risco acumulado do estudante. Cálculo baseado em ausências e ocorrências. Suporte a múltiplos filhos com seletor. |
 | Justificativas | Envio de justificativa de falta com suporte a múltiplos dias (checkbox "Justificativa para múltiplos dias"). Upload de anexo com compressão automática via Canvas API (redimensionamento para 1600px, qualidade JPEG 0.6) e otimização serverless via Edge Function. Envio fire-and-forget sem bloqueio da interface. Formulário permanece na tela após envio. |
 | Aviso de presença obrigatória | Badge urgente em alertas quando uma ocorrência exige a presença física do responsável na escola para liberar o retorno do estudante. |
-| Chat com horário protegido | Interface de chat com a coordenação escolar. Indicador de horário comercial (online/offline). Envio de mensagens desabilitado fora do horário letivo (segunda a sexta, 7h às 17h). Auto-scroll para novas mensagens. Horários configurados via `configuracoes_escola`. |
-
-## Funcionalidades Previstas
-
-### Recursos para os Professores
-
-- **Registro de Frequência por Exceção:** O professor não perderá tempo fazendo a chamada completa. O sistema assumirá que todos estão presentes; o docente gastará apenas poucos segundos para marcar quem faltou.
-- **Controle de Ausência na Aula:** Permitirá registrar quando o estudante entrou na escola pela manhã, mas se ausentou de uma aula específica ao longo do dia.
-- **Foco Restrito no Comportamento Extremo:** O aplicativo removerá o monitoramento de pequenas indisciplinas diárias para evitar perseguições. O professor só poderá registrar ocorrências de comportamento extremo que realmente ameacem a permanência do aluno na escola.
-
-### Recursos para os Admins (Direção e Coordenação)
-
-- **Painel Confidencial de Monitoramento:** Tela centralizada para monitorar a frequência geral da escola e identificar desvios imediatamente.
-- **Ranking de Priorização de Risco:** Um painel interno e estritamente secreto que organizará os estudantes em uma lista, do caso mais crítico ao mais leve, com base no acúmulo de ausências, apontando quem precisa de um contato urgente da equipe de monitoramento.
-- **Central de Ocorrências Graves e Suspensões:** Espaço para formalizar avisos prévios ou termos de suspensão, permitindo anexar o documento oficial digitalizado direto no sistema.
-- **Bloqueio de Retorno (Presença do Responsável):** Mecanismo que sinalizará no sistema que, após uma ocorrência grave, o estudante só poderá retornar às aulas presenciais mediante o comparecimento físico do seu responsável na escola.
-- **Validação de Justificativas:** Área para analisar, aceitar ou recusar os atestados e justificativas enviados digitalmente pelos pais.
-
-### Recursos para os Pais e Responsáveis
-
-- **Alerta de Ausência da Escola:** Notificação imediata logo no início do turno caso o estudante não cruze o portão de entrada da instituição.
-- **Alerta de Ausência na Aula:** Aviso ou resumo diário informando se o jovem estava na escola, mas deixou de assistir a algum período específico de aula.
-- **Termômetro de Atenção Visual:** Um indicador simples por cores (verde, amarelo e vermelho) que mostrará ao pai o acúmulo de riscos do filho de forma clara, sem termos complicados.
-- **Sistema de Anexo para Justificativas:** Opção para o responsável tirar foto de um atestado médico ou comprovante e enviar diretamente para a secretaria pelo celular.
-- **Aviso de Presença Obrigatória:** Alerta claro na tela do pai informando sobre a suspensão ou ocorrência grave e notificando a necessidade de sua ida presencial à escola para liberar o retorno do estudante.
-- **Canal de Diálogo com Horário Protegido:** Um chat direto com a coordenação que se desativará automaticamente fora do horário escolar, protegendo o descanso dos educadores e mantendo a conversa oficial e profissional.
-- **Acessibilidade e Simplicidade:** Telas limpas, com letras grandes, botões objetivos e comandos fáceis, desenhados sob medida para responsáveis que possuem pouca familiaridade com celulares ou dados limitados de internet.
+| Chat com horário protegido | Interface de chat com a coordenação escolar. Indicador de horário comercial (online/offline). Aviso exibido fora do horário letivo (segunda a sexta, 7h às 17h), mas envio permanece disponível. Auto-scroll para novas mensagens. Horário fixo (hardcoded), pendente de leitura via `configuracoes_escola`. |
+| Acessibilidade e simplicidade | Telas limpas com Bootstrap 5, mensagens em português claro sem jargão técnico, indicadores visuais de leitura instantânea (termômetro, badges), botões objetivos e instruções passo a passo. Compressão automática de imagens no cliente suporta qualquer câmera de celular. |
 
 ## Arquitetura
 

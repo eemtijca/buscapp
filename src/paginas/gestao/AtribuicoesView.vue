@@ -213,7 +213,9 @@ async function alternarAtivo(atribuicao: AtribuicaoItem) {
 }
 
 const papelBadge = (papel: string) => {
-  return papel === 'titular' ? 'text-bg-primary' : 'text-bg-info';
+  const idx = opcoesPapel.value.findIndex(p => p.valor === papel);
+  const cores = ['text-bg-primary', 'text-bg-info', 'text-bg-success', 'text-bg-warning'];
+  return cores[idx % cores.length] || 'text-bg-secondary';
 };
 
 onMounted(async () => {
@@ -292,7 +294,7 @@ onMounted(async () => {
               <td>{{ a.disciplina_nome ?? '—' }}</td>
               <td>
                 <span class="badge" :class="papelBadge(a.papel)">
-                  {{ a.papel === 'titular' ? 'Titular' : 'Substituto' }}
+                  {{ opcoesPapel.find(p => p.valor === a.papel)?.rotulo ?? a.papel }}
                 </span>
               </td>
               <td>{{ formatarData(a.data_inicio) }}</td>

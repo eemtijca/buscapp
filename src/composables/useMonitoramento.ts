@@ -25,26 +25,27 @@ import type {
   HorarioProtegido,
 } from '@/tipos/componentes';
 
-let cacheLimitesRisco: { critico: number; preventivo: number } | null = null;
+let cacheConfigSistema: { critico: number; preventivo: number; mensagemForaHorario: string } | null = null;
 
-async function carregarLimitesRisco(): Promise<void> {
-  if (cacheLimitesRisco) return;
+async function carregarConfigSistema(): Promise<void> {
+  if (cacheConfigSistema) return;
   try {
     const { data } = await supabaseClient
       .from('configuracoes_sistema')
-      .select('limite_critico_faltas, limite_preventivo_faltas')
+      .select('limite_critico_faltas, limite_preventivo_faltas, mensagem_fora_horario')
       .single();
-    cacheLimitesRisco = {
+    cacheConfigSistema = {
       critico: data?.limite_critico_faltas ?? 25,
       preventivo: data?.limite_preventivo_faltas ?? 10,
+      mensagemForaHorario: data?.mensagem_fora_horario ?? 'O canal de diálogo está fora do horário escolar. Mensagens enviadas agora serão respondidas quando a coordenação estiver disponível.',
     };
   } catch {
-    cacheLimitesRisco = { critico: 25, preventivo: 10 };
+    cacheConfigSistema = { critico: 25, preventivo: 10, mensagemForaHorario: 'O canal de diálogo está fora do horário escolar.' };
   }
 }
 
 function calcularNivelRisco(totalAusencias: number, totalOcorrencias: number): NivelRisco {
-  const l = cacheLimitesRisco ?? { critico: 25, preventivo: 10 };
+  const l = cacheConfigSistema ?? { critico: 25, preventivo: 10, mensagemForaHorario: '' };
   if (totalAusencias >= l.critico || totalOcorrencias >= 1) return 'alto';
   if (totalAusencias >= l.preventivo) return 'medio';
   return 'baixo';
@@ -353,7 +354,7 @@ export function useMonitoramento() {
   }
 
   async function buscarRankingRisco(): Promise<AlunoRisco[]> {
-    await carregarLimitesRisco();
+    await carregarConfigSistema();
     carregando.value = true;
     erro.value = null;
     try {
@@ -766,7 +767,7 @@ export function useMonitoramento() {
     alunoNome: string,
     alunoTurma: string | null,
   ): Promise<TermometroAtencao> {
-    await carregarLimitesRisco();
+    await carregarConfigSistema();
     try {
       const { data: freqs, error: errF } = await supabaseClient
         .from('frequencias')
@@ -1466,6 +1467,8 @@ export function useMonitoramento() {
 
   async function carregarHorarios(): Promise<HorarioProtegido> {
     if (cacheHorarios) return cacheHorarios;
+    await carregarConfigSistema();
+    const msg = cacheConfigSistema?.mensagemForaHorario ?? 'O canal de diálogo está fora do horário escolar.';
     try {
       const { data } = await supabaseClient
         .from('horarios_letivos')
@@ -1473,42 +1476,16 @@ export function useMonitoramento() {
         .eq('ativo', true)
         .order('dia_semana');
       if (!data || data.length === 0) {
-        cacheHorarios = {
-          inicio: '07:00',
-          fim: '17:00',
-          diasSemana: [1, 2, 3, 4, 5],
-          mensagemForaHorario:
-            'O canal de diálogo está fora do horário escolar (segunda a sexta, das 7h às 17h). ' +
-            'Mensagens enviadas agora serão respondidas quando a coordenação estiver disponível.',
-        };
+        cacheHorarios = { inicio: '07:00', fim: '17:00', diasSemana: [1, 2, 3, 4, 5], mensagemForaHorario: msg };
         return cacheHorarios;
       }
       const dias = [...new Set(data.map((h: { dia_semana: number }) => h.dia_semana))].sort();
-      const horasInicio = data
-        .filter((h: { dia_semana: number }) => h.dia_semana === dias[0])
-        .map((h: { hora_inicio: string }) => h.hora_inicio.slice(0, 5))
-        .sort()[0] ?? '07:00';
-      const horasFim = data
-        .filter((h: { dia_semana: number }) => h.dia_semana === dias[dias.length - 1])
-        .map((h: { hora_fim: string }) => h.hora_fim.slice(0, 5))
-        .sort()
-        .reverse()[0] ?? '17:00';
-      cacheHorarios = {
-        inicio: horasInicio,
-        fim: horasFim,
-        diasSemana: dias,
-        mensagemForaHorario: `O canal de diálogo está fora do horário escolar. Mensagens enviadas agora serão respondidas quando a coordenação estiver disponível.`,
-      };
+      const horasInicio = data.filter((h: { dia_semana: number }) => h.dia_semana === dias[0]).map((h: { hora_inicio: string }) => h.hora_inicio.slice(0, 5)).sort()[0] ?? '07:00';
+      const horasFim = data.filter((h: { dia_semana: number }) => h.dia_semana === dias[dias.length - 1]).map((h: { hora_fim: string }) => h.hora_fim.slice(0, 5)).sort().reverse()[0] ?? '17:00';
+      cacheHorarios = { inicio: horasInicio, fim: horasFim, diasSemana: dias, mensagemForaHorario: msg };
       return cacheHorarios;
     } catch {
-      cacheHorarios = {
-        inicio: '07:00',
-        fim: '17:00',
-        diasSemana: [1, 2, 3, 4, 5],
-        mensagemForaHorario:
-          'O canal de diálogo está fora do horário escolar (segunda a sexta, das 7h às 17h). ' +
-          'Mensagens enviadas agora serão respondidas quando a coordenação estiver disponível.',
-      };
+      cacheHorarios = { inicio: '07:00', fim: '17:00', diasSemana: [1, 2, 3, 4, 5], mensagemForaHorario: msg };
       return cacheHorarios;
     }
   }

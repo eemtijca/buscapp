@@ -1183,7 +1183,7 @@ echo ""; echo "=== 25. OPCÕES DE CONFIGURAÇÃO ==="
 HTTP=$(api_code GET "/rest/v1/opcoes_configuracao?tipo=eq.modulo&select=chave,rotulo,icone,ordem&order=ordem" '' "$TG")
 assert "25.1 gestao SELECT modulo 200" "200" "$HTTP"
 QTD_MOD=$(api_body | py "d=json.load(sys.stdin); print(len(d) if isinstance(d,list) else 0)" 2>/dev/null)
-assert "25.1 modulo tem 5 opcoes" "5" "$QTD_MOD"
+assert "25.1 modulo tem 2 opcoes" "2" "$QTD_MOD"
 
 # 25.2 Gestao INSERT nova opcao
 CFG_ID=$(UUID)

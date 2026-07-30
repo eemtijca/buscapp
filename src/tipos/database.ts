@@ -64,6 +64,7 @@ export interface ConfiguracaoSistema {
   limite_preventivo_faltas: number;
   dias_expurgo_anexos: number;
   escola_nome: string;
+  mensagem_fora_horario: string;
   updated_at: string;
 }
 

@@ -144,7 +144,7 @@ onMounted(carregar);
 
 <template>
   <div class="container py-4" style="max-width: 900px">
-    <div class="d-flex align-items-center gap-2 mb-4 flex-wrap">
+    <div class="d-flex gap-2 mb-1">
       <router-link to="/gestao" class="btn btn-sm btn-outline-success">
         <i class="bi bi-house me-1" aria-hidden="true"></i>
         Início
@@ -153,7 +153,9 @@ onMounted(carregar);
         <i class="bi bi-arrow-left me-1" aria-hidden="true"></i>
         Voltar
       </router-link>
-      <h1 class="h4 fw-bold mb-0 ms-2">Horários Letivos</h1>
+    </div>
+    <div class="d-flex align-items-center gap-2 mb-4 flex-wrap">
+      <h1 class="h4 fw-bold mb-0">Horários Letivos</h1>
       <button class="btn btn-success btn-sm ms-auto" @click="abrirNovo">
         <i class="bi bi-plus-lg"></i> Novo horário
       </button>

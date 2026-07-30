@@ -174,14 +174,14 @@ on conflict (codigo_sige) do nothing;
 -- 7. TAGS DE COMPORTAMENTO (RF16)
 -- ============================================================================
 insert into public.tags_comportamento (nome, categoria, icone, descricao, peso_pontuacao) values
-  ('Participativo',   'positivo', 'bi-hand-thumbs-up', 'Aluno participou ativamente da aula', 10),
-  ('Colaborativo',    'positivo', 'bi-people',         'Trabalhou bem em grupo',             10),
-  ('Pontual',         'positivo', 'bi-clock',          'Chegou no horário',                  5),
-  ('Protagonista',    'positivo', 'bi-star',           'Demonstrou iniciativa e liderança',   15),
-  ('Desatenção',      'atencao',  'bi-eye-slash',      'Dificuldade de concentração pontual', 0),
-  ('Uso de celular',  'atencao',  'bi-phone',          'Uso não autorizado de celular',      0),
-  ('Conversa paralela', 'atencao', 'bi-chat-dots',     'Conversa fora do contexto da aula',   0),
-  ('Sem material',    'atencao',  'bi-book',            'Não trouxe material necessário',     0)
+  ('Participativo',   'positivo', 'hand-thumbs-up', 'Aluno participou ativamente da aula', 10),
+  ('Colaborativo',    'positivo', 'people',         'Trabalhou bem em grupo',             10),
+  ('Pontual',         'positivo', 'clock',          'Chegou no horário',                  5),
+  ('Protagonista',    'positivo', 'star',           'Demonstrou iniciativa e liderança',   15),
+  ('Desatenção',      'atencao',  'eye-slash',      'Dificuldade de concentração pontual', 0),
+  ('Uso de celular',  'atencao',  'phone',          'Uso não autorizado de celular',      0),
+  ('Conversa paralela', 'atencao', 'chat-dots',     'Conversa fora do contexto da aula',   0),
+  ('Sem material',    'atencao',  'book',            'Não trouxe material necessário',     0)
 on conflict (nome) do nothing;
 
 -- ============================================================================
@@ -486,18 +486,9 @@ begin
   if not exists (select 1 from public.opcoes_configuracao where tipo = 'modulo') then
     insert into public.opcoes_configuracao (tipo, chave, rotulo, icone, ordem, ativo) values
       ('modulo', 'frequencia', 'Frequência', 'check2-square', 1, true),
-      ('modulo', 'ocorrencias', 'Ocorrências', 'exclamation-triangle', 2, true),
-      ('modulo', 'chat', 'Chat', 'chat-dots', 3, true),
-      ('modulo', 'relatorios', 'Relatórios', 'file-earmark-bar-graph', 4, true),
-      ('modulo', 'exportacao', 'Exportação', 'download', 5, true);
+      ('modulo', 'ocorrencias', 'Ocorrências', 'exclamation-triangle', 2, true);
   end if;
-  -- permissao
-  if not exists (select 1 from public.opcoes_configuracao where tipo = 'permissao') then
-    insert into public.opcoes_configuracao (tipo, chave, rotulo, icone, ordem, ativo) values
-      ('permissao', 'exportar', 'Exportar dados', 'file-earmark-arrow-down', 1, true),
-      ('permissao', 'importar', 'Importar planilhas', 'file-earmark-arrow-up', 2, true),
-      ('permissao', 'gerenciar_usuarios', 'Gerenciar usuários', 'people', 3, true);
-  end if;
+  -- permissao (vazio por enquanto — todas as funcionalidades são controladas por papel, não por permissão granular)
   -- documento
   if not exists (select 1 from public.opcoes_configuracao where tipo = 'documento') then
     insert into public.opcoes_configuracao (tipo, chave, rotulo, icone, ordem, ativo) values
@@ -554,16 +545,16 @@ begin
   -- serie_turma
   if not exists (select 1 from public.opcoes_configuracao where tipo = 'serie_turma') then
     insert into public.opcoes_configuracao (tipo, chave, rotulo, icone, ordem, ativo) values
-      ('serie_turma', '1º', '1º Ano', null, 1, true),
-      ('serie_turma', '2º', '2º Ano', null, 2, true),
-      ('serie_turma', '3º', '3º Ano', null, 3, true);
+      ('serie_turma', '1º', '1º', null, 1, true),
+      ('serie_turma', '2º', '2º', null, 2, true),
+      ('serie_turma', '3º', '3º', null, 3, true);
   end if;
   -- letra_turma
   if not exists (select 1 from public.opcoes_configuracao where tipo = 'letra_turma') then
     insert into public.opcoes_configuracao (tipo, chave, rotulo, icone, ordem, ativo) values
-      ('letra_turma', 'A', 'Turma A', null, 1, true),
-      ('letra_turma', 'B', 'Turma B', null, 2, true),
-      ('letra_turma', 'C', 'Turma C', null, 3, true);
+      ('letra_turma', 'A', 'A', null, 1, true),
+      ('letra_turma', 'B', 'B', null, 2, true),
+      ('letra_turma', 'C', 'C', null, 3, true);
   end if;
 end;
 $$;

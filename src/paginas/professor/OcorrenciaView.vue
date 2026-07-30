@@ -29,6 +29,13 @@ const { buscarOpcoes } = useOpcoesConfiguracao();
 const opcoesTipo = ref<OpcaoCheckbox[]>([]);
 const opcoesTags = ref<OpcaoCheckbox[]>([]);
 
+function corOcorrencia(valor: string): 'warning' | 'danger' | 'info' | 'success' | 'primary' {
+  const idx = opcoesTipo.value.findIndex(t => t.valor === valor);
+  const cols = ['warning', 'danger', 'info', 'success', 'primary'];
+  const pos = idx >= 0 ? idx % cols.length : 0;
+  return cols[pos] as 'warning' | 'danger' | 'info' | 'success' | 'primary';
+}
+
 const rotuloTipo = computed(() => {
   if (tipos.value.includes('suspensao')) return 'suspensão';
   if (tipos.value.includes('grave')) return 'ocorrência grave';
@@ -167,7 +174,7 @@ onMounted(async () => {
               v-for="op in opcoesTipo"
               :key="op.valor"
               :selecionado="tipos.includes(op.valor)"
-              :variante="op.valor === 'suspensao' ? 'danger' : 'warning'"
+              :variante="corOcorrencia(op.valor)"
               @click="
                 tipos = tipos.includes(op.valor)
                   ? tipos.filter((t) => t !== op.valor)

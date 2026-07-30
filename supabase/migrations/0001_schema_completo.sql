@@ -24,7 +24,7 @@ create type public.serie_turma as enum ('1º', '2º', '3º');
 create type public.letra_turma as enum ('A', 'B', 'C');
 create type public.tipo_registro_frequencia as enum ('entrada_portao', 'chamada_aula', 'saida');
 create type public.status_frequencia as enum ('presente', 'ausente', 'justificado');
-create type public.categoria_tag as enum ('positivo', 'atencao');
+create type public.categoria_tag as enum ('positivo', 'atencao', 'critico');
 create type public.tipo_ocorrencia as enum ('grave', 'suspensao');
 create type public.status_ocorrencia as enum ('aberta', 'em_andamento', 'resolvida', 'arquivada');
 create type public.tipo_contato_busca as enum ('telefone', 'whatsapp', 'presencial', 'carta', 'outro');
@@ -90,6 +90,7 @@ create table public.configuracoes_sistema (
   limite_preventivo_faltas integer not null default 10,
   dias_expurgo_anexos      integer not null default 30,
   escola_nome              text    not null default 'EEMTI',
+  mensagem_fora_horario    text    not null default 'O canal de diálogo está fora do horário escolar. Mensagens enviadas agora serão respondidas quando a coordenação estiver disponível.',
   updated_at               timestamptz not null default now(),
   constraint chk_sistema_singleton check (id = 1)
 );
@@ -1614,7 +1615,8 @@ select
     2
   ) as percentual_presenca,
   count(distinct rc.id) filter (where tc.categoria = 'positivo') as comportamentos_positivos,
-  count(distinct rc.id) filter (where tc.categoria = 'atencao') as comportamentos_atencao
+  count(distinct rc.id) filter (where tc.categoria = 'atencao') as comportamentos_atencao,
+  count(distinct rc.id) filter (where tc.categoria = 'critico') as comportamentos_criticos
 from public.turmas t
 join public.enturmacoes e on e.turma_id = t.id and e.status = 'matriculado'
 left join public.frequencias f on f.turma_id = t.id and f.deleted_at is null
@@ -2319,7 +2321,8 @@ select
     2
   ) as percentual_presenca,
   count(distinct rc.id) filter (where tc.categoria = 'positivo') as comportamentos_positivos,
-  count(distinct rc.id) filter (where tc.categoria = 'atencao') as comportamentos_atencao
+  count(distinct rc.id) filter (where tc.categoria = 'atencao') as comportamentos_atencao,
+  count(distinct rc.id) filter (where tc.categoria = 'critico') as comportamentos_criticos
 from public.turmas t
 join public.enturmacoes e on e.turma_id = t.id and e.status = 'matriculado'
 left join public.frequencias f on f.turma_id = t.id and f.deleted_at is null

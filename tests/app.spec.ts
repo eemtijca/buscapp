@@ -581,11 +581,11 @@ test.describe('Gestao - Usuario - Modulos e permissoes', () => {
   test('CT61 - Modulos de acesso sao selecionaveis', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/usuarios/novo');
-    await page.waitForSelector('#modulo-ocorrencias', { timeout: 10000 });
+    await page.waitForSelector('#modulo-frequencia', { timeout: 10000 });
+    await page.locator('#modulo-frequencia').check();
     await page.locator('#modulo-ocorrencias').check();
-    await page.locator('#modulo-chat').check();
+    await expect(page.locator('#modulo-frequencia')).toBeChecked();
     await expect(page.locator('#modulo-ocorrencias')).toBeChecked();
-    await expect(page.locator('#modulo-chat')).toBeChecked();
   });
 });
 
@@ -631,11 +631,11 @@ test.describe('Gestao - Turmas - Modal', () => {
     await page.waitForSelector('#campoSerie');
     const serieOptions = await page.locator('#campoSerie option').allTextContents();
     expect(serieOptions.length).toBeGreaterThanOrEqual(3);
-    expect(serieOptions).toContain('1º Ano');
-    expect(serieOptions).toContain('2º Ano');
+    expect(serieOptions).toContain('1º');
+    expect(serieOptions).toContain('2º');
     const letraOptions = await page.locator('#campoLetra option').allTextContents();
     expect(letraOptions.length).toBeGreaterThanOrEqual(3);
-    expect(letraOptions).toContain('Turma A');
+    expect(letraOptions).toContain('A');
     await page.click('button:has-text("Cancelar")');
   });
 });
@@ -708,9 +708,9 @@ test.describe('Gestao - Configuracao', () => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/configuracao/sistema');
     await expect(page.locator('h1')).toContainText('Configurações do Sistema');
-    await expect(page.locator('#cfg-escola-nome')).toBeVisible();
-    await expect(page.locator('#cfg-limite-critico')).toBeVisible();
-    await expect(page.locator('#cfg-limite-preventivo')).toBeVisible();
+    await expect(page.locator('#cfg-nome')).toBeVisible();
+    await expect(page.locator('#cfg-critico')).toBeVisible();
+    await expect(page.locator('#cfg-preventivo')).toBeVisible();
   });
 
   test('CT115 - Horarios carrega com tabela', async ({ page }) => {

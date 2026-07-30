@@ -20,7 +20,7 @@ const categorias = [
 
 <template>
   <div class="container py-4 py-md-5" style="max-width: 800px">
-    <router-link to="/gestao" class="btn btn-sm btn-outline-success mb-3">
+    <router-link to="/gestao" class="btn btn-sm btn-outline-success">
       <i class="bi bi-arrow-left me-1" aria-hidden="true"></i>
       Voltar ao início
     </router-link>

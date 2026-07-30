@@ -73,11 +73,18 @@ function abrirEditar(item: TagComportamento) {
   modalAberto.value = true;
 }
 
+function validarPeso(): boolean {
+  if (formPeso.value < -50) { mostrarErro('O peso mínimo é -50.'); return false; }
+  if (formPeso.value > 50) { mostrarErro('O peso máximo é +50.'); return false; }
+  return true;
+}
+
 async function salvar() {
   if (!formNome.value.trim()) {
     mostrarErro('Preencha o nome da tag.');
     return;
   }
+  if (!validarPeso()) return;
   carregando.value = true;
   try {
     if (modoEdicao.value && editandoId.value) {
@@ -144,7 +151,7 @@ onMounted(carregar);
 
 <template>
   <div class="container py-4" style="max-width: 960px">
-    <div class="d-flex align-items-center gap-2 mb-4 flex-wrap">
+    <div class="d-flex gap-2 mb-1">
       <router-link to="/gestao" class="btn btn-sm btn-outline-success">
         <i class="bi bi-house me-1" aria-hidden="true"></i>
         Início
@@ -153,7 +160,9 @@ onMounted(carregar);
         <i class="bi bi-arrow-left me-1" aria-hidden="true"></i>
         Voltar
       </router-link>
-      <h1 class="h4 fw-bold mb-0 ms-2">Tags de Comportamento</h1>
+    </div>
+    <div class="d-flex align-items-center gap-2 mb-4 flex-wrap">
+      <h1 class="h4 fw-bold mb-0">Tags de Comportamento</h1>
       <button class="btn btn-success btn-sm ms-auto" @click="abrirNovo">
         <i class="bi bi-plus-lg"></i> Nova tag
       </button>
@@ -189,7 +198,7 @@ onMounted(carregar);
           <tr v-for="item in tags" :key="item.id" :class="{ 'text-body-tertiary': !item.ativo }">
             <td><code>{{ item.nome }}</code></td>
             <td>
-              <span :class="'badge bg-' + (item.categoria === 'positivo' ? 'success' : 'warning')">
+              <span :class="'badge bg-' + (item.categoria === 'positivo' ? 'success' : item.categoria === 'atencao' ? 'warning' : 'danger')">
                 {{ item.categoria }}
               </span>
             </td>
@@ -242,6 +251,7 @@ onMounted(carregar);
               <select class="form-select" v-model="formCategoria">
                 <option value="positivo">Positivo</option>
                 <option value="atencao">Atenção</option>
+                <option value="critico">Crítico</option>
               </select>
             </div>
             <SeletorIcone v-model="formIcone" :desabilitado="carregando" />
@@ -249,7 +259,7 @@ onMounted(carregar);
               <input id="tag-descricao" v-model="formDescricao" type="text" class="form-control" :disabled="carregando" />
             </CampoFormulario>
             <CampoFormulario id="tag-peso" label="Peso/pontuação">
-              <input id="tag-peso" v-model.number="formPeso" type="number" class="form-control" :disabled="carregando" />
+              <input id="tag-peso" v-model.number="formPeso" type="number" class="form-control" :disabled="carregando" min="-50" max="50" />
             </CampoFormulario>
             <div class="form-check form-switch mt-3">
               <input class="form-check-input" type="checkbox" id="tag-ativo" v-model="formAtivo" />

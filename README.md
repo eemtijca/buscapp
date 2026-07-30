@@ -107,6 +107,7 @@ Projeto em desenvolvimento ativo. A infraestrutura central está concluída e os
 | Bootstrap Icons | 1.13.1 | Biblioteca de ícones |
 | Geist Sans / Geist Mono | 5.x | Fontes tipográficas via @fontsource |
 | jwt-decode | ^4.0.0 | Decodificação de JWT no cliente (evita requisição extra ao servidor) |
+| sortablejs | ^3.0.0 | Arrastar e soltar responsivo com suporte a toque, usado na reordenação de catálogos |
 | @popperjs/core | ^2.11.8 | Dependência do Bootstrap JS para tooltips e popovers |
 
 ### Backend e Infraestrutura
@@ -183,7 +184,7 @@ Projeto em desenvolvimento ativo. A infraestrutura central está concluída e os
 | Atribuições | Vínculo professor-turma-disciplina com suporte a professor titular e substituto e período de vigência. |
 | Gestão de códigos | Tela com fila de solicitações de código, lista de códigos ativos com status, opção de revogação e expiração automática após 1 hora. |
 | Notificações em tempo real | Badge de notificações não lidas atualizado via Supabase Realtime. |
-| Catálogos genéricos | CRUD completo para módulos, permissões, documentos, períodos, motivos de ausência, tipos de ocorrência, vínculos, papéis de atribuição, séries e letras de turma via interface unificada sobre a tabela `opcoes_configuracao`. |
+| Catálogos genéricos | CRUD completo para módulos, permissões, documentos, períodos, motivos de ausência, tipos de ocorrência, vínculos, papéis de atribuição, séries e letras de turma via interface unificada sobre a tabela `opcoes_configuracao`. A chave interna é gerada automaticamente a partir do nome. Reordenação por arrastar com modo protegido (salvar ou cancelar, sem escrita automática no banco). Seletor visual de ícones com busca e categorias. |
 | Tags de comportamento | Interface dedicada para gerenciar o catálogo de tags comportamentais com nome, categoria, ícone, descrição e peso de pontuação. |
 | Parâmetros do sistema | Edição dos limites crítico e preventivo de faltas, dias de expurgo de anexos e nome da escola. |
 | Horários letivos | CRUD de janelas de atendimento do chat com suporte a dias da semana e horários customizáveis. |
@@ -221,11 +222,12 @@ buscapp/
 │   │   ├── FormularioJustificativa.vue  # Formulário de envio de justificativa com suporte a múltiplos dias
 │   │   ├── IndicadorConexao.vue         # Indicador de status da conexão (verde/amarelo/vermelho)
 │   │   ├── ListaOcorrencias.vue         # Lista de ocorrências graves
+│   │   ├── SeletorIcone.vue            # Seletor visual de ícones Bootstrap com busca e categorias
 │   │   └── TermometroRisco.vue          # Termômetro visual de risco
 │   ├── composables/                     # Lógica de apresentação reutilizável
 │   │   ├── useAutenticacao.ts           # Login, logout, sessão, recuperação de senha
 │   │   ├── useGestaoUsuarios.ts         # CRUD de usuários, alunos, turmas, disciplinas, atribuições, códigos
-│   │   ├── useMonitoramento.ts          # Frequência, comportamento, ocorrências, ranking, risco, termômetro, chat
+│   │   ├── useMonitoramento.ts          # Frequência, comportamento, ocorrências, ranking, risco, termômetro, chat. Limites e horários lidos do banco com cache em memória.
 │   │   ├── useOpcoesConfiguracao.ts     # Busca em cache de opções configuráveis por tipo
 │   │   ├── useRealtimeRefresh.ts        # Canal de conexão Realtime e auto-refresh
 │   │   └── useStatusConexao.ts          # Health check periódico no Supabase Auth
@@ -256,11 +258,11 @@ buscapp/
 │   │   │   ├── TurmasView.vue
 │   │   │   ├── DisciplinasView.vue
 │   │   │   ├── AtribuicoesView.vue
-│   │   │   ├── GestaoConfiguracaoView.vue
-│   │   │   ├── GestaoConfiguracaoOpcoesView.vue
-│   │   │   ├── GestaoConfiguracaoTagsView.vue
-│   │   │   ├── GestaoConfiguracaoSistemaView.vue
-│   │   │   └── GestaoConfiguracaoHorariosView.vue
+│   │   │   ├── GestaoConfiguracaoView.vue              # Hub central com cartões de navegação
+│   │   │   ├── GestaoConfiguracaoOpcoesView.vue        # CRUD genérico com arrastar e soltar
+│   │   │   ├── GestaoConfiguracaoTagsView.vue          # Gerenciamento de tags de comportamento
+│   │   │   ├── GestaoConfiguracaoSistemaView.vue        # Parâmetros globais do sistema
+│   │   │   └── GestaoConfiguracaoHorariosView.vue       # Janelas de atendimento do chat
 │   │   ├── responsavel/                 # Páginas do responsável
 │   │   │   ├── HomeView.vue
 │   │   │   ├── AlertasView.vue

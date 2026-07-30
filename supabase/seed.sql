@@ -475,3 +475,95 @@ insert into public.monitoramento_acoes (aluno_id, responsavel_id, tipo_contato, 
     '2026-07-15 14:00:00-03',
     null
   );
+
+-- ============================================================================
+-- 9. OPCÕES DE CONFIGURAÇÃO (catálogo genérico)
+-- ============================================================================
+
+do $$
+begin
+  -- modulo
+  if not exists (select 1 from public.opcoes_configuracao where tipo = 'modulo') then
+    insert into public.opcoes_configuracao (tipo, chave, rotulo, icone, ordem, ativo) values
+      ('modulo', 'frequencia', 'Frequência', 'check2-square', 1, true),
+      ('modulo', 'ocorrencias', 'Ocorrências', 'exclamation-triangle', 2, true),
+      ('modulo', 'chat', 'Chat', 'chat-dots', 3, true),
+      ('modulo', 'relatorios', 'Relatórios', 'file-earmark-bar-graph', 4, true),
+      ('modulo', 'exportacao', 'Exportação', 'download', 5, true);
+  end if;
+  -- permissao
+  if not exists (select 1 from public.opcoes_configuracao where tipo = 'permissao') then
+    insert into public.opcoes_configuracao (tipo, chave, rotulo, icone, ordem, ativo) values
+      ('permissao', 'exportar', 'Exportar dados', 'file-earmark-arrow-down', 1, true),
+      ('permissao', 'importar', 'Importar planilhas', 'file-earmark-arrow-up', 2, true),
+      ('permissao', 'gerenciar_usuarios', 'Gerenciar usuários', 'people', 3, true);
+  end if;
+  -- documento
+  if not exists (select 1 from public.opcoes_configuracao where tipo = 'documento') then
+    insert into public.opcoes_configuracao (tipo, chave, rotulo, icone, ordem, ativo) values
+      ('documento', 'rg', 'RG', 'person-vcard', 1, true),
+      ('documento', 'cpf', 'CPF', 'credit-card', 2, true),
+      ('documento', 'certidao_nascimento', 'Certidão de Nascimento', 'file-earmark-text', 3, true),
+      ('documento', 'comprovante_residencia', 'Comprovante de Residência', 'house', 4, true),
+      ('documento', 'cartao_vacina', 'Cartão de Vacina', 'heart-pulse', 5, true),
+      ('documento', 'nis', 'NIS', 'person-badge', 6, true);
+  end if;
+  -- periodo
+  if not exists (select 1 from public.opcoes_configuracao where tipo = 'periodo') then
+    insert into public.opcoes_configuracao (tipo, chave, rotulo, icone, ordem, ativo) values
+      ('periodo', 'Dia completo', 'Dia completo', 'calendar-check', 1, true),
+      ('periodo', '1º Horário', '1º Horário', null, 2, true),
+      ('periodo', '2º Horário', '2º Horário', null, 3, true),
+      ('periodo', '3º Horário', '3º Horário', null, 4, true),
+      ('periodo', '4º Horário', '4º Horário', null, 5, true),
+      ('periodo', 'Manhã', 'Manhã', 'sun', 6, true),
+      ('periodo', 'Tarde', 'Tarde', 'sunset', 7, true);
+  end if;
+  -- motivo_ausencia
+  if not exists (select 1 from public.opcoes_configuracao where tipo = 'motivo_ausencia') then
+    insert into public.opcoes_configuracao (tipo, chave, rotulo, icone, ordem, ativo) values
+      ('motivo_ausencia', 'enfermaria', 'Enfermaria', 'heart-pulse', 1, true),
+      ('motivo_ausencia', 'orientacao', 'Orientação pedagógica', 'people', 2, true),
+      ('motivo_ausencia', 'saida_antecipada', 'Saída antecipada', 'door-open', 3, true),
+      ('motivo_ausencia', 'conselho_tutelar', 'Conselho tutelar', 'shield-check', 4, true),
+      ('motivo_ausencia', 'atendimento_psicologico', 'Atendimento psicológico', 'heart', 5, true),
+      ('motivo_ausencia', 'atividade_externa', 'Atividade externa', 'briefcase', 6, true);
+  end if;
+  -- tipo_ocorrencia
+  if not exists (select 1 from public.opcoes_configuracao where tipo = 'tipo_ocorrencia') then
+    insert into public.opcoes_configuracao (tipo, chave, rotulo, icone, ordem, ativo) values
+      ('tipo_ocorrencia', 'grave', 'Ocorrência grave', 'exclamation-triangle', 1, true),
+      ('tipo_ocorrencia', 'suspensao', 'Suspensão', 'shield-exclamation', 2, true);
+  end if;
+  -- tipo_vinculo
+  if not exists (select 1 from public.opcoes_configuracao where tipo = 'tipo_vinculo') then
+    insert into public.opcoes_configuracao (tipo, chave, rotulo, icone, ordem, ativo) values
+      ('tipo_vinculo', 'pai', 'Pai', null, 1, true),
+      ('tipo_vinculo', 'mae', 'Mãe', null, 2, true),
+      ('tipo_vinculo', 'tutor', 'Tutor', null, 3, true),
+      ('tipo_vinculo', 'avo', 'Avó/Avô', null, 4, true),
+      ('tipo_vinculo', 'irmao', 'Irmão/Irmã', null, 5, true),
+      ('tipo_vinculo', 'outro', 'Outro', null, 6, true);
+  end if;
+  -- papel_atribuicao
+  if not exists (select 1 from public.opcoes_configuracao where tipo = 'papel_atribuicao') then
+    insert into public.opcoes_configuracao (tipo, chave, rotulo, icone, ordem, ativo) values
+      ('papel_atribuicao', 'titular', 'Titular', null, 1, true),
+      ('papel_atribuicao', 'substituto', 'Substituto', null, 2, true);
+  end if;
+  -- serie_turma
+  if not exists (select 1 from public.opcoes_configuracao where tipo = 'serie_turma') then
+    insert into public.opcoes_configuracao (tipo, chave, rotulo, icone, ordem, ativo) values
+      ('serie_turma', '1º', '1º Ano', null, 1, true),
+      ('serie_turma', '2º', '2º Ano', null, 2, true),
+      ('serie_turma', '3º', '3º Ano', null, 3, true);
+  end if;
+  -- letra_turma
+  if not exists (select 1 from public.opcoes_configuracao where tipo = 'letra_turma') then
+    insert into public.opcoes_configuracao (tipo, chave, rotulo, icone, ordem, ativo) values
+      ('letra_turma', 'A', 'Turma A', null, 1, true),
+      ('letra_turma', 'B', 'Turma B', null, 2, true),
+      ('letra_turma', 'C', 'Turma C', null, 3, true);
+  end if;
+end;
+$$;

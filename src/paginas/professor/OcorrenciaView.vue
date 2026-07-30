@@ -3,11 +3,12 @@ import { computed, onMounted, ref, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAutenticacao } from '@/composables/useAutenticacao';
 import { useMonitoramento } from '@/composables/useMonitoramento';
+import { useOpcoesConfiguracao } from '@/composables/useOpcoesConfiguracao';
+import { supabaseClient } from '@/servicos/supabase';
 import CampoFormulario from '@/componentes/CampoFormulario.vue';
 import GrupoCheckbox from '@/componentes/GrupoCheckbox.vue';
 import CartaoSelecao from '@/componentes/CartaoSelecao.vue';
-import type { AlunoFrequencia } from '@/tipos/componentes';
-import { TAGS_COMPORTAMENTO } from '@/tipos/componentes';
+import type { AlunoFrequencia, OpcaoCheckbox } from '@/tipos/componentes';
 
 const router = useRouter();
 const { usuario } = useAutenticacao();
@@ -24,16 +25,9 @@ const notificarResponsavel = ref(false);
 const mensagemSucesso = ref<string | null>(null);
 const mensagemErro = ref<string | null>(null);
 
-const opcoesTipo = [
-  { valor: 'grave', rotulo: 'Ocorrência grave', icone: 'exclamation-triangle' },
-  { valor: 'suspensao', rotulo: 'Suspensão', icone: 'shield-exclamation' },
-];
-
-const opcoesTags = Object.entries(TAGS_COMPORTAMENTO).map(([valor, info]) => ({
-  valor,
-  rotulo: info.rotulo,
-  icone: info.icone,
-}));
+const { buscarOpcoes } = useOpcoesConfiguracao();
+const opcoesTipo = ref<OpcaoCheckbox[]>([]);
+const opcoesTags = ref<OpcaoCheckbox[]>([]);
 
 const rotuloTipo = computed(() => {
   if (tipos.value.includes('suspensao')) return 'suspensão';
@@ -43,7 +37,7 @@ const rotuloTipo = computed(() => {
 
 const descricaoSugerida = computed(() => {
   if (!tags.value.length) return '';
-  const nomes = tags.value.map((t) => opcoesTags.find((o) => o.valor === t)?.rotulo ?? t);
+  const nomes = tags.value.map((t) => opcoesTags.value.find((o) => o.valor === t)?.rotulo ?? t);
   return `Relato de ${rotuloTipo.value}: ${nomes.join(', ')}. `;
 });
 
@@ -102,6 +96,17 @@ async function confirmar() {
 }
 
 onMounted(async () => {
+  opcoesTipo.value = await buscarOpcoes('tipo_ocorrencia');
+  const { data: tagsData } = await supabaseClient
+    .from('tags_comportamento')
+    .select('nome, icone, descricao')
+    .eq('ativo', true)
+    .order('nome');
+  opcoesTags.value = (tagsData ?? []).map((t: { nome: string; icone: string | null; descricao: string | null }) => ({
+    valor: t.nome,
+    rotulo: t.descricao ?? t.nome,
+    icone: t.icone ?? undefined,
+  }));
   alunos.value = await buscarAlunosParaFrequencia();
 });
 </script>

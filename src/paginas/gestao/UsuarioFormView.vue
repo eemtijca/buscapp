@@ -2,6 +2,7 @@
 import { onMounted, ref, watch, nextTick } from 'vue';
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router';
 import { useGestaoUsuarios } from '@/composables/useGestaoUsuarios';
+import { useOpcoesConfiguracao } from '@/composables/useOpcoesConfiguracao';
 import { supabaseClient } from '@/servicos/supabase';
 import CampoFormulario from '@/componentes/CampoFormulario.vue';
 import GrupoCheckbox from '@/componentes/GrupoCheckbox.vue';
@@ -11,10 +12,12 @@ import type {
   AtribuicaoProfessor,
   VinculoResponsavel,
 } from '@/tipos/database';
+import type { OpcaoCheckbox } from '@/tipos/componentes';
 
 const route = useRoute();
 const router = useRouter();
 const { buscarUsuarios, criarUsuario, atualizarUsuario, carregando, erro } = useGestaoUsuarios();
+const { buscarOpcoes } = useOpcoesConfiguracao();
 
 const modoEdicao = ref(false);
 const usuarioId = ref<string | null>(null);
@@ -29,19 +32,8 @@ const notificacoesAtivas = ref(true);
 const acessoModulos = ref<string[]>(['frequencia']);
 const permissoes = ref<string[]>([]);
 
-const opcoesModulos = [
-  { valor: 'frequencia', rotulo: 'Frequência', icone: 'check2-square' },
-  { valor: 'ocorrencias', rotulo: 'Ocorrências', icone: 'exclamation-triangle' },
-  { valor: 'chat', rotulo: 'Chat', icone: 'chat-dots' },
-  { valor: 'relatorios', rotulo: 'Relatórios', icone: 'file-earmark-bar-graph' },
-  { valor: 'exportacao', rotulo: 'Exportação', icone: 'download' },
-];
-
-const opcoesPermissoes = [
-  { valor: 'exportar', rotulo: 'Exportar dados', icone: 'file-earmark-arrow-down' },
-  { valor: 'importar', rotulo: 'Importar planilhas', icone: 'file-earmark-arrow-up' },
-  { valor: 'gerenciar_usuarios', rotulo: 'Gerenciar usuários', icone: 'people' },
-];
+const opcoesModulos = ref<OpcaoCheckbox[]>([]);
+const opcoesPermissoes = ref<OpcaoCheckbox[]>([]);
 
 const atribuicoes = ref<(AtribuicaoProfessor & { turma_nome?: string })[]>([]);
 const vinculos = ref<(VinculoResponsavel & { aluno_nome?: string })[]>([]);
@@ -134,6 +126,8 @@ async function copiarCodigoCriado() {
 }
 
 onMounted(async () => {
+  opcoesModulos.value = await buscarOpcoes('modulo');
+  opcoesPermissoes.value = await buscarOpcoes('permissao');
   const id = route.params.id as string | undefined;
   if (id) {
     modoEdicao.value = true;

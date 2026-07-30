@@ -1,15 +1,5 @@
 import type { PapelPerfil, StatusPerfil, StatusAluno } from './database';
 
-export const TAGS_COMPORTAMENTO: Record<string, { rotulo: string; icone: string }> = {
-  agressao_verbal: { rotulo: 'Agressão verbal', icone: 'chat-quote' },
-  agressao_fisica: { rotulo: 'Agressão física', icone: 'hand-index' },
-  desacato: { rotulo: 'Desacato', icone: 'person-fill-exclamation' },
-  dano_patrimonio: { rotulo: 'Dano ao patrimônio', icone: 'building-dash' },
-  bullying: { rotulo: 'Bullying', icone: 'people-fill' },
-  descumprimento_regras: { rotulo: 'Descumprimento de regras', icone: 'file-earmark-x' },
-  saida_nao_autorizada: { rotulo: 'Saída não autorizada', icone: 'door-open' },
-};
-
 export interface LinkNav {
   rotulo: string;
   url: string;

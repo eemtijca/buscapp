@@ -23,6 +23,11 @@ import GestaoTurmasView from '@/paginas/gestao/TurmasView.vue';
 import GestaoDisciplinasView from '@/paginas/gestao/DisciplinasView.vue';
 import GestaoAtribuicoesView from '@/paginas/gestao/AtribuicoesView.vue';
 import GestaoChatView from '@/paginas/gestao/GestaoChatView.vue';
+import GestaoConfiguracaoView from '@/paginas/gestao/GestaoConfiguracaoView.vue';
+import GestaoConfiguracaoOpcoesView from '@/paginas/gestao/GestaoConfiguracaoOpcoesView.vue';
+import GestaoConfiguracaoTagsView from '@/paginas/gestao/GestaoConfiguracaoTagsView.vue';
+import GestaoConfiguracaoSistemaView from '@/paginas/gestao/GestaoConfiguracaoSistemaView.vue';
+import GestaoConfiguracaoHorariosView from '@/paginas/gestao/GestaoConfiguracaoHorariosView.vue';
 import ResponsavelHomeView from '@/paginas/responsavel/HomeView.vue';
 import ResponsavelAlertasView from '@/paginas/responsavel/AlertasView.vue';
 import ResponsavelTermometroView from '@/paginas/responsavel/TermometroView.vue';
@@ -209,6 +214,36 @@ const router = createRouter({
           name: 'gestao-chat',
           meta: { requerAutenticacao: true, papeisPermitidos: ['gestao'] },
           component: GestaoChatView,
+        },
+        {
+          path: 'configuracao',
+          name: 'gestao-configuracao',
+          meta: { requerAutenticacao: true, papeisPermitidos: ['gestao'] },
+          component: GestaoConfiguracaoView,
+        },
+        {
+          path: 'configuracao/:tipo',
+          name: 'gestao-configuracao-opcoes',
+          meta: { requerAutenticacao: true, papeisPermitidos: ['gestao'] },
+          component: GestaoConfiguracaoOpcoesView,
+        },
+        {
+          path: 'configuracao/tags',
+          name: 'gestao-configuracao-tags',
+          meta: { requerAutenticacao: true, papeisPermitidos: ['gestao'] },
+          component: GestaoConfiguracaoTagsView,
+        },
+        {
+          path: 'configuracao/sistema',
+          name: 'gestao-configuracao-sistema',
+          meta: { requerAutenticacao: true, papeisPermitidos: ['gestao'] },
+          component: GestaoConfiguracaoSistemaView,
+        },
+        {
+          path: 'configuracao/horarios',
+          name: 'gestao-configuracao-horarios',
+          meta: { requerAutenticacao: true, papeisPermitidos: ['gestao'] },
+          component: GestaoConfiguracaoHorariosView,
         },
       ],
     },

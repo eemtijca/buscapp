@@ -6,7 +6,7 @@ import { useMonitoramento } from '@/composables/useMonitoramento';
 import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh';
 import CartaoAlertaResponsavel from '@/componentes/CartaoAlertaResponsavel.vue';
 import type { AlertaResponsavel } from '@/tipos/componentes';
-import { TAGS_COMPORTAMENTO } from '@/tipos/componentes';
+import { supabaseClient } from '@/servicos/supabase';
 
 const router = useRouter();
 const { usuario } = useAutenticacao();
@@ -16,6 +16,20 @@ const { ultimaAtualizacao, estaAtualizando, atualizar: refresh } = useRealtimeRe
 const alertas = ref<AlertaResponsavel[]>([]);
 const alertaSelecionado = ref<AlertaResponsavel | null>(null);
 const mostrarModal = ref(false);
+
+const tagsMap = ref<Record<string, { rotulo: string; icone: string }>>({});
+
+async function carregarTags() {
+  const { data } = await supabaseClient
+    .from('tags_comportamento')
+    .select('nome, icone, descricao')
+    .eq('ativo', true);
+  const map: Record<string, { rotulo: string; icone: string }> = {};
+  for (const t of data ?? []) {
+    map[t.nome] = { rotulo: t.descricao ?? t.nome, icone: t.icone ?? 'tag' };
+  }
+  tagsMap.value = map;
+}
 
 function abrirJustificativa(payload: { alertaId: string; frequenciaId?: string }) {
   const query: Record<string, string> = {};
@@ -51,6 +65,7 @@ async function atualizarManual() {
 }
 
 onMounted(async () => {
+  await carregarTags();
   await carregarAlertas();
 });
 </script>
@@ -308,10 +323,10 @@ onMounted(async () => {
                     class="badge text-bg-warning-subtle text-warning-emphasis small d-inline-flex align-items-center gap-1"
                   >
                     <i
-                      :class="'bi bi-' + (TAGS_COMPORTAMENTO[tag]?.icone ?? 'tag')"
+                      :class="'bi bi-' + (tagsMap[tag]?.icone ?? 'tag')"
                       aria-hidden="true"
                     ></i>
-                    {{ TAGS_COMPORTAMENTO[tag]?.rotulo ?? tag }}
+                    {{ tagsMap[tag]?.rotulo ?? tag }}
                   </span>
                 </div>
               </div>

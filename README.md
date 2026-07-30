@@ -55,7 +55,7 @@ Projeto em desenvolvimento ativo. A infraestrutura central está concluída e os
 - Autenticação com Supabase Auth (email/senha) e JWT com custom claims (nome, papel) via Custom Access Token Hook
 - RBAC com três papéis (professor, gestão, responsável) e guardas de rota no Vue Router
 - Storage adaptativo: localStorage para "lembrar-me", sessionStorage para sessões temporárias
-- Banco de dados PostgreSQL com 27 tabelas, 5 views analíticas, 22 enums, 40+ índices
+- Banco de dados PostgreSQL com 28 tabelas, 5 views analíticas, 18 enums, 40+ índices
 - Row-Level Security (RLS) em todas as tabelas com políticas por papel
 - Triggers: criação automática de perfil ao criar usuário em auth.users
 - Extensões pgcrypto e pg_trgm
@@ -81,13 +81,16 @@ Projeto em desenvolvimento ativo. A infraestrutura central está concluída e os
 - Tratamento e tradução de erros do Supabase Auth para português
 - Páginas de erro personalizadas (403, 404, 500) com redirecionamento automático
 - Páginas responsivas com Bootstrap 5
+- Sistema de configuração 100% data-driven com catálogo genérico `opcoes_configuracao`: módulos, permissões, documentos, períodos, motivos de ausência, tipos de ocorrência, vínculos, papéis de atribuição, séries e letras de turma — todos configuráveis via interface de administração
+- Tags de comportamento gerenciáveis via interface dedicada (anteriormente hardcoded no código-fonte)
+- Parâmetros globais do sistema (limite crítico de faltas, limite preventivo, dias de expurgo de anexos, nome da escola) configuráveis via interface
+- Horários letivos (janelas de atendimento do chat) gerenciáveis via CRUD
 - Testes em 4 camadas: TypeScript, Banco de Dados (PL/pgSQL), API (bash/curl), E2E (Playwright)
 - CI/CD: CodeQL (GitHub Actions) + Vercel
 
 ### Em Andamento
 
 - Gamificação entre turmas (estrutura de dados e views prontas, frontend não conectado)
-- Sistema de comportamento com tags (schema do banco e tipos definidos, tags integradas ao registro de ocorrências e exibição de alertas, sem interface dedicada de gerenciamento)
 - Notificações push
 
 ## Stack Tecnológico
@@ -180,6 +183,10 @@ Projeto em desenvolvimento ativo. A infraestrutura central está concluída e os
 | Atribuições | Vínculo professor-turma-disciplina com suporte a professor titular e substituto e período de vigência. |
 | Gestão de códigos | Tela com fila de solicitações de código, lista de códigos ativos com status, opção de revogação e expiração automática após 1 hora. |
 | Notificações em tempo real | Badge de notificações não lidas atualizado via Supabase Realtime. |
+| Catálogos genéricos | CRUD completo para módulos, permissões, documentos, períodos, motivos de ausência, tipos de ocorrência, vínculos, papéis de atribuição, séries e letras de turma via interface unificada sobre a tabela `opcoes_configuracao`. |
+| Tags de comportamento | Interface dedicada para gerenciar o catálogo de tags comportamentais com nome, categoria, ícone, descrição e peso de pontuação. |
+| Parâmetros do sistema | Edição dos limites crítico e preventivo de faltas, dias de expurgo de anexos e nome da escola. |
+| Horários letivos | CRUD de janelas de atendimento do chat com suporte a dias da semana e horários customizáveis. |
 
 ### Módulo Responsável
 
@@ -189,7 +196,7 @@ Projeto em desenvolvimento ativo. A infraestrutura central está concluída e os
 | Termômetro de atenção | Indicador visual com barra de progresso colorida (verde/amarelo/vermelho) que mostra o nível de risco acumulado do estudante. Cálculo baseado em ausências e ocorrências. Suporte a múltiplos filhos com seletor. |
 | Justificativas | Envio de justificativa de falta com suporte a múltiplos dias (checkbox "Justificativa para múltiplos dias"). Upload de anexo com compressão automática via Canvas API (redimensionamento para 1600px, qualidade JPEG 0.6) e otimização serverless via Edge Function. Envio fire-and-forget sem bloqueio da interface. Formulário permanece na tela após envio. |
 | Aviso de presença obrigatória | Badge urgente em alertas quando uma ocorrência exige a presença física do responsável na escola para liberar o retorno do estudante. |
-| Chat com horário protegido | Interface de chat com a coordenação escolar. Indicador de horário comercial (online/offline). Aviso exibido fora do horário letivo (segunda a sexta, 7h às 17h), mas envio permanece disponível. Auto-scroll para novas mensagens. Horário fixo (hardcoded), pendente de leitura via `configuracoes_escola`. |
+| Chat com horário protegido | Interface de chat com a coordenação escolar. Indicador de horário comercial (online/offline) baseado nos horários letivos cadastrados na tabela `horarios_letivos`. Auto-scroll para novas mensagens. |
 | Acessibilidade e simplicidade | Telas limpas com Bootstrap 5, mensagens em português claro sem jargão técnico, indicadores visuais de leitura instantânea (termômetro, badges), botões objetivos e instruções passo a passo. Compressão automática de imagens no cliente suporta qualquer câmera de celular. |
 
 ## Arquitetura
@@ -219,6 +226,7 @@ buscapp/
 │   │   ├── useAutenticacao.ts           # Login, logout, sessão, recuperação de senha
 │   │   ├── useGestaoUsuarios.ts         # CRUD de usuários, alunos, turmas, disciplinas, atribuições, códigos
 │   │   ├── useMonitoramento.ts          # Frequência, comportamento, ocorrências, ranking, risco, termômetro, chat
+│   │   ├── useOpcoesConfiguracao.ts     # Busca em cache de opções configuráveis por tipo
 │   │   ├── useRealtimeRefresh.ts        # Canal de conexão Realtime e auto-refresh
 │   │   └── useStatusConexao.ts          # Health check periódico no Supabase Auth
 │   ├── layouts/
@@ -247,7 +255,12 @@ buscapp/
 │   │   │   ├── CodigosView.vue
 │   │   │   ├── TurmasView.vue
 │   │   │   ├── DisciplinasView.vue
-│   │   │   └── AtribuicoesView.vue
+│   │   │   ├── AtribuicoesView.vue
+│   │   │   ├── GestaoConfiguracaoView.vue
+│   │   │   ├── GestaoConfiguracaoOpcoesView.vue
+│   │   │   ├── GestaoConfiguracaoTagsView.vue
+│   │   │   ├── GestaoConfiguracaoSistemaView.vue
+│   │   │   └── GestaoConfiguracaoHorariosView.vue
 │   │   ├── responsavel/                 # Páginas do responsável
 │   │   │   ├── HomeView.vue
 │   │   │   ├── AlertasView.vue
@@ -345,7 +358,7 @@ Navegador (SPA Vue 3 + TypeScript + Vite)
         v
 PostgreSQL 17 (gerenciado pelo Supabase)
        +--> auth schema (GoTrue: usuários, sessões)
-       +--> public schema (27 tabelas, 5 views, 22 enums, 40+ índices)
+       +--> public schema (28 tabelas, 5 views, 18 enums, 40+ índices)
        +--> RLS: políticas por linha para cada papel
        +--> Extensões: pgcrypto, pg_trgm
        +--> Realtime: publicação de tabelas via logical replication
@@ -363,7 +376,7 @@ PostgreSQL 17 (gerenciado pelo Supabase)
 
 ## Banco de Dados
 
-O banco de dados é gerenciado pelo Supabase (PostgreSQL 17) com 27 tabelas, 5 views, 22 enums e mais de 40 índices. Todas as tabelas possuem RLS (Row-Level Security) habilitado, com políticas específicas para cada papel (professor, gestão, responsável).
+O banco de dados é gerenciado pelo Supabase (PostgreSQL 17) com 28 tabelas, 5 views, 18 enums e mais de 40 índices. Todas as tabelas possuem RLS (Row-Level Security) habilitado, com políticas específicas para cada papel (professor, gestão, responsável).
 
 ### Principais Tabelas
 
@@ -430,6 +443,7 @@ O banco de dados é gerenciado pelo Supabase (PostgreSQL 17) com 27 tabelas, 5 v
 |--------|-----------|
 | `configuracoes_escola` | Configurações chave-valor da escola (horários de chat, etc.). |
 | `configuracoes_sistema` | Parâmetros do sistema (limites de ausência crítica, dias de expiração). |
+| `opcoes_configuracao` | Catálogo genérico de opções configuráveis pela gestão (módulos, permissões, documentos, períodos, motivos de ausência, tipos de ocorrência, vínculos, papéis de atribuição, séries e letras de turma). |
 
 ### Views Analíticas
 
@@ -608,7 +622,7 @@ O projeto possui quatro camadas de teste independentes.
 ### Testes de Banco de Dados (PL/pgSQL)
 
 - **Arquivo:** `supabase/tests/0001_validacao_completa.sql`
-- **Cobertura:** 846 linhas de testes transacionais (executados dentro de uma transação e revertidos ao final). Inclui:
+- **Cobertura:** 925 linhas de testes transacionais (executados dentro de uma transação e revertidos ao final). Inclui:
   - Testes de constraints (chaves estrangeiras, unicidade, check)
   - Testes de triggers (criação automática de perfil)
   - Testes de RLS para todos os papéis (gestão, professor, responsável, usuário não autenticado)
@@ -616,12 +630,15 @@ O projeto possui quatro camadas de teste independentes.
   - Testes de todas as views analíticas
   - Testes de geração, expiração, revogação e validação de códigos de redefinição
   - Testes de casos extremos (limites, dados maliciosos)
+  - Testes de validação da tabela `opcoes_configuracao` (estrutura, RLS, UNIQUE, seed)
+  - Testes de verificação de conversão de colunas enum para text
+  - Testes de remoção dos tipos enum antigos
 - **Execução:** `npm run test:db` (executa dentro do container Docker do Supabase)
 
 ### Testes de API (Bash + curl)
 
-- **Arquivo:** `scripts/test-api.sh` (~245 asserts em 25 seções)
-- **Cobertura:** 245 asserts distribuídos em:
+- **Arquivo:** `scripts/test-api.sh` (253 asserts em 25 seções)
+- **Cobertura:** 253 asserts distribuídos em:
   - Autenticação (login, logout, claims do JWT)
   - Edge Functions (solicitar-codigo, redefinir-senha-codigo, criar-usuario, processar-anexo)
   - Funções RPC (gerar código, revogar código)
@@ -633,14 +650,16 @@ O projeto possui quatro camadas de teste independentes.
   - Ciclo completo de justificativas com anexos (upload, RLS, auto-justify via trigger)
   - Compressão de anexos via Edge Function (upload, processamento, verificação de metadados)
   - Chat: CRUD de conversas, envio de mensagens, RLS, trigger de notificação, integridade (unicode, SQL injection, 10k caracteres), cascade, concorrência
+  - Catálogo de configuração: CRUD completo da tabela `opcoes_configuracao`, verificação de RLS por papel, inserção em colunas convertidas de enum para text (`serie="4º"`, `tipo_relacao="primo"`, `papel="monitor"`)
 - **Execução:** `npm run test:api` (requer Supabase local + seed executado)
 
 ### Testes E2E (Playwright)
 
 - **Arquivo:** `tests/app.spec.ts`
-- **Cobertura:** 88 casos de teste em 3 ambientes de navegador:
-  - Chromium, Firefox, WebKit
-  - Fluxos testados: login, logout, credenciais inválidas, gestão (home, usuários, alunos, códigos), professor (frequência, ocorrências), responsável (chat, home, alertas, justificativas), notificações (popover, marcar lidas, limpar todas), chat completo (sidebar, mensagens, busca, header), resiliência, casos extremos
+- **Cobertura:** 115 casos de teste em 5 configurações de navegador:
+  - Chromium, Firefox, WebKit, Mobile Chrome, Mobile Safari
+  - Fluxos testados: login, logout, credenciais inválidas, gestão (home, usuários, alunos, códigos, turmas, modal de atribuições), professor (frequência, ausência, ocorrências), responsável (chat, home, alertas, justificativas), notificações (popover, marcar lidas, limpar todas), chat completo (sidebar, mensagens, busca, header), resiliência, casos extremos
+  - **Configuração do sistema:** hub de configuração, CRUD de opções genéricas, gerenciamento de tags de comportamento, parâmetros do sistema, horários letivos, verificações de carregamento dinâmico de opções do banco de dados em formulários
 - **Execução:** `npm run test:e2e` (requer Supabase local + seed + servidor dev em execução)
 - **Configuração:** `playwright.config.ts` com 3 projetos, dev server auto-start, CI detection
 

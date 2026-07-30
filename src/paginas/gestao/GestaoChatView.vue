@@ -27,7 +27,7 @@ const contatoAtivo = ref<ContatoChat | null>(null);
 const horarioAtivo = ref(false);
 const enviando = ref(false);
 const carregandoContatos = ref(true);
-const horarioConfig = obterHorarioProtegido();
+const horarioConfig = ref({ inicio: '07:00', fim: '17:00', diasSemana: [1, 2, 3, 4, 5], mensagemForaHorario: '' });
 const statusMsg = ref<string | null>(null);
 const confirmandoExcluir = ref(false);
 const ocultarConvId = ref<string | null>(null);
@@ -175,6 +175,7 @@ function handleVoltar() {
 }
 
 onMounted(async () => {
+  horarioConfig.value = await obterHorarioProtegido();
   horarioAtivo.value = horarioProtegidoAtivo();
   if (usuario.value) {
     await carregarContatos();

@@ -272,6 +272,25 @@ create table public.tags_comportamento (
 comment on table public.tags_comportamento is 'RF16: Catálogo de chips/tags de comportamento. peso_pontuacao usado na gamificação (RF28).';
 
 -- ============================================================================
+-- 5.1 OPÇÕES DE CONFIGURAÇÃO (catálogo genérico)
+-- ============================================================================
+
+create table public.opcoes_configuracao (
+  id          uuid        primary key default gen_random_uuid(),
+  tipo        text        not null,
+  chave       text        not null,
+  rotulo      text        not null,
+  icone       text,
+  ordem       integer     not null default 0,
+  ativo       boolean     not null default true,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now(),
+  unique (tipo, chave)
+);
+
+comment on table public.opcoes_configuracao is 'Catálogo genérico de opções configuráveis pela gestão (módulos, permissões, documentos, períodos, motivos, vínculos, séries, letras, etc.).';
+
+-- ============================================================================
 -- 6. TABELAS — OPERACIONAIS (FREQUÊNCIA, COMPORTAMENTO, OCORRÊNCIAS)
 -- ============================================================================
 
@@ -590,7 +609,7 @@ begin
     'anos_letivos', 'configuracoes_escola', 'configuracoes_sistema',
     'horarios_letivos', 'disciplinas', 'perfis', 'turmas', 'alunos',
     'enturmacoes', 'vinculos_responsaveis', 'atribuicoes_professores',
-    'tags_comportamento', 'frequencias', 'registros_comportamento',
+    'tags_comportamento', 'opcoes_configuracao', 'frequencias', 'registros_comportamento',
     'ocorrencias', 'anexos', 'justificativas_faltas', 'conversas',
     'mensagens', 'monitoramento_acoes', 'pontuacao_turmas',
     'importacoes_log', 'exportacoes', 'convites'
@@ -599,7 +618,8 @@ begin
     execute format(
       'create trigger trg_set_updated_at before update on public.%I
        for each row execute function public.fn_set_updated_at();', t
-    );
+);
+
   end loop;
 end;
 $$;
@@ -843,6 +863,23 @@ create policy "Horarios: leitura autenticados"
 
 create policy "Horarios: gestao gerencia"
   on public.horarios_letivos for all
+  to authenticated
+  using (public.get_user_papel() = 'gestao')
+  with check (public.get_user_papel() = 'gestao');
+
+-- ============================================================================
+-- 18.4.1 OPÇÕES DE CONFIGURAÇÃO
+-- ============================================================================
+
+alter table public.opcoes_configuracao enable row level security;
+
+create policy "OpcoesConfig: leitura autenticados"
+  on public.opcoes_configuracao for select
+  to authenticated
+  using (true);
+
+create policy "OpcoesConfig: gestao gerencia"
+  on public.opcoes_configuracao for all
   to authenticated
   using (public.get_user_papel() = 'gestao')
   with check (public.get_user_papel() = 'gestao');
@@ -1703,6 +1740,7 @@ grant insert, update on public.anos_letivos to authenticated;
 grant insert, update on public.atribuicoes_professores to authenticated;
 grant insert, update on public.tags_comportamento to authenticated;
 grant insert, update on public.horarios_letivos to authenticated;
+grant insert, update, delete on public.opcoes_configuracao to authenticated;
 grant insert, update on public.disciplinas to authenticated;
 grant insert, update on public.configuracoes_escola to authenticated;
 grant insert, update on public.importacoes_log to authenticated;
@@ -2219,6 +2257,79 @@ alter table ocorrencias
 
 -- drop do enum já que não é mais usado
 drop type if exists public.tipo_ocorrencia;
+
+-- ============================================================================
+-- Migration: Conversão de enums de catálogo para text
+-- Permite que a gestão configure valores via opcoes_configuracao
+-- ============================================================================
+
+-- views que dependem das colunas precisam ser recriadas
+drop view if exists public.v_gamificacao_ranking;
+drop view if exists public.v_pontuacao_diaria_turmas;
+
+alter table public.turmas alter column serie type text;
+alter table public.turmas alter column letra type text;
+
+alter table public.vinculos_responsaveis
+  alter column tipo_relacao drop default,
+  alter column tipo_relacao type text,
+  alter column tipo_relacao set default 'outro';
+
+alter table public.atribuicoes_professores
+  alter column papel drop default,
+  alter column papel type text,
+  alter column papel set default 'titular';
+
+drop type if exists public.serie_turma;
+drop type if exists public.letra_turma;
+drop type if exists public.tipo_vinculo;
+drop type if exists public.papel_atribuicao;
+
+-- recria as views que dependiam das colunas
+create or replace view public.v_gamificacao_ranking
+with (security_invoker = true)
+as
+select
+  t.id as turma_id,
+  t.nome_completo as turma_nome,
+  t.serie,
+  t.letra,
+  al.ano,
+  coalesce(sum(pt.pontos_total), 0) as pontos_total,
+  coalesce(avg(pt.pontos_presenca), 0) as media_presenca,
+  coalesce(avg(pt.pontos_comportamento), 0) as media_comportamento,
+  rank() over (partition by al.ano order by coalesce(sum(pt.pontos_total), 0) desc) as posicao_ranking
+from public.turmas t
+join public.anos_letivos al on al.id = t.ano_letivo_id and al.ativo = true
+left join public.pontuacao_turmas pt on pt.turma_id = t.id and pt.ano_letivo_id = al.id
+group by t.id, t.nome_completo, t.serie, t.letra, al.ano;
+
+create or replace view public.v_pontuacao_diaria_turmas
+with (security_invoker = true)
+as
+select
+  t.id as turma_id,
+  t.nome_completo as turma_nome,
+  f.data_aula as data_referencia,
+  count(distinct f.aluno_id) filter (where f.status = 'presente') as total_presentes,
+  count(distinct e.aluno_id) as total_alunos,
+  round(
+    (count(distinct f.aluno_id) filter (where f.status = 'presente'))::numeric /
+    nullif(count(distinct e.aluno_id), 0) * 100,
+    2
+  ) as percentual_presenca,
+  count(distinct rc.id) filter (where tc.categoria = 'positivo') as comportamentos_positivos,
+  count(distinct rc.id) filter (where tc.categoria = 'atencao') as comportamentos_atencao
+from public.turmas t
+join public.enturmacoes e on e.turma_id = t.id and e.status = 'matriculado'
+left join public.frequencias f on f.turma_id = t.id and f.deleted_at is null
+left join public.registros_comportamento rc on rc.turma_id = t.id
+left join public.registro_comportamento_tags rct on rct.registro_id = rc.id
+left join public.tags_comportamento tc on tc.id = rct.tag_id
+group by t.id, t.nome_completo, f.data_aula;
+
+comment on view public.v_gamificacao_ranking is 'RF28: Leaderboard interturmas baseado na pontuação mensal acumulada.';
+comment on view public.v_pontuacao_diaria_turmas is 'RF28: Base para cálculo dos snapshots mensais de gamificação.';
 
 -- recria a view com o novo tipo
 create or replace view public.v_feed_aluno

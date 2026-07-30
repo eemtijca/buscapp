@@ -5,7 +5,7 @@ import { useAutenticacao } from '@/composables/useAutenticacao';
 import { useMonitoramento } from '@/composables/useMonitoramento';
 import { supabaseClient } from '@/servicos/supabase';
 import ChatPainelDuplo from '@/componentes/ChatPainelDuplo.vue';
-import type { ContatoChat, MensagemChat } from '@/tipos/componentes';
+import type { ContatoChat, MensagemChat, HorarioProtegido } from '@/tipos/componentes';
 import { avatarCor } from '@/utils/chatUtils';
 
 const router = useRouter();
@@ -26,7 +26,7 @@ const contatoAtivo = ref<ContatoChat | null>(null);
 const horarioAtivo = ref(false);
 const enviando = ref(false);
 const carregandoContatos = ref(true);
-const horarioConfig = obterHorarioProtegido();
+const horarioConfig = ref<HorarioProtegido | null>(null);
 const erro = ref<string | null>(null);
 
 let canalMensagens: ReturnType<typeof supabaseClient.channel> | null = null;
@@ -159,6 +159,7 @@ function handleVoltar() {
 }
 
 onMounted(async () => {
+  horarioConfig.value = await obterHorarioProtegido();
   horarioAtivo.value = horarioProtegidoAtivo();
   if (usuario.value) {
     await carregarContatos();
@@ -215,7 +216,7 @@ onUnmounted(() => {
       :mensagens="mensagens"
       :conversa-ativa-id="conversaAtivaId"
       :horario-ativo="horarioAtivo"
-      :mensagem-fora-horario="horarioConfig.mensagemForaHorario"
+      :mensagem-fora-horario="horarioConfig?.mensagemForaHorario ?? ''"
       :enviando="enviando"
       :carregando-contatos="carregandoContatos"
       :papel-usuario="usuario?.papel ?? 'responsavel'"

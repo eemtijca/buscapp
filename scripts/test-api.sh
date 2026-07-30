@@ -71,7 +71,10 @@ for grant_sql in \
   "GRANT INSERT ON public.justificativas_faltas TO authenticated" \
   "GRANT INSERT ON public.anexos TO authenticated" \
   "GRANT INSERT ON public.justificativa_anexos TO authenticated" \
-  "GRANT UPDATE ON public.anexos TO authenticated"; do
+  "GRANT UPDATE ON public.anexos TO authenticated" \
+  "GRANT INSERT ON public.opcoes_configuracao TO authenticated" \
+  "GRANT UPDATE ON public.opcoes_configuracao TO authenticated" \
+  "GRANT DELETE ON public.opcoes_configuracao TO authenticated"; do
   npx supabase db query "$grant_sql;" 2>/dev/null || true
 done
 
@@ -1173,6 +1176,79 @@ echo "=========================================="
 
 # Restore prof1 password
 restore_pw "a0000000-0000-0000-0000-000000000002" "$SENHA_PROF"
+
+echo ""; echo "=== 25. OPCÕES DE CONFIGURAÇÃO ==="
+
+# 25.1 Gestao SELECT opcoes
+HTTP=$(api_code GET "/rest/v1/opcoes_configuracao?tipo=eq.modulo&select=chave,rotulo,icone,ordem&order=ordem" '' "$TG")
+assert "25.1 gestao SELECT modulo 200" "200" "$HTTP"
+QTD_MOD=$(api_body | py "d=json.load(sys.stdin); print(len(d) if isinstance(d,list) else 0)" 2>/dev/null)
+assert "25.1 modulo tem 5 opcoes" "5" "$QTD_MOD"
+
+# 25.2 Gestao INSERT nova opcao
+CFG_ID=$(UUID)
+HTTP=$(api_code POST "/rest/v1/opcoes_configuracao" "{\"id\":\"$CFG_ID\",\"tipo\":\"modulo\",\"chave\":\"teste_api\",\"rotulo\":\"Teste API\",\"ordem\":99}" "$TG")
+assert "25.2 gestao INSERT 201" "201" "$HTTP"
+
+# 25.3 Gestao UPDATE opcao
+HTTP=$(api_code PATCH "/rest/v1/opcoes_configuracao?id=eq.$CFG_ID" '{"rotulo":"Teste Editado","ordem":50}' "$TG")
+assert "25.3 gestao PATCH 204" "204" "$HTTP"
+
+# 25.4 Gestao DELETE opcao
+HTTP=$(api_code DELETE "/rest/v1/opcoes_configuracao?id=eq.$CFG_ID" '' "$TG")
+assert "25.4 gestao DELETE 204" "204" "$HTTP"
+
+# 25.5 Professor SELECT opcoes (deve conseguir ler)
+HTTP=$(api_code GET "/rest/v1/opcoes_configuracao?tipo=eq.modulo&limit=1" '' "$TP")
+assert "25.5 professor SELECT 200" "200" "$HTTP"
+
+# 25.6 Professor INSERT rejeitado
+CFG_ID2=$(UUID)
+HTTP=$(api_code POST "/rest/v1/opcoes_configuracao" "{\"id\":\"$CFG_ID2\",\"tipo\":\"modulo\",\"chave\":\"prof_test\",\"rotulo\":\"Prof Test\",\"ordem\":99}" "$TP")
+# RLS rejeita: HTTP deve ser 201 (se PostgREST aceita mas RLS bloqueia, retorna 201 com 0 rows visiveis)
+CFG_EXISTS=$(api_code GET "/rest/v1/opcoes_configuracao?id=eq.$CFG_ID2" '' "$TG" && echo "1" || echo "0")
+if [ "$HTTP" = "201" ] || [ "$HTTP" = "200" ]; then
+  # Verify RLS actually blocked it (gestao can't see it either, meaning row was never inserted)
+  HTTP_CHECK=$(api_code GET "/rest/v1/opcoes_configuracao?select=id&id=eq.$CFG_ID2" '' "$TG")
+  QTD_CHECK=$(api_body | py "d=json.load(sys.stdin); print(len(d) if isinstance(d,list) else 0)" 2>/dev/null)
+  assert "25.6 prof nao inseriu (RLS bloqueou)" "0" "$QTD_CHECK"
+else
+  assert "25.6 prof INSERT rejeitado" 1 1
+fi
+
+# 25.7 Responsavel SELECT opcoes (deve conseguir ler)
+HTTP=$(api_code GET "/rest/v1/opcoes_configuracao?tipo=eq.periodo&limit=1" '' "$TR")
+assert "25.7 responsavel SELECT 200" "200" "$HTTP"
+
+# 25.8 Turmas com serie fora do enum original (apos conversao para text)
+TID_NOVA=$(UUID)
+HTTP=$(api_code POST "/rest/v1/turmas" "{\"id\":\"$TID_NOVA\",\"ano_letivo_id\":\"b0000000-0000-0000-0000-000000000001\",\"serie\":\"4º\",\"letra\":\"D\"}" "$TG")
+assert "25.8 turma serie 4o letra D 201" "201" "$HTTP"
+
+HTTP=$(api_code GET "/rest/v1/turmas?select=serie,letra&id=eq.$TID_NOVA" '' "$TG")
+assert_contains "25.8 serie=4o salva" "$(api_body)" "4º"
+
+# Cleanup
+HTTP=$(api_code DELETE "/rest/v1/frequencias?turma_id=eq.$TID_NOVA" '' "$TG")
+HTTP=$(api_code DELETE "/rest/v1/enturmacoes?turma_id=eq.$TID_NOVA" '' "$TG")
+HTTP=$(api_code DELETE "/rest/v1/turmas?id=eq.$TID_NOVA" '' "$TG")
+
+# 25.9 Vinculo com tipo_relacao fora do enum original
+AID_VINC=$(UUID)
+HTTP=$(api_code POST "/rest/v1/alunos" "{\"id\":\"$AID_VINC\",\"nome\":\"Teste Vinculo\",\"matricula\":\"VINC${UNIQ}\"}" "$TG")
+assert "25.9 criar aluno 201" "201" "$HTTP"
+HTTP=$(api_code POST "/rest/v1/vinculos_responsaveis" "{\"responsavel_id\":\"a0000000-0000-0000-0000-000000000005\",\"aluno_id\":\"$AID_VINC\",\"tipo_relacao\":\"primo\"}" "$TG")
+assert "25.9 vinculo tipo_relacao primo 201" "201" "$HTTP"
+
+HTTP=$(api_code GET "/rest/v1/vinculos_responsaveis?select=tipo_relacao&responsavel_id=eq.a0000000-0000-0000-0000-000000000005&aluno_id=eq.$AID_VINC" '' "$TG")
+assert_contains "25.9 tipo_relacao=primo salva" "$(api_body)" "primo"
+
+# 25.10 Atribuicao com papel fora do enum original
+ATR_ID=$(UUID)
+HTTP=$(api_code POST "/rest/v1/atribuicoes_professores" "{\"id\":\"$ATR_ID\",\"professor_id\":\"a0000000-0000-0000-0000-000000000002\",\"turma_id\":\"d0000000-0000-0000-0000-000000000001\",\"disciplina_id\":\"c0000000-0000-0000-0000-000000000001\",\"papel\":\"monitor\",\"data_inicio\":\"2026-01-01\"}" "$TG")
+assert "25.10 atribuicao papel monitor 201" "201" "$HTTP"
+
+HTTP=$(api_code DELETE "/rest/v1/atribuicoes_professores?id=eq.$ATR_ID" '' "$TG")
 
 echo ""; echo "=========================================="
 echo "  TOTAL: $((PASS+FAIL))  |  PASS: $PASS  |  FAIL: $FAIL"

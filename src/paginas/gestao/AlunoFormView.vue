@@ -2,15 +2,18 @@
 import { computed, onMounted, ref, watch, nextTick } from 'vue';
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router';
 import { useGestaoUsuarios } from '@/composables/useGestaoUsuarios';
+import { useOpcoesConfiguracao } from '@/composables/useOpcoesConfiguracao';
 import { supabaseClient } from '@/servicos/supabase';
 import CampoFormulario from '@/componentes/CampoFormulario.vue';
 import GrupoCheckbox from '@/componentes/GrupoCheckbox.vue';
 import type { Turma, Enturmacao, VinculoResponsavel } from '@/tipos/database';
+import type { OpcaoCheckbox } from '@/tipos/componentes';
 
 const route = useRoute();
 const router = useRouter();
 const { buscarAlunos, buscarTurmas, criarAluno, atualizarAluno, carregando, erro } =
   useGestaoUsuarios();
+const { buscarOpcoes } = useOpcoesConfiguracao();
 
 const modoEdicao = ref(false);
 const alunoId = ref<string | null>(null);
@@ -30,14 +33,8 @@ const alimentacaoDiferenciada = ref(false);
 const necessidadesEspeciais = ref(false);
 const documentosRecebidos = ref<string[]>([]);
 
-const opcoesDocumentos = [
-  { valor: 'rg', rotulo: 'RG', icone: 'person-vcard' },
-  { valor: 'cpf', rotulo: 'CPF', icone: 'credit-card' },
-  { valor: 'certidao_nascimento', rotulo: 'Certidão de Nascimento', icone: 'file-earmark-text' },
-  { valor: 'comprovante_residencia', rotulo: 'Comprovante de Residência', icone: 'house' },
-  { valor: 'cartao_vacina', rotulo: 'Cartão de Vacina', icone: 'heart-pulse' },
-  { valor: 'nis', rotulo: 'NIS', icone: 'person-badge' },
-];
+const opcoesDocumentos = ref<OpcaoCheckbox[]>([]);
+const opcoesTipoVinculo = ref<OpcaoCheckbox[]>([]);
 
 const vinculoTipo = ref<'existente' | 'novo'>('existente');
 const responsavelEmail = ref('');
@@ -305,6 +302,8 @@ async function salvarNovoResponsavel() {
 
 onMounted(async () => {
   turmas.value = await buscarTurmas();
+  opcoesDocumentos.value = await buscarOpcoes('documento');
+  opcoesTipoVinculo.value = await buscarOpcoes('tipo_vinculo');
   const id = route.params.id as string | undefined;
   if (id) {
     modoEdicao.value = true;
@@ -704,12 +703,7 @@ async function salvar() {
                 v-model="tipoVinculo"
                 class="form-select form-select-sm"
               >
-                <option value="pai">Pai</option>
-                <option value="mae">Mãe</option>
-                <option value="tutor">Tutor</option>
-                <option value="avo">Avô/Avó</option>
-                <option value="irmao">Irmão/Irmã</option>
-                <option value="outro">Outro</option>
+                <option v-for="v in opcoesTipoVinculo" :key="v.valor" :value="v.valor">{{ v.rotulo }}</option>
               </select>
             </CampoFormulario>
           </template>
@@ -897,12 +891,7 @@ async function salvar() {
                   v-model="novoTipoVinculo"
                   class="form-select form-select-sm"
                 >
-                  <option value="pai">Pai</option>
-                  <option value="mae">Mãe</option>
-                  <option value="tutor">Tutor</option>
-                  <option value="avo">Avô/Avó</option>
-                  <option value="irmao">Irmão/Irmã</option>
-                  <option value="outro">Outro</option>
+                  <option v-for="v in opcoesTipoVinculo" :key="v.valor" :value="v.valor">{{ v.rotulo }}</option>
                 </select>
               </CampoFormulario>
             </template>

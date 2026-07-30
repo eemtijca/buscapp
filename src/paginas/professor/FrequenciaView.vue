@@ -3,9 +3,10 @@ import { computed, onMounted, ref, watch, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAutenticacao } from '@/composables/useAutenticacao';
 import { useMonitoramento } from '@/composables/useMonitoramento';
+import { useOpcoesConfiguracao } from '@/composables/useOpcoesConfiguracao';
 import CartaoAlunoFrequencia from '@/componentes/CartaoAlunoFrequencia.vue';
 import GrupoCheckbox from '@/componentes/GrupoCheckbox.vue';
-import type { AlunoFrequencia } from '@/tipos/componentes';
+import type { AlunoFrequencia, OpcaoCheckbox } from '@/tipos/componentes';
 
 const router = useRouter();
 const { usuario } = useAutenticacao();
@@ -18,15 +19,8 @@ const periodosSelecionados = ref<string[]>(['Dia completo']);
 const mensagemSucesso = ref<string | null>(null);
 const salvando = ref(false);
 
-const opcoesPeriodos = [
-  { valor: 'Dia completo', rotulo: 'Dia completo', icone: 'calendar-check' },
-  { valor: '1º Horário', rotulo: '1º Horário' },
-  { valor: '2º Horário', rotulo: '2º Horário' },
-  { valor: '3º Horário', rotulo: '3º Horário' },
-  { valor: '4º Horário', rotulo: '4º Horário' },
-  { valor: 'Manhã', rotulo: 'Manhã', icone: 'sun' },
-  { valor: 'Tarde', rotulo: 'Tarde', icone: 'sunset' },
-];
+const { buscarOpcoes } = useOpcoesConfiguracao();
+const opcoesPeriodos = ref<OpcaoCheckbox[]>([]);
 
 const alunosFiltrados = computed(() => {
   if (!buscaAluno.value.trim()) return alunos.value;
@@ -92,7 +86,10 @@ async function carregarAlunos() {
   alunos.value = await buscarAlunosParaFrequencia(dataAula.value);
 }
 
-onMounted(carregarAlunos);
+onMounted(async () => {
+  opcoesPeriodos.value = await buscarOpcoes('periodo');
+  await carregarAlunos();
+});
 
 watch(dataAula, () => {
   carregarAlunos();

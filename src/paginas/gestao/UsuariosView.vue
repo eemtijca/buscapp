@@ -322,13 +322,6 @@ onMounted(async () => {
                   >
                     {{ usuario.acesso_modulos.length }} mód.
                   </span>
-                  <span
-                    v-if="usuario.permissoes.length"
-                    class="badge text-bg-warning border small"
-                    :title="'Permissões: ' + usuario.permissoes.join(', ')"
-                  >
-                    {{ usuario.permissoes.length }} perm.
-                  </span>
                 </div>
               </td>
               <td class="text-end">

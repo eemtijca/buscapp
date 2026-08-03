@@ -85,7 +85,7 @@ onMounted(carregar);
 
 <template>
   <div class="container py-4" style="max-width: 700px">
-    <div class="d-flex gap-2 mb-1">
+    <div class="d-flex gap-2 mb-3">
       <router-link to="/gestao" class="btn btn-sm btn-outline-success"><i class="bi bi-house me-1"></i> Início</router-link>
       <router-link to="/gestao/configuracao" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i> Voltar</router-link>
     </div>

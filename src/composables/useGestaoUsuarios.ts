@@ -59,7 +59,6 @@ export function useGestaoUsuarios() {
         ultimo_acesso: p.ultimo_acesso_em,
         notificacoes_ativas: p.notificacoes_ativas,
         acesso_modulos: p.acesso_modulos ?? [],
-        permissoes: p.permissoes ?? [],
       }));
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);

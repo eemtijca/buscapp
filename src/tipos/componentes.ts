@@ -308,7 +308,6 @@ export interface UsuarioItem {
   ultimo_acesso: string | null;
   notificacoes_ativas: boolean;
   acesso_modulos: string[];
-  permissoes: string[];
 }
 
 /**

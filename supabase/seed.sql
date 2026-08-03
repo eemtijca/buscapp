@@ -554,7 +554,8 @@ begin
     insert into public.opcoes_configuracao (tipo, chave, rotulo, icone, ordem, ativo) values
       ('letra_turma', 'A', 'A', null, 1, true),
       ('letra_turma', 'B', 'B', null, 2, true),
-      ('letra_turma', 'C', 'C', null, 3, true);
+      ('letra_turma', 'C', 'C', null, 3, true),
+      ('letra_turma', 'D', 'D', null, 4, true);
   end if;
 end;
 $$;

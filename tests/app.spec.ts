@@ -575,7 +575,6 @@ test.describe('Gestao - Usuario - Modulos e permissoes', () => {
     await expect(page.locator('text=Módulos de acesso')).toBeVisible({ timeout: 10000 });
     await page.waitForSelector('#modulo-frequencia', { timeout: 10000 });
     await expect(page.locator('#modulo-ocorrencias')).toBeVisible();
-    await expect(page.locator('#permissao-exportar')).toBeVisible();
   });
 
   test('CT61 - Modulos de acesso sao selecionaveis', async ({ page }) => {
@@ -672,7 +671,6 @@ test.describe('Gestao - Configuracao', () => {
     await page.goto('/gestao/configuracao');
     await expect(page.locator('h1')).toContainText('Configurações');
     await expect(page.locator('h3.card-nav-title').filter({ hasText: 'Módulos' })).toBeVisible();
-    await expect(page.locator('h3.card-nav-title').filter({ hasText: 'Permissões' })).toBeVisible();
     await expect(page.locator('h3.card-nav-title').filter({ hasText: 'Documentos' })).toBeVisible();
     await expect(page.locator('h3.card-nav-title').filter({ hasText: 'Períodos' })).toBeVisible();
   });
@@ -691,10 +689,84 @@ test.describe('Gestao - Configuracao', () => {
     await page.goto('/gestao/configuracao/modulo');
     await page.click('button:has-text("Nova opção")');
     await expect(page.locator('.modal-title')).toContainText('Nova opção');
-    await page.fill('#campo-nome', 'Teste E2E');
+    await page.click('button:has-text("Outra...")');
+    const nome = `Teste E2E ${Date.now()}`;
+    await page.fill('#campo-nome', nome);
     await page.click('button:has-text("Salvar")');
     await page.waitForTimeout(1000);
-    await expect(page.locator('table')).toContainText('Teste E2E', { timeout: 5000 });
+    await expect(page.locator('table')).toContainText(nome, { timeout: 5000 });
+  });
+
+  test('CT112b - Seletor de letras de turma exibe o catalogo incluindo D', async ({ page }) => {
+    await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
+    await page.goto('/gestao/configuracao/letra_turma');
+    await page.click('button:has-text("Nova opção")');
+    await expect(page.locator('.modal-title')).toContainText('Nova opção');
+    for (const letra of ['A', 'B', 'C', 'D']) {
+      await expect(page.getByRole('button', { name: letra, exact: true })).toBeVisible();
+    }
+    await page.click('button:has-text("Cancelar")');
+  });
+
+  test('CT112c - Duplicata de opcao existente e bloqueada', async ({ page }) => {
+    await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
+    await page.goto('/gestao/configuracao/modulo');
+    await page.click('button:has-text("Nova opção")');
+    await page.click('button:has-text("Outra...")');
+    await page.fill('#campo-nome', 'Frequência');
+    await expect(page.getByText(/Já existe uma opção chamada/)).toBeVisible();
+  });
+
+  test('CT112d - Serie aceita apenas numeros com sufixo º', async ({ page }) => {
+    await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
+    await page.goto('/gestao/configuracao/serie_turma');
+    await page.click('button:has-text("Nova opção")');
+    await page.click('button:has-text("Outra...")');
+    const input = page.locator('#campo-nome');
+    await input.pressSequentially('abc4x9');
+    await expect(input).toHaveValue('49');
+    await expect(page.locator('.input-group-text')).toHaveText('º');
+    await page.click('button:has-text("Cancelar")');
+  });
+
+  test('CT112e - Letra aceita apenas uma letra maiuscula', async ({ page }) => {
+    await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
+    await page.goto('/gestao/configuracao/letra_turma');
+    await page.click('button:has-text("Nova opção")');
+    await page.click('button:has-text("Outra...")');
+    const input = page.locator('#campo-nome');
+    await input.pressSequentially('xz');
+    await expect(input).toHaveValue('X');
+    await input.fill('');
+    await input.pressSequentially('ab');
+    await expect(input).toHaveValue('A');
+    await page.click('button:has-text("Cancelar")');
+  });
+
+  test('CT112f - Cartoes do seletor tem altura uniforme', async ({ page }) => {
+    await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
+    await page.goto('/gestao/configuracao/documento');
+    await page.click('button:has-text("Nova opção")');
+    await expect(page.locator('.modal-title')).toContainText('Nova opção');
+    await page.waitForTimeout(400);
+    const alturas = await page
+      .locator('.modal .cartao-selecao')
+      .evaluateAll((els) => els.map((el) => Math.round(el.getBoundingClientRect().height)));
+    expect(alturas.length).toBeGreaterThan(1);
+    expect(Math.max(...alturas) - Math.min(...alturas)).toBeLessThanOrEqual(1);
+    await page.click('button:has-text("Cancelar")');
+  });
+
+  test('CT112g - Texto do cartao permanece legivel no hover', async ({ page }) => {
+    await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
+    await page.goto('/gestao/configuracao/modulo');
+    await page.click('button:has-text("Nova opção")');
+    await expect(page.locator('.modal-title')).toContainText('Nova opção');
+    const card = page.locator('.modal .cartao-selecao').first();
+    await card.hover();
+    const cor = await card.locator('span').first().evaluate((el) => getComputedStyle(el).color);
+    expect(cor.toLowerCase()).not.toBe('rgb(255, 255, 255)');
+    await page.click('button:has-text("Cancelar")');
   });
 
   test('CT113 - Tags de comportamento carrega com tabela', async ({ page }) => {

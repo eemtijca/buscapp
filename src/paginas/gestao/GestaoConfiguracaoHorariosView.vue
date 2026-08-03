@@ -144,7 +144,7 @@ onMounted(carregar);
 
 <template>
   <div class="container py-4" style="max-width: 900px">
-    <div class="d-flex gap-2 mb-1">
+    <div class="d-flex gap-2 mb-3">
       <router-link to="/gestao" class="btn btn-sm btn-outline-success">
         <i class="bi bi-house me-1" aria-hidden="true"></i>
         Início

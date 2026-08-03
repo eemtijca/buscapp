@@ -1,45 +1,24 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref, computed, nextTick } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { useRoute } from 'vue-router';
 import { supabaseClient } from '@/servicos/supabase';
 import { useOpcoesConfiguracao } from '@/composables/useOpcoesConfiguracao';
+import { useAlturaUniformeCards } from '@/composables/useAlturaUniformeCards';
 import CampoFormulario from '@/componentes/CampoFormulario.vue';
+import CartaoSelecao from '@/componentes/CartaoSelecao.vue';
+import { obterRegra, gerarChave, normalizarChaveTexto } from '@/utils/opcoesConfiguracao';
 import type { OpcaoConfiguracao } from '@/tipos/database';
 import Sortable from 'sortablejs';
 
 const route = useRoute();
-const router = useRouter();
 const { limparCache } = useOpcoesConfiguracao();
 
 const tipo = computed(() => route.params.tipo as string);
 
-const iconesPadrao: Record<string, string> = {
-  modulo: 'ui-checks', permissao: 'shield-check', documento: 'file-earmark-text',
-  periodo: 'clock', motivo_ausencia: 'heart-pulse', tipo_ocorrencia: 'exclamation-triangle',
-  tipo_vinculo: 'people', papel_atribuicao: 'person-badge',
-  serie_turma: 'book', letra_turma: 'fonts',
-};
-
-const nomeRotulos: Record<string, string> = {
-  modulo: 'Módulos', permissao: 'Permissões', documento: 'Documentos',
-  periodo: 'Períodos', motivo_ausencia: 'Motivos de Ausência',
-  tipo_ocorrencia: 'Tipos de Ocorrência', tipo_vinculo: 'Vínculos',
-  papel_atribuicao: 'Papéis de Atribuição', serie_turma: 'Séries', letra_turma: 'Letras de Turma',
-};
-
-const tituloPagina = computed(() => nomeRotulos[tipo.value] ?? tipo.value);
-
-const labelNome = computed(() => {
-  if (tipo.value === 'letra_turma') return 'Letra';
-  if (tipo.value === 'serie_turma') return 'Série';
-  return 'Nome';
-});
-
-const placeholderNome = computed(() => {
-  if (tipo.value === 'letra_turma') return 'ex.: D';
-  if (tipo.value === 'serie_turma') return 'ex.: 1º';
-  return 'ex.: Frequência';
-});
+const regra = computed(() => obterRegra(tipo.value));
+const tituloPagina = computed(() => regra.value.titulo);
+const labelNome = computed(() => regra.value.rotulo);
+const placeholderNome = computed(() => regra.value.placeholder);
 
 const opcoes = ref<OpcaoConfiguracao[]>([]);
 const carregando = ref(false);
@@ -53,12 +32,9 @@ const editandoId = ref<string | null>(null);
 const formNome = ref('');
 const formAtivo = ref(true);
 const erroValidacao = ref<string | null>(null);
-const mostrarInputCustom = ref(false);
-const useDropdown = computed(() => tipo.value === 'letra_turma' || tipo.value === 'serie_turma');
-const opcoesDropdown = computed(() => {
-  if (!useDropdown.value) return [];
-  return opcoes.value.filter(o => o.ativo).sort((a, b) => a.ordem - b.ordem);
-});
+
+const opcaoSelecionada = ref<string | null>(null);
+const mostrarCustom = ref(false);
 
 const modoReordenar = ref(false);
 const snapshotPreReordenacao = ref<OpcaoConfiguracao[]>([]);
@@ -68,45 +44,23 @@ const ordemAlterada = computed(() => {
   return opcoes.value.some((item, index) => item.id !== snapshotPreReordenacao.value[index]?.id);
 });
 
+const opcoesPicker = computed(() => {
+  const lista = opcoes.value.filter((o) => o.ativo).sort((a, b) => a.ordem - b.ordem);
+  if (editandoId.value && !lista.some((o) => o.id === editandoId.value)) {
+    const item = opcoes.value.find((o) => o.id === editandoId.value);
+    if (item) lista.push(item);
+  }
+  return lista;
+});
+
+const mostrarAreaEntrada = computed(() => opcaoSelecionada.value !== null || mostrarCustom.value);
+
+const digitosSerie = computed<string>(() => formNome.value.replace(/[ºª]/g, ''));
+
+const gridPickerRef = ref<HTMLElement | null>(null);
+const { altura: alturaCartao } = useAlturaUniformeCards(gridPickerRef);
+
 let sortableInstance: Sortable | null = null;
-
-function gerarChave(nome: string, t: string): string {
-  switch (t) {
-    case 'letra_turma':
-      return nome.trim().charAt(0).toUpperCase() || 'A';
-    case 'serie_turma': {
-      const m = nome.trim().match(/^(\d+[ºª]?)/);
-      return m ? (m[1] ?? nome.trim()) : nome.trim();
-    }
-    default:
-      return nome.toLowerCase()
-        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-        .replace(/[^a-z0-9]+/g, '_')
-        .replace(/^_|_$/g, '').replace(/_+/g, '_');
-  }
-}
-
-function validarNome(): boolean {
-  erroValidacao.value = null;
-  const nome = formNome.value.trim();
-  if (!nome) { erroValidacao.value = 'O nome é obrigatório.'; return false; }
-  if (nome.length > 80) { erroValidacao.value = 'Máximo de 80 caracteres.'; return false; }
-  if (tipo.value === 'letra_turma') {
-    if (!/^[A-Za-zÀ-ÿ]$/.test(nome.charAt(0))) {
-      erroValidacao.value = 'Digite apenas a letra da turma (ex.: D).';
-      return false;
-    }
-  } else if (tipo.value === 'serie_turma') {
-    if (!/^\d/.test(nome)) {
-      erroValidacao.value = 'A série deve começar com um número (ex.: 1º).';
-      return false;
-    }
-  } else if (nome.length < 2) {
-    erroValidacao.value = 'O nome deve ter pelo menos 2 caracteres.';
-    return false;
-  }
-  return true;
-}
 
 function mostrarSucesso(msg: string) {
   mensagemSucesso.value = msg;
@@ -124,6 +78,90 @@ function resetForm() {
   modoEdicao.value = false;
   editandoId.value = null;
   erroValidacao.value = null;
+  opcaoSelecionada.value = null;
+  mostrarCustom.value = false;
+}
+
+function rotuloFinal(): string {
+  const r = regra.value;
+  return r.transformar ? r.transformar(formNome.value) : formNome.value.trim();
+}
+
+function validarNome(): boolean {
+  erroValidacao.value = null;
+  const rotulo = rotuloFinal();
+  if (!rotulo) {
+    erroValidacao.value = 'O nome é obrigatório.';
+    return false;
+  }
+  const r = regra.value;
+  const valorChecado = r.campo === 'ordinal' ? rotulo.replace(/[ºª]/g, '') : rotulo;
+  if (valorChecado.length < r.minlength) {
+    erroValidacao.value = `Mínimo de ${r.minlength} caractere${r.minlength > 1 ? 's' : ''}.`;
+    return false;
+  }
+  if (valorChecado.length > r.maxlength) {
+    erroValidacao.value = `Máximo de ${r.maxlength} caracteres.`;
+    return false;
+  }
+  if (r.padrao && !r.padrao.test(rotulo)) {
+    erroValidacao.value = r.mensagemPadrao ?? 'Formato inválido.';
+    return false;
+  }
+  const norm = normalizarChaveTexto(rotulo);
+  const existente = opcoes.value.find(
+    (o) => o.id !== editandoId.value && normalizarChaveTexto(o.rotulo) === norm,
+  );
+  if (existente) {
+    erroValidacao.value = existente.ativo
+      ? `Já existe uma opção chamada "${existente.rotulo}".`
+      : `Já existe uma opção chamada "${existente.rotulo}" (inativa). Reative-a na lista para reutilizá-la.`;
+    return false;
+  }
+  const chave = gerarChave(rotulo, tipo.value);
+  const colisao = opcoes.value.find((o) => o.chave === chave && o.id !== editandoId.value);
+  if (colisao) {
+    erroValidacao.value = `Já existe uma opção com a chave "${chave}". Escolha outro nome.`;
+    return false;
+  }
+  return true;
+}
+
+function aoDigitar(e: Event) {
+  const el = e.target as HTMLInputElement;
+  const v = regra.value.filtrar ? regra.value.filtrar(el.value) : el.value;
+  formNome.value = v;
+  if (el.value !== v) el.value = v;
+  validarNome();
+}
+
+function aoDigitarSerie(e: Event) {
+  const el = e.target as HTMLInputElement;
+  const d = regra.value.filtrar ? regra.value.filtrar(el.value) : el.value;
+  formNome.value = d ? `${d}º` : '';
+  if (el.value !== d) el.value = d;
+  validarNome();
+}
+
+function selecionarOpcao(id: string) {
+  if (opcaoSelecionada.value === id) {
+    resetForm();
+    return;
+  }
+  const opt = opcoes.value.find((o) => o.id === id);
+  if (!opt) return;
+  opcaoSelecionada.value = id;
+  mostrarCustom.value = false;
+  modoEdicao.value = true;
+  editandoId.value = opt.id;
+  formNome.value = opt.rotulo;
+  formAtivo.value = opt.ativo;
+  erroValidacao.value = null;
+}
+
+function selecionarOutra() {
+  resetForm();
+  mostrarCustom.value = true;
 }
 
 function destroySortable() {
@@ -202,54 +240,26 @@ async function carregar() {
 
 function abrirNovo() {
   resetForm();
-  mostrarInputCustom.value = false;
   modalAberto.value = true;
-}
-
-function selecionarDropdown(valor: string) {
-  if (valor === '__outra__') {
-    formNome.value = '';
-    mostrarInputCustom.value = true;
-  } else {
-    mostrarInputCustom.value = false;
-    const opt = opcoes.value.find(o => o.id === valor);
-    if (opt) {
-      formNome.value = opt.rotulo;
-      editandoId.value = opt.id;
-      modoEdicao.value = true;
-      formAtivo.value = opt.ativo;
-    }
-  }
 }
 
 function abrirEditar(item: OpcaoConfiguracao) {
   modoEdicao.value = true;
   editandoId.value = item.id;
+  opcaoSelecionada.value = item.id;
+  mostrarCustom.value = false;
   formNome.value = item.rotulo;
   formAtivo.value = item.ativo;
   erroValidacao.value = null;
   modalAberto.value = true;
 }
 
-const tabelasVerificar: Record<string, { tabela: string; coluna: string; isArray: boolean }[]> = {
-  modulo: [{ tabela: 'perfis', coluna: 'acesso_modulos', isArray: true }],
-  permissao: [{ tabela: 'perfis', coluna: 'permissoes', isArray: true }],
-  documento: [{ tabela: 'alunos', coluna: 'documentos_recebidos', isArray: true }],
-  periodo: [{ tabela: 'frequencias', coluna: 'periodo', isArray: false }],
-  motivo_ausencia: [{ tabela: 'frequencias', coluna: 'motivos_ausencia', isArray: true }],
-  tipo_ocorrencia: [{ tabela: 'ocorrencias', coluna: 'tipo', isArray: true }],
-  tipo_vinculo: [{ tabela: 'vinculos_responsaveis', coluna: 'tipo_relacao', isArray: false }],
-  papel_atribuicao: [{ tabela: 'atribuicoes_professores', coluna: 'papel', isArray: false }],
-  serie_turma: [{ tabela: 'turmas', coluna: 'serie', isArray: false }],
-  letra_turma: [{ tabela: 'turmas', coluna: 'letra', isArray: false }],
-};
-
 async function verificarUso(chave: string): Promise<number> {
-  const checks = tabelasVerificar[tipo.value];
-  if (!checks) return 0;
+  const usos = regra.value.verificarUso;
+  if (!usos.length) return 0;
   let total = 0;
-  for (const c of checks) {
-    let q = c.isArray
+  for (const c of usos) {
+    const q = c.isArray
       ? supabaseClient.from(c.tabela).select('id', { count: 'exact', head: true }).filter(c.coluna, 'cs', `{${chave}}`)
       : supabaseClient.from(c.tabela).select('id', { count: 'exact', head: true }).eq(c.coluna, chave);
     const { count } = await q;
@@ -261,20 +271,19 @@ async function verificarUso(chave: string): Promise<number> {
 async function salvar() {
   if (!validarNome()) return;
   carregando.value = true;
+  const rotulo = rotuloFinal();
   try {
     if (modoEdicao.value && editandoId.value) {
       await supabaseClient.from('opcoes_configuracao').update({
-        rotulo: formNome.value.trim(), ativo: formAtivo.value,
+        rotulo, ativo: formAtivo.value,
       }).eq('id', editandoId.value);
       mostrarSucesso('Opção atualizada.');
     } else {
-      let chave = gerarChave(formNome.value.trim(), tipo.value);
+      const chave = gerarChave(rotulo, tipo.value);
       const maxOrdem = opcoes.value.reduce((max, o) => Math.max(max, o.ordem), 0);
-      let sf = 1, chaveF = chave;
-      while (opcoes.value.some(o => o.chave === chaveF)) { sf++; chaveF = `${chave}_${sf}`; }
       await supabaseClient.from('opcoes_configuracao').insert({
-        tipo: tipo.value, chave: chaveF, rotulo: formNome.value.trim(),
-        icone: iconesPadrao[tipo.value] ?? null, ordem: maxOrdem + 1, ativo: formAtivo.value,
+        tipo: tipo.value, chave, rotulo,
+        icone: regra.value.icone, ordem: maxOrdem + 1, ativo: formAtivo.value,
       });
       mostrarSucesso('Opção criada.');
     }
@@ -310,7 +319,7 @@ onUnmounted(destroySortable);
 
 <template>
   <div class="container py-4" style="max-width: 960px">
-    <div class="d-flex gap-2 mb-1">
+    <div class="d-flex gap-2 mb-3">
       <router-link to="/gestao" class="btn btn-sm btn-outline-success"><i class="bi bi-house me-1"></i> Início</router-link>
       <router-link to="/gestao/configuracao" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i> Voltar</router-link>
     </div>
@@ -380,29 +389,73 @@ onUnmounted(destroySortable);
             <button type="button" class="btn-close" @click="modalAberto = false"></button>
           </div>
           <div class="modal-body">
-            <template v-if="useDropdown && !modoEdicao">
-              <CampoFormulario :id="'campo-select'" :label="labelNome" :obrigatorio="true">
-                <select :id="'campo-select'" class="form-select" :disabled="carregando" @change="selecionarDropdown(($event.target as HTMLSelectElement).value)">
-                  <option value="">Selecionar {{ labelNome.toLowerCase() }}...</option>
-                  <option v-for="o in opcoesDropdown" :key="o.id" :value="o.id">{{ o.rotulo }}</option>
-                  <option disabled>──────────</option>
-                  <option value="__outra__">Outra...</option>
-                </select>
+            <CampoFormulario :id="'campo-picker'" :label="labelNome" :obrigatorio="true">
+              <div class="border rounded p-2 mb-2 overflow-auto" style="max-height: 200px">
+                <div class="row g-2" ref="gridPickerRef" :style="{ '--altura-cartao': alturaCartao ? `${alturaCartao}px` : undefined }">
+                  <div v-for="op in opcoesPicker" :key="op.id" class="col-6 col-md-4">
+                    <CartaoSelecao
+                      :selecionado="opcaoSelecionada === op.id"
+                      :desabilitado="carregando"
+                      @click="selecionarOpcao(op.id)"
+                    >
+                      <i v-if="op.icone" :class="`bi bi-${op.icone} me-1`" aria-hidden="true"></i>
+                      {{ op.rotulo }}
+                    </CartaoSelecao>
+                  </div>
+                  <div class="col-6 col-md-4">
+                    <CartaoSelecao
+                      :selecionado="mostrarCustom"
+                      :tracejado="!mostrarCustom"
+                      :desabilitado="carregando"
+                      @click="selecionarOutra"
+                    >
+                      <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>
+                      Outra...
+                    </CartaoSelecao>
+                  </div>
+                </div>
+              </div>
+            </CampoFormulario>
+
+            <template v-if="mostrarAreaEntrada">
+              <CampoFormulario :id="'campo-nome'" :label="labelNome" :erro="erroValidacao" :obrigatorio="true">
+                <div v-if="regra.campo === 'ordinal'" class="input-group">
+                  <input
+                    :id="'campo-nome'"
+                    :value="digitosSerie"
+                    type="text"
+                    inputmode="numeric"
+                    class="form-control"
+                    :class="{ 'is-invalid': erroValidacao }"
+                    :placeholder="placeholderNome"
+                    :disabled="carregando"
+                    :maxlength="regra.maxlength"
+                    @input="aoDigitarSerie($event)"
+                  />
+                  <span class="input-group-text">º</span>
+                </div>
+                <input
+                  v-else
+                  :id="'campo-nome'"
+                  :value="formNome"
+                  type="text"
+                  class="form-control"
+                  :class="{ 'is-invalid': erroValidacao }"
+                  :placeholder="placeholderNome"
+                  :disabled="carregando"
+                  :maxlength="regra.maxlength"
+                  @input="aoDigitar($event)"
+                />
               </CampoFormulario>
+              <div class="form-check form-switch mt-3">
+                <input class="form-check-input" type="checkbox" id="campo-ativo" v-model="formAtivo" />
+                <label class="form-check-label" for="campo-ativo">Ativo</label>
+              </div>
             </template>
-            <template v-if="!useDropdown || modoEdicao || mostrarInputCustom">
-              <CampoFormulario :id="'campo-nome'" :label="useDropdown && modoEdicao ? labelNome : labelNome" :erro="erroValidacao" :obrigatorio="true">
-                <input :id="'campo-nome'" v-model="formNome" type="text" class="form-control" :class="{ 'is-invalid': erroValidacao }" :placeholder="placeholderNome" :disabled="carregando" :maxlength="tipo === 'letra_turma' ? 2 : 80" @input="validarNome()" />
-              </CampoFormulario>
-            </template>
-            <div class="form-check form-switch mt-3">
-              <input class="form-check-input" type="checkbox" id="campo-ativo" v-model="formAtivo" />
-              <label class="form-check-label" for="campo-ativo">Ativo</label>
-            </div>
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-outline-secondary" @click="modalAberto = false">Cancelar</button>
-            <button type="button" class="btn btn-success" @click="salvar" :disabled="erroValidacao !== null || carregando">
+            <button type="button" class="btn btn-success" @click="salvar" :disabled="!mostrarAreaEntrada || erroValidacao !== null || carregando">
               <span v-if="carregando" class="spinner-border spinner-border-sm me-1"></span> Salvar
             </button>
           </div>

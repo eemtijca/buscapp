@@ -3,7 +3,6 @@ import CartaoNavegacao from '@/componentes/CartaoNavegacao.vue';
 
 const categorias = [
   { icone: 'ui-checks', titulo: 'Módulos', descricao: 'Módulos disponíveis para professores', rota: '/gestao/configuracao/modulo', cor: 'success' as const },
-  { icone: 'shield-check', titulo: 'Permissões', descricao: 'Permissões especiais de usuários', rota: '/gestao/configuracao/permissao', cor: 'success' as const },
   { icone: 'file-earmark-text', titulo: 'Documentos', descricao: 'Tipos de documento dos alunos', rota: '/gestao/configuracao/documento', cor: 'success' as const },
   { icone: 'calendar-event', titulo: 'Períodos', descricao: 'Períodos letivos e horários', rota: '/gestao/configuracao/periodo', cor: 'success' as const },
   { icone: 'heart-pulse', titulo: 'Motivos de Ausência', descricao: 'Razões para ausência de alunos', rota: '/gestao/configuracao/motivo_ausencia', cor: 'success' as const },

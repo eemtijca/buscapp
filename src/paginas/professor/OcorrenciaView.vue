@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router';
 import { useAutenticacao } from '@/composables/useAutenticacao';
 import { useMonitoramento } from '@/composables/useMonitoramento';
 import { useOpcoesConfiguracao } from '@/composables/useOpcoesConfiguracao';
+import { useAlturaUniformeCards } from '@/composables/useAlturaUniformeCards';
 import { supabaseClient } from '@/servicos/supabase';
 import CampoFormulario from '@/componentes/CampoFormulario.vue';
 import GrupoCheckbox from '@/componentes/GrupoCheckbox.vue';
@@ -28,6 +29,9 @@ const mensagemErro = ref<string | null>(null);
 const { buscarOpcoes } = useOpcoesConfiguracao();
 const opcoesTipo = ref<OpcaoCheckbox[]>([]);
 const opcoesTags = ref<OpcaoCheckbox[]>([]);
+
+const tipoOcorrenciaRef = ref<HTMLElement | null>(null);
+const { altura: alturaCartaoTipo } = useAlturaUniformeCards(tipoOcorrenciaRef);
 
 function corOcorrencia(valor: string): 'warning' | 'danger' | 'info' | 'success' | 'primary' {
   const idx = opcoesTipo.value.findIndex(t => t.valor === valor);
@@ -169,7 +173,11 @@ onMounted(async () => {
         </CampoFormulario>
 
         <CampoFormulario id="tipoOcorrencia" label="Tipo de ocorrência" :obrigatorio="true">
-          <div class="d-flex gap-2">
+          <div
+            class="d-flex gap-2 flex-wrap"
+            ref="tipoOcorrenciaRef"
+            :style="{ '--altura-cartao': alturaCartaoTipo ? `${alturaCartaoTipo}px` : undefined }"
+          >
             <CartaoSelecao
               v-for="op in opcoesTipo"
               :key="op.valor"

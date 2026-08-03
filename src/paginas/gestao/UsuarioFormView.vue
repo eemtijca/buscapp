@@ -30,10 +30,8 @@ const cargo = ref('');
 const status = ref<StatusPerfil>('ativo');
 const notificacoesAtivas = ref(true);
 const acessoModulos = ref<string[]>(['frequencia']);
-const permissoes = ref<string[]>([]);
 
 const opcoesModulos = ref<OpcaoCheckbox[]>([]);
-const opcoesPermissoes = ref<OpcaoCheckbox[]>([]);
 
 const atribuicoes = ref<(AtribuicaoProfessor & { turma_nome?: string })[]>([]);
 const vinculos = ref<(VinculoResponsavel & { aluno_nome?: string })[]>([]);
@@ -69,7 +67,6 @@ function salvarDraft() {
           cargo: cargo.value,
           notificacoesAtivas: notificacoesAtivas.value,
           acessoModulos: acessoModulos.value,
-          permissoes: permissoes.value,
         }),
       );
     } catch {
@@ -96,7 +93,7 @@ onBeforeRouteLeave((_to, _from, next) => {
 });
 
 watch(
-  [nome, email, telefone, cargo, notificacoesAtivas, acessoModulos, permissoes, papel],
+  [nome, email, telefone, cargo, notificacoesAtivas, acessoModulos, papel],
   () => {
     if (!formDirty.value && !usuarioCriado.value) formDirty.value = true;
     if (!usuarioCriado.value) salvarDraft();
@@ -127,7 +124,6 @@ async function copiarCodigoCriado() {
 
 onMounted(async () => {
   opcoesModulos.value = await buscarOpcoes('modulo');
-  opcoesPermissoes.value = await buscarOpcoes('permissao');
   const id = route.params.id as string | undefined;
   if (id) {
     modoEdicao.value = true;
@@ -147,13 +143,12 @@ onMounted(async () => {
     }
     const { data: perfil } = await supabaseClient
       .from('perfis')
-      .select('notificacoes_ativas, acesso_modulos, permissoes')
+      .select('notificacoes_ativas, acesso_modulos')
       .eq('id', id)
       .single();
     if (perfil) {
       notificacoesAtivas.value = perfil.notificacoes_ativas;
       acessoModulos.value = perfil.acesso_modulos?.length ? perfil.acesso_modulos : ['frequencia'];
-      permissoes.value = perfil.permissoes ?? [];
     }
     if (usuario.papel === 'professor') {
       const { data: atribs } = await supabaseClient
@@ -196,7 +191,6 @@ onMounted(async () => {
       if (typeof parsed.notificacoesAtivas === 'boolean')
         notificacoesAtivas.value = parsed.notificacoesAtivas;
       if (parsed.acessoModulos) acessoModulos.value = parsed.acessoModulos;
-      if (parsed.permissoes) permissoes.value = parsed.permissoes;
     }
   } catch {
     /* ignorar dados corrompidos */
@@ -218,7 +212,6 @@ async function salvar() {
     const dadosExtras = {
       notificacoes_ativas: notificacoesAtivas.value,
       acesso_modulos: acessoModulos.value,
-      permissoes: permissoes.value,
     };
     if (modoEdicao.value && usuarioId.value) {
       const ok = await atualizarUsuario(usuarioId.value, {
@@ -464,31 +457,7 @@ async function salvar() {
         </div>
       </div>
 
-      <div v-if="papel === 'professor'" class="card border mb-3">
-        <div class="card-header bg-body-tertiary py-2">
-          <span class="fw-medium small">Permissões</span>
-        </div>
-        <div class="card-body">
-          <CampoFormulario
-            id="permissoes"
-            label="Permissões especiais"
-            dica="Conceda permissões adicionais a este professor"
-          >
-            <GrupoCheckbox
-              nome="permissao"
-              :opcoes="opcoesPermissoes"
-              :modelo="permissoes"
-              :colunas="2"
-              @update:modelo="permissoes = $event"
-            />
-          </CampoFormulario>
-        </div>
-      </div>
-
-      <div
-        v-if="modoEdicao && papel === 'professor' && atribuicoes.length"
-        class="card border mb-3"
-      >
+      <div v-if="modoEdicao && papel === 'professor' && atribuicoes.length" class="card border mb-3">
         <div class="card-header bg-body-tertiary py-2">
           <span class="fw-medium small">Atribuições</span>
         </div>

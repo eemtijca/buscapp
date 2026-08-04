@@ -496,6 +496,30 @@ test.describe('Recuperacao de senha - Fluxo publico', () => {
     const requisitos = page.locator('ul[aria-label="Requisitos de senha"] li');
     await expect(requisitos.first()).toBeVisible();
   });
+
+  test('CT34 - Checkbox Mostrar senhas alterna visibilidade', async ({ page }) => {
+    await page.goto('/redefinir-senha-codigo');
+    const novaSenha = page.locator('input[id="nova-senha"]');
+    const confirmar = page.locator('input[id="confirmar-senha"]');
+    await expect(novaSenha).toHaveAttribute('type', 'password');
+    await expect(confirmar).toHaveAttribute('type', 'password');
+    await page.check('#mostrar-senhas');
+    await expect(novaSenha).toHaveAttribute('type', 'text');
+    await expect(confirmar).toHaveAttribute('type', 'text');
+    await page.uncheck('#mostrar-senhas');
+    await expect(novaSenha).toHaveAttribute('type', 'password');
+    await expect(confirmar).toHaveAttribute('type', 'password');
+  });
+
+  test('CT35 - Checkbox Mostrar senha alterna visibilidade no login', async ({ page }) => {
+    await page.goto('/');
+    const senha = page.locator('input[id="senha"]');
+    await expect(senha).toHaveAttribute('type', 'password');
+    await page.check('#mostrar-senha');
+    await expect(senha).toHaveAttribute('type', 'text');
+    await page.uncheck('#mostrar-senha');
+    await expect(senha).toHaveAttribute('type', 'password');
+  });
 });
 
 test.describe('Gestao - Codigos - Mobile', () => {
@@ -800,67 +824,76 @@ const CHAT_CONV_ID = 'f0000000-0000-0000-0000-000000000001';
 const CHAT_CONV2_ID = 'f0000000-0000-0000-0000-000000000002';
 
 test.beforeAll(async () => {
-  // Create test conversations and messages via service role API
+  // Create test conversations and messages via service role API.
+  // Usa upsert (merge-duplicates) para que seja seguro sob execucao paralela
+  // de varios workers: cada beforeAll converge para o mesmo estado.
   const headers = {
     'Content-Type': 'application/json',
     apikey: SERVICE_KEY,
     Authorization: `Bearer ${SERVICE_KEY}`,
-    Prefer: 'return=representation',
+    Prefer: 'resolution=merge-duplicates,return=representation',
   };
 
-  // Upsert: first try to clean existing test data
-  await fetch(`${URL_SUPABASE}/rest/v1/mensagens?conversa_id=in.(${CHAT_CONV_ID},${CHAT_CONV2_ID})`, {
-    method: 'DELETE',
-    headers,
-  });
-  await fetch(`${URL_SUPABASE}/rest/v1/conversas?id=in.(${CHAT_CONV_ID},${CHAT_CONV2_ID})`, {
-    method: 'DELETE',
-    headers,
-  });
+  async function api(url: string, options: RequestInit = {}) {
+    const res = await fetch(`${URL_SUPABASE}${url}`, { headers, ...options });
+    if (!res.ok) {
+      const corpo = await res.text().catch(() => '');
+      throw new Error(
+        `Falha no setup do chat (${options.method ?? 'GET'} ${url}): ${res.status} ${corpo}`,
+      );
+    }
+    return res;
+  }
 
-  await fetch(`${URL_SUPABASE}/rest/v1/conversas`, {
+  const RESPONSAVEL_ID = 'a0000000-0000-0000-0000-000000000005';
+  const ALUNO1_ID = 'e0000000-0000-0000-0000-000000000001';
+  const ALUNO2_ID = 'e0000000-0000-0000-0000-000000000002';
+
+  // Upsert das conversas (unicidade por par responsavel/aluno), resetando ativa.
+  await api('/rest/v1/conversas?on_conflict=responsavel_id,aluno_id', {
     method: 'POST',
-    headers,
     body: JSON.stringify({
       id: CHAT_CONV_ID,
       turma_id: 'd0000000-0000-0000-0000-000000000001',
-      responsavel_id: 'a0000000-0000-0000-0000-000000000005',
-      aluno_id: 'e0000000-0000-0000-0000-000000000001',
+      responsavel_id: RESPONSAVEL_ID,
+      aluno_id: ALUNO1_ID,
+      ativa: true,
     }),
   });
 
-  await fetch(`${URL_SUPABASE}/rest/v1/conversas`, {
+  await api('/rest/v1/conversas?on_conflict=responsavel_id,aluno_id', {
     method: 'POST',
-    headers,
     body: JSON.stringify({
       id: CHAT_CONV2_ID,
       turma_id: 'd0000000-0000-0000-0000-000000000001',
-      responsavel_id: 'a0000000-0000-0000-0000-000000000005',
-      aluno_id: 'e0000000-0000-0000-0000-000000000002',
+      responsavel_id: RESPONSAVEL_ID,
+      aluno_id: ALUNO2_ID,
+      ativa: true,
     }),
   });
 
-  // Messages from responsavel and gestao
+  // Upsert das mensagens (unicidade por id)
   for (const msg of [
-    { id: 'f0000000-0000-0000-0000-0000000011', conversa_id: CHAT_CONV_ID, remetente_id: 'a0000000-0000-0000-0000-000000000005', conteudo: 'Bom dia, gostaria de saber como esta meu filho', created_at: '2026-07-20T08:00:00Z' },
-    { id: 'f0000000-0000-0000-0000-0000000012', conversa_id: CHAT_CONV_ID, remetente_id: 'a0000000-0000-0000-0000-000000000001', conteudo: 'Bom dia! O Joao esta bem, participando das aulas.', created_at: '2026-07-20T08:15:00Z' },
-    { id: 'f0000000-0000-0000-0000-0000000013', conversa_id: CHAT_CONV_ID, remetente_id: 'a0000000-0000-0000-0000-000000000002', conteudo: 'Confirmo! Ele tem se destacado em matematica.', created_at: '2026-07-20T08:30:00Z' },
-    { id: 'f0000000-0000-0000-0000-0000000014', conversa_id: CHAT_CONV_ID, remetente_id: 'a0000000-0000-0000-0000-000000000005', conteudo: 'Que bom! Obrigado pela atencao.', created_at: '2026-07-20T09:00:00Z' },
+    { id: 'f0000000-0000-0000-0000-000000000011', conversa_id: CHAT_CONV_ID, remetente_id: 'a0000000-0000-0000-0000-000000000005', conteudo: 'Bom dia, gostaria de saber como esta meu filho', created_at: '2026-07-20T08:00:00Z' },
+    { id: 'f0000000-0000-0000-0000-000000000012', conversa_id: CHAT_CONV_ID, remetente_id: 'a0000000-0000-0000-0000-000000000001', conteudo: 'Bom dia! O Joao esta bem, participando das aulas.', created_at: '2026-07-20T08:15:00Z' },
+    { id: 'f0000000-0000-0000-0000-000000000013', conversa_id: CHAT_CONV_ID, remetente_id: 'a0000000-0000-0000-0000-000000000002', conteudo: 'Confirmo! Ele tem se destacado em matematica.', created_at: '2026-07-20T08:30:00Z' },
+    { id: 'f0000000-0000-0000-0000-000000000014', conversa_id: CHAT_CONV_ID, remetente_id: 'a0000000-0000-0000-0000-000000000005', conteudo: 'Que bom! Obrigado pela atencao.', created_at: '2026-07-20T09:00:00Z' },
   ]) {
-    await fetch(`${URL_SUPABASE}/rest/v1/mensagens`, { method: 'POST', headers, body: JSON.stringify(msg) });
+    await api('/rest/v1/mensagens?on_conflict=id', { method: 'POST', body: JSON.stringify(msg) });
   }
 
   // Update ultima_mensagem_em
-  await fetch(`${URL_SUPABASE}/rest/v1/conversas?id=eq.${CHAT_CONV_ID}`, {
+  await api(`/rest/v1/conversas?id=eq.${CHAT_CONV_ID}`, {
     method: 'PATCH',
-    headers,
     body: JSON.stringify({ ultima_mensagem_em: '2026-07-20T09:00:00Z' }),
   });
 
-  // Create a notification for gestao
-  await fetch(`${URL_SUPABASE}/rest/v1/notificacoes`, {
+  // Notificacao de teste para gestao (evita acumulo entre execucoes)
+  await api(`/rest/v1/notificacoes?metadados->>conversa_id=eq.${CHAT_CONV_ID}`, {
+    method: 'DELETE',
+  });
+  await api('/rest/v1/notificacoes', {
     method: 'POST',
-    headers,
     body: JSON.stringify({
       destinatario_id: 'a0000000-0000-0000-0000-000000000001',
       tipo: 'mensagem',
@@ -886,7 +919,7 @@ test.describe('Responsavel — Chat', () => {
   test('CT68 - Sidebar mostra nome dos contatos', async ({ page }) => {
     await login(page, 'resp1@email.com', SENHA_RESP);
     await page.goto('/responsavel/chat');
-    await page.waitForTimeout(2000);
+    await expect(page.locator('.chat-sidebar button').first()).toBeVisible({ timeout: 10000 });
     const items = page.locator('.chat-sidebar button');
     const count = await items.count();
     expect(count).toBeGreaterThanOrEqual(1);
@@ -898,8 +931,8 @@ test.describe('Responsavel — Chat', () => {
   test('CT69 - Selecionar conversa exibe mensagens', async ({ page }) => {
     await login(page, 'resp1@email.com', SENHA_RESP);
     await page.goto('/responsavel/chat');
-    await page.waitForTimeout(2000);
     const primeiroItem = page.locator('.chat-sidebar button').first();
+    await expect(primeiroItem).toBeVisible({ timeout: 10000 });
     await primeiroItem.click();
     await page.waitForTimeout(1000);
     const bolhas = page.locator('.chat-messages .rounded-3');
@@ -954,6 +987,7 @@ test.describe('Responsavel — Chat', () => {
 // ============================================================================
 test.describe('Gestao — Chat', () => {
   test('CT73 - Pagina de chat carrega com sidebar e placeholder', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 720 });
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/chat');
     await page.waitForSelector('.chat-layout', { timeout: 10000 });
@@ -964,7 +998,7 @@ test.describe('Gestao — Chat', () => {
   test('CT74 - Sidebar mostra contatos', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/chat');
-    await page.waitForTimeout(2000);
+    await expect(page.locator('.chat-sidebar button').first()).toBeVisible({ timeout: 10000 });
     const items = page.locator('.chat-sidebar button');
     const count = await items.count();
     expect(count).toBeGreaterThanOrEqual(1);
@@ -1029,11 +1063,12 @@ test.describe('Notificacoes — Popover', () => {
   test('CT87 - Popover abre ao clicar no sino', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao');
-    await page.locator('button[aria-label="Notificações"]').click();
+    const btnNotif = page.locator('button[aria-label="Notificações"]');
+    await btnNotif.click();
     await page.waitForTimeout(500);
     await expect(page.locator('.notif-menu').first()).toBeVisible({ timeout: 5000 });
-    // Click outside to close
-    await page.locator('h1').first().click();
+    // Toggle para fechar (o menu cobre o h1 em telas menores)
+    await btnNotif.click();
     await page.waitForTimeout(300);
   });
 
@@ -1112,7 +1147,7 @@ test.describe('Chat — Resiliencia', () => {
   test('CT95 - Sidebar contatos visivel na gestao', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/chat');
-    await page.waitForTimeout(3000);
+    await expect(page.locator('.chat-sidebar button').first()).toBeVisible({ timeout: 10000 });
     const count = await page.locator('.chat-sidebar button').count();
     expect(count).toBeGreaterThanOrEqual(1);
   });
@@ -1219,7 +1254,8 @@ test.describe('Notificacoes — Casos Extremos', () => {
     await btnNotif.click();
     await page.waitForTimeout(300);
     await expect(page.locator('.notif-menu').first()).toBeVisible({ timeout: 5000 });
-    await page.locator('h1').first().click();
+    // Toggle para fechar (o menu cobre o h1 em telas menores)
+    await btnNotif.click();
     await page.waitForTimeout(300);
     await btnNotif.click();
     await page.waitForTimeout(300);

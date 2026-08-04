@@ -2040,6 +2040,12 @@ grant update, delete on public.notificacoes to authenticated;
 -- Permissao INSERT para justificativas (gestao inserir manualmente)
 grant insert on public.justificativas_faltas to authenticated;
 
+-- Permissoes para o service_role (chave de servico) nas tabelas de chat,
+-- usadas pela Edge Function e pelo setup de testes via REST API.
+grant select, insert, update, delete on public.conversas to service_role;
+grant select, insert, update, delete on public.mensagens to service_role;
+grant select, insert, update, delete on public.notificacoes to service_role;
+
 grant execute on function public.fn_gerar_codigo_redefinicao to authenticated;
 grant execute on function public.fn_criar_usuario to authenticated;
 grant execute on function public.fn_solicitar_codigo_redefinicao to anon;

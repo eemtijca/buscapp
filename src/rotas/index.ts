@@ -2,8 +2,6 @@ import { createRouter, createWebHistory } from 'vue-router';
 import { supabaseClient, decodificarToken } from '@/servicos/supabase';
 import LayoutPrincipal from '@/layouts/LayoutPrincipal.vue';
 import LoginView from '@/paginas/auth/LoginView.vue';
-import SolicitarRecuperacaoView from '@/paginas/auth/SolicitarRecuperacaoView.vue';
-import RecuperarSenhaView from '@/paginas/auth/RecuperarSenhaView.vue';
 import SolicitarCodigoView from '@/paginas/auth/SolicitarCodigoView.vue';
 import RedefinirSenhaCodigoView from '@/paginas/auth/RedefinirSenhaCodigoView.vue';
 import ProfessorHomeView from '@/paginas/professor/HomeView.vue';
@@ -50,12 +48,6 @@ const homePorPapel: Record<string, string> = {
   responsavel: '/responsavel',
 };
 
-function redirecionarSeDesabilitado() {
-  if (import.meta.env.VITE_RECUPERACAO_SENHA_HABILITADA === 'false') {
-    return { name: 'login' };
-  }
-}
-
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
@@ -64,20 +56,6 @@ const router = createRouter({
       name: 'login',
       meta: { requerAutenticacao: false },
       component: LoginView,
-    },
-    {
-      path: '/solicitar-recuperacao',
-      name: 'solicitar-recuperacao',
-      meta: { requerAutenticacao: false },
-      beforeEnter: redirecionarSeDesabilitado,
-      component: SolicitarRecuperacaoView,
-    },
-    {
-      path: '/recuperar-senha',
-      name: 'recuperar-senha',
-      meta: { requerAutenticacao: false },
-      beforeEnter: redirecionarSeDesabilitado,
-      component: RecuperarSenhaView,
     },
     {
       path: '/solicitar-codigo',

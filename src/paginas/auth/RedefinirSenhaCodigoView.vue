@@ -9,8 +9,7 @@ const email = ref('');
 const codigo = ref('');
 const novaSenha = ref('');
 const confirmarSenha = ref('');
-const mostrarSenha = ref(false);
-const mostrarConfirmacao = ref(false);
+const mostrarSenhas = ref(false);
 const carregando = ref(false);
 const atualizado = ref(false);
 const erro = ref<string | null>(null);
@@ -133,12 +132,12 @@ async function handleRedefinir(): Promise<void> {
             <label for="codigo">Código de 6 dígitos</label>
           </div>
 
-          <div class="form-floating position-relative mt-3">
+          <div class="form-floating mt-3">
             <input
               id="nova-senha"
               v-model="novaSenha"
-              :type="mostrarSenha ? 'text' : 'password'"
-              class="form-control pe-5"
+              :type="mostrarSenhas ? 'text' : 'password'"
+              class="form-control"
               :class="{ 'is-invalid': erro && !novaSenha.trim() }"
               placeholder="Nova senha"
               :disabled="carregando"
@@ -146,17 +145,6 @@ async function handleRedefinir(): Promise<void> {
               required
             />
             <label for="nova-senha">Nova senha</label>
-            <button
-              type="button"
-              class="btn btn-link position-absolute end-0 top-50 translate-middle-y text-decoration-none p-1 pe-2"
-              style="z-index: 5"
-              @click="mostrarSenha = !mostrarSenha"
-              :aria-label="mostrarSenha ? 'Ocultar senha' : 'Mostrar senha'"
-              :aria-controls="'nova-senha'"
-              tabindex="-1"
-            >
-              <i :class="mostrarSenha ? 'bi-eye-slash' : 'bi-eye'" class="fs-5 lh-1"></i>
-            </button>
           </div>
 
           <ul
@@ -179,12 +167,12 @@ async function handleRedefinir(): Promise<void> {
             </li>
           </ul>
 
-          <div class="form-floating position-relative mt-3">
+          <div class="form-floating mt-3">
             <input
               id="confirmar-senha"
               v-model="confirmarSenha"
-              :type="mostrarConfirmacao ? 'text' : 'password'"
-              class="form-control pe-5"
+              :type="mostrarSenhas ? 'text' : 'password'"
+              class="form-control"
               :class="{
                 'is-valid': senhasConferem,
                 'is-invalid': senhasDiferem,
@@ -195,17 +183,16 @@ async function handleRedefinir(): Promise<void> {
               required
             />
             <label for="confirmar-senha">Confirmar senha</label>
-            <button
-              type="button"
-              class="btn btn-link position-absolute end-0 top-50 translate-middle-y text-decoration-none p-1 pe-2"
-              style="z-index: 5"
-              @click="mostrarConfirmacao = !mostrarConfirmacao"
-              :aria-label="mostrarConfirmacao ? 'Ocultar senha' : 'Mostrar senha'"
-              :aria-controls="'confirmar-senha'"
-              tabindex="-1"
-            >
-              <i :class="mostrarConfirmacao ? 'bi-eye-slash' : 'bi-eye'" class="fs-5 lh-1"></i>
-            </button>
+          </div>
+
+          <div class="form-check text-start mt-3">
+            <input
+              id="mostrar-senhas"
+              v-model="mostrarSenhas"
+              type="checkbox"
+              class="form-check-input"
+            />
+            <label class="form-check-label" for="mostrar-senhas">Mostrar senhas</label>
           </div>
 
           <div

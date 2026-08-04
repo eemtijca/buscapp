@@ -144,8 +144,7 @@ Projeto em desenvolvimento ativo. A infraestrutura central está concluída e os
 |----------------|-----------|
 | Autenticação | Login e logout com email e senha via Supabase Auth |
 | Sessão persistente | Opção "lembrar-me" que alterna entre localStorage (permanente) e sessionStorage (temporária) |
-| Recuperação de senha | Fluxo de "Esqueci minha senha" com email (configurável via feature flag) |
-| Código de redefinição | Sistema de código de 6 dígitos para redefinir senha sem depender de email (gerado por admin, solicitado por responsável) |
+| Recuperação de senha | Fluxo unificado com o primeiro acesso: código de 6 dígitos para redefinir a senha sem depender de email (gerado por admin, solicitado pelo usuário) |
 | JWT com custom claims | Token JWT contém nome e papel do usuário, injetado via Custom Access Token Hook do Supabase |
 | RBAC | Guardas de rota no Vue Router que redirecionam usuários não autenticados e bloqueiam acesso a rotas não autorizadas |
 | Redirecionamento pós-login | Redirecionamento automático para a página inicial do perfil após login bem-sucedido |
@@ -225,7 +224,7 @@ buscapp/
 │   │   ├── SeletorIcone.vue            # Seletor visual de ícones Bootstrap com busca e categorias
 │   │   └── TermometroRisco.vue          # Termômetro visual de risco
 │   ├── composables/                     # Lógica de apresentação reutilizável
-│   │   ├── useAutenticacao.ts           # Login, logout, sessão, recuperação de senha
+│   │   ├── useAutenticacao.ts           # Login, logout, sessão e redefinição de senha por código
 │   │   ├── useGestaoUsuarios.ts         # CRUD de usuários, alunos, turmas, disciplinas, atribuições, códigos
 │   │   ├── useMonitoramento.ts          # Frequência, comportamento, ocorrências, ranking, risco, termômetro, chat. Limites e horários lidos do banco com cache em memória.
 │   │   ├── useOpcoesConfiguracao.ts     # Busca em cache de opções configuráveis por tipo
@@ -236,10 +235,8 @@ buscapp/
 │   ├── paginas/
 │   │   ├── auth/                        # Páginas de autenticação
 │   │   │   ├── LoginView.vue
-│   │   │   ├── RecuperarSenhaView.vue
 │   │   │   ├── RedefinirSenhaCodigoView.vue
-│   │   │   ├── SolicitarCodigoView.vue
-│   │   │   └── SolicitarRecuperacaoView.vue
+│   │   │   └── SolicitarCodigoView.vue
 │   │   ├── professor/                   # Páginas do professor
 │   │   │   ├── HomeView.vue
 │   │   │   ├── FrequenciaView.vue
@@ -301,7 +298,6 @@ buscapp/
 │   │   ├── criar-usuario/             # Cria usuário com senha temporária e código automático
 │   │   └── processar-anexo/           # Otimiza anexos de justificativas (Imagemagick WASM + pdf-lib)
 │   ├── templates/                      # Templates de email
-│   │   ├── recuperacao.html
 │   │   └── senha_alterada_notificacao.html
 │   └── tests/
 │       └── 0001_validacao_completa.sql # Testes PL/pgSQL transacionais (846 linhas)
@@ -509,9 +505,7 @@ Quatro funções serverless implementadas em Deno, utilizadas para operações q
 |----------|-------------|-----------|--------------|
 | `VITE_SUPABASE_URL` | Sim | URL do projeto Supabase | `http://127.0.0.1:54321` (desenvolvimento local) |
 | `VITE_SUPABASE_PUBLISHABLE_KEY` | Sim | Chave anônima/publishable do Supabase | — |
-| `VITE_RECUPERACAO_SENHA_HABILITADA` | Não | Exibe ou oculta o fluxo "Esqueci minha senha" na tela de login | `true` |
 | `VITE_EDGE_FUNCTIONS_URL` | Não | URL base das Edge Functions (utilizado quando o proxy do Supabase não está disponível) | `{VITE_SUPABASE_URL}/functions/v1` |
-| `VITE_PUBLIC_SITE_URL` | Não | URL pública do site para redirecionamento no fluxo de recuperação de senha | `window.location.origin` |
 
 ## Como Executar o Projeto
 

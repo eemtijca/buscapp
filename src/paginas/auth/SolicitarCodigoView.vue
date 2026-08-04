@@ -77,7 +77,8 @@ async function handleSolicitarCodigo(): Promise<void> {
         <h1 class="h4 mb-3 fw-normal text-center">Solicitar código de acesso</h1>
 
         <p class="text-body-secondary text-center mb-4" style="font-size: 0.875rem">
-          Informe seu e-mail para receber um código de redefinição de senha da administração.
+          Informe seu e-mail para receber um código de acesso ou de redefinição de senha da
+          administração.
         </p>
 
         <div v-if="erro" class="alert alert-danger d-flex align-items-center" role="alert">

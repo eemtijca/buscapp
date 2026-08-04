@@ -52,12 +52,34 @@ serve(async (req: Request) => {
       )
     }
 
+    // Consome o código de forma atômica ANTES de alterar a senha, para impedir
+    // a reutilização (replay) do mesmo código em requisições concorrentes.
+    const { data: marcado, error: marcarError } = await supabaseAdmin
+      .from('codigos_redefinicao')
+      .update({ usado_em: new Date().toISOString() })
+      .eq('id', codigoData.id)
+      .is('usado_em', null)
+      .select('id')
+
+    if (marcarError || !marcado || marcado.length === 0) {
+      return new Response(
+        JSON.stringify({ error: 'Código já utilizado. Solicite um novo código.' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } },
+      )
+    }
+
     const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
       codigoData.perfil_id,
       { password: novaSenha },
     )
 
     if (updateError) {
+      // Reverte o consumo do código para permitir nova tentativa.
+      await supabaseAdmin
+        .from('codigos_redefinicao')
+        .update({ usado_em: null })
+        .eq('id', codigoData.id)
+        .is('usado_em', null)
       console.error('[redefinir-senha-codigo] Erro ao atualizar senha:', updateError.message)
       return new Response(
         JSON.stringify({ error: 'Erro ao redefinir senha. Tente novamente.' }),
@@ -65,16 +87,15 @@ serve(async (req: Request) => {
       )
     }
 
-    await supabaseAdmin
-      .from('codigos_redefinicao')
-      .update({ usado_em: new Date().toISOString() })
-      .eq('id', codigoData.id)
-
-    await supabaseAdmin
+    const { error: ativarError } = await supabaseAdmin
       .from('perfis')
       .update({ status: 'ativo' })
       .eq('id', codigoData.perfil_id)
       .eq('status', 'pendente')
+
+    if (ativarError) {
+      console.error('[redefinir-senha-codigo] Erro ao ativar perfil:', ativarError.message)
+    }
 
     return new Response(
       JSON.stringify({ success: true }),

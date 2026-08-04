@@ -1001,49 +1001,67 @@ export function useMonitoramento() {
     }
   }
 
-  function processarAnexoAsync(justificativaId: string, responsavelId: string, arquivo: File) {
+  async function processarAnexoAsync(
+    justificativaId: string,
+    responsavelId: string,
+    arquivo: File,
+  ) {
     const edgeFunctionUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/processar-anexo`;
     const ext = arquivo.type === 'image/jpeg' ? 'jpg' : (arquivo.name.split('.').pop() ?? 'bin');
     const storagePath = `${responsavelId}/${justificativaId}/${Date.now()}-${justificativaId.slice(0, 8)}.${ext}`;
 
-    comprimirImagem(arquivo)
-      .then(({ blob, mimeType, tamanhoComprimido }) =>
-        supabaseClient.storage
-          .from('justificativas')
-          .upload(storagePath, blob, { contentType: mimeType, upsert: false })
-          .then(() => ({ blob, mimeType, tamanhoComprimido })),
-      )
-      .then(({ mimeType, tamanhoComprimido }) => {
-        const anexoId = crypto.randomUUID();
-        return supabaseClient
-          .from('anexos')
-          .insert({
-            id: anexoId,
-            storage_path: storagePath,
-            nome_arquivo: arquivo.name,
-            mime_type: mimeType,
-            tamanho_bytes: tamanhoComprimido,
-            criado_por: responsavelId,
-          })
-          .then(() => anexoId);
-      })
-      .then((anexoId) =>
-        supabaseClient
-          .from('justificativa_anexos')
-          .insert({
-            justificativa_id: justificativaId,
-            anexo_id: anexoId,
-          })
-          .then(() => anexoId),
-      )
-      .then((anexoId) => {
-        fetch(edgeFunctionUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ storagePath, mimeType: arquivo.type, anexoId }),
-        }).catch(() => {});
-      })
-      .catch((e) => console.error('[useMonitoramento] Anexo async processing failed:', e));
+    const removerStorage = () =>
+      supabaseClient.storage
+        .from('justificativas')
+        .remove([storagePath])
+        .catch(() => {});
+
+    try {
+      const { blob, mimeType, tamanhoComprimido } = await comprimirImagem(arquivo);
+
+      await supabaseClient.storage.from('justificativas').upload(storagePath, blob, {
+        contentType: mimeType,
+        upsert: false,
+      });
+
+      const anexoId = crypto.randomUUID();
+      const { error: anexoError } = await supabaseClient.from('anexos').insert({
+        id: anexoId,
+        storage_path: storagePath,
+        nome_arquivo: arquivo.name,
+        mime_type: mimeType,
+        tamanho_bytes: tamanhoComprimido,
+        criado_por: responsavelId,
+      });
+      if (anexoError) {
+        await removerStorage();
+        throw anexoError;
+      }
+
+      const { error: vinculoError } = await supabaseClient
+        .from('justificativa_anexos')
+        .insert({
+          justificativa_id: justificativaId,
+          anexo_id: anexoId,
+        });
+      if (vinculoError) {
+        // Compensação: remove o objeto do storage e tenta remover a linha de anexo
+        // (se a permissão permitir). Linhas remanescentes são limpas pelo job de expurgo.
+        try {
+          await supabaseClient.from('anexos').delete().eq('id', anexoId);
+        } catch { /* sem permissão de deleção pelo cliente */ }
+        await removerStorage();
+        throw vinculoError;
+      }
+
+      fetch(edgeFunctionUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ storagePath, mimeType: arquivo.type, anexoId }),
+      }).catch((e) => console.error('[useMonitoramento] Anexo processing (edge) failed:', e));
+    } catch (e) {
+      console.error('[useMonitoramento] Anexo async processing failed:', e);
+    }
   }
 
   async function criarOuObterConversa(

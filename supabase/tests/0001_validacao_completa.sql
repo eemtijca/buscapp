@@ -149,7 +149,7 @@ begin
   values ('Bruno Souza', 'MAT002', 'ativo') returning id into v_aluno2_id;
   insert into public.alunos (nome, matricula, status)
   values ('Carla Dias', 'MAT003', 'ativo') returning id into v_aluno3_id;
-  insert into public.alunos (nome, matricula, status) values ('Daniel Lima', 'MAT004', 'ativo');
+  insert into public.alunos (nome, matricula, status) values ('Daniel Lima', 'MAT004', 'transferido');
   insert into public.alunos (nome, matricula, status)
   values ('Eduarda Reis', 'MAT005', 'egresso') returning id into v_aluno_egresso;
   insert into public.alunos (nome, matricula, status)
@@ -174,25 +174,25 @@ begin
   values (v_professor_id, v_turma_a_id, v_disc_id, 'titular');
 
   insert into public.frequencias (aluno_id, professor_id, turma_id, ano_letivo_id, data_aula, tipo_registro, periodo, status)
-  values (v_aluno1_id, v_professor_id, v_turma_a_id, v_ano_id, current_date, 'entrada_portao', 'manha', 'presente');
+  values (v_aluno1_id, v_professor_id, v_turma_a_id, v_ano_id, current_date, 'entrada_portao', 'Manhã', 'presente');
   insert into public.frequencias (aluno_id, professor_id, turma_id, ano_letivo_id, data_aula, tipo_registro, periodo, status)
-  values (v_aluno1_id, v_professor_id, v_turma_a_id, v_ano_id, current_date, 'chamada_aula', '1o horario', 'presente');
+  values (v_aluno1_id, v_professor_id, v_turma_a_id, v_ano_id, current_date, 'chamada_aula', '1º Horário', 'presente');
   insert into public.frequencias (aluno_id, professor_id, turma_id, ano_letivo_id, data_aula, tipo_registro, periodo, status)
-  values (v_aluno1_id, v_professor_id, v_turma_a_id, v_ano_id, current_date - 1, 'entrada_portao', 'manha', 'ausente');
+  values (v_aluno1_id, v_professor_id, v_turma_a_id, v_ano_id, current_date - 1, 'entrada_portao', 'Manhã', 'ausente');
   insert into public.frequencias (aluno_id, professor_id, turma_id, ano_letivo_id, data_aula, tipo_registro, periodo, status, client_request_id)
-  values (v_aluno1_id, v_professor_id, v_turma_a_id, v_ano_id, current_date - 2, 'chamada_aula', '2o horario', 'ausente', 'a0000000-0000-0000-0000-000000000001');
+  values (v_aluno1_id, v_professor_id, v_turma_a_id, v_ano_id, current_date - 2, 'chamada_aula', '2º Horário', 'ausente', 'a0000000-0000-0000-0000-000000000001');
   insert into public.frequencias (aluno_id, professor_id, turma_id, ano_letivo_id, data_aula, tipo_registro, periodo, status, deleted_at)
-  values (v_aluno1_id, v_professor_id, v_turma_a_id, v_ano_id, current_date - 3, 'chamada_aula', '1o horario', 'ausente', now());
+  values (v_aluno1_id, v_professor_id, v_turma_a_id, v_ano_id, current_date - 3, 'chamada_aula', '1º Horário', 'ausente', now());
   insert into public.frequencias (aluno_id, professor_id, turma_id, ano_letivo_id, data_aula, tipo_registro, periodo, status)
-  values (v_aluno2_id, v_professor_id, v_turma_a_id, v_ano_id, current_date, 'entrada_portao', 'manha', 'presente');
+  values (v_aluno2_id, v_professor_id, v_turma_a_id, v_ano_id, current_date, 'entrada_portao', 'Manhã', 'presente');
   insert into public.frequencias (aluno_id, professor_id, turma_id, ano_letivo_id, data_aula, tipo_registro, periodo, status)
-  values (v_aluno2_id, v_professor_id, v_turma_a_id, v_ano_id, current_date, 'chamada_aula', '1o horario', 'ausente');
+  values (v_aluno2_id, v_professor_id, v_turma_a_id, v_ano_id, current_date, 'chamada_aula', '1º Horário', 'ausente');
   insert into public.frequencias (aluno_id, professor_id, turma_id, ano_letivo_id, data_aula, tipo_registro, periodo, status)
-  values (v_aluno3_id, v_gestao_id, v_turma_b_id, v_ano_id, current_date, 'entrada_portao', 'manha', 'presente');
+  values (v_aluno3_id, v_gestao_id, v_turma_b_id, v_ano_id, current_date, 'entrada_portao', 'Manhã', 'presente');
   insert into public.frequencias (aluno_id, professor_id, turma_id, ano_letivo_id, data_aula, tipo_registro, periodo, status)
-  values (v_aluno3_id, v_gestao_id, v_turma_b_id, v_ano_id, current_date, 'chamada_aula', '1o horario', 'ausente');
+  values (v_aluno3_id, v_gestao_id, v_turma_b_id, v_ano_id, current_date, 'chamada_aula', '1º Horário', 'ausente');
   insert into public.frequencias (aluno_id, professor_id, turma_id, ano_letivo_id, data_aula, tipo_registro, periodo, status)
-  values (v_aluno3_id, v_gestao_id, v_turma_b_id, v_ano_id, current_date - 1, 'entrada_portao', 'manha', 'ausente');
+  values (v_aluno3_id, v_gestao_id, v_turma_b_id, v_ano_id, current_date - 1, 'entrada_portao', 'Manhã', 'ausente');
 
   insert into public.registros_comportamento (aluno_id, professor_id, turma_id, ano_letivo_id, observacao)
   values (v_aluno1_id, v_professor_id, v_turma_a_id, v_ano_id, 'Participativo')
@@ -321,7 +321,7 @@ begin
     insert into public.frequencias (aluno_id, professor_id, turma_id, ano_letivo_id, data_aula, tipo_registro, periodo, status, client_request_id)
     values ((public.test_get('aluno1_id'))::uuid, (public.test_get('professor_id'))::uuid,
             (select id from public.turmas limit 1), (public.test_get('ano_id'))::uuid,
-            current_date, 'chamada_aula', '3o horario', 'presente', 'a0000000-0000-0000-0000-000000000001');
+            current_date, 'chamada_aula', '3º Horário', 'presente', 'a0000000-0000-0000-0000-000000000001');
     perform public.test_msg('C6: client_request_id unico', false);
   exception when unique_violation then
     perform public.test_msg('C6: client_request_id unico', true);
@@ -370,6 +370,7 @@ begin
   delete from public.perfis where id = v_temp_id;
   select count(*) into v_count from public.vinculos_responsaveis where responsavel_id = v_temp_id;
   perform public.test_msg('C11: FK CASCADE perfil->vinculos', v_count = 0);
+  delete from auth.users where id = v_temp_id;
 
   -- C12: FK SET NULL — deletar professor de ocorrencia
   v_temp_perfil_id := public.test_create_auth_user('tempprof2@test.com', 'Temp Prof', 'professor');
@@ -381,6 +382,7 @@ begin
   delete from public.perfis where id = v_temp_perfil_id;
   select count(*) into v_count from public.ocorrencias where id = v_temp_id and professor_id is null;
   perform public.test_msg('C12: FK SET NULL ocorrencia.professor_id', v_count = 1);
+  delete from auth.users where id = v_temp_perfil_id;
 
   raise notice '[OK] Phase 2: Constraints concluida';
 end;
@@ -588,7 +590,7 @@ begin
     values ((public.test_get('aluno1_id'))::uuid, (public.test_get('professor_id'))::uuid,
             (select id from public.turmas where nome_completo = '1º A'),
             (public.test_get('ano_id'))::uuid,
-            current_date, 'chamada_aula', '5o horario', 'presente',
+            current_date, 'chamada_aula', '4º Horário', 'presente',
             'a0000000-0000-0000-0000-000000000001');
     perform public.test_msg('E3: idempotencia (client_request_id)', false);
   exception when unique_violation then
@@ -878,12 +880,20 @@ begin
   where typname in ('serie_turma', 'letra_turma', 'tipo_vinculo', 'papel_atribuicao');
   perform public.test_msg('C7: enums antigos removidos', v_qtd = 0);
 
-  -- C8: colunas text aceitam valores fora do enum original
+  -- C8: serie/letra validam contra o catalogo de opcoes (serie "4º" nao cadastrada)
   begin
     insert into public.turmas (ano_letivo_id, serie, letra) values ('b0000000-0000-0000-0000-000000000001', '4º', 'D');
-    perform public.test_msg('C8: serie text aceita "4º"', true);
+    perform public.test_msg('C8: serie fora do catalogo rejeitada', false);
+  exception when check_violation then
+    perform public.test_msg('C8: serie fora do catalogo rejeitada', true);
+  end;
+
+  -- C8b: serie/letra cadastradas no catalogo sao aceitas
+  begin
+    insert into public.turmas (ano_letivo_id, serie, letra) values ('b0000000-0000-0000-0000-000000000001', '1º', 'D');
+    perform public.test_msg('C8b: serie do catalogo aceita', true);
   exception when others then
-    perform public.test_msg('C8: serie text aceita "4º"', false);
+    perform public.test_msg('C8b: serie do catalogo aceita', false);
   end;
 
   -- C9: views recriadas
@@ -895,6 +905,98 @@ begin
   raise notice '[OK] Phase 8: Configuracao concluida';
 end;
 $p8$;
+
+-- ============================================================================
+-- INTEGRIDADE — dados órfãos (catálogo, perfis, enturmações, anexos)
+-- ============================================================================
+
+do $integrity$
+declare
+  v int;
+begin
+  select count(*) into v
+  from public.perfis p
+  where exists (
+    select 1 from unnest(p.acesso_modulos) c
+    where not exists (select 1 from public.opcoes_configuracao o where o.tipo = 'modulo' and o.chave = c)
+  );
+  perform public.test_msg('I1: nenhum acesso_modulos orfao', v = 0);
+
+  select count(*) into v
+  from public.alunos a
+  where exists (
+    select 1 from unnest(a.documentos_recebidos) c
+    where not exists (select 1 from public.opcoes_configuracao o where o.tipo = 'documento' and o.chave = c)
+  );
+  perform public.test_msg('I2: nenhum documentos_recebidos orfao', v = 0);
+
+  select count(*) into v
+  from public.frequencias f
+  where not exists (select 1 from public.opcoes_configuracao o where o.tipo = 'periodo' and o.chave = f.periodo);
+  perform public.test_msg('I3: nenhum frequencias.periodo orfao', v = 0);
+
+  select count(*) into v
+  from public.frequencias f
+  where exists (
+    select 1 from unnest(f.motivos_ausencia) c
+    where not exists (select 1 from public.opcoes_configuracao o where o.tipo = 'motivo_ausencia' and o.chave = c)
+  );
+  perform public.test_msg('I4: nenhum motivos_ausencia orfao', v = 0);
+
+  select count(*) into v
+  from public.ocorrencias o
+  where exists (
+    select 1 from unnest(o.tipo) c
+    where not exists (select 1 from public.opcoes_configuracao oc where oc.tipo = 'tipo_ocorrencia' and oc.chave = c)
+  );
+  perform public.test_msg('I5: nenhum ocorrencias.tipo orfao', v = 0);
+
+  select count(*) into v
+  from public.ocorrencias o
+  where exists (
+    select 1 from unnest(o.tags_comportamento) t
+    where not exists (select 1 from public.tags_comportamento tc where tc.nome = t)
+  );
+  perform public.test_msg('I6: nenhum tags_comportamento orfao', v = 0);
+
+  select count(*) into v
+  from public.turmas t
+  where not exists (select 1 from public.opcoes_configuracao o where o.tipo = 'serie_turma' and o.chave = t.serie)
+     or not exists (select 1 from public.opcoes_configuracao o where o.tipo = 'letra_turma' and o.chave = t.letra);
+  perform public.test_msg('I7: nenhuma turma serie/letra orfa', v = 0);
+
+  select count(*) into v
+  from public.vinculos_responsaveis vv
+  where not exists (select 1 from public.opcoes_configuracao o where o.tipo = 'tipo_vinculo' and o.chave = vv.tipo_relacao);
+  perform public.test_msg('I8: nenhum vinculo tipo_relacao orfao', v = 0);
+
+  select count(*) into v
+  from public.atribuicoes_professores ap
+  where not exists (select 1 from public.opcoes_configuracao o where o.tipo = 'papel_atribuicao' and o.chave = ap.papel);
+  perform public.test_msg('I9: nenhuma atribuicao papel orfa', v = 0);
+
+  select count(*) into v
+  from auth.users u
+  left join public.perfis p on p.id = u.id
+  where p.id is null;
+  perform public.test_msg('I10: auth.users sempre tem perfil', v = 0);
+
+  select count(*) into v
+  from public.alunos a
+  where a.status = 'ativo'
+    and not exists (
+      select 1 from public.enturmacoes e
+      where e.aluno_id = a.id and e.status = 'matriculado'
+    );
+  perform public.test_msg('I11: aluno ativo tem enturmacao matriculado', v = 0);
+
+  select count(*) into v
+  from public.anexos a
+  where not exists (select 1 from public.justificativa_anexos ja where ja.anexo_id = a.id)
+    and not exists (select 1 from public.ocorrencia_anexos oa where oa.anexo_id = a.id);
+  perform public.test_msg('I12: nenhum anexo sem vinculo', v = 0);
+end;
+$integrity$;
 
 -- ============================================================================
 -- FINAL: Summary

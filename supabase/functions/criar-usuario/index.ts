@@ -79,7 +79,7 @@ serve(async (req: Request) => {
 
     const userId = novoUsuario.user.id
 
-    await supabaseAdmin
+    const { error: perfilError } = await supabaseAdmin
       .from('perfis')
       .update({
         telefone: telefone ?? null,
@@ -88,15 +88,35 @@ serve(async (req: Request) => {
       })
       .eq('id', userId)
 
+    if (perfilError) {
+      // Evita usuario autenticado orfao (sem perfil utilizavel).
+      await supabaseAdmin.auth.admin.deleteUser(userId).catch(() => {})
+      console.error('[criar-usuario] Erro ao finalizar perfil:', perfilError.message)
+      return new Response(
+        JSON.stringify({ error: 'Falha ao finalizar o perfil do usuario. Tente novamente.' }),
+        { status: 500, headers: { 'Content-Type': 'application/json' } },
+      )
+    }
+
     let codigo: string | null = null
     try {
-      const { data: codigoData } = await supabaseAdmin.rpc('fn_gerar_codigo_redefinicao', {
-        p_perfil_id: userId,
-        p_criado_por: user.id,
-      })
+      const { data: codigoData, error: codigoError } = await supabaseAdmin.rpc(
+        'fn_gerar_codigo_redefinicao',
+        {
+          p_perfil_id: userId,
+          p_criado_por: user.id,
+        },
+      )
+      if (codigoError) throw codigoError
       codigo = codigoData as string | null
     } catch (e) {
+      // Compensa a criacao para nao deixar usuario sem codigo de acesso.
+      await supabaseAdmin.auth.admin.deleteUser(userId).catch(() => {})
       console.error('[criar-usuario] Erro ao gerar codigo automatico:', e)
+      return new Response(
+        JSON.stringify({ error: 'Falha ao gerar o codigo de acesso. Usuario nao criado.' }),
+        { status: 500, headers: { 'Content-Type': 'application/json' } },
+      )
     }
 
     return new Response(

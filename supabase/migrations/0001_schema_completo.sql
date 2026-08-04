@@ -2551,3 +2551,240 @@ create trigger trg_notificar_nova_mensagem
   after insert on public.mensagens
   for each row
   execute function public.fn_notificar_nova_mensagem();
+
+-- ============================================================================
+-- 26. INTEGRIDADE — PREVENÇÃO DE DADOS ÓRFÃOS
+-- ============================================================================
+
+-- 26.1 Reparo idempotente: recria opções de catálogo e tags referenciadas que
+-- estejam ausentes, para que as constraints abaixo possam ser ativadas sem
+-- quebrar dados existentes.
+insert into public.opcoes_configuracao (tipo, chave, rotulo, icone, ordem, ativo)
+select distinct 'modulo', c, c, null, 200, true
+from public.perfis, unnest(acesso_modulos) as c
+where not exists (select 1 from public.opcoes_configuracao o where o.tipo = 'modulo' and o.chave = c);
+
+insert into public.opcoes_configuracao (tipo, chave, rotulo, icone, ordem, ativo)
+select distinct 'documento', c, c, null, 200, true
+from public.alunos, unnest(documentos_recebidos) as c
+where not exists (select 1 from public.opcoes_configuracao o where o.tipo = 'documento' and o.chave = c);
+
+insert into public.opcoes_configuracao (tipo, chave, rotulo, icone, ordem, ativo)
+select distinct 'periodo', periodo, periodo, null, 200, true
+from public.frequencias
+where not exists (select 1 from public.opcoes_configuracao o where o.tipo = 'periodo' and o.chave = frequencias.periodo);
+
+insert into public.opcoes_configuracao (tipo, chave, rotulo, icone, ordem, ativo)
+select distinct 'motivo_ausencia', c, c, null, 200, true
+from public.frequencias, unnest(motivos_ausencia) as c
+where not exists (select 1 from public.opcoes_configuracao o where o.tipo = 'motivo_ausencia' and o.chave = c);
+
+insert into public.opcoes_configuracao (tipo, chave, rotulo, icone, ordem, ativo)
+select distinct 'tipo_ocorrencia', c, c, null, 200, true
+from public.ocorrencias, unnest(tipo) as c
+where not exists (select 1 from public.opcoes_configuracao o where o.tipo = 'tipo_ocorrencia' and o.chave = c);
+
+insert into public.opcoes_configuracao (tipo, chave, rotulo, icone, ordem, ativo)
+select distinct 'tipo_vinculo', tipo_relacao, tipo_relacao, null, 200, true
+from public.vinculos_responsaveis
+where not exists (select 1 from public.opcoes_configuracao o where o.tipo = 'tipo_vinculo' and o.chave = vinculos_responsaveis.tipo_relacao);
+
+insert into public.opcoes_configuracao (tipo, chave, rotulo, icone, ordem, ativo)
+select distinct 'papel_atribuicao', papel, papel, null, 200, true
+from public.atribuicoes_professores
+where not exists (select 1 from public.opcoes_configuracao o where o.tipo = 'papel_atribuicao' and o.chave = atribuicoes_professores.papel);
+
+insert into public.opcoes_configuracao (tipo, chave, rotulo, icone, ordem, ativo)
+select distinct 'serie_turma', serie, serie, null, 200, true
+from public.turmas
+where not exists (select 1 from public.opcoes_configuracao o where o.tipo = 'serie_turma' and o.chave = turmas.serie);
+
+insert into public.opcoes_configuracao (tipo, chave, rotulo, icone, ordem, ativo)
+select distinct 'letra_turma', letra, letra, null, 200, true
+from public.turmas
+where not exists (select 1 from public.opcoes_configuracao o where o.tipo = 'letra_turma' and o.chave = turmas.letra);
+
+insert into public.tags_comportamento (nome, categoria, icone, descricao, peso_pontuacao, ativo)
+select distinct t, 'atencao'::public.categoria_tag, null, null, 0, true
+from public.ocorrencias, unnest(tags_comportamento) as t
+where not exists (select 1 from public.tags_comportamento tc where tc.nome = t);
+
+-- 26.2 Funções auxiliares de validação de catálogo (usadas nas CHECKs).
+create or replace function public.fn_chave_catalogo_valida(p_tipo text, p_chave text)
+returns boolean
+language sql
+stable
+as $$
+  select exists (
+    select 1 from public.opcoes_configuracao
+    where tipo = p_tipo and chave = p_chave
+  )
+$$;
+
+create or replace function public.fn_chaves_catalogo_validas(p_tipo text, p_chaves text[])
+returns boolean
+language sql
+stable
+as $$
+  select coalesce(cardinality(p_chaves), 0) = 0
+      or not exists (
+        select 1 from unnest(p_chaves) as c(chave)
+        where not exists (
+          select 1 from public.opcoes_configuracao
+          where tipo = p_tipo and chave = c.chave
+        )
+      )
+$$;
+
+create or replace function public.fn_tags_validas(p_nomes text[])
+returns boolean
+language sql
+stable
+as $$
+  select coalesce(cardinality(p_nomes), 0) = 0
+      or not exists (
+        select 1 from unnest(p_nomes) as t(nome)
+        where not exists (
+          select 1 from public.tags_comportamento
+          where nome = t.nome
+        )
+      )
+$$;
+
+grant execute on function public.fn_chave_catalogo_valida(text, text) to authenticated;
+grant execute on function public.fn_chaves_catalogo_validas(text, text[]) to authenticated;
+grant execute on function public.fn_tags_validas(text[]) to authenticated;
+
+-- 26.3 Constraints que impedem a gravação de chaves/nomes sem correspondência
+-- no catálogo (impede a criação de referências órfãs a partir de novas escritas).
+alter table public.turmas
+  add constraint chk_turmas_serie_catalogo
+  check (public.fn_chave_catalogo_valida('serie_turma', serie));
+alter table public.turmas
+  add constraint chk_turmas_letra_catalogo
+  check (public.fn_chave_catalogo_valida('letra_turma', letra));
+alter table public.vinculos_responsaveis
+  add constraint chk_vinculos_tipo_relacao_catalogo
+  check (public.fn_chave_catalogo_valida('tipo_vinculo', tipo_relacao));
+alter table public.atribuicoes_professores
+  add constraint chk_atribuicoes_papel_catalogo
+  check (public.fn_chave_catalogo_valida('papel_atribuicao', papel));
+alter table public.frequencias
+  add constraint chk_frequencias_periodo_catalogo
+  check (public.fn_chave_catalogo_valida('periodo', periodo));
+alter table public.perfis
+  add constraint chk_perfis_modulos_catalogo
+  check (public.fn_chaves_catalogo_validas('modulo', acesso_modulos));
+alter table public.alunos
+  add constraint chk_alunos_documentos_catalogo
+  check (public.fn_chaves_catalogo_validas('documento', documentos_recebidos));
+alter table public.frequencias
+  add constraint chk_frequencias_motivos_catalogo
+  check (public.fn_chaves_catalogo_validas('motivo_ausencia', motivos_ausencia));
+alter table public.ocorrencias
+  add constraint chk_ocorrencias_tipo_catalogo
+  check (public.fn_chaves_catalogo_validas('tipo_ocorrencia', tipo));
+alter table public.ocorrencias
+  add constraint chk_ocorrencias_tags_validas
+  check (public.fn_tags_validas(tags_comportamento));
+
+-- 26.4 Exclusão de turma não deve apagar silenciosamente chat/atribuições.
+alter table public.conversas
+  drop constraint conversas_turma_id_fkey,
+  add constraint conversas_turma_id_fkey
+  foreign key (turma_id) references public.turmas(id) on delete restrict;
+
+alter table public.atribuicoes_professores
+  drop constraint atribuicoes_professores_turma_id_fkey,
+  add constraint atribuicoes_professores_turma_id_fkey
+  foreign key (turma_id) references public.turmas(id) on delete restrict;
+
+-- 26.5 Expurgo de anexos e objetos de storage órfãos.
+-- O Supabase não permite deletar storage.objects via SQL; o expurgo é feito pela
+-- Edge Function "limpar-anexos" (usa a Storage API). O relatório de órfãos abaixo
+-- (fn_relatorio_orfas) permite monitorar/auditar as pendências.
+-- Agendamento sugerido: cron diário no Dashboard do Supabase chamando
+-- /functions/v1/limpar-anexos (com header cron-secret).
+
+-- 26.6 Relatório de referências órfãs (monitoramento).
+create or replace function public.fn_relatorio_orfas()
+returns table (categoria text, detalhe text, quantidade bigint)
+language sql
+security definer
+set search_path = ''
+as $$
+  select 'catalogo', 'perfis.acesso_modulos sem opcao de modulo', count(*)::bigint
+  from public.perfis p
+  where exists (
+    select 1 from unnest(p.acesso_modulos) c
+    where not exists (select 1 from public.opcoes_configuracao o where o.tipo = 'modulo' and o.chave = c)
+  )
+  union all
+  select 'catalogo', 'alunos.documentos_recebidos sem opcao de documento', count(*)::bigint
+  from public.alunos a
+  where exists (
+    select 1 from unnest(a.documentos_recebidos) c
+    where not exists (select 1 from public.opcoes_configuracao o where o.tipo = 'documento' and o.chave = c)
+  )
+  union all
+  select 'catalogo', 'frequencias.periodo sem opcao de periodo', count(*)::bigint
+  from public.frequencias f
+  where not exists (select 1 from public.opcoes_configuracao o where o.tipo = 'periodo' and o.chave = f.periodo)
+  union all
+  select 'catalogo', 'frequencias.motivos_ausencia sem opcao de motivo', count(*)::bigint
+  from public.frequencias f
+  where exists (
+    select 1 from unnest(f.motivos_ausencia) c
+    where not exists (select 1 from public.opcoes_configuracao o where o.tipo = 'motivo_ausencia' and o.chave = c)
+  )
+  union all
+  select 'catalogo', 'ocorrencias.tipo sem opcao de tipo_ocorrencia', count(*)::bigint
+  from public.ocorrencias o
+  where exists (
+    select 1 from unnest(o.tipo) c
+    where not exists (select 1 from public.opcoes_configuracao oc where oc.tipo = 'tipo_ocorrencia' and oc.chave = c)
+  )
+  union all
+  select 'catalogo', 'ocorrencias.tags_comportamento sem tag existente', count(*)::bigint
+  from public.ocorrencias o
+  where exists (
+    select 1 from unnest(o.tags_comportamento) t
+    where not exists (select 1 from public.tags_comportamento tc where tc.nome = t)
+  )
+  union all
+  select 'catalogo', 'turmas.serie sem opcao de serie_turma', count(*)::bigint
+  from public.turmas t
+  where not exists (select 1 from public.opcoes_configuracao o where o.tipo = 'serie_turma' and o.chave = t.serie)
+  union all
+  select 'catalogo', 'turmas.letra sem opcao de letra_turma', count(*)::bigint
+  from public.turmas t
+  where not exists (select 1 from public.opcoes_configuracao o where o.tipo = 'letra_turma' and o.chave = t.letra)
+  union all
+  select 'catalogo', 'vinculos.tipo_relacao sem opcao de tipo_vinculo', count(*)::bigint
+  from public.vinculos_responsaveis v
+  where not exists (select 1 from public.opcoes_configuracao o where o.tipo = 'tipo_vinculo' and o.chave = v.tipo_relacao)
+  union all
+  select 'catalogo', 'atribuicoes.papel sem opcao de papel_atribuicao', count(*)::bigint
+  from public.atribuicoes_professores a
+  where not exists (select 1 from public.opcoes_configuracao o where o.tipo = 'papel_atribuicao' and o.chave = a.papel)
+  union all
+  select 'perfil', 'auth.users sem perfil', count(*)::bigint
+  from auth.users u
+  left join public.perfis p on p.id = u.id
+  where p.id is null
+  union all
+  select 'enturmacao', 'alunos ativos sem enturmacao matriculado', count(*)::bigint
+  from public.alunos a
+  where a.status = 'ativo'
+    and not exists (
+      select 1 from public.enturmacoes e
+      where e.aluno_id = a.id and e.status = 'matriculado'
+    )
+  union all
+  select 'anexos', 'anexos sem vinculo (justificativa_anexos/ocorrencia_anexos)', count(*)::bigint
+  from public.anexos a
+  where not exists (select 1 from public.justificativa_anexos ja where ja.anexo_id = a.id)
+    and not exists (select 1 from public.ocorrencia_anexos oa where oa.anexo_id = a.id)
+$$;
+
+grant execute on function public.fn_relatorio_orfas to authenticated;

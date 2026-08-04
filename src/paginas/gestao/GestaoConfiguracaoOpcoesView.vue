@@ -306,7 +306,12 @@ async function excluir(id: string) {
   if (!item) return;
   if (!confirm(`Excluir "${item.rotulo}"?`)) return;
   const uso = await verificarUso(item.chave);
-  if (uso > 0 && !confirm(`Esta opção é referenciada por ${uso} registro(s). A exclusão pode afetar a exibição de dados. Deseja excluir mesmo assim?`)) return;
+  if (uso > 0) {
+    mostrarErro(
+      `Não é possível excluir "${item.rotulo}": está referenciada por ${uso} registro(s). Desative-a para deixá-la indisponível.`,
+    );
+    return;
+  }
   await supabaseClient.from('opcoes_configuracao').delete().eq('id', id);
   limparCache(tipo.value);
   mostrarSucesso(`"${item.rotulo}" excluído.`);

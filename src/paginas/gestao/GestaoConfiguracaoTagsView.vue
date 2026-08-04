@@ -79,6 +79,18 @@ function validarPeso(): boolean {
   return true;
 }
 
+async function contarUsoTag(nome: string): Promise<number> {
+  try {
+    const { count } = await supabaseClient
+      .from('ocorrencias')
+      .select('id', { count: 'exact', head: true })
+      .filter('tags_comportamento', 'cs', `{${nome}}`);
+    return count ?? 0;
+  } catch {
+    return 0;
+  }
+}
+
 async function salvar() {
   if (!formNome.value.trim()) {
     mostrarErro('Preencha o nome da tag.');
@@ -88,10 +100,21 @@ async function salvar() {
   carregando.value = true;
   try {
     if (modoEdicao.value && editandoId.value) {
+      const atual = tags.value.find((t) => t.id === editandoId.value);
+      const novoNome = formNome.value.trim();
+      if (atual && atual.nome !== novoNome) {
+        const uso = await contarUsoTag(atual.nome);
+        if (uso > 0) {
+          mostrarErro(
+            `Não é possível renomear: a tag é usada em ${uso} ocorrência(s). Desative-a em vez de renomear.`,
+          );
+          return;
+        }
+      }
       await supabaseClient
         .from('tags_comportamento')
         .update({
-          nome: formNome.value.trim(),
+          nome: novoNome,
           categoria: formCategoria.value,
           icone: formIcone.value.trim() || null,
           descricao: formDescricao.value.trim() || null,
@@ -136,13 +159,23 @@ async function alternarAtivo(item: TagComportamento) {
 }
 
 async function excluir(id: string) {
-  if (!confirm('Excluir esta tag?')) return;
+  const item = tags.value.find((t) => t.id === id);
+  if (!item) return;
+  if (!confirm(`Excluir a tag "${item.nome}"?`)) return;
+  const uso = await contarUsoTag(item.nome);
+  if (uso > 0) {
+    mostrarErro(
+      `Não é possível excluir: a tag é usada em ${uso} ocorrência(s). Desative-a para deixá-la indisponível.`,
+    );
+    return;
+  }
   try {
-    await supabaseClient.from('tags_comportamento').delete().eq('id', id);
+    const { error } = await supabaseClient.from('tags_comportamento').delete().eq('id', id);
+    if (error) throw error;
     mostrarSucesso('Tag excluída.');
     await carregar();
   } catch {
-    mostrarErro('Falha ao excluir.');
+    mostrarErro('Falha ao excluir. A tag pode estar vinculada a registros de comportamento.');
   }
 }
 

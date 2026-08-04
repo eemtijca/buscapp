@@ -185,12 +185,6 @@ async function salvarAlterarEnturmacao() {
   }
   salvando.value = true;
   try {
-    if (enturmacaoAtual.value) {
-      await supabaseClient
-        .from('enturmacoes')
-        .update({ status: 'transferido', data_encerramento: hoje() })
-        .eq('id', enturmacaoAtual.value.id);
-    }
     const { data: anos } = await supabaseClient
       .from('anos_letivos')
       .select('id')
@@ -201,16 +195,41 @@ async function salvarAlterarEnturmacao() {
       mostrarErro('Nenhum ano letivo ativo encontrado.');
       return;
     }
-    const { error } = await supabaseClient.from('enturmacoes').insert({
-      aluno_id: alunoId.value,
-      turma_id: novaTurmaId.value,
-      ano_letivo_id: anoLetivoId,
-      status: 'matriculado',
-      data_matricula: novaDataMatricula.value,
-    });
-    if (error) {
-      mostrarErro('Falha ao alterar enturmação.');
-      return;
+
+    if (enturmacaoAtual.value && enturmacaoAtual.value.ano_letivo_id === anoLetivoId) {
+      // Mesmo ano letivo: reutiliza a linha existente (evita violar a unicidade
+      // (aluno_id, ano_letivo_id) e garante que o aluno nunca fique sem enturmação ativa).
+      const { error } = await supabaseClient
+        .from('enturmacoes')
+        .update({
+          turma_id: novaTurmaId.value,
+          status: 'matriculado',
+          data_encerramento: null,
+          data_matricula: novaDataMatricula.value,
+        })
+        .eq('id', enturmacaoAtual.value.id);
+      if (error) {
+        mostrarErro('Falha ao alterar enturmação.');
+        return;
+      }
+    } else {
+      if (enturmacaoAtual.value) {
+        await supabaseClient
+          .from('enturmacoes')
+          .update({ status: 'transferido', data_encerramento: hoje() })
+          .eq('id', enturmacaoAtual.value.id);
+      }
+      const { error } = await supabaseClient.from('enturmacoes').insert({
+        aluno_id: alunoId.value,
+        turma_id: novaTurmaId.value,
+        ano_letivo_id: anoLetivoId,
+        status: 'matriculado',
+        data_matricula: novaDataMatricula.value,
+      });
+      if (error) {
+        mostrarErro('Falha ao alterar enturmação.');
+        return;
+      }
     }
     alterarEnturmacao.value = false;
     await carregarEnturmacao();

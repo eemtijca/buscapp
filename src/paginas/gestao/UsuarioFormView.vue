@@ -70,7 +70,7 @@ function salvarDraft() {
         }),
       );
     } catch {
-      /* storage cheio ou indisponível */
+      /* armazenamento cheio ou indisponível */
     }
   }, 500);
 }

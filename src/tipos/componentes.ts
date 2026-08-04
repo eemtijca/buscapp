@@ -239,7 +239,7 @@ export interface TermometroAtencao {
 }
 
 /**
- * Item da lista de conversas (sidebar do chat).
+ * Item da lista de conversas (barra lateral do chat).
  */
 export interface ContatoChat {
   conversaId: string;
@@ -274,7 +274,7 @@ export interface MensagemChat {
 }
 
 /**
- * Notificação renderizada no popover do header.
+ * Notificação renderizada no popover do cabeçalho.
  */
 export interface NotificacaoItem {
   id: string;
@@ -297,7 +297,7 @@ export interface HorarioProtegido {
 }
 
 /**
- * Item de usuario para listagem na gestao.
+ * Item de usuário para listagem na gestão.
  */
 export interface UsuarioItem {
   id: string;
@@ -313,7 +313,7 @@ export interface UsuarioItem {
 }
 
 /**
- * Item de aluno para listagem na gestao.
+ * Item de aluno para listagem na gestão.
  */
 export interface AlunoItem {
   id: string;
@@ -332,7 +332,7 @@ export interface AlunoItem {
 }
 
 /**
- * Solicitacao de codigo de redefinicao pendente.
+ * Solicitação de código de redefinição pendente.
  */
 export interface SolicitacaoCodigo {
   id: string;
@@ -344,7 +344,7 @@ export interface SolicitacaoCodigo {
 }
 
 /**
- * Codigo de redefinicao gerado (para exibicao na listagem).
+ * Código de redefinição gerado (para exibição na listagem).
  */
 export interface CodigoGerado {
   id: string;
@@ -360,7 +360,7 @@ export interface CodigoGerado {
 }
 
 /**
- * Dados para criacao de usuario.
+ * Dados para criação de usuário.
  */
 export interface DadosCriacaoUsuario {
   nome: string;
@@ -371,7 +371,7 @@ export interface DadosCriacaoUsuario {
 }
 
 /**
- * Opcao para GrupoCheckbox.
+ * Opção para GrupoCheckbox.
  */
 export interface OpcaoCheckbox {
   valor: string;
@@ -381,7 +381,7 @@ export interface OpcaoCheckbox {
 }
 
 /**
- * Dados para criacao de aluno.
+ * Dados para criação de aluno.
  */
 export interface DadosCriacaoAluno {
   nome: string;

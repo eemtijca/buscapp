@@ -47,8 +47,8 @@ Deno.serve(async (req) => {
       .download(path)
 
     if (dlError || !fileData) {
-      console.error('Download failed:', dlError?.message ?? 'no data')
-      throw new Error('Download failed')
+      console.error('Falha no download:', dlError?.message ?? 'sem dados')
+      throw new Error('Falha no download')
     }
 
     const originalBytes = new Uint8Array(await fileData.arrayBuffer())
@@ -71,7 +71,7 @@ Deno.serve(async (req) => {
         })
         resultMimeType = 'image/jpeg'
       } catch (imgErr) {
-        console.error('Image processing error, storing original:', imgErr)
+        console.error('Erro ao processar imagem, armazenando original:', imgErr)
         processedBytes = originalBytes
       }
     } else if (mimeType === 'application/pdf') {
@@ -85,7 +85,7 @@ Deno.serve(async (req) => {
           objectsPerTick: 100,
         })
       } catch (pdfErr) {
-        console.error('PDF processing error, storing original:', pdfErr)
+        console.error('Erro ao processar PDF, armazenando original:', pdfErr)
         processedBytes = originalBytes
       }
     } else {
@@ -100,8 +100,8 @@ Deno.serve(async (req) => {
       })
 
     if (upError) {
-      console.error('Upload failed:', upError.message)
-      throw new Error('Upload failed')
+      console.error('Falha no upload:', upError.message)
+      throw new Error('Falha no upload')
     }
 
     const compressedSize = processedBytes.length
@@ -115,7 +115,7 @@ Deno.serve(async (req) => {
       .eq('id', anexoId)
 
     if (dbError) {
-      console.error('Failed to update anexos metadata:', dbError.message)
+      console.error('Falha ao atualizar os metadados do anexo:', dbError.message)
     }
 
     return new Response(
@@ -130,7 +130,7 @@ Deno.serve(async (req) => {
       { headers: { 'Content-Type': 'application/json' } },
     )
   } catch (err) {
-    console.error('processar-anexo error:', err)
+    console.error('[processar-anexo] Erro:', err)
     return new Response(
       JSON.stringify({ success: false, error: 'Erro interno ao processar anexo.' }),
       { status: 500, headers: { 'Content-Type': 'application/json' } },

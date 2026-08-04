@@ -43,7 +43,7 @@ async function handleLogin(): Promise<void> {
       // Redirecionamento EXPLÍCITO baseado no papel do usuário
       await router.push(homePorPapel[papel]);
     } else {
-      // Caso o perfil não tenha papel definido (fallback de segurança)
+      // Caso o perfil não tenha papel definido (recurso de segurança alternativo)
       erro.value = 'Perfil não identificado. Contate a gestão escolar.';
     }
   } catch (erroDesconhecido: unknown) {

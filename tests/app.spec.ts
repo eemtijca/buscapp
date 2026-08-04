@@ -63,7 +63,7 @@ test.beforeAll(async () => {
       /* still starting */
     }
   }
-  throw new Error('Edge functions nao iniciaram apos 60s');
+  throw new Error('Edge functions não iniciaram após 60s');
 });
 
 test.afterAll(() => {
@@ -72,11 +72,11 @@ test.afterAll(() => {
 
 async function login(page: Page, email: string, password: string) {
   await page.goto('/');
-  // Wait for the page to fully load
+  // Aguarda a página carregar completamente
   await page.waitForSelector('button[type="submit"]');
   await page.fill('input[type="email"]', email);
   await page.fill('input[type="password"]', password);
-  // Click and wait for navigation/response
+  // Clica e aguarda a navegação/resposta
   await Promise.all([
     page.waitForURL(/\/gestao|\/professor|\/responsavel/, { timeout: 15000 }).catch(() => {}),
     page.click('button[type="submit"]'),
@@ -84,7 +84,7 @@ async function login(page: Page, email: string, password: string) {
   await page.waitForTimeout(1000);
 }
 
-test.describe('Autenticacao', () => {
+test.describe('Autenticação', () => {
   test.beforeEach(async ({ page }) => {
     page.on('console', (msg) => {
       if (msg.type() === 'error') console.error(`[BROWSER ERROR] ${msg.text()}`);
@@ -96,7 +96,7 @@ test.describe('Autenticacao', () => {
       }
     });
   });
-  test('CT01 - Pagina de login carrega corretamente', async ({ page }) => {
+  test('CT01 - Página de login carrega corretamente', async ({ page }) => {
     await page.goto('/');
     await expect(page.locator('h1')).toContainText('Entrar');
     await expect(page.locator('input[type="email"]')).toBeVisible();
@@ -104,7 +104,7 @@ test.describe('Autenticacao', () => {
     await expect(page.getByText('Solicitar código de acesso')).toBeVisible();
   });
 
-  test('CT02 - Login como gestao redireciona para /gestao', async ({ page }) => {
+  test('CT02 - Login como gestão redireciona para /gestao', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await expect(page).toHaveURL(/\/gestao/);
   });
@@ -114,7 +114,7 @@ test.describe('Autenticacao', () => {
     await expect(page).toHaveURL(/\/professor/);
   });
 
-  test('CT04 - Login com credenciais invalidas mostra erro', async ({ page }) => {
+  test('CT04 - Login com credenciais inválidas mostra erro', async ({ page }) => {
     await login(page, 'invalido@email.com', 'senha_errada');
     await expect(page.locator('.alert-danger')).toBeVisible();
   });
@@ -128,8 +128,8 @@ test.describe('Autenticacao', () => {
   });
 });
 
-test.describe('Gestao - Home', () => {
-  test('CT06 - Pagina inicial do gestor mostra cards de navegacao', async ({ page }) => {
+test.describe('Gestão - Home', () => {
+  test('CT06 - Página inicial do gestor mostra cards de navegação', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await expect(page.locator('h3.card-nav-title').first()).toHaveText('Ranking de risco');
     await expect(page.locator('h3.card-nav-title').nth(1)).toHaveText('Ocorrências graves');
@@ -140,7 +140,7 @@ test.describe('Gestao - Home', () => {
     await expect(page.locator('h3.card-nav-title').nth(10)).toHaveText('Configurações');
   });
 
-  test('CT07 - Notificacao de codigo aparece no header', async ({ page }) => {
+  test('CT07 - Notificação de código aparece no header', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     const bell = page.locator(
       'button[aria-label="Notificações"] i.bi-bell, a[aria-label="Notificações"] i.bi-bell',
@@ -149,8 +149,8 @@ test.describe('Gestao - Home', () => {
   });
 });
 
-test.describe('Gestao - Usuarios', () => {
-  test('CT08 - Listagem de usuarios exibe dados do seed', async ({ page }) => {
+test.describe('Gestão - Usuários', () => {
+  test('CT08 - Listagem de usuários exibe dados do seed', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/usuarios');
     await expect(page.locator('table')).toContainText('Carlos Administrador');
@@ -166,7 +166,7 @@ test.describe('Gestao - Usuarios', () => {
     await expect(page.getByText('Maria Silva')).not.toBeVisible();
   });
 
-  test('CT10 - Formulario de novo usuario carrega', async ({ page }) => {
+  test('CT10 - Formulário de novo usuário carrega', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/usuarios/novo');
     await expect(page.locator('label:has-text("Nome")')).toBeVisible();
@@ -175,7 +175,7 @@ test.describe('Gestao - Usuarios', () => {
   });
 });
 
-test.describe('Gestao - Alunos', () => {
+test.describe('Gestão - Alunos', () => {
   test('CT11 - Listagem de alunos exibe dados do seed', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/alunos');
@@ -192,15 +192,15 @@ test.describe('Gestao - Alunos', () => {
   });
 });
 
-test.describe('Gestao - Codigos', () => {
-  test('CT13 - Pagina de codigos carrega com abas', async ({ page }) => {
+test.describe('Gestão - Códigos', () => {
+  test('CT13 - Página de códigos carrega com abas', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/codigos');
     await expect(page.getByRole('button', { name: 'Solicitações' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Códigos' })).toBeVisible();
   });
 
-  test('CT14 - Codigos do seed sao exibidos', async ({ page }) => {
+  test('CT14 - Códigos do seed são exibidos', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/codigos');
     await expect(page.getByRole('button', { name: 'Solicitações' })).toBeVisible();
@@ -208,14 +208,14 @@ test.describe('Gestao - Codigos', () => {
   });
 });
 
-test.describe('Recuperacao de senha por codigo', () => {
-  test('CT15 - Pagina de solicitar codigo carrega', async ({ page }) => {
+test.describe('Recuperação de senha por código', () => {
+  test('CT15 - Página de solicitar código carrega', async ({ page }) => {
     await page.goto('/solicitar-codigo');
     await expect(page.getByText('Solicitar código de acesso')).toBeVisible();
     await expect(page.locator('input[type="email"]')).toBeVisible();
   });
 
-  test('CT16 - Fluxo de solicitacao de codigo via UI', async ({ page }) => {
+  test('CT16 - Fluxo de solicitação de código via UI', async ({ page }) => {
     await page.goto('/solicitar-codigo');
     await page.fill('input[type="email"]', 'prof1@escola.edu.br');
     await page.click('button[type="submit"]');
@@ -224,7 +224,7 @@ test.describe('Recuperacao de senha por codigo', () => {
     });
   });
 
-  test('CT17 - Pagina de redefinir senha com codigo carrega', async ({ page }) => {
+  test('CT17 - Página de redefinir senha com código carrega', async ({ page }) => {
     await page.goto('/redefinir-senha-codigo');
     await expect(page.getByText('Redefinir senha com código')).toBeVisible();
     await expect(page.locator('input[id="email"]')).toBeVisible();
@@ -233,8 +233,8 @@ test.describe('Recuperacao de senha por codigo', () => {
   });
 });
 
-test.describe('Professor - Funcionalidades basicas', () => {
-  test('CT18 - Home do professor mostra cards de navegacao', async ({ page }) => {
+test.describe('Professor - Funcionalidades básicas', () => {
+  test('CT18 - Home do professor mostra cards de navegação', async ({ page }) => {
     await login(page, 'prof1@escola.edu.br', SENHA_PROF);
     await expect(page.getByText('Registrar frequência')).toBeVisible();
     await expect(page.getByText('Ausência em aula')).toBeVisible();
@@ -242,8 +242,8 @@ test.describe('Professor - Funcionalidades basicas', () => {
   });
 });
 
-test.describe('Responsavel - Funcionalidades basicas', () => {
-  test('CT19 - Home do responsavel mostra cards de navegacao', async ({ page }) => {
+test.describe('Responsável - Funcionalidades básicas', () => {
+  test('CT19 - Home do responsável mostra cards de navegação', async ({ page }) => {
     await login(page, 'resp1@email.com', SENHA_RESP);
     await expect(page.getByRole('link', { name: 'Alertas' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Termômetro' })).toBeVisible();
@@ -252,14 +252,14 @@ test.describe('Responsavel - Funcionalidades basicas', () => {
   });
 });
 
-test.describe('Gestao - Ranking e Ocorrencias', () => {
+test.describe('Gestão - Ranking e Ocorrências', () => {
   test('CT20 - Pagina de ranking de risco carrega', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/ranking');
     await expect(page.getByText('Ranking de priorização de risco')).toBeVisible();
   });
 
-  test('CT20b - Botao Chat abre conversa com o responsavel', async ({ page }) => {
+  test('CT20b - Botão Chat abre conversa com o responsável', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/ranking');
     const cardJoao = page.locator('.card').filter({ hasText: 'João Miguel da Silva' });
@@ -268,7 +268,7 @@ test.describe('Gestao - Ranking e Ocorrencias', () => {
     await expect(page.getByText('Maria Silva').first()).toBeVisible({ timeout: 10000 });
   });
 
-  test('CT21 - Pagina de ocorrencias carrega', async ({ page }) => {
+  test('CT21 - Página de ocorrências carrega', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/ocorrencias');
     await expect(page.getByText('Ocorrências graves e suspensões')).toBeVisible();
@@ -284,7 +284,7 @@ test.describe('Gestao - Ranking e Ocorrencias', () => {
 // ============================================================================
 // VISUALIZADOR DE ANEXO (BLOB) — gestão justificativas + responsável alertas
 // ============================================================================
-test.describe('Gestao/Responsavel — Visualizador de anexo (blob)', () => {
+test.describe('Gestão/Responsável — Visualizador de anexo (blob)', () => {
   const JUST_ID = '10000000-0000-0000-0000-000000000001';
   const ANEXO_ID = '20000000-0000-0000-0000-000000000001';
   const FREQ_ID = '30000000-0000-0000-0000-000000000001';
@@ -314,7 +314,7 @@ test.describe('Gestao/Responsavel — Visualizador de anexo (blob)', () => {
   }
 
   test.beforeAll(async () => {
-    // Token do responsavel (dono do anexo): RLS exige owner_id = auth.uid()
+    // Token do responsável (dono do anexo): RLS exige owner_id = auth.uid()
     const loginRes = await fetch(`${URL_SUPABASE}/auth/v1/token?grant_type=password`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', apikey: SERVICE_KEY },
@@ -385,7 +385,7 @@ test.describe('Gestao/Responsavel — Visualizador de anexo (blob)', () => {
     });
   });
 
-  test('CT22A - Gestao: Ver anexo abre modal com imagem via blob (sem token)', async ({ page }) => {
+  test('CT22A - Gestão: Ver anexo abre modal com imagem via blob (sem token)', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/justificativas');
     const item = page.locator('article').filter({ hasText: 'Anexo para testes do visualizador' });
@@ -402,7 +402,7 @@ test.describe('Gestao/Responsavel — Visualizador de anexo (blob)', () => {
     expect(await page.locator('img[src*="token="]').count()).toBe(0);
   });
 
-  test('CT22B - Gestao: modal mostra nome e botao Baixar', async ({ page }) => {
+  test('CT22B - Gestão: modal mostra nome e botão Baixar', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/justificativas');
     const item = page.locator('article').filter({ hasText: 'Anexo para testes do visualizador' });
@@ -416,7 +416,7 @@ test.describe('Gestao/Responsavel — Visualizador de anexo (blob)', () => {
     await expect(baixar).toHaveAttribute('href', /^blob:/);
   });
 
-  test('CT22C - Gestao: Fechar encerra o modal', async ({ page }) => {
+  test('CT22C - Gestão: Fechar encerra o modal', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/justificativas');
     const item = page.locator('article').filter({ hasText: 'Anexo para testes do visualizador' });
@@ -427,7 +427,7 @@ test.describe('Gestao/Responsavel — Visualizador de anexo (blob)', () => {
     await expect(page.locator('.modal.show')).toHaveCount(0);
   });
 
-  test('CT22D - Responsavel: anexo do alerta abre via modal (blob)', async ({ page }) => {
+  test('CT22D - Responsável: anexo do alerta abre via modal (blob)', async ({ page }) => {
     await login(page, 'resp1@email.com', SENHA_RESP);
     await page.goto('/responsavel/alertas');
     const card = page.locator('.card').filter({ hasText: '15/09/2026' });
@@ -442,8 +442,8 @@ test.describe('Gestao/Responsavel — Visualizador de anexo (blob)', () => {
   });
 });
 
-test.describe('Professor - Frequencia', () => {
-  test('CT23 - Pagina de registro de frequencia carrega', async ({ page }) => {
+test.describe('Professor - Frequência', () => {
+  test('CT23 - Página de registro de frequência carrega', async ({ page }) => {
     await login(page, 'prof1@escola.edu.br', SENHA_PROF);
     await page.goto('/professor/frequencia');
     await expect(page.getByText('Registrar frequência')).toBeVisible();
@@ -454,9 +454,9 @@ test.describe('Professor - Frequencia', () => {
   test('CT24 - Marcar aluno como ausente e salvar', async ({ page }) => {
     await login(page, 'prof1@escola.edu.br', SENHA_PROF);
     await page.goto('/professor/frequencia');
-    // Wait for student list to load
+    // Aguarda a lista de alunos carregar
     await page.waitForSelector('.card-body .card');
-    // Find the first "Presente" (present/ausente toggle) and click to mark as ausente
+    // Encontra o primeiro "Presente" (alternância presente/ausente) e clica para marcar como ausente
     const botoes = page.locator('button[aria-label*="Marcar"]');
     const primeiro = botoes.first();
     const label = await primeiro.getAttribute('aria-label');
@@ -467,7 +467,7 @@ test.describe('Professor - Frequencia', () => {
     await expect(page.locator('.alert-success').first()).toBeVisible({ timeout: 10000 });
   });
 
-  test('CT25 - Mid-day absence form carrega', async ({ page }) => {
+  test('CT25 - Formulário de ausência no meio do dia carrega', async ({ page }) => {
     await login(page, 'prof1@escola.edu.br', SENHA_PROF);
     await page.goto('/professor/ausencia');
     await expect(page.getByText('Registrar ausência em aula')).toBeVisible();
@@ -475,11 +475,11 @@ test.describe('Professor - Frequencia', () => {
     await expect(page.getByText('Registrar ausência').first()).toBeVisible();
   });
 
-  test('CT26 - Pagina de frequencia persiste dados ao retornar', async ({ page }) => {
+  test('CT26 - Página de frequência persiste dados ao retornar', async ({ page }) => {
     await login(page, 'prof1@escola.edu.br', SENHA_PROF);
     await page.goto('/professor/frequencia');
     await page.waitForSelector('.card-body .card');
-    // Mark first student as absent
+    // Marca o primeiro aluno como ausente
     const botoes = page.locator('button[aria-label*="Marcar"]');
     const primeiro = botoes.first();
     const label = await primeiro.getAttribute('aria-label');
@@ -488,15 +488,15 @@ test.describe('Professor - Frequencia', () => {
     }
     await page.click('button:has-text("Salvar frequência")');
     await expect(page.locator('.alert-success').first()).toBeVisible({ timeout: 10000 });
-    // Navigate away and back — check the page loads
+    // Sai e volta — verifica se a página carrega
     await page.goto('/professor');
     await page.goto('/professor/frequencia');
     await expect(page.getByText('Registrar frequência')).toBeVisible();
   });
 });
 
-test.describe('Gestao - Usuarios - Codigo no cadastro', () => {
-  test('CT27 - Criar usuario exibe codigo no sucesso', async ({ page }) => {
+test.describe('Gestão - Usuários - Código no cadastro', () => {
+  test('CT27 - Criar usuário exibe código no sucesso', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     const emailUnico = `playwright${Date.now()}@test.com`;
     await page.goto('/gestao/usuarios/novo');
@@ -508,7 +508,7 @@ test.describe('Gestao - Usuarios - Codigo no cadastro', () => {
     expect(textoCode?.trim().length).toBe(6);
   });
 
-  test('CT28 - Botao Copiar no sucesso funciona', async ({ page }) => {
+  test('CT28 - Botão Copiar no sucesso funciona', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     const emailUnico = `copy${Date.now()}@test.com`;
     await page.goto('/gestao/usuarios/novo');
@@ -521,7 +521,7 @@ test.describe('Gestao - Usuarios - Codigo no cadastro', () => {
     await expect(page.getByText('Código copiado!')).toBeVisible({ timeout: 5000 });
   });
 
-  test('CT29 - Criar usuario valida campos obrigatorios', async ({ page }) => {
+  test('CT29 - Criar usuário valida campos obrigatórios', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/usuarios/novo');
     await page.evaluate(() => {
@@ -533,8 +533,8 @@ test.describe('Gestao - Usuarios - Codigo no cadastro', () => {
   });
 });
 
-test.describe('Gestao - Codigos - Aba Pendentes', () => {
-  test('CT34 - Pagina de codigos carrega com abas e indicador', async ({ page }) => {
+test.describe('Gestão - Códigos - Aba Pendentes', () => {
+  test('CT34 - Página de códigos carrega com abas e indicador', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/codigos');
     await expect(page.getByRole('button', { name: 'Solicitações' })).toBeVisible();
@@ -555,7 +555,7 @@ test.describe('Gestao - Codigos - Aba Pendentes', () => {
     }
   });
 
-  test('CT36 - Botao Atualizar recarrega dados', async ({ page }) => {
+  test('CT36 - Botão Atualizar recarrega dados', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/codigos');
     const btnAtualizar = page.locator('button:has-text("Atualizar")');
@@ -585,7 +585,7 @@ test.describe('Gestao - Codigos - Aba Pendentes', () => {
   });
 });
 
-test.describe('Gestao - Codigos - Aba Recentes', () => {
+test.describe('Gestão - Códigos - Aba Recentes', () => {
   test('CT40 - Busca por nome filtra resultados', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/codigos');
@@ -599,7 +599,7 @@ test.describe('Gestao - Codigos - Aba Recentes', () => {
     }
   });
 
-  test('CT41 - Toggle visibilidade do codigo', async ({ page }) => {
+  test('CT41 - Toggle visibilidade do código', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/codigos');
     await page.locator('button:has-text("Códigos")').click();
@@ -621,7 +621,7 @@ test.describe('Gestao - Codigos - Aba Recentes', () => {
     expect(count).toBeGreaterThanOrEqual(0);
   });
 
-  test('CT43 - Paginacao visivel quando necessario', async ({ page }) => {
+  test('CT43 - Paginação visível quando necessário', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/codigos');
     await page.locator('button:has-text("Códigos")').click();
@@ -639,8 +639,8 @@ test.describe('Gestao - Codigos - Aba Recentes', () => {
   });
 });
 
-test.describe('Gestao - Codigos - Fluxo de revogacao', () => {
-  test('CT46 - Botao revogar abre modal de confirmacao', async ({ page }) => {
+test.describe('Gestão - Códigos - Fluxo de revogação', () => {
+  test('CT46 - Botão revogar abre modal de confirmação', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/codigos');
     await page.locator('button:has-text("Códigos")').click();
@@ -654,15 +654,15 @@ test.describe('Gestao - Codigos - Fluxo de revogacao', () => {
   });
 });
 
-test.describe('Recuperacao de senha - Fluxo publico', () => {
-  test('CT31 - Pagina de solicitar codigo mostra formulario', async ({ page }) => {
+test.describe('Recuperação de senha - Fluxo público', () => {
+  test('CT31 - Página de solicitar código mostra formulário', async ({ page }) => {
     await page.goto('/solicitar-codigo');
     await expect(page.getByText('Solicitar código de acesso')).toBeVisible();
     await expect(page.locator('input[type="email"]')).toBeVisible();
     await expect(page.getByText('Já tenho um código')).toBeVisible();
   });
 
-  test('CT32 - Pagina de redefinir senha mostra todos os campos', async ({ page }) => {
+  test('CT32 - Página de redefinir senha mostra todos os campos', async ({ page }) => {
     await page.goto('/redefinir-senha-codigo');
     await expect(page.locator('input[id="email"]')).toBeVisible();
     await expect(page.locator('input[id="codigo"]')).toBeVisible();
@@ -670,7 +670,7 @@ test.describe('Recuperacao de senha - Fluxo publico', () => {
     await expect(page.getByText('Redefinir senha com código')).toBeVisible();
   });
 
-  test('CT33 - Validacao de senha aparece ao digitar', async ({ page }) => {
+  test('CT33 - Validação de senha aparece ao digitar', async ({ page }) => {
     await page.goto('/redefinir-senha-codigo');
     await page.fill('input[id="nova-senha"]', 'Ab');
     const requisitos = page.locator('ul[aria-label="Requisitos de senha"] li');
@@ -702,7 +702,7 @@ test.describe('Recuperacao de senha - Fluxo publico', () => {
   });
 });
 
-test.describe('Gestao - Codigos - Mobile', () => {
+test.describe('Gestão - Códigos - Mobile', () => {
   test('CT53 - Layout mobile carrega sem erros', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 });
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
@@ -711,7 +711,7 @@ test.describe('Gestao - Codigos - Mobile', () => {
     await expect(page.getByRole('button', { name: 'Códigos' })).toBeVisible();
   });
 
-  test('CT54 - Mobile: botao Atualizar funciona', async ({ page }) => {
+  test('CT54 - Mobile: botão Atualizar funciona', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 });
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/codigos');
@@ -732,8 +732,8 @@ test.describe('Gestao - Codigos - Mobile', () => {
   });
 });
 
-test.describe('Professor - Ocorrencia com tags', () => {
-  test('CT56 - Formulario de ocorrencia carrega com checkboxes de tags', async ({ page }) => {
+test.describe('Professor - Ocorrência com tags', () => {
+  test('CT56 - Formulário de ocorrência carrega com checkboxes de tags', async ({ page }) => {
     await login(page, 'prof1@escola.edu.br', SENHA_PROF);
     await page.goto('/professor/ocorrencia');
     await expect(page.getByText('Registrar ocorrência grave')).toBeVisible();
@@ -742,7 +742,7 @@ test.describe('Professor - Ocorrencia com tags', () => {
     await expect(page.getByText('Notificar coordenação')).toBeVisible();
   });
 
-  test('CT57 - Tags carregam do banco e descricao se preenche', async ({ page }) => {
+  test('CT57 - Tags carregam do banco e descrição se preenche', async ({ page }) => {
     await login(page, 'prof1@escola.edu.br', SENHA_PROF);
     await page.goto('/professor/ocorrencia');
     await page.waitForSelector('input[type="checkbox"]', { timeout: 10000 });
@@ -752,8 +752,8 @@ test.describe('Professor - Ocorrencia com tags', () => {
   });
 });
 
-test.describe('Professor - Ausencia com multisselecao', () => {
-  test('CT58 - Formulario de ausencia tem checkboxes de periodo', async ({ page }) => {
+test.describe('Professor - Ausência com multisseleção', () => {
+  test('CT58 - Formulário de ausência tem checkboxes de período', async ({ page }) => {
     await login(page, 'prof1@escola.edu.br', SENHA_PROF);
     await page.goto('/professor/ausencia');
     await expect(page.getByText('Registrar ausência em aula')).toBeVisible();
@@ -762,7 +762,7 @@ test.describe('Professor - Ausencia com multisselecao', () => {
     await expect(page.getByText('Enfermaria')).toBeVisible();
   });
 
-  test('CT59 - Selecionar multiplos periodos habilita botao', async ({ page }) => {
+  test('CT59 - Selecionar múltiplos períodos habilita botão', async ({ page }) => {
     await login(page, 'prof1@escola.edu.br', SENHA_PROF);
     await page.goto('/professor/ausencia');
     await page.getByText('1º Horário').first().click();
@@ -771,8 +771,8 @@ test.describe('Professor - Ausencia com multisselecao', () => {
   });
 });
 
-test.describe('Gestao - Usuario - Modulos e permissoes', () => {
-  test('CT60 - Formulario de usuario tem modulos de acesso', async ({ page }) => {
+test.describe('Gestão - Usuário - Módulos e permissões', () => {
+  test('CT60 - Formulário de usuário tem módulos de acesso', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/usuarios/novo');
     await page.waitForSelector('form');
@@ -792,7 +792,7 @@ test.describe('Gestao - Usuario - Modulos e permissoes', () => {
   });
 });
 
-test.describe('Gestao - Aluno - Documentos e indicadores', () => {
+test.describe('Gestão - Aluno - Documentos e indicadores', () => {
   test('CT62 - Formulario de aluno tem documentos e indicadores', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/alunos/novo');
@@ -815,7 +815,7 @@ test.describe('Gestao - Aluno - Documentos e indicadores', () => {
   });
 });
 
-test.describe('Gestao - Turmas - Modal', () => {
+test.describe('Gestão - Turmas - Modal', () => {
   test('CT64 - Modal de criar turma abre e tem campos', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/turmas');
@@ -843,7 +843,7 @@ test.describe('Gestao - Turmas - Modal', () => {
   });
 });
 
-test.describe('Gestao - Disciplinas - Modal', () => {
+test.describe('Gestão - Disciplinas - Modal', () => {
   test('CT65 - Modal de criar disciplina abre e tem campos', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/disciplinas');
@@ -856,8 +856,8 @@ test.describe('Gestao - Disciplinas - Modal', () => {
   });
 });
 
-test.describe('Gestao - Atribuicoes - Modal', () => {
-  test('CT66 - Modal de criar atribuicao abre e tem campos', async ({ page }) => {
+test.describe('Gestão - Atribuições - Modal', () => {
+  test('CT66 - Modal de criar atribuição abre e tem campos', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/atribuicoes');
     await page.click('button:has-text("Nova atribuição")');
@@ -869,7 +869,7 @@ test.describe('Gestao - Atribuicoes - Modal', () => {
   });
 });
 
-test.describe('Gestao - Configuracao', () => {
+test.describe('Gestão - Configuração', () => {
   test('CT110 - Pagina hub carrega com categorias', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/configuracao');
@@ -879,7 +879,7 @@ test.describe('Gestao - Configuracao', () => {
     await expect(page.locator('h3.card-nav-title').filter({ hasText: 'Períodos' })).toBeVisible();
   });
 
-  test('CT111 - Pagina de modulo carrega com tabela', async ({ page }) => {
+  test('CT111 - Página de módulo carrega com tabela', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/configuracao/modulo');
     await expect(page.locator('h1')).toContainText('Módulos');
@@ -888,7 +888,7 @@ test.describe('Gestao - Configuracao', () => {
     await expect(page.locator('table')).toContainText('Ocorrências');
   });
 
-  test('CT112 - Criar opcao no modal', async ({ page }) => {
+  test('CT112 - Criar opção no modal', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/configuracao/modulo');
     await page.click('button:has-text("Nova opção")');
@@ -901,7 +901,7 @@ test.describe('Gestao - Configuracao', () => {
     await expect(page.locator('table')).toContainText(nome, { timeout: 5000 });
   });
 
-  test('CT112b - Seletor de letras de turma exibe o catalogo incluindo D', async ({ page }) => {
+  test('CT112b - Seletor de letras de turma exibe o catálogo incluindo D', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/configuracao/letra_turma');
     await page.click('button:has-text("Nova opção")');
@@ -912,7 +912,7 @@ test.describe('Gestao - Configuracao', () => {
     await page.click('button:has-text("Cancelar")');
   });
 
-  test('CT112c - Duplicata de opcao existente e bloqueada', async ({ page }) => {
+  test('CT112c - Duplicata de opção existente é bloqueada', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/configuracao/modulo');
     await page.click('button:has-text("Nova opção")');
@@ -983,7 +983,7 @@ test.describe('Gestao - Configuracao', () => {
     await expect(page.locator('table')).toBeVisible();
   });
 
-  test('CT114 - Sistema carrega e salva alteracao', async ({ page }) => {
+  test('CT114 - Sistema carrega e salva alteração', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/configuracao/sistema');
     await expect(page.locator('h1')).toContainText('Configurações do Sistema');
@@ -992,7 +992,7 @@ test.describe('Gestao - Configuracao', () => {
     await expect(page.locator('#cfg-preventivo')).toBeVisible();
   });
 
-  test('CT115 - Horarios carrega com tabela', async ({ page }) => {
+  test('CT115 - Horários carrega com tabela', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/configuracao/horarios');
     await expect(page.locator('h1')).toContainText('Horários Letivos');
@@ -1003,7 +1003,7 @@ test.describe('Gestao - Configuracao', () => {
 // ============================================================================
 // INTEGRIDADE DE CATÁLOGO — bloqueio de exclusão/renomeação e enturmação
 // ============================================================================
-test.describe('Gestao - Integridade de catalogo', () => {
+test.describe('Gestão - Integridade de catálogo', () => {
   test.beforeAll(async () => {
     // Referencia a tag de seed "Desatenção" em uma ocorrência para testar o
     // bloqueio de exclusão/renomeação.
@@ -1030,7 +1030,7 @@ test.describe('Gestao - Integridade de catalogo', () => {
     if (!res.ok) throw new Error(`Setup ocorrencia falhou: ${res.status}`);
   });
 
-  test('CT116 - Excluir opcao de catalogo referenciada e bloqueado', async ({ page }) => {
+  test('CT116 - Excluir opção de catálogo referenciada é bloqueado', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/configuracao/serie_turma');
     const linha = page.locator('.config-table tbody tr').filter({ hasText: '1º' });
@@ -1040,7 +1040,7 @@ test.describe('Gestao - Integridade de catalogo', () => {
     await expect(linha).toBeVisible();
   });
 
-  test('CT117 - Excluir opcao nao referenciada funciona', async ({ page }) => {
+  test('CT117 - Excluir opção não referenciada funciona', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/configuracao/modulo');
     await page.click('button:has-text("Nova opção")');
@@ -1079,7 +1079,7 @@ test.describe('Gestao - Integridade de catalogo', () => {
     await page.click('.modal-footer button:has-text("Cancelar")');
   });
 
-  test('CT120 - Transferencia de enturmacao mantem uma enturmacao ativa', async ({ page }) => {
+  test('CT120 - Transferência de enturmação mantém uma enturmação ativa', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/alunos/e0000000-0000-0000-0000-000000000001');
     const card = page.locator('.card').filter({ hasText: 'Enturmação atual' });
@@ -1118,11 +1118,11 @@ test.describe('Gestao - Integridade de catalogo', () => {
 // CHAT — Setup de dados de teste
 // ============================================================================
 test.beforeAll(async () => {
-  // Create test conversations and messages via service role API.
-  // Usa upsert (merge-duplicates) para que seja seguro sob execucao paralela
-  // de varios workers: cada beforeAll converge para o mesmo estado. As conversas
-  // sao reutilizadas (sem reescrever o id), evitando violacao de FK de mensagens
-  // quando existem conversas orfas de execucoes anteriores.
+  // Cria conversas e mensagens de teste via API com service role.
+  // Usa upsert (merge-duplicates) para que seja seguro sob execução paralela
+  // de vários workers: cada beforeAll converge para o mesmo estado. As conversas
+  // são reutilizadas (sem reescrever o id), evitando violação de FK de mensagens
+  // quando existem conversas órfãs de execuções anteriores.
   const headers = {
     'Content-Type': 'application/json',
     apikey: SERVICE_KEY,
@@ -1170,28 +1170,28 @@ test.beforeAll(async () => {
       id: 'f0000000-0000-0000-0000-000000000011',
       conversa_id: CONV1,
       remetente_id: 'a0000000-0000-0000-0000-000000000005',
-      conteudo: 'Bom dia, gostaria de saber como esta meu filho',
+      conteudo: 'Bom dia, gostaria de saber como está meu filho',
       created_at: '2026-07-20T08:00:00Z',
     },
     {
       id: 'f0000000-0000-0000-0000-000000000012',
       conversa_id: CONV1,
       remetente_id: 'a0000000-0000-0000-0000-000000000001',
-      conteudo: 'Bom dia! O Joao esta bem, participando das aulas.',
+      conteudo: 'Bom dia! O João está bem, participando das aulas.',
       created_at: '2026-07-20T08:15:00Z',
     },
     {
       id: 'f0000000-0000-0000-0000-000000000013',
       conversa_id: CONV1,
       remetente_id: 'a0000000-0000-0000-0000-000000000002',
-      conteudo: 'Confirmo! Ele tem se destacado em matematica.',
+      conteudo: 'Confirmo! Ele tem se destacado em matemática.',
       created_at: '2026-07-20T08:30:00Z',
     },
     {
       id: 'f0000000-0000-0000-0000-000000000014',
       conversa_id: CONV1,
       remetente_id: 'a0000000-0000-0000-0000-000000000005',
-      conteudo: 'Que bom! Obrigado pela atencao.',
+      conteudo: 'Que bom! Obrigado pela atenção.',
       created_at: '2026-07-20T09:00:00Z',
     },
   ]) {
@@ -1204,7 +1204,7 @@ test.beforeAll(async () => {
     body: JSON.stringify({ ultima_mensagem_em: '2026-07-20T09:00:00Z' }),
   });
 
-  // Notificacao de teste para gestao (evita acumulo entre execucoes)
+  // Notificação de teste para gestão (evita acúmulo entre execuções)
   await api(`/rest/v1/notificacoes?metadados->>conversa_id=eq.${CONV1}`, {
     method: 'DELETE',
   });
@@ -1214,16 +1214,16 @@ test.beforeAll(async () => {
       destinatario_id: 'a0000000-0000-0000-0000-000000000001',
       tipo: 'mensagem',
       titulo: 'Nova mensagem de Maria Silva',
-      corpo: 'Bom dia, gostaria de saber como esta meu filho',
+      corpo: 'Bom dia, gostaria de saber como está meu filho',
       metadados: { conversa_id: CONV1 },
     }),
   });
 });
 
 // ============================================================================
-// CT67–CT72: CHAT — Responsavel
+// CT67–CT72: CHAT — Responsável
 // ============================================================================
-test.describe('Responsavel — Chat', () => {
+test.describe('Responsável — Chat', () => {
   test('CT67 - Pagina de chat carrega com lista de contatos', async ({ page }) => {
     await login(page, 'resp1@email.com', SENHA_RESP);
     await page.goto('/responsavel/chat');
@@ -1241,7 +1241,7 @@ test.describe('Responsavel — Chat', () => {
     expect(count).toBeGreaterThanOrEqual(1);
     if (count > 0) {
       await expect(items.first()).toContainText(
-        /João|Maria|Ana|Pedro|Rafael|Lucas|Julia|Thiago|Isabela/,
+        /João|Maria|Ana|Pedro|Rafael|Lucas|Júlia|Thiago|Isabela/,
       );
     }
   });
@@ -1268,7 +1268,7 @@ test.describe('Responsavel — Chat', () => {
     await expect(page.getByText('Nenhuma conversa encontrada')).toBeVisible();
   });
 
-  test('CT71 - Input desabilitado ou aviso fora do horario', async ({ page }) => {
+  test('CT71 - Input desabilitado ou aviso fora do horário', async ({ page }) => {
     await login(page, 'resp1@email.com', SENHA_RESP);
     await page.goto('/responsavel/chat');
     await page.waitForTimeout(3000);
@@ -1285,7 +1285,7 @@ test.describe('Responsavel — Chat', () => {
     }
   });
 
-  test.skip('CT72 - Botao voltar aparece no mobile', async ({ page }) => {
+  test.skip('CT72 - Botão voltar aparece no mobile', async ({ page }) => {
     await login(page, 'resp1@email.com', SENHA_RESP);
     await page.setViewportSize({ width: 375, height: 667 });
     await page.goto('/responsavel/chat');
@@ -1301,10 +1301,10 @@ test.describe('Responsavel — Chat', () => {
 });
 
 // ============================================================================
-// CT73–CT79: CHAT — Gestao
+// CT73–CT79: CHAT — Gestão
 // ============================================================================
-test.describe('Gestao — Chat', () => {
-  test('CT73 - Pagina de chat carrega com sidebar e placeholder', async ({ page }) => {
+test.describe('Gestão — Chat', () => {
+  test('CT73 - Página de chat carrega com sidebar e placeholder', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 720 });
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/chat');
@@ -1337,7 +1337,7 @@ test.describe('Gestao — Chat', () => {
     }
   });
 
-  test('CT76 - Header de navegacao com titulo chat', async ({ page }) => {
+  test('CT76 - Header de navegação com título chat', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/chat');
     await page.waitForTimeout(2000);
@@ -1357,16 +1357,16 @@ test.describe('Gestao — Chat', () => {
 });
 
 // ============================================================================
-// CT84–CT88: NOTIFICACOES
+// CT84–CT88: NOTIFICAÇÕES
 // ============================================================================
-test.describe('Notificacoes — Popover', () => {
-  test('CT84 - Sino visivel para gestao', async ({ page }) => {
+test.describe('Notificações — Popover', () => {
+  test('CT84 - Sino visível para gestão', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao');
     await expect(page.locator('i.bi-bell').first()).toBeVisible();
   });
 
-  test('CT85 - Sino visivel para responsavel', async ({ page }) => {
+  test('CT85 - Sino visível para responsável', async ({ page }) => {
     await login(page, 'resp1@email.com', SENHA_RESP);
     await page.goto('/responsavel');
     await expect(page.locator('i.bi-bell').first()).toBeVisible();
@@ -1390,7 +1390,7 @@ test.describe('Notificacoes — Popover', () => {
     await page.waitForTimeout(300);
   });
 
-  test('CT88 - Notificacao de mensagem aparece no popover', async ({ page }) => {
+  test('CT88 - Notificação de mensagem aparece no popover', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao');
     await page.locator('button[aria-label="Notificações"]').click();
@@ -1415,7 +1415,7 @@ test.describe('Chat — Mobile', () => {
     await login(page, 'resp1@email.com', SENHA_RESP);
     await page.goto('/responsavel/chat');
     await page.waitForTimeout(1500);
-    // No mobile, sidebar should be full width initially
+    // No mobile, a barra lateral deve ter largura total inicialmente
     await expect(page.locator('input[type="search"]')).toBeVisible();
   });
 
@@ -1433,7 +1433,7 @@ test.describe('Chat — Mobile', () => {
     }
   });
 
-  test('CT91 - Desktop: dois paineis visiveis', async ({ page }) => {
+  test('CT91 - Desktop: dois painéis visíveis', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 720 });
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/chat');
@@ -1447,22 +1447,22 @@ test.describe('Chat — Mobile', () => {
 // CT92–CT94: EDGE CASES — CHAT
 // ============================================================================
 test.describe('Chat — Casos Extremos', () => {
-  test('CT92 - Rota /gestao/chat exige autenticacao', async ({ page }) => {
+  test('CT92 - Rota /gestao/chat exige autenticação', async ({ page }) => {
     await page.goto('/gestao/chat');
     await expect(page).toHaveURL('/');
   });
 
-  test('CT94 - Rota /responsavel/chat exige autenticacao', async ({ page }) => {
+  test('CT94 - Rota /responsavel/chat exige autenticação', async ({ page }) => {
     await page.goto('/responsavel/chat');
     await expect(page).toHaveURL('/');
   });
 });
 
 // ============================================================================
-// CT95–CT98: RESILIENCIA
+// CT95–CT98: RESILIÊNCIA
 // ============================================================================
-test.describe('Chat — Resiliencia', () => {
-  test('CT95 - Sidebar contatos visivel na gestao', async ({ page }) => {
+test.describe('Chat — Resiliência', () => {
+  test('CT95 - Sidebar contatos visível na gestão', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/chat');
     await expect(page.locator('.chat-sidebar button').first()).toBeVisible({ timeout: 10000 });
@@ -1480,7 +1480,7 @@ test.describe('Chat — Resiliencia', () => {
     await expect(page.locator('input[type="search"]')).toBeVisible();
   });
 
-  test('CT97 - Responsavel home nao quebrou com novo card chat', async ({ page }) => {
+  test('CT97 - Responsável home não quebrou com novo card chat', async ({ page }) => {
     await login(page, 'resp1@email.com', SENHA_RESP);
     await page.goto('/responsavel');
     await expect(page.getByText('Falar com coordenação')).toBeVisible();
@@ -1489,7 +1489,7 @@ test.describe('Chat — Resiliencia', () => {
     await expect(page.getByText('Justificativa')).toBeVisible();
   });
 
-  test('CT98 - Gestao home nao quebrou com novo card chat', async ({ page }) => {
+  test('CT98 - Gestão home não quebrou com novo card chat', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao');
     await expect(page.getByText('Chat com pais')).toBeVisible();
@@ -1501,7 +1501,7 @@ test.describe('Chat — Resiliencia', () => {
 // CT99–CT103: INPUT EDGE CASES
 // ============================================================================
 test.describe('Chat — Input', () => {
-  test('CT99 - Botao enviar desabilitado com input vazio', async ({ page }) => {
+  test('CT99 - Botão enviar desabilitado com input vazio', async ({ page }) => {
     await login(page, 'resp1@email.com', SENHA_RESP);
     await page.goto('/responsavel/chat');
     await page.waitForTimeout(2000);
@@ -1534,11 +1534,11 @@ test.describe('Chat — Input', () => {
     }
   });
 
-  test('CT101 - Gestao profile (side effect): logout nao quebra', async ({ page }) => {
+  test('CT101 - Gestão profile (side effect): logout não quebra', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/chat');
     await page.waitForTimeout(1000);
-    // Click logout in dropdown
+    // Clica em sair no dropdown
     await page.locator('button[data-bs-toggle="dropdown"]').click();
     await page.locator('.dropdown-menu').getByText('Sair da conta').click();
     await expect(page).toHaveURL('/');
@@ -1552,7 +1552,7 @@ test.describe('Chat — Input', () => {
     if ((await items.count()) > 0) {
       await items.first().click();
       await page.waitForTimeout(1000);
-      // System messages appear centered - just verify no JS errors
+      // Mensagens de sistema aparecem centralizadas - apenas verifica se não há erros de JS
       const pageErrors: string[] = [];
       page.on('pageerror', (err) => pageErrors.push(err.message));
       await page.waitForTimeout(500);
@@ -1562,9 +1562,9 @@ test.describe('Chat — Input', () => {
 });
 
 // ============================================================================
-// CT103–CT106: NOTIFICACOES — CASOS EXTREMOS
+// CT103–CT106: NOTIFICAÇÕES — CASOS EXTREMOS
 // ============================================================================
-test.describe('Notificacoes — Casos Extremos', () => {
+test.describe('Notificações — Casos Extremos', () => {
   test('CT103 - Popover fecha e reabre sem erros', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao');
@@ -1594,7 +1594,7 @@ test.describe('Notificacoes — Casos Extremos', () => {
     }
   });
 
-  test('CT105 - Notificacao com rota de chat', async ({ page }) => {
+  test('CT105 - Notificação com rota de chat', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao');
     await page.locator('button[aria-label="Notificações"]').click();
@@ -1606,7 +1606,7 @@ test.describe('Notificacoes — Casos Extremos', () => {
     }
   });
 
-  test('CT106 - Popover sem notificacoes mostra estado vazio', async ({ page }) => {
+  test('CT106 - Popover sem notificações mostra estado vazio', async ({ page }) => {
     await login(page, 'resp1@email.com', SENHA_RESP);
     await page.goto('/responsavel');
     await page.locator('button[aria-label="Notificações"]').click();

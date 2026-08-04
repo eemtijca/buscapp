@@ -7,7 +7,7 @@ const supabasePublishableKey: string = import.meta.env.VITE_SUPABASE_PUBLISHABLE
 
 if (!supabaseUrl || !supabasePublishableKey) {
   console.warn(
-    '[supabase] VITE_SUPABASE_URL ou VITE_SUPABASE_PUBLISHABLE_KEY nao definidas. O cliente nao sera inicializado.',
+    '[supabase] VITE_SUPABASE_URL ou VITE_SUPABASE_PUBLISHABLE_KEY não definidas. O cliente não será inicializado.',
   );
 }
 
@@ -25,7 +25,7 @@ interface TokenClaims {
 }
 
 /**
- * Decodifica o JWT sem latencia de rede (diferente de getSession()).
+ * Decodifica o JWT sem latência de rede (diferente de getSession()).
  * Usado pelo router guard para ler 'papel' da claim do token.
  */
 export { armazenamento };

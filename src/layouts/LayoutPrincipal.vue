@@ -47,7 +47,7 @@ const papelChat = () => {
   <div class="d-flex flex-column overflow-hidden" style="height: 100dvh">
     <CabecalhoNavegacao variante="dashboard" :itens="[]" marca="BuscApp" :rotaMarca="rotaInicio()">
       <template #usuario>
-        <!-- Chat button (apenas responsavel e gestao) -->
+        <!-- Botão de chat (apenas responsável e gestão) -->
         <router-link
           v-if="papelChat()"
           :to="`/${papelChat()}/chat`"
@@ -65,7 +65,7 @@ const papelChat = () => {
           </span>
         </router-link>
 
-        <!-- Notificacoes (outros tipos) -->
+        <!-- Notificações (outros tipos) -->
         <NotificacoesPopover />
 
         <div class="dropdown">

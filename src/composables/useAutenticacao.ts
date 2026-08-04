@@ -6,8 +6,8 @@ const usuario: Ref<Perfil | null> = ref(null);
 const carregando: Ref<boolean> = ref(true);
 
 /**
- * Fallback para tokens emitidos antes do Custom Access Token Hook.
- * Em operacao normal as claims do JWT ja contem nome e papel.
+ * Recurso alternativo para tokens emitidos antes do Custom Access Token Hook.
+ * Em operação normal as claims do JWT já contêm nome e papel.
  */
 async function carregarPerfil() {
   const {
@@ -31,9 +31,9 @@ async function carregarPerfil() {
 }
 
 /**
- * Listener global registrado UMA vez no escopo de modulo.
+ * Ouvinte global registrado UMA vez no escopo de módulo.
  * Reage a INITIAL_SESSION, SIGNED_IN, TOKEN_REFRESHED e SIGNED_OUT
- * sem necessidade de onMounted ou polling.
+ * sem necessidade de onMounted ou verificação periódica.
  */
 supabaseClient.auth.onAuthStateChange((event, session) => {
   if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
@@ -92,7 +92,7 @@ supabaseClient.auth.onAuthStateChange((event, session) => {
 
 export function useAutenticacao() {
   /**
-   * Autentica com email/senha. O listener onAuthStateChange
+   * Autentica com email/senha. O ouvinte onAuthStateChange
    * preenche usuario.value automaticamente via JWT.
    */
   async function login(email: string, senha: string) {
@@ -110,7 +110,7 @@ export function useAutenticacao() {
     return data;
   }
 
-  /** Encerra a sessao atual (scope: 'local' = nao afeta outras abas). */
+  /** Encerra a sessão atual (scope: 'local' = não afeta outras abas). */
   async function logout() {
     supabaseClient.removeAllChannels();
     await supabaseClient.auth.signOut({ scope: 'local' });

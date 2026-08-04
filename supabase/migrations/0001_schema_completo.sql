@@ -169,7 +169,7 @@ create table public.turmas (
 
 comment on table public.turmas is 'RF09/RD02: Turmas normalizadas. Máximo 9 por ano (1º-3º × A-C).';
 
--- Trigger: auto-set nome_completo from serie and letra
+-- Trigger: define nome_completo automaticamente a partir da série e da letra
 create or replace function public.fn_set_turma_nome()
 returns trigger
 language plpgsql
@@ -1816,7 +1816,7 @@ begin
     raise sqlstate 'PGRST' using
       message = json_build_object(
         'code',    'PGRST401',
-        'message', 'Token JWT ausente ou invalido. Autentique-se para acessar a API.'
+        'message', 'Token JWT ausente ou inválido. Autentique-se para acessar a API.'
       )::text,
       detail = json_build_object(
         'status',  401,
@@ -1837,8 +1837,8 @@ revoke execute on function public.is_responsavel_do_aluno from anon;
 revoke execute on function public.get_turma_do_aluno from anon;
 -- ============================================================================
 -- Migration: codigos_redefinicao
--- Descricao: Tabela de codigos para redefinicao de senha, funcoes auxiliares
---            e alteracao do enum tipo_notificacao.
+-- Descrição: Tabela de códigos para redefinição de senha, funções auxiliares
+--            e alteração do enum tipo_notificacao.
 -- ============================================================================
 
 -- ============================================================================
@@ -1862,13 +1862,13 @@ create table public.codigos_redefinicao (
 );
 
 comment on table public.codigos_redefinicao is
-  'Codigos de uso unico para redefinicao de senha via administracao. Expira em 1 hora.';
+  'Códigos de uso único para redefinição de senha via administração. Expira em 1 hora.';
 
 create index idx_codigos_redefinicao_email on public.codigos_redefinicao(email);
 create index idx_codigos_redefinicao_email_codigo on public.codigos_redefinicao(email, codigo);
 
 -- ============================================================================
--- 3. FUNCOES AUXILIARES
+-- 3. FUNÇÕES AUXILIARES
 -- ============================================================================
 
 create or replace function public.fn_gerar_codigo_redefinicao(
@@ -1884,7 +1884,7 @@ declare
   v_email  text;
 begin
   if public.get_user_papel() != 'gestao' then
-    raise exception 'Apenas a gestao pode gerar codigos de redefinicao.';
+    raise exception 'Apenas a gestão pode gerar códigos de redefinição.';
   end if;
 
   select email into v_email
@@ -1892,7 +1892,7 @@ begin
   where id = p_perfil_id and status = 'ativo';
 
   if v_email is null then
-    raise exception 'Perfil nao encontrado ou inativo.';
+    raise exception 'Perfil não encontrado ou inativo.';
   end if;
 
   v_codigo := lpad(floor(random() * 1000000)::text, 6, '0');
@@ -1905,7 +1905,7 @@ end;
 $$;
 
 comment on function public.fn_gerar_codigo_redefinicao is
-  'Gera um codigo de 6 digitos para redefinicao de senha. Apenas gestao.';
+  'Gera um código de 6 dígitos para redefinição de senha. Apenas gestão.';
 
 create or replace function public.fn_solicitar_codigo_redefinicao(p_email text)
 returns void
@@ -1927,8 +1927,8 @@ begin
     select
       p.id,
       'codigo_redefinicao',
-      'Solicitacao de redefinicao de senha',
-      'O usuario ' || v_nome || ' (' || p_email || ', ' || v_papel || ') solicitou um codigo para redefinir a senha.',
+      'Solicitação de redefinição de senha',
+      'O usuário ' || v_nome || ' (' || p_email || ', ' || v_papel || ') solicitou um código para redefinir a senha.',
       jsonb_build_object('email', p_email, 'perfil_id', v_perfil_id)
     from public.perfis p
     where p.papel = 'gestao' and p.status = 'ativo';
@@ -1937,10 +1937,10 @@ end;
 $$;
 
 comment on function public.fn_solicitar_codigo_redefinicao is
-  'Cria notificacoes para todos os usuarios de gestao quando alguem solicita redefinicao de senha.';
+  'Cria notificações para todos os usuários de gestão quando alguém solicita redefinição de senha.';
 
 -- ============================================================================
--- 3B. FUNCAO CRIAR USUARIO
+-- 3B. FUNÇÃO CRIAR USUÁRIO
 -- ============================================================================
 
 create or replace function public.fn_criar_usuario(
@@ -1959,7 +1959,7 @@ declare
   v_user_id uuid;
 begin
   if public.get_user_papel() != 'gestao' then
-    raise exception 'Apenas gestao pode criar usuarios.';
+    raise exception 'Apenas gestão pode criar usuários.';
   end if;
 
   v_user_id := gen_random_uuid();
@@ -1997,7 +1997,7 @@ end;
 $$;
 
 comment on function public.fn_criar_usuario is
-  'Cria usuario em auth.users com perfil pendente. Apenas gestao. O trigger fn_handle_new_user cria o perfil automaticamente.';
+  'Cria usuário em auth.users com perfil pendente. Apenas gestão. O trigger fn_handle_new_user cria o perfil automaticamente.';
 
 -- ============================================================================
 -- 4. ROW LEVEL SECURITY
@@ -2031,27 +2031,27 @@ create trigger trg_set_updated_at
   execute function public.fn_set_updated_at();
 
 -- ============================================================================
--- 6. GRANTS — EXPOR TABELAS E FUNCOES VIA DATA API
+-- 6. GRANTS — EXPOR TABELAS E FUNÇÕES VIA DATA API
 -- ============================================================================
 
 grant select, insert, update on public.codigos_redefinicao to authenticated, service_role;
 
--- Permissao DELETE para frequencias (usada pelo fluxo de DELETE+INSERT)
+-- Permissão DELETE para frequências (usada pelo fluxo de DELETE+INSERT)
 grant delete on public.frequencias to authenticated;
 
--- Permissao UPDATE para notificacoes (marcar como lida)
+-- Permissão UPDATE para notificações (marcar como lida)
 grant update, delete on public.notificacoes to authenticated;
 
--- Permissao INSERT para justificativas (gestao inserir manualmente)
+-- Permissão INSERT para justificativas (gestão inserir manualmente)
 grant insert on public.justificativas_faltas to authenticated;
 
--- Permissoes para o service_role (chave de servico) nas tabelas de chat,
+-- Permissões para o service_role (chave de serviço) nas tabelas de chat,
 -- usadas pela Edge Function e pelo setup de testes via REST API.
 grant select, insert, update, delete on public.conversas to service_role;
 grant select, insert, update, delete on public.mensagens to service_role;
 grant select, insert, update, delete on public.notificacoes to service_role;
 
--- Permissoes para o service_role nas tabelas usadas pelas Edge Functions
+-- Permissões para o service_role nas tabelas usadas pelas Edge Functions
 -- (criar-usuario, redefinir-senha-codigo, processar-anexo, limpar-anexos)
 -- e pelo setup de testes via REST API.
 grant select, insert, update, delete on public.perfis to service_role;
@@ -2097,10 +2097,10 @@ create policy "Notif: destinatario deleta proprias"
   using (destinatario_id = auth.uid());
 -- ============================================================================
 -- Migration: codigos_lifecycle
--- Descricao: Aprimora o ciclo de vida dos codigos de redefinicao:
---   1. Aceita perfil pendente na geracao
---   2. Evita duplicacao de codigos ativos para o mesmo perfil
---   3. Adiciona funcao de revogacao
+-- Descrição: Aprimora o ciclo de vida dos códigos de redefinição:
+--   1. Aceita perfil pendente na geração
+--   2. Evita duplicação de códigos ativos para o mesmo perfil
+--   3. Adiciona função de revogação
 --   4. Adiciona coluna revogado_em para auditoria
 -- ============================================================================
 
@@ -2111,14 +2111,14 @@ alter table public.codigos_redefinicao
   add column if not exists revogado_em timestamptz;
 
 comment on column public.codigos_redefinicao.revogado_em is
-  'Preenchido quando um admin revoga manualmente o codigo antes da expiracao natural.';
+  'Preenchido quando um admin revoga manualmente o código antes da expiração natural.';
 
 -- ============================================================================
--- 2. FUNCAO — GERAR CODIGO (REVISADA)
+-- 2. FUNÇÃO — GERAR CÓDIGO (REVISADA)
 -- ============================================================================
--- Mudancas:
+-- Mudanças:
 --   - Aceita perfis com status 'ativo' ou 'pendente'
---   - Retorna codigo ativo existente em vez de criar duplicata
+--   - Retorna código ativo existente em vez de criar duplicata
 -- ============================================================================
 
 create or replace function public.fn_gerar_codigo_redefinicao(
@@ -2135,10 +2135,10 @@ declare
   v_existente text;
 begin
   if public.get_user_papel() != 'gestao' then
-    raise exception 'Apenas a gestao pode gerar codigos de redefinicao.';
+    raise exception 'Apenas a gestão pode gerar códigos de redefinição.';
   end if;
 
-  -- Verifica se ja existe codigo ativo para este perfil
+  -- Verifica se já existe código ativo para este perfil
   select codigo into v_existente
   from public.codigos_redefinicao
   where perfil_id = p_perfil_id
@@ -2157,7 +2157,7 @@ begin
   where id = p_perfil_id and status in ('ativo', 'pendente');
 
   if v_email is null then
-    raise exception 'Perfil nao encontrado ou inativo.';
+    raise exception 'Perfil não encontrado ou inativo.';
   end if;
 
   v_codigo := lpad(floor(random() * 1000000)::text, 6, '0');
@@ -2170,10 +2170,10 @@ end;
 $$;
 
 comment on function public.fn_gerar_codigo_redefinicao is
-  'Gera codigo de 6 digitos ou retorna codigo ativo existente. Aceita perfis ativo ou pendente. Apenas gestao.';
+  'Gera código de 6 dígitos ou retorna código ativo existente. Aceita perfis ativo ou pendente. Apenas gestão.';
 
 -- ============================================================================
--- 3. FUNCAO — REVOGAR CODIGO
+-- 3. FUNÇÃO — REVOGAR CÓDIGO
 -- ============================================================================
 
 create or replace function public.fn_revogar_codigo(p_codigo_id uuid)
@@ -2184,7 +2184,7 @@ set search_path = ''
 as $$
 begin
   if public.get_user_papel() != 'gestao' then
-    raise exception 'Apenas a gestao pode revogar codigos.';
+    raise exception 'Apenas a gestão pode revogar códigos.';
   end if;
 
   update public.codigos_redefinicao
@@ -2195,13 +2195,13 @@ begin
     and expira_em > now();
 
   if not found then
-    raise exception 'Codigo ja foi usado ou ja expirou.';
+    raise exception 'Código já foi usado ou já expirou.';
   end if;
 end;
 $$;
 
 comment on function public.fn_revogar_codigo is
-  'Revogacao manual de codigo ativo. Define expira_em = now() e registra revogado_em. Lanca erro se ja usado ou expirado.';
+  'Revogação manual de código ativo. Define expira_em = now() e registra revogado_em. Lança erro se já usado ou expirado.';
 
 -- ============================================================================
 -- 4. GRANTS
@@ -2211,7 +2211,7 @@ grant execute on function public.fn_gerar_codigo_redefinicao to authenticated;
 grant execute on function public.fn_revogar_codigo to authenticated;
 -- ============================================================================
 -- Migration: enable_realtime
--- Descricao: Adiciona tabelas necessarias a publication supabase_realtime
+-- Descrição: Adiciona tabelas necessárias à publication supabase_realtime
 --            para que os eventos postgres_changes funcionem.
 -- ============================================================================
 
@@ -2259,7 +2259,7 @@ alter table ocorrencias
   add column if not exists notificar_responsavel boolean not null default false;
 
 -- -------- frequencias --------
--- observacao já existe; adicionar coluna para os motivos rápidos
+-- observação já existe; adicionar coluna para os motivos rápidos
 alter table frequencias
   add column if not exists motivos_ausencia text[] not null default '{}';
 
@@ -2458,7 +2458,7 @@ create policy "JustBucket: gestao update"
   with check (bucket_id = 'justificativas' and public.get_user_papel() = 'gestao');
 
 -- ============================================================================
--- RLS: Guardian attachment read access
+-- RLS: Acesso de leitura de anexos pelo responsável
 -- ============================================================================
 
 create policy "JustAnexos: responsavel le proprio"
@@ -2482,7 +2482,7 @@ create policy "Anexos: responsavel le proprio"
   );
 
 -- ============================================================================
--- Trigger: auto-justify frequencies on justification acceptance
+-- Trigger: justifica automaticamente as frequências ao aceitar a justificativa
 -- ============================================================================
 
 create or replace function public.fn_auto_justificar_frequencias()
@@ -2512,7 +2512,7 @@ create trigger trg_auto_justificar_frequencias
 
 -- ============================================================================
 -- Migration: chat_notificacoes
--- Descricao: Trigger que cria notificacao automatica ao receber mensagem no chat.
+-- Descrição: Trigger que cria notificação automática ao receber mensagem no chat.
 -- ============================================================================
 
 create or replace function public.fn_notificar_nova_mensagem()
@@ -2533,7 +2533,7 @@ begin
 
   select nome into v_nome_remetente from public.perfis where id = new.remetente_id;
 
-  -- Reabrir conversa se estava oculta (responsavel enviou)
+  -- Reabrir conversa se estava oculta (responsável enviou)
   update public.conversas
   set ativa = true
   where id = new.conversa_id and ativa = false;
@@ -2732,32 +2732,32 @@ language sql
 security definer
 set search_path = ''
 as $$
-  select 'catalogo', 'perfis.acesso_modulos sem opcao de modulo', count(*)::bigint
+  select 'catalogo', 'perfis.acesso_modulos sem opção de modulo', count(*)::bigint
   from public.perfis p
   where exists (
     select 1 from unnest(p.acesso_modulos) c
     where not exists (select 1 from public.opcoes_configuracao o where o.tipo = 'modulo' and o.chave = c)
   )
   union all
-  select 'catalogo', 'alunos.documentos_recebidos sem opcao de documento', count(*)::bigint
+  select 'catalogo', 'alunos.documentos_recebidos sem opção de documento', count(*)::bigint
   from public.alunos a
   where exists (
     select 1 from unnest(a.documentos_recebidos) c
     where not exists (select 1 from public.opcoes_configuracao o where o.tipo = 'documento' and o.chave = c)
   )
   union all
-  select 'catalogo', 'frequencias.periodo sem opcao de periodo', count(*)::bigint
+  select 'catalogo', 'frequencias.periodo sem opção de periodo', count(*)::bigint
   from public.frequencias f
   where not exists (select 1 from public.opcoes_configuracao o where o.tipo = 'periodo' and o.chave = f.periodo)
   union all
-  select 'catalogo', 'frequencias.motivos_ausencia sem opcao de motivo', count(*)::bigint
+  select 'catalogo', 'frequencias.motivos_ausencia sem opção de motivo', count(*)::bigint
   from public.frequencias f
   where exists (
     select 1 from unnest(f.motivos_ausencia) c
     where not exists (select 1 from public.opcoes_configuracao o where o.tipo = 'motivo_ausencia' and o.chave = c)
   )
   union all
-  select 'catalogo', 'ocorrencias.tipo sem opcao de tipo_ocorrencia', count(*)::bigint
+  select 'catalogo', 'ocorrencias.tipo sem opção de tipo_ocorrencia', count(*)::bigint
   from public.ocorrencias o
   where exists (
     select 1 from unnest(o.tipo) c
@@ -2771,19 +2771,19 @@ as $$
     where not exists (select 1 from public.tags_comportamento tc where tc.nome = t)
   )
   union all
-  select 'catalogo', 'turmas.serie sem opcao de serie_turma', count(*)::bigint
+  select 'catalogo', 'turmas.serie sem opção de serie_turma', count(*)::bigint
   from public.turmas t
   where not exists (select 1 from public.opcoes_configuracao o where o.tipo = 'serie_turma' and o.chave = t.serie)
   union all
-  select 'catalogo', 'turmas.letra sem opcao de letra_turma', count(*)::bigint
+  select 'catalogo', 'turmas.letra sem opção de letra_turma', count(*)::bigint
   from public.turmas t
   where not exists (select 1 from public.opcoes_configuracao o where o.tipo = 'letra_turma' and o.chave = t.letra)
   union all
-  select 'catalogo', 'vinculos.tipo_relacao sem opcao de tipo_vinculo', count(*)::bigint
+  select 'catalogo', 'vinculos.tipo_relacao sem opção de tipo_vinculo', count(*)::bigint
   from public.vinculos_responsaveis v
   where not exists (select 1 from public.opcoes_configuracao o where o.tipo = 'tipo_vinculo' and o.chave = v.tipo_relacao)
   union all
-  select 'catalogo', 'atribuicoes.papel sem opcao de papel_atribuicao', count(*)::bigint
+  select 'catalogo', 'atribuicoes.papel sem opção de papel_atribuicao', count(*)::bigint
   from public.atribuicoes_professores a
   where not exists (select 1 from public.opcoes_configuracao o where o.tipo = 'papel_atribuicao' and o.chave = a.papel)
   union all

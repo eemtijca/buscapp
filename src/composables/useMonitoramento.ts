@@ -278,7 +278,7 @@ export function useMonitoramento() {
         .eq('status', 'matriculado')
         .single();
 
-      if (!enturmacao) throw new Error('Aluno nao encontrado em nenhuma turma.');
+      if (!enturmacao) throw new Error('Aluno não encontrado em nenhuma turma.');
       const tId = (enturmacao as unknown as { turma_id: string }).turma_id;
       const aId = (enturmacao as unknown as { ano_letivo_id: string }).ano_letivo_id;
 
@@ -1061,7 +1061,7 @@ export function useMonitoramento() {
         anexo_id: anexoId,
       });
       if (vinculoError) {
-        // Compensação: remove o objeto do storage e tenta remover a linha de anexo
+        // Compensação: remove o objeto do armazenamento e tenta remover a linha de anexo
         // (se a permissão permitir). Linhas remanescentes são limpas pelo job de expurgo.
         try {
           await supabaseClient.from('anexos').delete().eq('id', anexoId);
@@ -1076,9 +1076,9 @@ export function useMonitoramento() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ storagePath, mimeType: arquivo.type, anexoId }),
-      }).catch((e) => console.error('[useMonitoramento] Anexo processing (edge) failed:', e));
+      }).catch((e) => console.error('[useMonitoramento] Falha no processamento do anexo (edge):', e));
     } catch (e) {
-      console.error('[useMonitoramento] Anexo async processing failed:', e);
+      console.error('[useMonitoramento] Falha no processamento assíncrono do anexo:', e);
     }
   }
 
@@ -1377,7 +1377,7 @@ export function useMonitoramento() {
       return contatos;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      console.error('[useMonitoramento] Erro ao buscar contatos do responsavel:', msg);
+      console.error('[useMonitoramento] Erro ao buscar contatos do responsável:', msg);
       return [];
     }
   }
@@ -1477,7 +1477,7 @@ export function useMonitoramento() {
       return contatos.filter((c) => c.ultimaMensagem !== 'Nenhuma mensagem ainda');
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      console.error('[useMonitoramento] Erro ao buscar contatos staff:', msg);
+      console.error('[useMonitoramento] Erro ao buscar contatos da equipe:', msg);
       return [];
     }
   }

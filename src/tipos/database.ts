@@ -430,7 +430,7 @@ export interface CodigoRedefinicao {
   updated_at: string;
 }
 
-// -------- Supabase Database Type Map --------
+// -------- Mapa de Tipos do Banco de Dados Supabase --------
 export interface Database {
   public: {
     Tables: {

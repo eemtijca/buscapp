@@ -14,7 +14,7 @@ serve(async (req: Request) => {
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
       return new Response(
-        JSON.stringify({ error: 'Token de autenticacao nao fornecido.' }),
+        JSON.stringify({ error: 'Token de autenticação não fornecido.' }),
         { status: 401, headers: { 'Content-Type': 'application/json' } },
       )
     }
@@ -28,7 +28,7 @@ serve(async (req: Request) => {
     const { data: { user }, error: userError } = await supabaseClient.auth.getUser()
     if (userError || !user) {
       return new Response(
-        JSON.stringify({ error: 'Token invalido.' }),
+        JSON.stringify({ error: 'Token inválido.' }),
         { status: 401, headers: { 'Content-Type': 'application/json' } },
       )
     }
@@ -41,7 +41,7 @@ serve(async (req: Request) => {
 
     if (!perfil || perfil.papel !== 'gestao') {
       return new Response(
-        JSON.stringify({ error: 'Apenas gestao pode criar usuarios.' }),
+        JSON.stringify({ error: 'Apenas gestão pode criar usuários.' }),
         { status: 403, headers: { 'Content-Type': 'application/json' } },
       )
     }
@@ -50,7 +50,7 @@ serve(async (req: Request) => {
 
     if (!nome || !email || !papel) {
       return new Response(
-        JSON.stringify({ error: 'Nome, e-mail e papel sao obrigatorios.' }),
+        JSON.stringify({ error: 'Nome, e-mail e papel são obrigatórios.' }),
         { status: 400, headers: { 'Content-Type': 'application/json' } },
       )
     }
@@ -70,9 +70,9 @@ serve(async (req: Request) => {
     })
 
     if (createError) {
-      console.error('[criar-usuario] Erro ao criar usuario:', createError.message)
+      console.error('[criar-usuario] Erro ao criar usuário:', createError.message)
       return new Response(
-        JSON.stringify({ error: 'Este e-mail ja esta cadastrado no sistema.' }),
+        JSON.stringify({ error: 'Este e-mail já está cadastrado no sistema.' }),
         { status: 400, headers: { 'Content-Type': 'application/json' } },
       )
     }
@@ -89,11 +89,11 @@ serve(async (req: Request) => {
       .eq('id', userId)
 
     if (perfilError) {
-      // Evita usuario autenticado orfao (sem perfil utilizavel).
+      // Evita usuário autenticado órfão (sem perfil utilizável).
       await supabaseAdmin.auth.admin.deleteUser(userId).catch(() => {})
       console.error('[criar-usuario] Erro ao finalizar perfil:', perfilError.message)
       return new Response(
-        JSON.stringify({ error: 'Falha ao finalizar o perfil do usuario. Tente novamente.' }),
+        JSON.stringify({ error: 'Falha ao finalizar o perfil do usuário. Tente novamente.' }),
         { status: 500, headers: { 'Content-Type': 'application/json' } },
       )
     }
@@ -110,11 +110,11 @@ serve(async (req: Request) => {
       if (codigoError) throw codigoError
       codigo = codigoData as string | null
     } catch (e) {
-      // Compensa a criacao para nao deixar usuario sem codigo de acesso.
+      // Compensa a criação para não deixar usuário sem código de acesso.
       await supabaseAdmin.auth.admin.deleteUser(userId).catch(() => {})
-      console.error('[criar-usuario] Erro ao gerar codigo automatico:', e)
+      console.error('[criar-usuario] Erro ao gerar código automático:', e)
       return new Response(
-        JSON.stringify({ error: 'Falha ao gerar o codigo de acesso. Usuario nao criado.' }),
+        JSON.stringify({ error: 'Falha ao gerar o código de acesso. Usuário não criado.' }),
         { status: 500, headers: { 'Content-Type': 'application/json' } },
       )
     }

@@ -722,7 +722,9 @@ async function salvar() {
                 v-model="tipoVinculo"
                 class="form-select form-select-sm"
               >
-                <option v-for="v in opcoesTipoVinculo" :key="v.valor" :value="v.valor">{{ v.rotulo }}</option>
+                <option v-for="v in opcoesTipoVinculo" :key="v.valor" :value="v.valor">
+                  {{ v.rotulo }}
+                </option>
               </select>
             </CampoFormulario>
           </template>
@@ -910,7 +912,9 @@ async function salvar() {
                   v-model="novoTipoVinculo"
                   class="form-select form-select-sm"
                 >
-                  <option v-for="v in opcoesTipoVinculo" :key="v.valor" :value="v.valor">{{ v.rotulo }}</option>
+                  <option v-for="v in opcoesTipoVinculo" :key="v.valor" :value="v.valor">
+                    {{ v.rotulo }}
+                  </option>
                 </select>
               </CampoFormulario>
             </template>

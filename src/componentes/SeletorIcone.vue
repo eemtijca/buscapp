@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 
-const props = withDefaults(defineProps<{
-  modelValue: string;
-  desabilitado?: boolean;
-}>(), {
-  desabilitado: false,
-});
+const props = withDefaults(
+  defineProps<{
+    modelValue: string;
+    desabilitado?: boolean;
+  }>(),
+  {
+    desabilitado: false,
+  },
+);
 
 const emit = defineEmits<{
   'update:modelValue': [value: string];
@@ -112,7 +115,7 @@ const icones: IconEntry[] = [
   { nome: 'graph-down', rotulo: 'Declínio', categoria: 'Status' },
 ];
 
-const categorias = [...new Set(icones.map(i => i.categoria))];
+const categorias = [...new Set(icones.map((i) => i.categoria))];
 
 const modalAberto = ref(false);
 const busca = ref('');
@@ -121,13 +124,11 @@ const categoriaAtiva = ref('Todos');
 const iconesFiltrados = computed(() => {
   let items = icones;
   if (categoriaAtiva.value !== 'Todos') {
-    items = items.filter(i => i.categoria === categoriaAtiva.value);
+    items = items.filter((i) => i.categoria === categoriaAtiva.value);
   }
   if (busca.value.trim()) {
     const termo = busca.value.toLowerCase().trim();
-    items = items.filter(i =>
-      i.nome.includes(termo) || i.rotulo.toLowerCase().includes(termo)
-    );
+    items = items.filter((i) => i.nome.includes(termo) || i.rotulo.toLowerCase().includes(termo));
   }
   return items;
 });
@@ -193,11 +194,7 @@ function abrir() {
               </button>
             </div>
             <div class="row g-2" v-if="iconesFiltrados.length">
-              <div
-                v-for="ico in iconesFiltrados"
-                :key="ico.nome"
-                class="col-4 col-md-3 col-lg-2"
-              >
+              <div v-for="ico in iconesFiltrados" :key="ico.nome" class="col-4 col-md-3 col-lg-2">
                 <button
                   type="button"
                   class="btn btn-outline-success w-100 text-center py-2"

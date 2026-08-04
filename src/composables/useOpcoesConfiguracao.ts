@@ -10,7 +10,7 @@ export function useOpcoesConfiguracao() {
 
   async function buscarOpcoes(tipo: string): Promise<OpcaoCheckbox[]> {
     const chaveCache = `opcoes_${tipo}`;
-    if (cache.has(chaveCache)) return cache.get(chaveCache)!
+    if (cache.has(chaveCache)) return cache.get(chaveCache)!;
 
     carregando.value = true;
     try {
@@ -21,11 +21,13 @@ export function useOpcoesConfiguracao() {
         .eq('ativo', true)
         .order('ordem');
 
-      const opcoes: OpcaoCheckbox[] = (data ?? []).map((o: Pick<OpcaoConfiguracao, 'chave' | 'rotulo' | 'icone'>) => ({
-        valor: o.chave,
-        rotulo: o.rotulo,
-        icone: o.icone ?? undefined,
-      }));
+      const opcoes: OpcaoCheckbox[] = (data ?? []).map(
+        (o: Pick<OpcaoConfiguracao, 'chave' | 'rotulo' | 'icone'>) => ({
+          valor: o.chave,
+          rotulo: o.rotulo,
+          icone: o.icone ?? undefined,
+        }),
+      );
 
       cache.set(chaveCache, opcoes);
       return opcoes;

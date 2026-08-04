@@ -28,7 +28,9 @@ const dataAula = ref(new Date().toISOString().slice(0, 10));
 
 const justificativaSugerida = computed(() => {
   if (!motivos.value.length) return '';
-  const nomes = motivos.value.map((m) => opcoesMotivos.value.find((o) => o.valor === m)?.rotulo ?? m);
+  const nomes = motivos.value.map(
+    (m) => opcoesMotivos.value.find((o) => o.valor === m)?.rotulo ?? m,
+  );
   return `Aluno encaminhado para ${nomes.join(', ')}.`;
 });
 

@@ -457,7 +457,10 @@ async function salvar() {
         </div>
       </div>
 
-      <div v-if="modoEdicao && papel === 'professor' && atribuicoes.length" class="card border mb-3">
+      <div
+        v-if="modoEdicao && papel === 'professor' && atribuicoes.length"
+        class="card border mb-3"
+      >
         <div class="card-header bg-body-tertiary py-2">
           <span class="fw-medium small">Atribuições</span>
         </div>

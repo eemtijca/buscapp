@@ -282,12 +282,16 @@ onMounted(carregarTurmas);
             <div class="modal-body">
               <CampoFormulario id="campoSerie" label="Série" :obrigatorio="true">
                 <select id="campoSerie" v-model="formSerie" class="form-select form-select-sm">
-                  <option v-for="s in opcoesSerie" :key="s.valor" :value="s.valor">{{ s.rotulo }}</option>
+                  <option v-for="s in opcoesSerie" :key="s.valor" :value="s.valor">
+                    {{ s.rotulo }}
+                  </option>
                 </select>
               </CampoFormulario>
               <CampoFormulario id="campoLetra" label="Letra" :obrigatorio="true">
                 <select id="campoLetra" v-model="formLetra" class="form-select form-select-sm">
-                  <option v-for="l in opcoesLetra" :key="l.valor" :value="l.valor">{{ l.rotulo }}</option>
+                  <option v-for="l in opcoesLetra" :key="l.valor" :value="l.valor">
+                    {{ l.rotulo }}
+                  </option>
                 </select>
               </CampoFormulario>
               <CampoFormulario id="campoCapacidade" label="Capacidade">

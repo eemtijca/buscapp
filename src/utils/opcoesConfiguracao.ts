@@ -123,7 +123,11 @@ export const REGRA_TIPOS: Record<string, RegraCampo> = {
     campo: 'letra',
     minlength: 1,
     maxlength: 1,
-    filtrar: (v) => v.replace(/[^A-Za-zÀ-ÿ]/g, '').toUpperCase().slice(0, 1),
+    filtrar: (v) =>
+      v
+        .replace(/[^A-Za-zÀ-ÿ]/g, '')
+        .toUpperCase()
+        .slice(0, 1),
     transformar: (v) => v.trim().toUpperCase(),
     padrao: /^[A-ZÀ-Ý]$/,
     mensagemPadrao: 'Digite apenas a letra da turma (ex.: D).',

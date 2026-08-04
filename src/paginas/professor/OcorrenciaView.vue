@@ -34,7 +34,7 @@ const tipoOcorrenciaRef = ref<HTMLElement | null>(null);
 const { altura: alturaCartaoTipo } = useAlturaUniformeCards(tipoOcorrenciaRef);
 
 function corOcorrencia(valor: string): 'warning' | 'danger' | 'info' | 'success' | 'primary' {
-  const idx = opcoesTipo.value.findIndex(t => t.valor === valor);
+  const idx = opcoesTipo.value.findIndex((t) => t.valor === valor);
   const cols = ['warning', 'danger', 'info', 'success', 'primary'];
   const pos = idx >= 0 ? idx % cols.length : 0;
   return cols[pos] as 'warning' | 'danger' | 'info' | 'success' | 'primary';
@@ -113,11 +113,13 @@ onMounted(async () => {
     .select('nome, icone, descricao')
     .eq('ativo', true)
     .order('nome');
-  opcoesTags.value = (tagsData ?? []).map((t: { nome: string; icone: string | null; descricao: string | null }) => ({
-    valor: t.nome,
-    rotulo: t.descricao ?? t.nome,
-    icone: t.icone ?? undefined,
-  }));
+  opcoesTags.value = (tagsData ?? []).map(
+    (t: { nome: string; icone: string | null; descricao: string | null }) => ({
+      valor: t.nome,
+      rotulo: t.descricao ?? t.nome,
+      icone: t.icone ?? undefined,
+    }),
+  );
   alunos.value = await buscarAlunosParaFrequencia();
 });
 </script>

@@ -44,10 +44,7 @@ function resetForm() {
 async function carregar() {
   carregando.value = true;
   try {
-    const { data } = await supabaseClient
-      .from('tags_comportamento')
-      .select('*')
-      .order('nome');
+    const { data } = await supabaseClient.from('tags_comportamento').select('*').order('nome');
     tags.value = data ?? [];
   } catch {
     mostrarErro('Falha ao carregar tags.');
@@ -74,8 +71,14 @@ function abrirEditar(item: TagComportamento) {
 }
 
 function validarPeso(): boolean {
-  if (formPeso.value < -50) { mostrarErro('O peso mínimo é -50.'); return false; }
-  if (formPeso.value > 50) { mostrarErro('O peso máximo é +50.'); return false; }
+  if (formPeso.value < -50) {
+    mostrarErro('O peso mínimo é -50.');
+    return false;
+  }
+  if (formPeso.value > 50) {
+    mostrarErro('O peso máximo é +50.');
+    return false;
+  }
   return true;
 }
 
@@ -124,16 +127,14 @@ async function salvar() {
         .eq('id', editandoId.value);
       mostrarSucesso('Tag atualizada.');
     } else {
-      await supabaseClient
-        .from('tags_comportamento')
-        .insert({
-          nome: formNome.value.trim(),
-          categoria: formCategoria.value,
-          icone: formIcone.value.trim() || null,
-          descricao: formDescricao.value.trim() || null,
-          peso_pontuacao: formPeso.value,
-          ativo: formAtivo.value,
-        });
+      await supabaseClient.from('tags_comportamento').insert({
+        nome: formNome.value.trim(),
+        categoria: formCategoria.value,
+        icone: formIcone.value.trim() || null,
+        descricao: formDescricao.value.trim() || null,
+        peso_pontuacao: formPeso.value,
+        ativo: formAtivo.value,
+      });
       mostrarSucesso('Tag criada.');
     }
     modalAberto.value = false;
@@ -229,9 +230,20 @@ onMounted(carregar);
         </thead>
         <tbody>
           <tr v-for="item in tags" :key="item.id" :class="{ 'text-body-tertiary': !item.ativo }">
-            <td><code>{{ item.nome }}</code></td>
             <td>
-              <span :class="'badge bg-' + (item.categoria === 'positivo' ? 'success' : item.categoria === 'atencao' ? 'warning' : 'danger')">
+              <code>{{ item.nome }}</code>
+            </td>
+            <td>
+              <span
+                :class="
+                  'badge bg-' +
+                  (item.categoria === 'positivo'
+                    ? 'success'
+                    : item.categoria === 'atencao'
+                      ? 'warning'
+                      : 'danger')
+                "
+              >
                 {{ item.categoria }}
               </span>
             </td>
@@ -262,7 +274,9 @@ onMounted(carregar);
             </td>
           </tr>
           <tr v-if="!tags.length">
-            <td colspan="7" class="text-center text-body-secondary py-4">Nenhuma tag cadastrada.</td>
+            <td colspan="7" class="text-center text-body-secondary py-4">
+              Nenhuma tag cadastrada.
+            </td>
           </tr>
         </tbody>
       </table>
@@ -277,7 +291,14 @@ onMounted(carregar);
           </div>
           <div class="modal-body">
             <CampoFormulario id="tag-nome" label="Nome">
-              <input id="tag-nome" v-model="formNome" type="text" class="form-control" placeholder="ex.: agressao_verbal" :disabled="carregando" />
+              <input
+                id="tag-nome"
+                v-model="formNome"
+                type="text"
+                class="form-control"
+                placeholder="ex.: agressao_verbal"
+                :disabled="carregando"
+              />
             </CampoFormulario>
             <div class="mb-3">
               <label class="form-label">Categoria</label>
@@ -289,10 +310,24 @@ onMounted(carregar);
             </div>
             <SeletorIcone v-model="formIcone" :desabilitado="carregando" />
             <CampoFormulario id="tag-descricao" label="Descrição">
-              <input id="tag-descricao" v-model="formDescricao" type="text" class="form-control" :disabled="carregando" />
+              <input
+                id="tag-descricao"
+                v-model="formDescricao"
+                type="text"
+                class="form-control"
+                :disabled="carregando"
+              />
             </CampoFormulario>
             <CampoFormulario id="tag-peso" label="Peso/pontuação">
-              <input id="tag-peso" v-model.number="formPeso" type="number" class="form-control" :disabled="carregando" min="-50" max="50" />
+              <input
+                id="tag-peso"
+                v-model.number="formPeso"
+                type="number"
+                class="form-control"
+                :disabled="carregando"
+                min="-50"
+                max="50"
+              />
             </CampoFormulario>
             <div class="form-check form-switch mt-3">
               <input class="form-check-input" type="checkbox" id="tag-ativo" v-model="formAtivo" />
@@ -300,7 +335,9 @@ onMounted(carregar);
             </div>
           </div>
           <div class="modal-footer">
-            <button type="button" class="btn btn-outline-secondary" @click="modalAberto = false">Cancelar</button>
+            <button type="button" class="btn btn-outline-secondary" @click="modalAberto = false">
+              Cancelar
+            </button>
             <button type="button" class="btn btn-success" @click="salvar" :disabled="carregando">
               <span v-if="carregando" class="spinner-border spinner-border-sm me-1"></span>
               Salvar

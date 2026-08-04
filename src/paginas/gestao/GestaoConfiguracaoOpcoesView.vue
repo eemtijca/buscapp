@@ -165,7 +165,10 @@ function selecionarOutra() {
 }
 
 function destroySortable() {
-  if (sortableInstance) { sortableInstance.destroy(); sortableInstance = null; }
+  if (sortableInstance) {
+    sortableInstance.destroy();
+    sortableInstance = null;
+  }
 }
 
 function initSortable() {
@@ -174,12 +177,13 @@ function initSortable() {
     const tbody = document.querySelector<HTMLElement>('.config-table tbody');
     if (!tbody) return;
     sortableInstance = Sortable.create(tbody, {
-      handle: '.drag-handle', animation: 150,
+      handle: '.drag-handle',
+      animation: 150,
       onUpdate: () => {
         const newOrder: OpcaoConfiguracao[] = [];
-        tbody.querySelectorAll('tr').forEach(row => {
+        tbody.querySelectorAll('tr').forEach((row) => {
           const id = row.getAttribute('data-id');
-          const found = opcoes.value.find(o => o.id === id);
+          const found = opcoes.value.find((o) => o.id === id);
           if (found) newOrder.push({ ...found, ordem: newOrder.length + 1 });
         });
         if (newOrder.length === opcoes.value.length) opcoes.value = newOrder;
@@ -189,7 +193,7 @@ function initSortable() {
 }
 
 function entrarModoReordenar() {
-  snapshotPreReordenacao.value = opcoes.value.map(o => ({ ...o }));
+  snapshotPreReordenacao.value = opcoes.value.map((o) => ({ ...o }));
   modoReordenar.value = true;
   initSortable();
 }
@@ -203,10 +207,12 @@ async function salvarOrdem() {
   });
   try {
     const results = await Promise.allSettled(
-      updates.map(u => supabaseClient.from('opcoes_configuracao').update({ ordem: u.ordem }).eq('id', u.id))
+      updates.map((u) =>
+        supabaseClient.from('opcoes_configuracao').update({ ordem: u.ordem }).eq('id', u.id),
+      ),
     );
-    if (results.some(r => r.status === 'rejected')) {
-      opcoes.value = snapshotPreReordenacao.value.map(o => ({ ...o }));
+    if (results.some((r) => r.status === 'rejected')) {
+      opcoes.value = snapshotPreReordenacao.value.map((o) => ({ ...o }));
       initSortable();
       mostrarErro('Falha ao salvar a ordem. A ordem foi restaurada.');
       return;
@@ -217,14 +223,16 @@ async function salvarOrdem() {
     mostrarSucesso('Ordem salva.');
     await carregar();
   } catch (e) {
-    opcoes.value = snapshotPreReordenacao.value.map(o => ({ ...o }));
+    opcoes.value = snapshotPreReordenacao.value.map((o) => ({ ...o }));
     initSortable();
     mostrarErro(`Erro ao salvar: ${e instanceof Error ? e.message : 'Conexão'}`);
-  } finally { carregando.value = false; }
+  } finally {
+    carregando.value = false;
+  }
 }
 
 function cancelarReordenar() {
-  opcoes.value = snapshotPreReordenacao.value.map(o => ({ ...o }));
+  opcoes.value = snapshotPreReordenacao.value.map((o) => ({ ...o }));
   modoReordenar.value = false;
   destroySortable();
 }
@@ -232,10 +240,17 @@ function cancelarReordenar() {
 async function carregar() {
   carregando.value = true;
   try {
-    const { data } = await supabaseClient.from('opcoes_configuracao').select('*').eq('tipo', tipo.value).order('ordem');
+    const { data } = await supabaseClient
+      .from('opcoes_configuracao')
+      .select('*')
+      .eq('tipo', tipo.value)
+      .order('ordem');
     opcoes.value = data ?? [];
-  } catch { mostrarErro('Falha ao carregar.'); }
-  finally { carregando.value = false; }
+  } catch {
+    mostrarErro('Falha ao carregar.');
+  } finally {
+    carregando.value = false;
+  }
 }
 
 function abrirNovo() {
@@ -260,8 +275,14 @@ async function verificarUso(chave: string): Promise<number> {
   let total = 0;
   for (const c of usos) {
     const q = c.isArray
-      ? supabaseClient.from(c.tabela).select('id', { count: 'exact', head: true }).filter(c.coluna, 'cs', `{${chave}}`)
-      : supabaseClient.from(c.tabela).select('id', { count: 'exact', head: true }).eq(c.coluna, chave);
+      ? supabaseClient
+          .from(c.tabela)
+          .select('id', { count: 'exact', head: true })
+          .filter(c.coluna, 'cs', `{${chave}}`)
+      : supabaseClient
+          .from(c.tabela)
+          .select('id', { count: 'exact', head: true })
+          .eq(c.coluna, chave);
     const { count } = await q;
     total += count ?? 0;
   }
@@ -274,16 +295,24 @@ async function salvar() {
   const rotulo = rotuloFinal();
   try {
     if (modoEdicao.value && editandoId.value) {
-      await supabaseClient.from('opcoes_configuracao').update({
-        rotulo, ativo: formAtivo.value,
-      }).eq('id', editandoId.value);
+      await supabaseClient
+        .from('opcoes_configuracao')
+        .update({
+          rotulo,
+          ativo: formAtivo.value,
+        })
+        .eq('id', editandoId.value);
       mostrarSucesso('Opção atualizada.');
     } else {
       const chave = gerarChave(rotulo, tipo.value);
       const maxOrdem = opcoes.value.reduce((max, o) => Math.max(max, o.ordem), 0);
       await supabaseClient.from('opcoes_configuracao').insert({
-        tipo: tipo.value, chave, rotulo,
-        icone: regra.value.icone, ordem: maxOrdem + 1, ativo: formAtivo.value,
+        tipo: tipo.value,
+        chave,
+        rotulo,
+        icone: regra.value.icone,
+        ordem: maxOrdem + 1,
+        ativo: formAtivo.value,
       });
       mostrarSucesso('Opção criada.');
     }
@@ -292,7 +321,9 @@ async function salvar() {
     await carregar();
   } catch (e) {
     mostrarErro(e instanceof Error ? e.message : String(e));
-  } finally { carregando.value = false; }
+  } finally {
+    carregando.value = false;
+  }
 }
 
 async function alternarAtivo(item: OpcaoConfiguracao) {
@@ -302,7 +333,7 @@ async function alternarAtivo(item: OpcaoConfiguracao) {
 }
 
 async function excluir(id: string) {
-  const item = opcoes.value.find(o => o.id === id);
+  const item = opcoes.value.find((o) => o.id === id);
   if (!item) return;
   if (!confirm(`Excluir "${item.rotulo}"?`)) return;
   const uso = await verificarUso(item.chave);
@@ -325,63 +356,121 @@ onUnmounted(destroySortable);
 <template>
   <div class="container py-4" style="max-width: 960px">
     <div class="d-flex gap-2 mb-3">
-      <router-link to="/gestao" class="btn btn-sm btn-outline-success"><i class="bi bi-house me-1"></i> Início</router-link>
-      <router-link to="/gestao/configuracao" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i> Voltar</router-link>
+      <router-link to="/gestao" class="btn btn-sm btn-outline-success"
+        ><i class="bi bi-house me-1"></i> Início</router-link
+      >
+      <router-link to="/gestao/configuracao" class="btn btn-sm btn-outline-secondary"
+        ><i class="bi bi-arrow-left me-1"></i> Voltar</router-link
+      >
     </div>
     <div class="d-flex align-items-center gap-2 mb-4 flex-wrap">
       <h1 class="h4 fw-bold mb-0">{{ tituloPagina }}</h1>
       <template v-if="!modoReordenar">
-        <button class="btn btn-outline-primary btn-sm ms-auto" @click="entrarModoReordenar"><i class="bi bi-arrow-up-down me-1"></i>Reordenar</button>
-        <button class="btn btn-success btn-sm" @click="abrirNovo"><i class="bi bi-plus-lg"></i> Nova opção</button>
+        <button class="btn btn-outline-primary btn-sm ms-auto" @click="entrarModoReordenar">
+          <i class="bi bi-arrow-up-down me-1"></i>Reordenar
+        </button>
+        <button class="btn btn-success btn-sm" @click="abrirNovo">
+          <i class="bi bi-plus-lg"></i> Nova opção
+        </button>
       </template>
       <template v-else>
-        <button class="btn btn-success btn-sm ms-auto" :disabled="!ordemAlterada || carregando" @click="salvarOrdem">
-          <i v-if="carregando" class="spinner-border spinner-border-sm me-1"></i><i v-else class="bi bi-check-lg me-1"></i>Salvar ordem
+        <button
+          class="btn btn-success btn-sm ms-auto"
+          :disabled="!ordemAlterada || carregando"
+          @click="salvarOrdem"
+        >
+          <i v-if="carregando" class="spinner-border spinner-border-sm me-1"></i
+          ><i v-else class="bi bi-check-lg me-1"></i>Salvar ordem
         </button>
-        <button class="btn btn-outline-secondary btn-sm" :disabled="carregando" @click="cancelarReordenar">Cancelar</button>
+        <button
+          class="btn btn-outline-secondary btn-sm"
+          :disabled="carregando"
+          @click="cancelarReordenar"
+        >
+          Cancelar
+        </button>
       </template>
     </div>
 
     <div v-if="modoReordenar" class="alert alert-info small py-2 mb-3">
-      <i class="bi bi-arrow-up-down me-1"></i> Arraste os itens pela alça <i class="bi bi-grip-vertical"></i> para reordenar.
+      <i class="bi bi-arrow-up-down me-1"></i> Arraste os itens pela alça
+      <i class="bi bi-grip-vertical"></i> para reordenar.
     </div>
 
-    <div v-if="mensagemSucesso" class="alert alert-success alert-dismissible fade show">{{ mensagemSucesso }}<button type="button" class="btn-close" @click="mensagemSucesso = null"></button></div>
-    <div v-if="mensagemErro" class="alert alert-danger alert-dismissible fade show">{{ mensagemErro }}<button type="button" class="btn-close" @click="mensagemErro = null"></button></div>
+    <div v-if="mensagemSucesso" class="alert alert-success alert-dismissible fade show">
+      {{ mensagemSucesso
+      }}<button type="button" class="btn-close" @click="mensagemSucesso = null"></button>
+    </div>
+    <div v-if="mensagemErro" class="alert alert-danger alert-dismissible fade show">
+      {{ mensagemErro
+      }}<button type="button" class="btn-close" @click="mensagemErro = null"></button>
+    </div>
 
-    <div v-if="carregando && !opcoes.length" class="text-center py-4"><div class="spinner-border text-success"></div></div>
+    <div v-if="carregando && !opcoes.length" class="text-center py-4">
+      <div class="spinner-border text-success"></div>
+    </div>
 
     <div v-else class="table-responsive">
       <table class="table table-hover align-middle config-table">
         <thead class="table-light">
           <tr>
-            <th v-if="modoReordenar" style="width:32px"></th>
-            <th style="width:60px">Ordem</th>
+            <th v-if="modoReordenar" style="width: 32px"></th>
+            <th style="width: 60px">Ordem</th>
             <th>{{ labelNome }}</th>
-            <th style="width:80px">Ativo</th>
-            <th v-if="!modoReordenar" class="text-end" style="width:100px">Ações</th>
+            <th style="width: 80px">Ativo</th>
+            <th v-if="!modoReordenar" class="text-end" style="width: 100px">Ações</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="(item, idx) in opcoes" :key="item.id" :data-id="item.id" :class="{ 'text-body-tertiary': !item.ativo }">
-            <td v-if="modoReordenar"><i class="bi bi-grip-vertical drag-handle text-body-secondary" style="cursor:grab"></i></td>
-            <td><code>{{ item.ordem }}</code></td>
+          <tr
+            v-for="(item, idx) in opcoes"
+            :key="item.id"
+            :data-id="item.id"
+            :class="{ 'text-body-tertiary': !item.ativo }"
+          >
+            <td v-if="modoReordenar">
+              <i
+                class="bi bi-grip-vertical drag-handle text-body-secondary"
+                style="cursor: grab"
+              ></i>
+            </td>
             <td>
-              <span v-if="!item.ativo"><s>{{ item.rotulo }}</s></span>
+              <code>{{ item.ordem }}</code>
+            </td>
+            <td>
+              <span v-if="!item.ativo"
+                ><s>{{ item.rotulo }}</s></span
+              >
               <span v-else>{{ item.rotulo }}</span>
             </td>
             <td>
               <div class="form-check form-switch">
-                <input class="form-check-input" type="checkbox" :checked="item.ativo" @change="alternarAtivo(item)" :id="'ativo-'+idx" />
-                <label class="form-check-label" :for="'ativo-'+idx">{{ item.ativo ? 'Sim' : 'Não' }}</label>
+                <input
+                  class="form-check-input"
+                  type="checkbox"
+                  :checked="item.ativo"
+                  @change="alternarAtivo(item)"
+                  :id="'ativo-' + idx"
+                />
+                <label class="form-check-label" :for="'ativo-' + idx">{{
+                  item.ativo ? 'Sim' : 'Não'
+                }}</label>
               </div>
             </td>
             <td v-if="!modoReordenar" class="text-end">
-              <button class="btn btn-outline-primary btn-sm me-1" @click="abrirEditar(item)"><i class="bi bi-pencil"></i></button>
-              <button class="btn btn-outline-danger btn-sm" @click="excluir(item.id)"><i class="bi bi-trash"></i></button>
+              <button class="btn btn-outline-primary btn-sm me-1" @click="abrirEditar(item)">
+                <i class="bi bi-pencil"></i>
+              </button>
+              <button class="btn btn-outline-danger btn-sm" @click="excluir(item.id)">
+                <i class="bi bi-trash"></i>
+              </button>
             </td>
           </tr>
-          <tr v-if="!opcoes.length"><td :colspan="modoReordenar ? 4 : 5" class="text-center text-body-secondary py-4">Nenhuma opção cadastrada.</td></tr>
+          <tr v-if="!opcoes.length">
+            <td :colspan="modoReordenar ? 4 : 5" class="text-center text-body-secondary py-4">
+              Nenhuma opção cadastrada.
+            </td>
+          </tr>
         </tbody>
       </table>
     </div>
@@ -396,7 +485,11 @@ onUnmounted(destroySortable);
           <div class="modal-body">
             <CampoFormulario :id="'campo-picker'" :label="labelNome" :obrigatorio="true">
               <div class="border rounded p-2 mb-2 overflow-auto" style="max-height: 200px">
-                <div class="row g-2" ref="gridPickerRef" :style="{ '--altura-cartao': alturaCartao ? `${alturaCartao}px` : undefined }">
+                <div
+                  class="row g-2"
+                  ref="gridPickerRef"
+                  :style="{ '--altura-cartao': alturaCartao ? `${alturaCartao}px` : undefined }"
+                >
                   <div v-for="op in opcoesPicker" :key="op.id" class="col-6 col-md-4">
                     <CartaoSelecao
                       :selecionado="opcaoSelecionada === op.id"
@@ -423,7 +516,12 @@ onUnmounted(destroySortable);
             </CampoFormulario>
 
             <template v-if="mostrarAreaEntrada">
-              <CampoFormulario :id="'campo-nome'" :label="labelNome" :erro="erroValidacao" :obrigatorio="true">
+              <CampoFormulario
+                :id="'campo-nome'"
+                :label="labelNome"
+                :erro="erroValidacao"
+                :obrigatorio="true"
+              >
                 <div v-if="regra.campo === 'ordinal'" class="input-group">
                   <input
                     :id="'campo-nome'"
@@ -453,14 +551,26 @@ onUnmounted(destroySortable);
                 />
               </CampoFormulario>
               <div class="form-check form-switch mt-3">
-                <input class="form-check-input" type="checkbox" id="campo-ativo" v-model="formAtivo" />
+                <input
+                  class="form-check-input"
+                  type="checkbox"
+                  id="campo-ativo"
+                  v-model="formAtivo"
+                />
                 <label class="form-check-label" for="campo-ativo">Ativo</label>
               </div>
             </template>
           </div>
           <div class="modal-footer">
-            <button type="button" class="btn btn-outline-secondary" @click="modalAberto = false">Cancelar</button>
-            <button type="button" class="btn btn-success" @click="salvar" :disabled="!mostrarAreaEntrada || erroValidacao !== null || carregando">
+            <button type="button" class="btn btn-outline-secondary" @click="modalAberto = false">
+              Cancelar
+            </button>
+            <button
+              type="button"
+              class="btn btn-success"
+              @click="salvar"
+              :disabled="!mostrarAreaEntrada || erroValidacao !== null || carregando"
+            >
               <span v-if="carregando" class="spinner-border spinner-border-sm me-1"></span> Salvar
             </button>
           </div>

@@ -4,12 +4,7 @@ import { useRouter, onBeforeRouteLeave } from 'vue-router';
 import { supabaseClient } from '@/servicos/supabase';
 import { useOpcoesConfiguracao } from '@/composables/useOpcoesConfiguracao';
 import CampoFormulario from '@/componentes/CampoFormulario.vue';
-import type {
-  AtribuicaoProfessor,
-  Perfil,
-  Turma,
-  Disciplina,
-} from '@/tipos/database';
+import type { AtribuicaoProfessor, Perfil, Turma, Disciplina } from '@/tipos/database';
 import type { OpcaoCheckbox } from '@/tipos/componentes';
 
 interface AtribuicaoItem extends AtribuicaoProfessor {
@@ -213,7 +208,7 @@ async function alternarAtivo(atribuicao: AtribuicaoItem) {
 }
 
 const papelBadge = (papel: string) => {
-  const idx = opcoesPapel.value.findIndex(p => p.valor === papel);
+  const idx = opcoesPapel.value.findIndex((p) => p.valor === papel);
   const cores = ['text-bg-primary', 'text-bg-info', 'text-bg-success', 'text-bg-warning'];
   return cores[idx % cores.length] || 'text-bg-secondary';
 };
@@ -294,7 +289,7 @@ onMounted(async () => {
               <td>{{ a.disciplina_nome ?? '—' }}</td>
               <td>
                 <span class="badge" :class="papelBadge(a.papel)">
-                  {{ opcoesPapel.find(p => p.valor === a.papel)?.rotulo ?? a.papel }}
+                  {{ opcoesPapel.find((p) => p.valor === a.papel)?.rotulo ?? a.papel }}
                 </span>
               </td>
               <td>{{ formatarData(a.data_inicio) }}</td>
@@ -391,7 +386,9 @@ onMounted(async () => {
               </CampoFormulario>
               <CampoFormulario id="campoPapel" label="Papel" :obrigatorio="true">
                 <select id="campoPapel" v-model="formPapel" class="form-select form-select-sm">
-                  <option v-for="p in opcoesPapel" :key="p.valor" :value="p.valor">{{ p.rotulo }}</option>
+                  <option v-for="p in opcoesPapel" :key="p.valor" :value="p.valor">
+                    {{ p.rotulo }}
+                  </option>
                 </select>
               </CampoFormulario>
               <CampoFormulario id="campoDataInicio" label="Data início" :obrigatorio="true">

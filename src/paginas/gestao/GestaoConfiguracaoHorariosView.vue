@@ -96,14 +96,12 @@ async function salvar() {
         .eq('id', editandoId.value);
       mostrarSucesso('Horário atualizado.');
     } else {
-      await supabaseClient
-        .from('horarios_letivos')
-        .insert({
-          dia_semana: formDia.value,
-          hora_inicio: formInicio.value,
-          hora_fim: formFim.value,
-          ativo: formAtivo.value,
-        });
+      await supabaseClient.from('horarios_letivos').insert({
+        dia_semana: formDia.value,
+        hora_inicio: formInicio.value,
+        hora_fim: formFim.value,
+        ativo: formAtivo.value,
+      });
       mostrarSucesso('Horário criado.');
     }
     modalAberto.value = false;
@@ -118,10 +116,7 @@ async function salvar() {
 
 async function alternarAtivo(item: HorarioLetivo) {
   try {
-    await supabaseClient
-      .from('horarios_letivos')
-      .update({ ativo: !item.ativo })
-      .eq('id', item.id);
+    await supabaseClient.from('horarios_letivos').update({ ativo: !item.ativo }).eq('id', item.id);
     await carregar();
   } catch {
     mostrarErro('Falha ao alternar status.');
@@ -163,7 +158,8 @@ onMounted(carregar);
 
     <div class="alert alert-info small" role="alert">
       <i class="bi bi-info-circle"></i>
-      Estes horários definem as janelas de atendimento do chat. Fora delas, o envio de mensagens é bloqueado.
+      Estes horários definem as janelas de atendimento do chat. Fora delas, o envio de mensagens é
+      bloqueado.
     </div>
 
     <div v-if="mensagemSucesso" class="alert alert-success alert-dismissible fade show">
@@ -191,13 +187,24 @@ onMounted(carregar);
           </tr>
         </thead>
         <tbody>
-          <tr v-for="item in horarios" :key="item.id" :class="{ 'text-body-tertiary': !item.ativo }">
-            <td>{{ diasSemana.find(d => d.valor === item.dia_semana)?.rotulo ?? item.dia_semana }}</td>
+          <tr
+            v-for="item in horarios"
+            :key="item.id"
+            :class="{ 'text-body-tertiary': !item.ativo }"
+          >
+            <td>
+              {{ diasSemana.find((d) => d.valor === item.dia_semana)?.rotulo ?? item.dia_semana }}
+            </td>
             <td>{{ item.hora_inicio.slice(0, 5) }}</td>
             <td>{{ item.hora_fim.slice(0, 5) }}</td>
             <td>
               <div class="form-check form-switch">
-                <input class="form-check-input" type="checkbox" :checked="item.ativo" @change="alternarAtivo(item)" />
+                <input
+                  class="form-check-input"
+                  type="checkbox"
+                  :checked="item.ativo"
+                  @change="alternarAtivo(item)"
+                />
               </div>
             </td>
             <td class="text-end">
@@ -210,7 +217,9 @@ onMounted(carregar);
             </td>
           </tr>
           <tr v-if="!horarios.length">
-            <td colspan="5" class="text-center text-body-secondary py-4">Nenhum horário cadastrado.</td>
+            <td colspan="5" class="text-center text-body-secondary py-4">
+              Nenhum horário cadastrado.
+            </td>
           </tr>
         </tbody>
       </table>
@@ -227,14 +236,28 @@ onMounted(carregar);
             <div class="mb-3">
               <label class="form-label">Dia da semana</label>
               <select class="form-select" v-model="formDia">
-                <option v-for="d in diasSemana" :key="d.valor" :value="d.valor">{{ d.rotulo }}</option>
+                <option v-for="d in diasSemana" :key="d.valor" :value="d.valor">
+                  {{ d.rotulo }}
+                </option>
               </select>
             </div>
             <CampoFormulario id="hr-inicio" label="Início">
-              <input id="hr-inicio" v-model="formInicio" type="time" class="form-control" :disabled="carregando" />
+              <input
+                id="hr-inicio"
+                v-model="formInicio"
+                type="time"
+                class="form-control"
+                :disabled="carregando"
+              />
             </CampoFormulario>
             <CampoFormulario id="hr-fim" label="Fim">
-              <input id="hr-fim" v-model="formFim" type="time" class="form-control" :disabled="carregando" />
+              <input
+                id="hr-fim"
+                v-model="formFim"
+                type="time"
+                class="form-control"
+                :disabled="carregando"
+              />
             </CampoFormulario>
             <div class="form-check form-switch mt-3">
               <input class="form-check-input" type="checkbox" id="hr-ativo" v-model="formAtivo" />
@@ -242,7 +265,9 @@ onMounted(carregar);
             </div>
           </div>
           <div class="modal-footer">
-            <button type="button" class="btn btn-outline-secondary" @click="modalAberto = false">Cancelar</button>
+            <button type="button" class="btn btn-outline-secondary" @click="modalAberto = false">
+              Cancelar
+            </button>
             <button type="button" class="btn btn-success" @click="salvar" :disabled="carregando">
               <span v-if="carregando" class="spinner-border spinner-border-sm me-1"></span>
               Salvar

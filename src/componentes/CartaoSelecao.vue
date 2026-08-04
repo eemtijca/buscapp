@@ -1,5 +1,5 @@
 <script setup lang="ts">
-  withDefaults(
+withDefaults(
   defineProps<{
     selecionado: boolean;
     desabilitado?: boolean;

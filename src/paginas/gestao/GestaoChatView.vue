@@ -29,7 +29,12 @@ const abertaPorDetalhe = ref(false);
 const horarioAtivo = ref(false);
 const enviando = ref(false);
 const carregandoContatos = ref(true);
-const horarioConfig = ref({ inicio: '07:00', fim: '17:00', diasSemana: [1, 2, 3, 4, 5], mensagemForaHorario: '' });
+const horarioConfig = ref({
+  inicio: '07:00',
+  fim: '17:00',
+  diasSemana: [1, 2, 3, 4, 5],
+  mensagemForaHorario: '',
+});
 const statusMsg = ref<string | null>(null);
 const confirmandoExcluir = ref(false);
 const ocultarConvId = ref<string | null>(null);

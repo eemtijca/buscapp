@@ -2051,6 +2051,17 @@ grant select, insert, update, delete on public.conversas to service_role;
 grant select, insert, update, delete on public.mensagens to service_role;
 grant select, insert, update, delete on public.notificacoes to service_role;
 
+-- Permissoes para o service_role nas tabelas usadas pelas Edge Functions
+-- (criar-usuario, redefinir-senha-codigo, processar-anexo, limpar-anexos)
+-- e pelo setup de testes via REST API.
+grant select, insert, update, delete on public.perfis to service_role;
+grant select, insert, update, delete on public.anexos to service_role;
+grant select, insert, update, delete on public.ocorrencias to service_role;
+
+-- O service_role é a chave administrativa de backend: espelha o comportamento
+-- do Supabase hospedado, com acesso total a todas as tabelas (bypass de RLS).
+grant all privileges on all tables in schema public to service_role;
+
 grant execute on function public.fn_gerar_codigo_redefinicao to authenticated;
 grant execute on function public.fn_criar_usuario to authenticated;
 grant execute on function public.fn_solicitar_codigo_redefinicao to anon;
@@ -2610,10 +2621,14 @@ from public.ocorrencias, unnest(tags_comportamento) as t
 where not exists (select 1 from public.tags_comportamento tc where tc.nome = t);
 
 -- 26.2 Funções auxiliares de validação de catálogo (usadas nas CHECKs).
+-- SECURITY DEFINER: as CHECKs são avaliadas com a role que grava (incluindo
+-- service_role nas Edge Functions), que pode não ter SELECT no catálogo.
 create or replace function public.fn_chave_catalogo_valida(p_tipo text, p_chave text)
 returns boolean
 language sql
 stable
+security definer
+set search_path = ''
 as $$
   select exists (
     select 1 from public.opcoes_configuracao
@@ -2625,6 +2640,8 @@ create or replace function public.fn_chaves_catalogo_validas(p_tipo text, p_chav
 returns boolean
 language sql
 stable
+security definer
+set search_path = ''
 as $$
   select coalesce(cardinality(p_chaves), 0) = 0
       or not exists (
@@ -2640,6 +2657,8 @@ create or replace function public.fn_tags_validas(p_nomes text[])
 returns boolean
 language sql
 stable
+security definer
+set search_path = ''
 as $$
   select coalesce(cardinality(p_nomes), 0) = 0
       or not exists (

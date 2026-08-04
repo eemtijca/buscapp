@@ -38,7 +38,7 @@ api_body() { cat /tmp/api_resp.txt; }
 
 edge_code() {
   local name="$1" body="$2" token="${3:-}"
-  local headers=(-H "Content-Type: application/json")
+  local headers=(-H "Content-Type: application/json" -H "apikey: $ANON_KEY")
   [ -n "$token" ] && headers+=(-H "Authorization: Bearer $token")
   curl -s -o /tmp/api_resp.txt -w "%{http_code}" -X POST "${headers[@]}" -d "$body" "$SUPABASE_URL/functions/v1/$name"
 }
@@ -493,15 +493,19 @@ QTD=$(echo "$DADOS" | py "d=json.load(sys.stdin); print(len(d) if isinstance(d,l
 assert "registros encontrados > 0" 1 "$( [ "$QTD" -gt 0 ] && echo 1 || echo 0 )"
 
 echo "  6.10 Registro de ausencia em periodo (mid-day absence)"
-# DELETE+INSERT para garantir idempotencia
-HTTP=$(api_code DELETE "/rest/v1/frequencias?aluno_id=eq.$FA&data_aula=eq.2026-07-26&periodo=eq.7o%20Horario&tipo_registro=eq.chamada_aula" '' "$TP")
-HTTP=$(api_code POST "/rest/v1/frequencias" "{\"aluno_id\":\"$FA\",\"professor_id\":\"$FP\",\"turma_id\":\"$FT\",\"ano_letivo_id\":\"b0000000-0000-0000-0000-000000000001\",\"data_aula\":\"2026-07-26\",\"periodo\":\"7o Horario\",\"tipo_registro\":\"chamada_aula\",\"status\":\"ausente\"}" "$TP")
+# DELETE+INSERT para garantir idempotencia. '4º Horário' existe no catalogo de periodos.
+HTTP=$(api_code DELETE "/rest/v1/frequencias?aluno_id=eq.$FA&data_aula=eq.2026-07-26&periodo=eq.4%C2%BA%20Hor%C3%A1rio&tipo_registro=eq.chamada_aula" '' "$TP")
+HTTP=$(api_code POST "/rest/v1/frequencias" "{\"aluno_id\":\"$FA\",\"professor_id\":\"$FP\",\"turma_id\":\"$FT\",\"ano_letivo_id\":\"b0000000-0000-0000-0000-000000000001\",\"data_aula\":\"2026-07-26\",\"periodo\":\"4º Horário\",\"tipo_registro\":\"chamada_aula\",\"status\":\"ausente\"}" "$TP")
 assert "ausencia em periodo 201" "201" "$HTTP"
 # Reinserir mesma ausencia (DELETE+INSERT)
-HTTP=$(api_code DELETE "/rest/v1/frequencias?aluno_id=eq.$FA&data_aula=eq.2026-07-26&periodo=eq.7o%20Horario&tipo_registro=eq.chamada_aula" '' "$TP")
+HTTP=$(api_code DELETE "/rest/v1/frequencias?aluno_id=eq.$FA&data_aula=eq.2026-07-26&periodo=eq.4%C2%BA%20Hor%C3%A1rio&tipo_registro=eq.chamada_aula" '' "$TP")
 assert "DELETE antes de reinserir 204" "204" "$HTTP"
-HTTP=$(api_code POST "/rest/v1/frequencias" "{\"aluno_id\":\"$FA\",\"professor_id\":\"$FP\",\"turma_id\":\"$FT\",\"ano_letivo_id\":\"b0000000-0000-0000-0000-000000000001\",\"data_aula\":\"2026-07-26\",\"periodo\":\"7o Horario\",\"tipo_registro\":\"chamada_aula\",\"status\":\"ausente\"}" "$TP")
+HTTP=$(api_code POST "/rest/v1/frequencias" "{\"aluno_id\":\"$FA\",\"professor_id\":\"$FP\",\"turma_id\":\"$FT\",\"ano_letivo_id\":\"b0000000-0000-0000-0000-000000000001\",\"data_aula\":\"2026-07-26\",\"periodo\":\"4º Horário\",\"tipo_registro\":\"chamada_aula\",\"status\":\"ausente\"}" "$TP")
 assert "reinserir ausencia 201" "201" "$HTTP"
+
+echo "  6.11 Periodo fora do catalogo rejeitado (CHECK chk_frequencias_periodo_catalogo)"
+HTTP=$(api_code POST "/rest/v1/frequencias" "{\"aluno_id\":\"$FA\",\"professor_id\":\"$FP\",\"turma_id\":\"$FT\",\"ano_letivo_id\":\"b0000000-0000-0000-0000-000000000001\",\"data_aula\":\"2026-07-27\",\"periodo\":\"7o Horario\",\"tipo_registro\":\"chamada_aula\",\"status\":\"ausente\"}" "$TP")
+assert "periodo fora do catalogo rejeitado" 1 "$( [ "$HTTP" = "400" ] || [ "$HTTP" = "422" ] && echo 1 || echo 0 )"
 
 echo ""; echo "=== 7. CICLO DE VIDA COMPLETO DOS CODIGOS ==="
 
@@ -607,7 +611,7 @@ assert "7.15 professor nao gera 400" "400" "$HTTP"
 echo ""; echo "=== 8. NOVOS CAMPOS — OCORRENCIAS ==="
 
 OCO_ID=$(UUID)
-HTTP=$(api_code POST "/rest/v1/ocorrencias" "{\"id\":\"$OCO_ID\",\"aluno_id\":\"e0000000-0000-0000-0000-000000000001\",\"professor_id\":\"$FP\",\"turma_id\":\"$FT\",\"ano_letivo_id\":\"b0000000-0000-0000-0000-000000000001\",\"titulo\":\"Test tipos\",\"descricao\":\"Teste de tipo multisselecao\",\"tipo\":[\"grave\",\"suspensao\"],\"tags_comportamento\":[\"agressao_verbal\",\"bullying\"],\"notificar_coordenacao\":true,\"notificar_responsavel\":true}" "$TG")
+HTTP=$(api_code POST "/rest/v1/ocorrencias" "{\"id\":\"$OCO_ID\",\"aluno_id\":\"e0000000-0000-0000-0000-000000000001\",\"professor_id\":\"$FP\",\"turma_id\":\"$FT\",\"ano_letivo_id\":\"b0000000-0000-0000-0000-000000000001\",\"titulo\":\"Test tipos\",\"descricao\":\"Teste de tipo multisselecao\",\"tipo\":[\"grave\",\"suspensao\"],\"tags_comportamento\":[\"Desatenção\",\"Uso de celular\"],\"notificar_coordenacao\":true,\"notificar_responsavel\":true}" "$TG")
 assert "8.1 ocorrencia com tipo array e tags 201" "201" "$HTTP"
 
 OCO_ID2=$(UUID)
@@ -619,13 +623,18 @@ assert "8.3 SELECT ocorrencia 200" "200" "$HTTP"
 OCO_DATA=$(api_body)
 assert_contains "8.3 tipo contem grave" "$OCO_DATA" "grave"
 assert_contains "8.3 tipo contem suspensao" "$OCO_DATA" "suspensao"
-assert_contains "8.3 tags_comportamento" "$OCO_DATA" "agressao_verbal"
+assert_contains "8.3 tags_comportamento" "$OCO_DATA" "Desatenção"
 assert_contains "8.3 notificar_coordenacao true" "$OCO_DATA" "true"
 
 HTTP=$(api_code GET "/rest/v1/ocorrencias?select=notificar_coordenacao,notificar_responsavel&id=eq.$OCO_ID2" '' "$TG")
 assert "8.4 SELECT ocorrencia notif 200" "200" "$HTTP"
 OCO_NTF=$(api_body)
 assert_contains "8.4 notificar_coordenacao false" "$OCO_NTF" "false"
+
+echo "  8.5 Tag fora do catalogo rejeitada (CHECK chk_ocorrencias_tags_validas)"
+OCO_BAD=$(UUID)
+HTTP=$(api_code POST "/rest/v1/ocorrencias" "{\"id\":\"$OCO_BAD\",\"aluno_id\":\"e0000000-0000-0000-0000-000000000001\",\"professor_id\":\"$FP\",\"turma_id\":\"$FT\",\"ano_letivo_id\":\"b0000000-0000-0000-0000-000000000001\",\"titulo\":\"Test tag invalida\",\"descricao\":\"Tag inexistente\",\"tipo\":[\"grave\"],\"tags_comportamento\":[\"tag_inexistente\"]}" "$TG")
+assert "8.5 tag fora do catalogo rejeitada" 1 "$( [ "$HTTP" = "400" ] || [ "$HTTP" = "422" ] && echo 1 || echo 0 )"
 
 echo ""; echo "=== 9. NOVOS CAMPOS — FREQUENCIAS ==="
 
@@ -659,7 +668,7 @@ assert_contains "9.2 observacao" "$FREQ_DATA" "Encaminhado"
 
 echo ""; echo "=== 10. NOVOS CAMPOS — PERFIS ==="
 
-HTTP=$(api_code PATCH "/rest/v1/perfis?id=eq.a0000000-0000-0000-0000-000000000002" '{"acesso_modulos":["frequencia","ocorrencias","chat","relatorios"],"permissoes":["exportar","gerenciar_usuarios"]}' "$TG")
+HTTP=$(api_code PATCH "/rest/v1/perfis?id=eq.a0000000-0000-0000-0000-000000000002" '{"acesso_modulos":["frequencia","ocorrencias"],"permissoes":["exportar","gerenciar_usuarios"]}' "$TG")
 assert "10.1 UPDATE perfil acesso_modulos e permissoes 204" "204" "$HTTP"
 
 HTTP=$(api_code GET "/rest/v1/perfis?select=acesso_modulos,permissoes&id=eq.a0000000-0000-0000-0000-000000000002" '' "$TG")
@@ -667,6 +676,10 @@ assert "10.2 SELECT perfil 200" "200" "$HTTP"
 PERF_DATA=$(api_body)
 assert_contains "10.2 acesso_modulos contem frequencia" "$PERF_DATA" "frequencia"
 assert_contains "10.2 permissoes contem exportar" "$PERF_DATA" "exportar"
+
+echo "  10.3 Modulo fora do catalogo rejeitado (CHECK chk_perfis_modulos_catalogo)"
+HTTP=$(api_code PATCH "/rest/v1/perfis?id=eq.a0000000-0000-0000-0000-000000000002" '{"acesso_modulos":["frequencia","chat"]}' "$TG")
+assert "10.3 modulo fora do catalogo rejeitado" 1 "$( [ "$HTTP" = "400" ] || [ "$HTTP" = "422" ] && echo 1 || echo 0 )"
 
 echo ""; echo "=== 11. NOVOS CAMPOS — ALUNOS ==="
 
@@ -1220,35 +1233,184 @@ fi
 HTTP=$(api_code GET "/rest/v1/opcoes_configuracao?tipo=eq.periodo&limit=1" '' "$TR")
 assert "25.7 responsavel SELECT 200" "200" "$HTTP"
 
-# 25.8 Turmas com serie fora do enum original (apos conversao para text)
+# 25.8 Turmas validam serie/letra contra o catalogo
+# serie "4º" nao cadastrada -> rejeitada
 TID_NOVA=$(UUID)
 HTTP=$(api_code POST "/rest/v1/turmas" "{\"id\":\"$TID_NOVA\",\"ano_letivo_id\":\"b0000000-0000-0000-0000-000000000001\",\"serie\":\"4º\",\"letra\":\"D\"}" "$TG")
-assert "25.8 turma serie 4o letra D 201" "201" "$HTTP"
+assert "25.8 serie fora do catalogo rejeitada" 1 "$( [ "$HTTP" = "400" ] || [ "$HTTP" = "422" ] && echo 1 || echo 0 )"
+# serie/letra do catalogo -> aceita
+TID_OK=$(UUID)
+HTTP=$(api_code POST "/rest/v1/turmas" "{\"id\":\"$TID_OK\",\"ano_letivo_id\":\"b0000000-0000-0000-0000-000000000001\",\"serie\":\"1º\",\"letra\":\"D\"}" "$TG")
+assert "25.8 turma serie do catalogo aceita 201" "201" "$HTTP"
+HTTP=$(api_code GET "/rest/v1/turmas?select=serie,letra&id=eq.$TID_OK" '' "$TG")
+assert_contains "25.8 serie salva" "$(api_body)" "1º"
+npx supabase db query "DELETE FROM public.turmas WHERE id='$TID_OK';" 2>/dev/null
 
-HTTP=$(api_code GET "/rest/v1/turmas?select=serie,letra&id=eq.$TID_NOVA" '' "$TG")
-assert_contains "25.8 serie=4o salva" "$(api_body)" "4º"
-
-# Cleanup
-HTTP=$(api_code DELETE "/rest/v1/frequencias?turma_id=eq.$TID_NOVA" '' "$TG")
-HTTP=$(api_code DELETE "/rest/v1/enturmacoes?turma_id=eq.$TID_NOVA" '' "$TG")
-HTTP=$(api_code DELETE "/rest/v1/turmas?id=eq.$TID_NOVA" '' "$TG")
-
-# 25.9 Vinculo com tipo_relacao fora do enum original
+# 25.9 Vinculos validam tipo_relacao contra o catalogo
 AID_VINC=$(UUID)
 HTTP=$(api_code POST "/rest/v1/alunos" "{\"id\":\"$AID_VINC\",\"nome\":\"Teste Vinculo\",\"matricula\":\"VINC${UNIQ}\"}" "$TG")
 assert "25.9 criar aluno 201" "201" "$HTTP"
 HTTP=$(api_code POST "/rest/v1/vinculos_responsaveis" "{\"responsavel_id\":\"a0000000-0000-0000-0000-000000000005\",\"aluno_id\":\"$AID_VINC\",\"tipo_relacao\":\"primo\"}" "$TG")
-assert "25.9 vinculo tipo_relacao primo 201" "201" "$HTTP"
+assert "25.9 tipo_relacao fora do catalogo rejeitado" 1 "$( [ "$HTTP" = "400" ] || [ "$HTTP" = "422" ] && echo 1 || echo 0 )"
+HTTP=$(api_code POST "/rest/v1/vinculos_responsaveis" "{\"responsavel_id\":\"a0000000-0000-0000-0000-000000000005\",\"aluno_id\":\"$AID_VINC\",\"tipo_relacao\":\"mae\"}" "$TG")
+assert "25.9 tipo_relacao do catalogo aceito 201" "201" "$HTTP"
 
-HTTP=$(api_code GET "/rest/v1/vinculos_responsaveis?select=tipo_relacao&responsavel_id=eq.a0000000-0000-0000-0000-000000000005&aluno_id=eq.$AID_VINC" '' "$TG")
-assert_contains "25.9 tipo_relacao=primo salva" "$(api_body)" "primo"
-
-# 25.10 Atribuicao com papel fora do enum original
+# 25.10 Atribuicoes validam papel contra o catalogo
 ATR_ID=$(UUID)
 HTTP=$(api_code POST "/rest/v1/atribuicoes_professores" "{\"id\":\"$ATR_ID\",\"professor_id\":\"a0000000-0000-0000-0000-000000000002\",\"turma_id\":\"d0000000-0000-0000-0000-000000000001\",\"disciplina_id\":\"c0000000-0000-0000-0000-000000000001\",\"papel\":\"monitor\",\"data_inicio\":\"2026-01-01\"}" "$TG")
-assert "25.10 atribuicao papel monitor 201" "201" "$HTTP"
+assert "25.10 papel fora do catalogo rejeitado" 1 "$( [ "$HTTP" = "400" ] || [ "$HTTP" = "422" ] && echo 1 || echo 0 )"
+ATR_OK=$(UUID)
+HTTP=$(api_code POST "/rest/v1/atribuicoes_professores" "{\"id\":\"$ATR_OK\",\"professor_id\":\"a0000000-0000-0000-0000-000000000002\",\"turma_id\":\"d0000000-0000-0000-0000-000000000001\",\"disciplina_id\":\"c0000000-0000-0000-0000-000000000001\",\"papel\":\"titular\",\"data_inicio\":\"2026-01-01\"}" "$TG")
+assert "25.10 papel do catalogo aceito 201" "201" "$HTTP"
+npx supabase db query "DELETE FROM public.atribuicoes_professores WHERE id='$ATR_OK';" 2>/dev/null
 
-HTTP=$(api_code DELETE "/rest/v1/atribuicoes_professores?id=eq.$ATR_ID" '' "$TG")
+echo ""; echo "=== 26. INTEGRIDADE DE CATALOGO (CHECKs) ==="
+
+# Aluno e turma reutilizaveis
+AID_INT=$(UUID)
+HTTP=$(api_code POST "/rest/v1/alunos" "{\"id\":\"$AID_INT\",\"nome\":\"Integridade\",\"matricula\":\"INT${UNIQ}\"}" "$TG")
+assert "26.1 criar aluno 201" "201" "$HTTP"
+TID_INT=$(UUID)
+HTTP=$(api_code POST "/rest/v1/turmas" "{\"id\":\"$TID_INT\",\"ano_letivo_id\":\"b0000000-0000-0000-0000-000000000001\",\"serie\":\"2º\",\"letra\":\"C\"}" "$TG")
+assert "26.2 criar turma 201" "201" "$HTTP"
+
+# 26.3 turmas.serie fora do catalogo
+TID_BAD=$(UUID)
+HTTP=$(api_code POST "/rest/v1/turmas" "{\"id\":\"$TID_BAD\",\"ano_letivo_id\":\"b0000000-0000-0000-0000-000000000001\",\"serie\":\"9º\",\"letra\":\"A\"}" "$TG")
+assert "26.3 turma serie 9o rejeitada" 1 "$( [ "$HTTP" = "400" ] || [ "$HTTP" = "422" ] && echo 1 || echo 0 )"
+
+# 26.4 turmas.letra fora do catalogo
+TID_BAD2=$(UUID)
+HTTP=$(api_code POST "/rest/v1/turmas" "{\"id\":\"$TID_BAD2\",\"ano_letivo_id\":\"b0000000-0000-0000-0000-000000000001\",\"serie\":\"1º\",\"letra\":\"Z\"}" "$TG")
+assert "26.4 turma letra Z rejeitada" 1 "$( [ "$HTTP" = "400" ] || [ "$HTTP" = "422" ] && echo 1 || echo 0 )"
+
+# 26.5 vinculos.tipo_relacao fora do catalogo
+HTTP=$(api_code POST "/rest/v1/vinculos_responsaveis" "{\"responsavel_id\":\"a0000000-0000-0000-0000-000000000005\",\"aluno_id\":\"$AID_INT\",\"tipo_relacao\":\"conhecido\"}" "$TG")
+assert "26.5 vinculo tipo invalido rejeitado" 1 "$( [ "$HTTP" = "400" ] || [ "$HTTP" = "422" ] && echo 1 || echo 0 )"
+
+# 26.6 atribuicoes.papel fora do catalogo
+HTTP=$(api_code POST "/rest/v1/atribuicoes_professores" "{\"professor_id\":\"a0000000-0000-0000-0000-000000000002\",\"turma_id\":\"$TID_INT\",\"disciplina_id\":\"c0000000-0000-0000-0000-000000000001\",\"papel\":\"diretor\",\"data_inicio\":\"2026-01-01\"}" "$TG")
+assert "26.6 atribuicao papel invalido rejeitada" 1 "$( [ "$HTTP" = "400" ] || [ "$HTTP" = "422" ] && echo 1 || echo 0 )"
+
+# 26.7 frequencias.motivos_ausencia fora do catalogo
+HTTP=$(api_code POST "/rest/v1/frequencias" "{\"aluno_id\":\"$AID_INT\",\"professor_id\":\"a0000000-0000-0000-0000-000000000002\",\"turma_id\":\"$TID_INT\",\"ano_letivo_id\":\"b0000000-0000-0000-0000-000000000001\",\"data_aula\":\"2026-07-30\",\"periodo\":\"Manhã\",\"status\":\"ausente\",\"motivos_ausencia\":[\"motivo_inexistente\"]}" "$TG")
+assert "26.7 motivo ausencia invalido rejeitado" 1 "$( [ "$HTTP" = "400" ] || [ "$HTTP" = "422" ] && echo 1 || echo 0 )"
+
+# 26.8 alunos.documentos_recebidos fora do catalogo
+HTTP=$(api_code POST "/rest/v1/alunos" "{\"id\":\"$(UUID)\",\"nome\":\"Doc Invalido\",\"matricula\":\"DOCBAD${UNIQ}\",\"documentos_recebidos\":[\"doc_inexistente\"]}" "$TG")
+assert "26.8 documento invalido rejeitado" 1 "$( [ "$HTTP" = "400" ] || [ "$HTTP" = "422" ] && echo 1 || echo 0 )"
+
+# 26.9 ocorrencias.tipo fora do catalogo
+OCO_BAD2=$(UUID)
+HTTP=$(api_code POST "/rest/v1/ocorrencias" "{\"id\":\"$OCO_BAD2\",\"aluno_id\":\"$AID_INT\",\"turma_id\":\"$TID_INT\",\"ano_letivo_id\":\"b0000000-0000-0000-0000-000000000001\",\"titulo\":\"Tipo invalido\",\"descricao\":\"Teste\",\"tipo\":[\"tipo_inexistente\"]}" "$TG")
+assert "26.9 tipo ocorrencia invalido rejeitado" 1 "$( [ "$HTTP" = "400" ] || [ "$HTTP" = "422" ] && echo 1 || echo 0 )"
+
+# 26.10 arrays vazios aceitos (aluno sem documentos, ocorrencia sem tipo/tags)
+HTTP=$(api_code POST "/rest/v1/alunos" "{\"id\":\"$(UUID)\",\"nome\":\"Arrays Vazios\",\"matricula\":\"ARRAYV${UNIQ}\",\"documentos_recebidos\":[]}" "$TG")
+assert "26.10 documento array vazio aceito 201" "201" "$HTTP"
+OCO_VAZIO2=$(UUID)
+HTTP=$(api_code POST "/rest/v1/ocorrencias" "{\"id\":\"$OCO_VAZIO2\",\"aluno_id\":\"$AID_INT\",\"turma_id\":\"$TID_INT\",\"ano_letivo_id\":\"b0000000-0000-0000-0000-000000000001\",\"titulo\":\"Vazio\",\"descricao\":\"Teste\",\"tipo\":[],\"tags_comportamento\":[]}" "$TG")
+assert "26.10 ocorrencia arrays vazios aceita 201" "201" "$HTTP"
+
+# Cleanup do aluno/turma do teste (via SQL, sem dependencia de grants)
+npx supabase db query "DELETE FROM public.frequencias WHERE turma_id='$TID_INT';" 2>/dev/null
+npx supabase db query "DELETE FROM public.ocorrencias WHERE turma_id='$TID_INT';" 2>/dev/null
+npx supabase db query "DELETE FROM public.enturmacoes WHERE turma_id='$TID_INT';" 2>/dev/null
+npx supabase db query "DELETE FROM public.atribuicoes_professores WHERE turma_id='$TID_INT';" 2>/dev/null
+npx supabase db query "DELETE FROM public.turmas WHERE id='$TID_INT';" 2>/dev/null
+npx supabase db query "DELETE FROM public.alunos WHERE id='$AID_INT';" 2>/dev/null
+
+echo ""; echo "=== 27. CASCADE → RESTRICT (turmas) ==="
+
+# 27.1 turma com conversa: DELETE bloqueado por FK RESTRICT
+TID_CONV=$(UUID)
+HTTP=$(api_code POST "/rest/v1/turmas" "{\"id\":\"$TID_CONV\",\"ano_letivo_id\":\"b0000000-0000-0000-0000-000000000001\",\"serie\":\"3º\",\"letra\":\"D\"}" "$TG")
+assert "27.1 criar turma 201" "201" "$HTTP"
+AID_CONV=$(UUID)
+HTTP=$(api_code POST "/rest/v1/alunos" "{\"id\":\"$AID_CONV\",\"nome\":\"Aluno Conversa\",\"matricula\":\"CONV${UNIQ}\"}" "$TG")
+assert "27.1 criar aluno 201" "201" "$HTTP"
+C_CONV=$(UUID)
+HTTP=$(api_code POST "/rest/v1/conversas" "{\"id\":\"$C_CONV\",\"turma_id\":\"$TID_CONV\",\"responsavel_id\":\"a0000000-0000-0000-0000-000000000005\",\"aluno_id\":\"$AID_CONV\"}" "$TG")
+assert "27.1 criar conversa 201" "201" "$HTTP"
+RESTRICT_OUT=$(npx supabase db query "DELETE FROM public.turmas WHERE id='$TID_CONV';" 2>&1)
+echo "$RESTRICT_OUT" | grep -qi "violates foreign key constraint" && assert "27.1 DELETE turma com conversa bloqueado (RESTRICT)" 1 1 || assert "27.1 DELETE turma com conversa bloqueado (RESTRICT)" 1 0
+HTTP=$(api_code GET "/rest/v1/conversas?select=id&id=eq.$C_CONV" '' "$TG")
+QTD=$(api_body | py "d=json.load(sys.stdin); print(len(d) if isinstance(d,list) else 0)" 2>/dev/null)
+assert "27.1 conversa permanece" "1" "$QTD"
+npx supabase db query "DELETE FROM public.conversas WHERE id='$C_CONV';" 2>/dev/null
+npx supabase db query "DELETE FROM public.alunos WHERE id='$AID_CONV';" 2>/dev/null
+npx supabase db query "DELETE FROM public.turmas WHERE id='$TID_CONV';" 2>/dev/null
+
+# 27.2 turma com atribuicao: DELETE bloqueado por FK RESTRICT
+TID_ATR=$(UUID)
+HTTP=$(api_code POST "/rest/v1/turmas" "{\"id\":\"$TID_ATR\",\"ano_letivo_id\":\"b0000000-0000-0000-0000-000000000001\",\"serie\":\"2º\",\"letra\":\"D\"}" "$TG")
+assert "27.2 criar turma 201" "201" "$HTTP"
+ATR_CONV=$(UUID)
+HTTP=$(api_code POST "/rest/v1/atribuicoes_professores" "{\"id\":\"$ATR_CONV\",\"professor_id\":\"a0000000-0000-0000-0000-000000000002\",\"turma_id\":\"$TID_ATR\",\"disciplina_id\":\"c0000000-0000-0000-0000-000000000001\",\"papel\":\"titular\",\"data_inicio\":\"2026-01-01\"}" "$TG")
+assert "27.2 criar atribuicao 201" "201" "$HTTP"
+RESTRICT_OUT=$(npx supabase db query "DELETE FROM public.turmas WHERE id='$TID_ATR';" 2>&1)
+echo "$RESTRICT_OUT" | grep -qi "violates foreign key constraint" && assert "27.2 DELETE turma com atribuicao bloqueado (RESTRICT)" 1 1 || assert "27.2 DELETE turma com atribuicao bloqueado (RESTRICT)" 1 0
+npx supabase db query "DELETE FROM public.atribuicoes_professores WHERE id='$ATR_CONV';" 2>/dev/null
+npx supabase db query "DELETE FROM public.turmas WHERE id='$TID_ATR';" 2>/dev/null
+
+# 27.3 turma sem filhos: DELETE OK
+TID_LIVRE=$(UUID)
+HTTP=$(api_code POST "/rest/v1/turmas" "{\"id\":\"$TID_LIVRE\",\"ano_letivo_id\":\"b0000000-0000-0000-0000-000000000001\",\"serie\":\"3º\",\"letra\":\"A\"}" "$TG")
+assert "27.3 criar turma 201" "201" "$HTTP"
+npx supabase db query "DELETE FROM public.turmas WHERE id='$TID_LIVRE';" 2>/dev/null
+HTTP=$(api_code GET "/rest/v1/turmas?select=id&id=eq.$TID_LIVRE" '' "$TG")
+QTD=$(api_body | py "d=json.load(sys.stdin); print(len(d) if isinstance(d,list) else 0)" 2>/dev/null)
+assert "27.3 turma sem filhos deletada" "0" "$QTD"
+
+echo ""; echo "=== 28. EXPURGO DE ANEXOS E RELATORIO DE ORFAOS ==="
+
+# 28.1 fn_relatorio_orfas (gestao pode chamar)
+HTTP=$(api_code POST "/rest/v1/rpc/fn_relatorio_orfas" '{}' "$TG")
+assert "28.1 relatorio orfas 200" "200" "$HTTP"
+REL=$(api_body)
+assert_contains "28.1 relatorio contem catalogo" "$REL" "catalogo"
+SEM_PERFIL=$(echo "$REL" | py "import sys,json; d=json.load(sys.stdin); print(next((r['quantidade'] for r in d if 'auth.users sem perfil' in r.get('detalhe','')), -1))" 2>/dev/null)
+assert "28.1 sem auth.users orfaos" "0" "$SEM_PERFIL"
+
+# 28.2 limpar-anexos: remover anexo expirado nao processado + objeto
+ANEXO_EXP=$(UUID)
+PATH_EXP="a0000000-0000-0000-0000-000000000005/just/exp-${UNIQ}.jpg"
+npx supabase db query "
+  select storage.objects.id from storage.create_object(
+    'justificativas',
+    '$PATH_EXP',
+    'image/jpeg'::text,
+    '{}'::jsonb,
+    decode('$(echo -n "expired-image-content" | base64 -w0)', 'base64'),
+    '{\"Content-Type\": \"image/jpeg\"}'::jsonb
+  );
+" 2>/dev/null | tail -1
+npx supabase db query "INSERT INTO public.anexos (id, storage_path, nome_arquivo, mime_type, tamanho_bytes, expurgo_em) VALUES ('$ANEXO_EXP', '$PATH_EXP', 'exp.jpg', 'image/jpeg', 100, now() - interval '1 day');" 2>/dev/null
+HTTP=$(edge_code "limpar-anexos" '{}')
+assert "28.2 limpar-anexos 200" "200" "$HTTP"
+EXP_RES=$(api_body)
+assert_contains "28.2 limpar-anexos ok" "$EXP_RES" "ok"
+EXP_STILL=$(npx supabase db query "SELECT count(*) FROM storage.objects WHERE name='$PATH_EXP';" 2>/dev/null | grep -o '[0-9]\+' | head -1)
+assert "28.2 objeto expirado removido" "0" "${EXP_STILL:-1}"
+EXP_EXPURGADO=$(npx supabase db query "SELECT count(*) FROM public.anexos WHERE id='$ANEXO_EXP' AND expurgado_em IS NOT NULL;" 2>/dev/null | grep -o '[0-9]\+' | head -1)
+assert "28.2 expurgado_em preenchido" "1" "${EXP_EXPURGADO:-0}"
+
+# 28.3 limpar-anexos: remover objeto orfao (sem linha de anexos)
+PATH_ORFAO="a0000000-0000-0000-0000-000000000005/just/orfao-${UNIQ}.png"
+npx supabase db query "
+  select storage.objects.id from storage.create_object(
+    'justificativas',
+    '$PATH_ORFAO',
+    'image/png'::text,
+    '{}'::jsonb,
+    decode('$(echo -n "orphan-image-content" | base64 -w0)', 'base64'),
+    '{\"Content-Type\": \"image/png\"}'::jsonb
+  );
+" 2>/dev/null | tail -1
+HTTP=$(edge_code "limpar-anexos" '{}')
+assert "28.3 limpar-anexos orfaos 200" "200" "$HTTP"
+ORF_STILL=$(npx supabase db query "SELECT count(*) FROM storage.objects WHERE name='$PATH_ORFAO';" 2>/dev/null | grep -o '[0-9]\+' | head -1)
+assert "28.3 objeto orfao removido" "0" "${ORF_STILL:-1}"
 
 echo ""; echo "=========================================="
 echo "  TOTAL: $((PASS+FAIL))  |  PASS: $PASS  |  FAIL: $FAIL"

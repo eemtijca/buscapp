@@ -255,7 +255,7 @@ test.describe('Gestao - Ranking e Ocorrencias', () => {
     const cardJoao = page.locator('.card').filter({ hasText: 'João Miguel da Silva' });
     await cardJoao.locator('button[title="Abrir conversa com o responsável"]').click();
     await page.waitForURL(/\/gestao\/chat/, { timeout: 10000 });
-    await expect(page.getByText('Maria Silva')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('Maria Silva').first()).toBeVisible({ timeout: 10000 });
   });
 
   test('CT21 - Pagina de ocorrencias carrega', async ({ page }) => {
@@ -827,15 +827,124 @@ test.describe('Gestao - Configuracao', () => {
 });
 
 // ============================================================================
+// INTEGRIDADE DE CATÁLOGO — bloqueio de exclusão/renomeação e enturmação
+// ============================================================================
+test.describe('Gestao - Integridade de catalogo', () => {
+  test.beforeAll(async () => {
+    // Referencia a tag de seed "Desatenção" em uma ocorrência para testar o
+    // bloqueio de exclusão/renomeação.
+    const headers = {
+      'Content-Type': 'application/json',
+      apikey: SERVICE_KEY,
+      Authorization: `Bearer ${SERVICE_KEY}`,
+      Prefer: 'return=representation',
+    };
+    const res = await fetch(`${URL_SUPABASE}/rest/v1/ocorrencias`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        aluno_id: 'e0000000-0000-0000-0000-000000000001',
+        professor_id: 'a0000000-0000-0000-0000-000000000002',
+        turma_id: 'd0000000-0000-0000-0000-000000000001',
+        ano_letivo_id: 'b0000000-0000-0000-0000-000000000001',
+        titulo: 'Integridade tag referenciada',
+        descricao: 'Setup de teste de integridade',
+        tipo: ['grave'],
+        tags_comportamento: ['Desatenção'],
+      }),
+    });
+    if (!res.ok) throw new Error(`Setup ocorrencia falhou: ${res.status}`);
+  });
+
+  test('CT116 - Excluir opcao de catalogo referenciada e bloqueado', async ({ page }) => {
+    await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
+    await page.goto('/gestao/configuracao/serie_turma');
+    const linha = page.locator('.config-table tbody tr').filter({ hasText: '1º' });
+    page.on('dialog', (d) => d.accept());
+    await linha.locator('button.btn-outline-danger').click();
+    await expect(page.getByText(/Não é possível excluir/)).toBeVisible();
+    await expect(linha).toBeVisible();
+  });
+
+  test('CT117 - Excluir opcao nao referenciada funciona', async ({ page }) => {
+    await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
+    await page.goto('/gestao/configuracao/modulo');
+    await page.click('button:has-text("Nova opção")');
+    await page.click('button:has-text("Outra...")');
+    const nome = `Opcao Excluivel ${Date.now()}`;
+    await page.fill('#campo-nome', nome);
+    await page.click('.modal-footer button:has-text("Salvar")');
+    await page.waitForTimeout(1000);
+    await expect(page.locator('table')).toContainText(nome, { timeout: 5000 });
+    const linha = page.locator('.config-table tbody tr').filter({ hasText: nome });
+    page.on('dialog', (d) => d.accept());
+    await linha.locator('button.btn-outline-danger').click();
+    await page.waitForTimeout(1000);
+    await expect(page.locator('table')).not.toContainText(nome, { timeout: 5000 });
+  });
+
+  test('CT118 - Excluir tag referenciada e bloqueado', async ({ page }) => {
+    await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
+    await page.goto('/gestao/configuracao/tags');
+    const linha = page.locator('tbody tr').filter({ hasText: 'Desatenção' });
+    page.on('dialog', (d) => d.accept());
+    await linha.locator('button.btn-outline-danger').click();
+    await expect(page.getByText(/Não é possível excluir/)).toBeVisible();
+    await expect(linha).toBeVisible();
+  });
+
+  test('CT119 - Renomear tag referenciada e bloqueado', async ({ page }) => {
+    await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
+    await page.goto('/gestao/configuracao/tags');
+    const linha = page.locator('tbody tr').filter({ hasText: 'Desatenção' });
+    await linha.locator('button.btn-outline-primary').click();
+    await expect(page.locator('.modal-title')).toContainText('Editar tag');
+    await page.fill('#tag-nome', 'Desatencao nova');
+    await page.click('.modal-footer button:has-text("Salvar")');
+    await expect(page.getByText(/Não é possível renomear/)).toBeVisible();
+    await page.click('.modal-footer button:has-text("Cancelar")');
+  });
+
+  test('CT120 - Transferencia de enturmacao mantem uma enturmacao ativa', async ({ page }) => {
+    await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
+    await page.goto('/gestao/alunos/e0000000-0000-0000-0000-000000000001');
+    const card = page.locator('.card').filter({ hasText: 'Enturmação atual' });
+    await card.locator('button:has-text("Alterar enturmação")').click();
+    await expect(card.locator('#campoNovaTurma')).toBeVisible({ timeout: 10000 });
+    await card.locator('#campoNovaTurma').selectOption({ label: '3º C' });
+    await card.locator('#campoNovaDataMat').fill('2026-08-01');
+    await card.locator('button:has-text("Salvar")').click();
+    await expect(card.locator('button:has-text("Alterar enturmação")')).toBeVisible({
+      timeout: 15000,
+    });
+    await expect(card).toContainText('3º C');
+
+    const query =
+      `${URL_SUPABASE}/rest/v1/enturmacoes?select=turma_id,status,ano_letivo_id` +
+      `&aluno_id=eq.e0000000-0000-0000-0000-000000000001&status=eq.matriculado`;
+    const fetchEnturmacoes = async () => {
+      const res = await fetch(query, {
+        headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` },
+      });
+      if (!res.ok) return null;
+      const data = (await res.json()) as { turma_id: string }[] | null;
+      return Array.isArray(data) ? data : null;
+    };
+    await expect
+      .poll(fetchEnturmacoes, { timeout: 10000 })
+      .toEqual([{ turma_id: 'd0000000-0000-0000-0000-000000000003', status: 'matriculado', ano_letivo_id: 'b0000000-0000-0000-0000-000000000001' }]);
+  });
+});
+
+// ============================================================================
 // CHAT — Setup de dados de teste
 // ============================================================================
-const CHAT_CONV_ID = 'f0000000-0000-0000-0000-000000000001';
-const CHAT_CONV2_ID = 'f0000000-0000-0000-0000-000000000002';
-
 test.beforeAll(async () => {
   // Create test conversations and messages via service role API.
   // Usa upsert (merge-duplicates) para que seja seguro sob execucao paralela
-  // de varios workers: cada beforeAll converge para o mesmo estado.
+  // de varios workers: cada beforeAll converge para o mesmo estado. As conversas
+  // sao reutilizadas (sem reescrever o id), evitando violacao de FK de mensagens
+  // quando existem conversas orfas de execucoes anteriores.
   const headers = {
     'Content-Type': 'application/json',
     apikey: SERVICE_KEY,
@@ -858,47 +967,43 @@ test.beforeAll(async () => {
   const ALUNO1_ID = 'e0000000-0000-0000-0000-000000000001';
   const ALUNO2_ID = 'e0000000-0000-0000-0000-000000000002';
 
-  // Upsert das conversas (unicidade por par responsavel/aluno), resetando ativa.
-  await api('/rest/v1/conversas?on_conflict=responsavel_id,aluno_id', {
-    method: 'POST',
-    body: JSON.stringify({
-      id: CHAT_CONV_ID,
-      turma_id: 'd0000000-0000-0000-0000-000000000001',
-      responsavel_id: RESPONSAVEL_ID,
-      aluno_id: ALUNO1_ID,
-      ativa: true,
-    }),
-  });
+  async function upsertConversa(alunoId: string): Promise<string> {
+    const res = await api('/rest/v1/conversas?on_conflict=responsavel_id,aluno_id', {
+      method: 'POST',
+      body: JSON.stringify({
+        turma_id: 'd0000000-0000-0000-0000-000000000001',
+        responsavel_id: RESPONSAVEL_ID,
+        aluno_id: alunoId,
+        ativa: true,
+      }),
+    });
+    const data = (await res.json()) as { id: string }[];
+    const convId = data?.[0]?.id;
+    if (!convId) throw new Error('Falha ao capturar id da conversa no setup do chat.');
+    return convId;
+  }
 
-  await api('/rest/v1/conversas?on_conflict=responsavel_id,aluno_id', {
-    method: 'POST',
-    body: JSON.stringify({
-      id: CHAT_CONV2_ID,
-      turma_id: 'd0000000-0000-0000-0000-000000000001',
-      responsavel_id: RESPONSAVEL_ID,
-      aluno_id: ALUNO2_ID,
-      ativa: true,
-    }),
-  });
+  const CONV1 = await upsertConversa(ALUNO1_ID);
+  await upsertConversa(ALUNO2_ID);
 
   // Upsert das mensagens (unicidade por id)
   for (const msg of [
-    { id: 'f0000000-0000-0000-0000-000000000011', conversa_id: CHAT_CONV_ID, remetente_id: 'a0000000-0000-0000-0000-000000000005', conteudo: 'Bom dia, gostaria de saber como esta meu filho', created_at: '2026-07-20T08:00:00Z' },
-    { id: 'f0000000-0000-0000-0000-000000000012', conversa_id: CHAT_CONV_ID, remetente_id: 'a0000000-0000-0000-0000-000000000001', conteudo: 'Bom dia! O Joao esta bem, participando das aulas.', created_at: '2026-07-20T08:15:00Z' },
-    { id: 'f0000000-0000-0000-0000-000000000013', conversa_id: CHAT_CONV_ID, remetente_id: 'a0000000-0000-0000-0000-000000000002', conteudo: 'Confirmo! Ele tem se destacado em matematica.', created_at: '2026-07-20T08:30:00Z' },
-    { id: 'f0000000-0000-0000-0000-000000000014', conversa_id: CHAT_CONV_ID, remetente_id: 'a0000000-0000-0000-0000-000000000005', conteudo: 'Que bom! Obrigado pela atencao.', created_at: '2026-07-20T09:00:00Z' },
+    { id: 'f0000000-0000-0000-0000-000000000011', conversa_id: CONV1, remetente_id: 'a0000000-0000-0000-0000-000000000005', conteudo: 'Bom dia, gostaria de saber como esta meu filho', created_at: '2026-07-20T08:00:00Z' },
+    { id: 'f0000000-0000-0000-0000-000000000012', conversa_id: CONV1, remetente_id: 'a0000000-0000-0000-0000-000000000001', conteudo: 'Bom dia! O Joao esta bem, participando das aulas.', created_at: '2026-07-20T08:15:00Z' },
+    { id: 'f0000000-0000-0000-0000-000000000013', conversa_id: CONV1, remetente_id: 'a0000000-0000-0000-0000-000000000002', conteudo: 'Confirmo! Ele tem se destacado em matematica.', created_at: '2026-07-20T08:30:00Z' },
+    { id: 'f0000000-0000-0000-0000-000000000014', conversa_id: CONV1, remetente_id: 'a0000000-0000-0000-0000-000000000005', conteudo: 'Que bom! Obrigado pela atencao.', created_at: '2026-07-20T09:00:00Z' },
   ]) {
     await api('/rest/v1/mensagens?on_conflict=id', { method: 'POST', body: JSON.stringify(msg) });
   }
 
   // Update ultima_mensagem_em
-  await api(`/rest/v1/conversas?id=eq.${CHAT_CONV_ID}`, {
+  await api(`/rest/v1/conversas?id=eq.${CONV1}`, {
     method: 'PATCH',
     body: JSON.stringify({ ultima_mensagem_em: '2026-07-20T09:00:00Z' }),
   });
 
   // Notificacao de teste para gestao (evita acumulo entre execucoes)
-  await api(`/rest/v1/notificacoes?metadados->>conversa_id=eq.${CHAT_CONV_ID}`, {
+  await api(`/rest/v1/notificacoes?metadados->>conversa_id=eq.${CONV1}`, {
     method: 'DELETE',
   });
   await api('/rest/v1/notificacoes', {
@@ -908,7 +1013,7 @@ test.beforeAll(async () => {
       tipo: 'mensagem',
       titulo: 'Nova mensagem de Maria Silva',
       corpo: 'Bom dia, gostaria de saber como esta meu filho',
-      metadados: { conversa_id: CHAT_CONV_ID },
+      metadados: { conversa_id: CONV1 },
     }),
   });
 });
@@ -1011,9 +1116,7 @@ test.describe('Gestao — Chat', () => {
     const items = page.locator('.chat-sidebar button');
     const count = await items.count();
     expect(count).toBeGreaterThanOrEqual(1);
-    if (count > 0) {
-      await expect(items.first()).toContainText('Maria Silva');
-    }
+    await expect(page.locator('.chat-sidebar button').filter({ hasText: 'Maria Silva' }).first()).toBeVisible();
   });
 
   test('CT75 - Selecionar conversa exibe mensagens', async ({ page }) => {

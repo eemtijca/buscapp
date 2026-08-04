@@ -1310,6 +1310,11 @@ create policy "Conv: participante cria"
   to authenticated
   with check (responsavel_id = auth.uid());
 
+create policy "Conv: gestao cria"
+  on public.conversas for insert
+  to authenticated
+  with check (public.get_user_papel() = 'gestao');
+
 create policy "Conv: gestao oculta"
   on public.conversas for update
   to authenticated

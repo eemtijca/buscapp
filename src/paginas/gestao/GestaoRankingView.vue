@@ -7,12 +7,21 @@ import CartaoAlunoRisco from '@/componentes/CartaoAlunoRisco.vue';
 import type { AlunoRisco } from '@/tipos/componentes';
 
 const router = useRouter();
-const { buscarRankingRisco, carregando } = useMonitoramento();
+const { buscarRankingRisco, abrirConversaResponsavel, carregando } = useMonitoramento();
 const { ultimaAtualizacao, estaAtualizando, atualizar: refresh } = useRealtimeRefresh();
 
 const ranking = ref<AlunoRisco[]>([]);
 const filtroRisco = ref<'todos' | 'alto' | 'medio' | 'baixo'>('todos');
 const buscaAluno = ref('');
+const mensagemInfo = ref<string | null>(null);
+
+let timeoutInfo: ReturnType<typeof setTimeout> | null = null;
+
+function mostrarInfo(msg: string) {
+  mensagemInfo.value = msg;
+  if (timeoutInfo) clearTimeout(timeoutInfo);
+  timeoutInfo = setTimeout(() => (mensagemInfo.value = null), 5000);
+}
 
 const rankingFiltrado = computed(() => {
   let lista = ranking.value;
@@ -35,7 +44,14 @@ const totalRiscoAlto = computed(() => ranking.value.filter((r) => r.nivel === 'a
 const totalRiscoMedio = computed(() => ranking.value.filter((r) => r.nivel === 'medio').length);
 const totalRiscoBaixo = computed(() => ranking.value.filter((r) => r.nivel === 'baixo').length);
 
-function contatarFamilia() {}
+async function abrirChat(alunoId: string) {
+  const conversaId = await abrirConversaResponsavel(alunoId);
+  if (!conversaId) {
+    mostrarInfo('Não foi possível abrir o chat: aluno sem responsável ou turma vinculados.');
+    return;
+  }
+  await router.push({ path: '/gestao/chat', query: { conversa: conversaId } });
+}
 
 async function carregarRanking() {
   ranking.value = await buscarRankingRisco();
@@ -155,6 +171,15 @@ onMounted(async () => {
       <span class="badge text-bg-success">{{ totalRiscoBaixo }} estável</span>
     </div>
 
+    <div
+      v-if="mensagemInfo"
+      class="alert alert-info py-2 small d-flex align-items-center mb-3"
+      role="status"
+    >
+      <i class="bi bi-info-circle me-2" aria-hidden="true"></i>
+      {{ mensagemInfo }}
+    </div>
+
     <div v-if="carregando && !ranking.length" class="text-center py-5">
       <div class="spinner-border text-primary" role="status">
         <span class="visually-hidden">Carregando...</span>
@@ -187,7 +212,7 @@ onMounted(async () => {
         v-for="aluno in rankingFiltrado"
         :key="aluno.id"
         :aluno="aluno"
-        @contatar="contatarFamilia"
+        @chat="abrirChat"
       />
     </div>
   </div>

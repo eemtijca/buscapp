@@ -7,7 +7,7 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  contatar: [alunoId: string];
+  chat: [alunoId: string];
   'ver-detalhes': [alunoId: string];
 }>();
 
@@ -87,11 +87,12 @@ const inicialAluno = computed(() =>
           type="button"
           class="btn btn-sm flex-shrink-0"
           :class="aluno.nivel === 'alto' ? 'btn-danger' : 'btn-outline-success'"
-          @click="emit('contatar', aluno.id)"
+          title="Abrir conversa com o responsável"
+          @click="emit('chat', aluno.id)"
         >
-          <i class="bi bi-telephone me-1" aria-hidden="true"></i>
-          <span class="d-none d-sm-inline">Contatar</span>
-          <span class="d-sm-none visually-hidden">Contatar família</span>
+          <i class="bi bi-chat-dots me-1" aria-hidden="true"></i>
+          <span class="d-none d-sm-inline">Chat</span>
+          <span class="d-sm-none visually-hidden">Abrir conversa com o responsável</span>
         </button>
       </div>
     </div>

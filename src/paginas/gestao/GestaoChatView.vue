@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, onUnmounted } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { useAutenticacao } from '@/composables/useAutenticacao';
 import { useMonitoramento } from '@/composables/useMonitoramento';
 import { supabaseClient } from '@/servicos/supabase';
@@ -8,6 +8,7 @@ import ChatPainelDuplo from '@/componentes/ChatPainelDuplo.vue';
 import type { ContatoChat, MensagemChat } from '@/tipos/componentes';
 import { avatarCor } from '@/utils/chatUtils';
 
+const route = useRoute();
 const router = useRouter();
 const { usuario } = useAutenticacao();
 const {
@@ -24,6 +25,7 @@ const contatos = ref<ContatoChat[]>([]);
 const mensagens = ref<MensagemChat[]>([]);
 const conversaAtivaId = ref<string | null>(null);
 const contatoAtivo = ref<ContatoChat | null>(null);
+const abertaPorDetalhe = ref(false);
 const horarioAtivo = ref(false);
 const enviando = ref(false);
 const carregandoContatos = ref(true);
@@ -56,7 +58,8 @@ async function carregarContatos() {
 
   if (
     conversaAtivaId.value &&
-    !contatos.value.find((c) => c.conversaId === conversaAtivaId.value)
+    !contatos.value.find((c) => c.conversaId === conversaAtivaId.value) &&
+    !abertaPorDetalhe.value
   ) {
     conversaAtivaId.value = null;
     contatoAtivo.value = null;
@@ -68,7 +71,6 @@ async function selecionarConversa(conversaId: string) {
   if (!usuario.value) return;
   const userId = usuario.value.id;
   conversaAtivaId.value = conversaId;
-  contatoAtivo.value = contatos.value.find((c) => c.conversaId === conversaId) ?? null;
   confirmandoExcluir.value = false;
 
   await marcarMensagensComoLidas(conversaId, userId);
@@ -76,9 +78,12 @@ async function selecionarConversa(conversaId: string) {
   const det = await buscarConversaDetalhe(conversaId, userId);
   mensagens.value = det.mensagens;
 
+  const contato = contatos.value.find((c) => c.conversaId === conversaId);
+  abertaPorDetalhe.value = !contato;
+  contatoAtivo.value = contato ?? det.contato;
+
   inscreverCanalMensagens(conversaId);
 
-  const contato = contatos.value.find((c) => c.conversaId === conversaId);
   if (contato) contato.naoLidas = 0;
 }
 
@@ -103,6 +108,7 @@ async function handleOcultarConversa() {
   if (ok) {
     confirmandoExcluir.value = false;
     ocultarConvId.value = null;
+    abertaPorDetalhe.value = false;
     mostrarStatus('Conversa ocultada. Reaparecerá se o responsável enviar nova mensagem.');
     if (convId === conversaAtivaId.value) {
       conversaAtivaId.value = null;
@@ -172,6 +178,7 @@ function inscreverCanalContatos() {
 function handleVoltar() {
   conversaAtivaId.value = null;
   contatoAtivo.value = null;
+  abertaPorDetalhe.value = false;
 }
 
 onMounted(async () => {
@@ -180,6 +187,10 @@ onMounted(async () => {
   if (usuario.value) {
     await carregarContatos();
     inscreverCanalContatos();
+    const conversaInicial = route.query.conversa as string | undefined;
+    if (conversaInicial && !conversaAtivaId.value) {
+      await selecionarConversa(conversaInicial);
+    }
   }
   intervaloRelogio = window.setInterval(() => {
     horarioAtivo.value = horarioProtegidoAtivo();

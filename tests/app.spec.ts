@@ -249,6 +249,15 @@ test.describe('Gestao - Ranking e Ocorrencias', () => {
     await expect(page.getByText('Ranking de priorização de risco')).toBeVisible();
   });
 
+  test('CT20b - Botao Chat abre conversa com o responsavel', async ({ page }) => {
+    await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
+    await page.goto('/gestao/ranking');
+    const cardJoao = page.locator('.card').filter({ hasText: 'João Miguel da Silva' });
+    await cardJoao.locator('button[title="Abrir conversa com o responsável"]').click();
+    await page.waitForURL(/\/gestao\/chat/, { timeout: 10000 });
+    await expect(page.getByText('Maria Silva')).toBeVisible({ timeout: 10000 });
+  });
+
   test('CT21 - Pagina de ocorrencias carrega', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/ocorrencias');

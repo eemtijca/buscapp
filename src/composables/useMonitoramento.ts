@@ -1050,6 +1050,7 @@ export function useMonitoramento() {
     responsavelId: string,
     alunoId: string,
     turmaId: string,
+    comMensagemSistema = true,
   ): Promise<string | null> {
     try {
       const { data: existing } = await supabaseClient
@@ -1077,22 +1078,60 @@ export function useMonitoramento() {
       if (error) throw error;
       const convId = (data as unknown as { id: string }).id;
 
-      const agora = new Date().toISOString();
-      await supabaseClient.from('mensagens').insert({
-        conversa_id: convId,
-        remetente_id: responsavelId,
-        conteudo: 'Conversa iniciada para acompanhamento escolar.',
-        is_system_message: true,
-        created_at: agora,
-      });
+      if (comMensagemSistema) {
+        const agora = new Date().toISOString();
+        await supabaseClient.from('mensagens').insert({
+          conversa_id: convId,
+          remetente_id: responsavelId,
+          conteudo: 'Conversa iniciada para acompanhamento escolar.',
+          is_system_message: true,
+          created_at: agora,
+        });
 
-      await supabaseClient.from('conversas').update({ ultima_mensagem_em: agora }).eq('id', convId);
+        await supabaseClient
+          .from('conversas')
+          .update({ ultima_mensagem_em: agora })
+          .eq('id', convId);
+      }
 
       return convId;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       console.error('[useMonitoramento] Erro ao criar/obter conversa:', msg);
       erro.value = 'Falha ao iniciar conversa.';
+      return null;
+    }
+  }
+
+  async function abrirConversaResponsavel(alunoId: string): Promise<string | null> {
+    try {
+      const { data: vinculos } = await supabaseClient
+        .from('vinculos_responsaveis')
+        .select('responsavel_id')
+        .eq('aluno_id', alunoId)
+        .eq('ativo', true)
+        .order('contato_prioritario', { ascending: false })
+        .limit(1);
+
+      const responsavelId = (vinculos?.[0] as { responsavel_id: string } | undefined)
+        ?.responsavel_id;
+      if (!responsavelId) return null;
+
+      const { data: enturmacoes } = await supabaseClient
+        .from('enturmacoes')
+        .select('turma_id')
+        .eq('aluno_id', alunoId)
+        .eq('status', 'matriculado')
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      const turmaId = (enturmacoes?.[0] as { turma_id: string } | undefined)?.turma_id;
+      if (!turmaId) return null;
+
+      return await criarOuObterConversa(responsavelId, alunoId, turmaId, false);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error('[useMonitoramento] Erro ao abrir conversa com responsável:', msg);
       return null;
     }
   }
@@ -1537,6 +1576,7 @@ export function useMonitoramento() {
     buscarContatosResponsavel,
     buscarContatosGestao,
     criarOuObterConversa,
+    abrirConversaResponsavel,
     enviarMensagem,
     marcarMensagensComoLidas,
     ocultarConversa,

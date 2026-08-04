@@ -1412,6 +1412,60 @@ assert "28.3 limpar-anexos orfaos 200" "200" "$HTTP"
 ORF_STILL=$(npx supabase db query "SELECT count(*) FROM storage.objects WHERE name='$PATH_ORFAO';" 2>/dev/null | grep -o '[0-9]\+' | head -1)
 assert "28.3 objeto orfao removido" "0" "${ORF_STILL:-1}"
 
+echo ""; echo "=== 29. VISUALIZADOR DE ANEXO (BLOB — sem token na URL) ==="
+# O app usa storage.download() com o JWT no header Authorization (nao mais
+# createSignedUrl). Verificar que o download autenticado funciona para
+# gestao (acesso total) e responsavel (apenas os proprios anexos).
+
+# 29.1 Re-obter tokens (evitar expiracao no meio do suite)
+HTTP=$(api_code POST "/auth/v1/token?grant_type=password" '{"email":"gestao@escola.edu.br","password":"'"$SENHA_ADMIN"'"}')
+TG=$(api_body | py "d=json.load(sys.stdin); print(d.get('access_token',''))")
+assert "29.1 login gestao 200" "200" "$HTTP"
+HTTP=$(api_code POST "/auth/v1/token?grant_type=password" '{"email":"resp1@email.com","password":"'"$SENHA_RESP"'"}')
+TR=$(api_body | py "d=json.load(sys.stdin); print(d.get('access_token',''))")
+assert "29.1 login responsavel 200" "200" "$HTTP"
+
+# 29.2 Responsavel envia proprio anexo via storage API (mesmo fluxo do app)
+python3 -c "
+import base64, sys
+png = base64.b64decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==')
+sys.stdout.buffer.write(png)
+" > /tmp/blob_test.png
+PATH_BLOB="$FR13/just/blob-test-${UNIQ}.png"
+HTTP=$(curl -s -o /tmp/api_resp.txt -w "%{http_code}" \
+  -X POST -H "Content-Type: image/png" -H "Authorization: Bearer $TR" \
+  --data-binary @/tmp/blob_test.png \
+  "$SUPABASE_URL/storage/v1/object/justificativas/$PATH_BLOB")
+assert "29.2 resp upload blob 200" "200" "$HTTP"
+
+# 29.3 Responsavel baixa o proprio anexo com JWT no header (owner_id = auth.uid())
+HTTP=$(curl -s -o /tmp/dl_resp.bin -w "%{http_code}" \
+  -H "Authorization: Bearer $TR" \
+  "$SUPABASE_URL/storage/v1/object/justificativas/$PATH_BLOB")
+assert "29.3 resp download blob 200" "200" "$HTTP"
+CT_RESP=$(curl -s -o /dev/null -w "%{content_type}" -H "Authorization: Bearer $TR" \
+  "$SUPABASE_URL/storage/v1/object/justificativas/$PATH_BLOB")
+assert_contains "29.3 content-type image/png" "$CT_RESP" "image/png"
+
+# 29.4 Gestao baixa o mesmo objeto (acesso total) com JWT no header
+HTTP=$(curl -s -o /tmp/dl_gestao.bin -w "%{http_code}" \
+  -H "Authorization: Bearer $TG" \
+  "$SUPABASE_URL/storage/v1/object/justificativas/$PATH_BLOB")
+assert "29.4 gestao download blob 200" "200" "$HTTP"
+CT_GESTAO=$(curl -s -o /dev/null -w "%{content_type}" -H "Authorization: Bearer $TG" \
+  "$SUPABASE_URL/storage/v1/object/justificativas/$PATH_BLOB")
+assert_contains "29.4 content-type image/png" "$CT_GESTAO" "image/png"
+
+# 29.5 Conteudo baixado identico ao enviado (integridade do blob)
+assert "29.5 conteudo identico ao upload" "1" "$(cmp -s /tmp/blob_test.png /tmp/dl_resp.bin && echo 1 || echo 0)"
+
+# 29.6 Sem token no header o download e negado (bucket privado)
+HTTP=$(curl -s -o /tmp/api_resp.txt -w "%{http_code}" \
+  "$SUPABASE_URL/storage/v1/object/justificativas/$PATH_BLOB")
+assert "29.6 download sem auth 400/401/403" 1 "$( [ "$HTTP" = "400" ] || [ "$HTTP" = "401" ] || [ "$HTTP" = "403" ] && echo 1 || echo 0 )"
+
+rm -f /tmp/blob_test.png /tmp/dl_resp.bin /tmp/dl_gestao.bin
+
 echo ""; echo "=========================================="
 echo "  TOTAL: $((PASS+FAIL))  |  PASS: $PASS  |  FAIL: $FAIL"
 echo "=========================================="

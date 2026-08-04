@@ -23,7 +23,9 @@ async function restaurarSenha(uid: string, senha: string) {
       },
       body: JSON.stringify({ password: senha, email_confirm: true }),
     });
-  } catch { /* ignorar */ }
+  } catch {
+    /* ignorar */
+  }
 }
 
 test.beforeAll(async () => {
@@ -39,7 +41,9 @@ test.beforeAll(async () => {
       body: JSON.stringify({ email: 'health@check.com' }),
     });
     if (res.ok) return;
-  } catch { /* not running */ }
+  } catch {
+    /* not running */
+  }
 
   funcoesProcess = spawn('npx', ['supabase', 'functions', 'serve'], {
     stdio: 'pipe',
@@ -55,7 +59,9 @@ test.beforeAll(async () => {
         body: JSON.stringify({ email: 'health@check.com' }),
       });
       if (res.ok) return;
-    } catch { /* still starting */ }
+    } catch {
+      /* still starting */
+    }
   }
   throw new Error('Edge functions nao iniciaram apos 60s');
 });
@@ -136,7 +142,9 @@ test.describe('Gestao - Home', () => {
 
   test('CT07 - Notificacao de codigo aparece no header', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
-    const bell = page.locator('button[aria-label="Notificações"] i.bi-bell, a[aria-label="Notificações"] i.bi-bell');
+    const bell = page.locator(
+      'button[aria-label="Notificações"] i.bi-bell, a[aria-label="Notificações"] i.bi-bell',
+    );
     await expect(bell.first()).toBeVisible();
   });
 });
@@ -211,7 +219,9 @@ test.describe('Recuperacao de senha por codigo', () => {
     await page.goto('/solicitar-codigo');
     await page.fill('input[type="email"]', 'prof1@escola.edu.br');
     await page.click('button[type="submit"]');
-    await expect(page.getByText('Solicitação enviada com sucesso!')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText('Solicitação enviada com sucesso!')).toBeVisible({
+      timeout: 15000,
+    });
   });
 
   test('CT17 - Pagina de redefinir senha com codigo carrega', async ({ page }) => {
@@ -268,6 +278,167 @@ test.describe('Gestao - Ranking e Ocorrencias', () => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/justificativas');
     await expect(page.getByText('Validação de justificativas')).toBeVisible();
+  });
+});
+
+// ============================================================================
+// VISUALIZADOR DE ANEXO (BLOB) — gestão justificativas + responsável alertas
+// ============================================================================
+test.describe('Gestao/Responsavel — Visualizador de anexo (blob)', () => {
+  const JUST_ID = '10000000-0000-0000-0000-000000000001';
+  const ANEXO_ID = '20000000-0000-0000-0000-000000000001';
+  const FREQ_ID = '30000000-0000-0000-0000-000000000001';
+  const RESP_ID = 'a0000000-0000-0000-0000-000000000005';
+  const ALUNO_ID = 'e0000000-0000-0000-0000-000000000001';
+  const TURMA_ID = 'd0000000-0000-0000-0000-000000000001';
+  const PROF_ID = 'a0000000-0000-0000-0000-000000000002';
+  const ANO_ID = 'b0000000-0000-0000-0000-000000000001';
+  const DATA_FALTA = '2026-09-15';
+  const PERIODO = 'Manhã';
+  const TIPO_REGISTRO = 'chamada_aula';
+  const NOME_ARQUIVO = 'comprovante.png';
+  const STORAGE_PATH = `${RESP_ID}/blobtest/comprovante-${Date.now()}.png`;
+
+  async function seedApi(url: string, options: RequestInit = {}) {
+    const res = await fetch(`${URL_SUPABASE}${url}`, {
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: SERVICE_KEY,
+        Authorization: `Bearer ${SERVICE_KEY}`,
+        Prefer: 'resolution=merge-duplicates,return=representation',
+      },
+      ...options,
+    });
+    if (!res.ok) throw new Error(`Setup ${options.method ?? 'GET'} ${url}: ${res.status}`);
+    return res;
+  }
+
+  test.beforeAll(async () => {
+    // Token do responsavel (dono do anexo): RLS exige owner_id = auth.uid()
+    const loginRes = await fetch(`${URL_SUPABASE}/auth/v1/token?grant_type=password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', apikey: SERVICE_KEY },
+      body: JSON.stringify({ email: 'resp1@email.com', password: SENHA_RESP }),
+    });
+    if (!loginRes.ok) throw new Error(`Setup login resp1: ${loginRes.status}`);
+    const { access_token: tokenResp } = (await loginRes.json()) as { access_token: string };
+
+    const png = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+      'base64',
+    );
+    const upload = await fetch(`${URL_SUPABASE}/storage/v1/object/justificativas/${STORAGE_PATH}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'image/png',
+        apikey: SERVICE_KEY,
+        Authorization: `Bearer ${tokenResp}`,
+      },
+      body: png,
+    });
+    if (!upload.ok) throw new Error(`Setup upload anexo: ${upload.status}`);
+
+    await seedApi('/rest/v1/anexos?on_conflict=id', {
+      method: 'POST',
+      body: JSON.stringify({
+        id: ANEXO_ID,
+        storage_path: STORAGE_PATH,
+        nome_arquivo: NOME_ARQUIVO,
+        mime_type: 'image/png',
+        tamanho_bytes: png.length,
+        criado_por: RESP_ID,
+      }),
+    });
+    await seedApi('/rest/v1/justificativas_faltas?on_conflict=id', {
+      method: 'POST',
+      body: JSON.stringify({
+        id: JUST_ID,
+        responsavel_id: RESP_ID,
+        aluno_id: ALUNO_ID,
+        data_falta: DATA_FALTA,
+        motivo: 'Anexo para testes do visualizador (blob).',
+      }),
+    });
+    await seedApi('/rest/v1/justificativa_anexos?on_conflict=justificativa_id,anexo_id', {
+      method: 'POST',
+      body: JSON.stringify({ justificativa_id: JUST_ID, anexo_id: ANEXO_ID }),
+    });
+    // Frequência ausente na mesma data -> gera o alerta do responsável
+    await seedApi(
+      `/rest/v1/frequencias?aluno_id=eq.${ALUNO_ID}&data_aula=eq.${DATA_FALTA}&periodo=eq.${PERIODO}&tipo_registro=eq.${TIPO_REGISTRO}`,
+      { method: 'DELETE' },
+    );
+    await seedApi('/rest/v1/frequencias?on_conflict=client_request_id', {
+      method: 'POST',
+      body: JSON.stringify({
+        id: FREQ_ID,
+        client_request_id: FREQ_ID,
+        aluno_id: ALUNO_ID,
+        professor_id: PROF_ID,
+        turma_id: TURMA_ID,
+        ano_letivo_id: ANO_ID,
+        data_aula: DATA_FALTA,
+        periodo: PERIODO,
+        tipo_registro: TIPO_REGISTRO,
+        status: 'ausente',
+      }),
+    });
+  });
+
+  test('CT22A - Gestao: Ver anexo abre modal com imagem via blob (sem token)', async ({ page }) => {
+    await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
+    await page.goto('/gestao/justificativas');
+    const item = page.locator('article').filter({ hasText: 'Anexo para testes do visualizador' });
+    const botao = item.getByRole('button', { name: /Ver anexo/ });
+    await expect(botao).toBeVisible({ timeout: 10000 });
+    await botao.click();
+    const modal = page.locator('.modal.show');
+    await expect(modal).toBeVisible();
+    const img = modal.locator('img');
+    await expect(img).toBeVisible({ timeout: 10000 });
+    const src = await img.getAttribute('src');
+    expect(src).toMatch(/^blob:/);
+    expect(page.url()).not.toContain('token=');
+    expect(await page.locator('img[src*="token="]').count()).toBe(0);
+  });
+
+  test('CT22B - Gestao: modal mostra nome e botao Baixar', async ({ page }) => {
+    await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
+    await page.goto('/gestao/justificativas');
+    const item = page.locator('article').filter({ hasText: 'Anexo para testes do visualizador' });
+    await item.getByRole('button', { name: /Ver anexo/ }).click();
+    const modal = page.locator('.modal.show');
+    await expect(modal.locator('img')).toBeVisible({ timeout: 10000 });
+    await expect(modal).toContainText(NOME_ARQUIVO);
+    const baixar = modal.locator('a.btn-primary');
+    await expect(baixar).toBeVisible();
+    await expect(baixar).toHaveAttribute('download', NOME_ARQUIVO);
+    await expect(baixar).toHaveAttribute('href', /^blob:/);
+  });
+
+  test('CT22C - Gestao: Fechar encerra o modal', async ({ page }) => {
+    await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
+    await page.goto('/gestao/justificativas');
+    const item = page.locator('article').filter({ hasText: 'Anexo para testes do visualizador' });
+    await item.getByRole('button', { name: /Ver anexo/ }).click();
+    const modal = page.locator('.modal.show');
+    await expect(modal).toBeVisible();
+    await modal.locator('button', { hasText: 'Fechar' }).click();
+    await expect(page.locator('.modal.show')).toHaveCount(0);
+  });
+
+  test('CT22D - Responsavel: anexo do alerta abre via modal (blob)', async ({ page }) => {
+    await login(page, 'resp1@email.com', SENHA_RESP);
+    await page.goto('/responsavel/alertas');
+    const card = page.locator('.card').filter({ hasText: '15/09/2026' });
+    const botao = card.getByRole('button', { name: /Ver anexo/ });
+    await expect(botao).toBeVisible({ timeout: 10000 });
+    await botao.click();
+    const modal = page.locator('.modal.show');
+    const img = modal.locator('img');
+    await expect(img).toBeVisible({ timeout: 10000 });
+    const src = await img.getAttribute('src');
+    expect(src).toMatch(/^blob:/);
   });
 });
 
@@ -434,7 +605,7 @@ test.describe('Gestao - Codigos - Aba Recentes', () => {
     await page.locator('button:has-text("Códigos")').click();
     await page.waitForTimeout(500);
     const olhos = page.locator('button[title="Mostrar"], button[title="Ocultar"]');
-    if (await olhos.count() > 0) {
+    if ((await olhos.count()) > 0) {
       await olhos.first().click();
       await expect(page.locator('code.user-select-all').first()).toBeVisible();
     }
@@ -797,7 +968,10 @@ test.describe('Gestao - Configuracao', () => {
     await expect(page.locator('.modal-title')).toContainText('Nova opção');
     const card = page.locator('.modal .cartao-selecao').first();
     await card.hover();
-    const cor = await card.locator('span').first().evaluate((el) => getComputedStyle(el).color);
+    const cor = await card
+      .locator('span')
+      .first()
+      .evaluate((el) => getComputedStyle(el).color);
     expect(cor.toLowerCase()).not.toBe('rgb(255, 255, 255)');
     await page.click('button:has-text("Cancelar")');
   });
@@ -930,9 +1104,13 @@ test.describe('Gestao - Integridade de catalogo', () => {
       const data = (await res.json()) as { turma_id: string }[] | null;
       return Array.isArray(data) ? data : null;
     };
-    await expect
-      .poll(fetchEnturmacoes, { timeout: 10000 })
-      .toEqual([{ turma_id: 'd0000000-0000-0000-0000-000000000003', status: 'matriculado', ano_letivo_id: 'b0000000-0000-0000-0000-000000000001' }]);
+    await expect.poll(fetchEnturmacoes, { timeout: 10000 }).toEqual([
+      {
+        turma_id: 'd0000000-0000-0000-0000-000000000003',
+        status: 'matriculado',
+        ano_letivo_id: 'b0000000-0000-0000-0000-000000000001',
+      },
+    ]);
   });
 });
 
@@ -988,10 +1166,34 @@ test.beforeAll(async () => {
 
   // Upsert das mensagens (unicidade por id)
   for (const msg of [
-    { id: 'f0000000-0000-0000-0000-000000000011', conversa_id: CONV1, remetente_id: 'a0000000-0000-0000-0000-000000000005', conteudo: 'Bom dia, gostaria de saber como esta meu filho', created_at: '2026-07-20T08:00:00Z' },
-    { id: 'f0000000-0000-0000-0000-000000000012', conversa_id: CONV1, remetente_id: 'a0000000-0000-0000-0000-000000000001', conteudo: 'Bom dia! O Joao esta bem, participando das aulas.', created_at: '2026-07-20T08:15:00Z' },
-    { id: 'f0000000-0000-0000-0000-000000000013', conversa_id: CONV1, remetente_id: 'a0000000-0000-0000-0000-000000000002', conteudo: 'Confirmo! Ele tem se destacado em matematica.', created_at: '2026-07-20T08:30:00Z' },
-    { id: 'f0000000-0000-0000-0000-000000000014', conversa_id: CONV1, remetente_id: 'a0000000-0000-0000-0000-000000000005', conteudo: 'Que bom! Obrigado pela atencao.', created_at: '2026-07-20T09:00:00Z' },
+    {
+      id: 'f0000000-0000-0000-0000-000000000011',
+      conversa_id: CONV1,
+      remetente_id: 'a0000000-0000-0000-0000-000000000005',
+      conteudo: 'Bom dia, gostaria de saber como esta meu filho',
+      created_at: '2026-07-20T08:00:00Z',
+    },
+    {
+      id: 'f0000000-0000-0000-0000-000000000012',
+      conversa_id: CONV1,
+      remetente_id: 'a0000000-0000-0000-0000-000000000001',
+      conteudo: 'Bom dia! O Joao esta bem, participando das aulas.',
+      created_at: '2026-07-20T08:15:00Z',
+    },
+    {
+      id: 'f0000000-0000-0000-0000-000000000013',
+      conversa_id: CONV1,
+      remetente_id: 'a0000000-0000-0000-0000-000000000002',
+      conteudo: 'Confirmo! Ele tem se destacado em matematica.',
+      created_at: '2026-07-20T08:30:00Z',
+    },
+    {
+      id: 'f0000000-0000-0000-0000-000000000014',
+      conversa_id: CONV1,
+      remetente_id: 'a0000000-0000-0000-0000-000000000005',
+      conteudo: 'Que bom! Obrigado pela atencao.',
+      created_at: '2026-07-20T09:00:00Z',
+    },
   ]) {
     await api('/rest/v1/mensagens?on_conflict=id', { method: 'POST', body: JSON.stringify(msg) });
   }
@@ -1038,7 +1240,9 @@ test.describe('Responsavel — Chat', () => {
     const count = await items.count();
     expect(count).toBeGreaterThanOrEqual(1);
     if (count > 0) {
-      await expect(items.first()).toContainText(/João|Maria|Ana|Pedro|Rafael|Lucas|Julia|Thiago|Isabela/);
+      await expect(items.first()).toContainText(
+        /João|Maria|Ana|Pedro|Rafael|Lucas|Julia|Thiago|Isabela/,
+      );
     }
   });
 
@@ -1116,7 +1320,9 @@ test.describe('Gestao — Chat', () => {
     const items = page.locator('.chat-sidebar button');
     const count = await items.count();
     expect(count).toBeGreaterThanOrEqual(1);
-    await expect(page.locator('.chat-sidebar button').filter({ hasText: 'Maria Silva' }).first()).toBeVisible();
+    await expect(
+      page.locator('.chat-sidebar button').filter({ hasText: 'Maria Silva' }).first(),
+    ).toBeVisible();
   });
 
   test('CT75 - Selecionar conversa exibe mensagens', async ({ page }) => {
@@ -1124,7 +1330,7 @@ test.describe('Gestao — Chat', () => {
     await page.goto('/gestao/chat');
     await page.waitForTimeout(2000);
     const items = page.locator('.chat-sidebar button');
-    if (await items.count() > 0) {
+    if ((await items.count()) > 0) {
       await items.first().click();
       await page.waitForTimeout(1000);
       await expect(page.locator('i.bi-check2-all, i.bi-check2').first()).toBeVisible();
@@ -1343,7 +1549,7 @@ test.describe('Chat — Input', () => {
     await page.goto('/gestao/chat');
     await page.waitForTimeout(2000);
     const items = page.locator('.chat-sidebar button');
-    if (await items.count() > 0) {
+    if ((await items.count()) > 0) {
       await items.first().click();
       await page.waitForTimeout(1000);
       // System messages appear centered - just verify no JS errors
@@ -1394,7 +1600,7 @@ test.describe('Notificacoes — Casos Extremos', () => {
     await page.locator('button[aria-label="Notificações"]').click();
     await page.waitForTimeout(500);
     const items = page.locator('.notif-menu button');
-    if (await items.count() > 0) {
+    if ((await items.count()) > 0) {
       await items.first().click();
       await page.waitForTimeout(1000);
     }
@@ -1407,7 +1613,7 @@ test.describe('Notificacoes — Casos Extremos', () => {
     await page.waitForTimeout(500);
     const notifMenu = page.locator('.notif-menu');
     if (await notifMenu.isVisible()) {
-      const hasItems = await notifMenu.locator('button').count() > 0;
+      const hasItems = (await notifMenu.locator('button').count()) > 0;
       if (hasItems) {
         await expect(notifMenu.locator('button').first()).toBeVisible();
       } else {

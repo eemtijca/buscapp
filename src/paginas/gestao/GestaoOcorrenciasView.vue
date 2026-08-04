@@ -38,15 +38,6 @@ async function alternarBloqueio(ocorrenciaId: string) {
   }
 }
 
-function verAnexoOcorrencia(ocorrenciaId: string) {
-  const oc = ocorrencias.value.find((o) => o.id === ocorrenciaId);
-  if (oc?.anexoUrl) {
-    window.open(oc.anexoUrl, '_blank', 'noopener');
-  } else {
-    mostrarErro('Documento não disponível.');
-  }
-}
-
 function registrarSuspensao() {
   mostrarSucesso('Encaminhado para formalização de suspensão.');
 }
@@ -121,7 +112,6 @@ onMounted(async () => {
         <ListaOcorrencias
           :ocorrencias="ocorrencias"
           @bloquear-retorno="alternarBloqueio"
-          @ver-anexo="verAnexoOcorrencia"
           @registrar-suspensao="registrarSuspensao"
         />
       </div>

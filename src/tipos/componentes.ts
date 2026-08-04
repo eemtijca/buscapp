@@ -167,7 +167,7 @@ export interface OcorrenciaGrave {
   notificar_responsavel: boolean;
   data: string;
   professorNome?: string;
-  anexoUrl?: string | null;
+  anexoPath?: string | null;
   anexoNome?: string;
   exigePresencaResponsavel: boolean;
   bloqueado: boolean;
@@ -184,8 +184,9 @@ export interface JustificativaPendente {
   dataAusencia: string;
   dataFim: string | null;
   motivo: string;
-  anexoUrl?: string;
+  anexoPath?: string;
   anexoNome?: string;
+  anexoMime?: string;
   anexoId?: string;
   processadoEm?: string;
   status: 'pendente' | 'aceita' | 'recusada';
@@ -216,8 +217,9 @@ export interface AlertaResponsavel {
   frequenciaId?: string;
   justificativaStatus?: 'pendente' | 'aceita' | 'recusada';
   justificativaMotivo?: string;
-  anexoUrl?: string;
+  anexoPath?: string;
   anexoNome?: string;
+  anexoMime?: string;
   ocorrenciaTipo?: string[];
   tagsComportamento?: string[];
   exigePresencaResponsavel?: boolean;

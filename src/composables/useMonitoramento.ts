@@ -25,7 +25,11 @@ import type {
   HorarioProtegido,
 } from '@/tipos/componentes';
 
-let cacheConfigSistema: { critico: number; preventivo: number; mensagemForaHorario: string } | null = null;
+let cacheConfigSistema: {
+  critico: number;
+  preventivo: number;
+  mensagemForaHorario: string;
+} | null = null;
 
 async function carregarConfigSistema(): Promise<void> {
   if (cacheConfigSistema) return;
@@ -37,10 +41,16 @@ async function carregarConfigSistema(): Promise<void> {
     cacheConfigSistema = {
       critico: data?.limite_critico_faltas ?? 25,
       preventivo: data?.limite_preventivo_faltas ?? 10,
-      mensagemForaHorario: data?.mensagem_fora_horario ?? 'O canal de diálogo está fora do horário escolar. Mensagens enviadas agora serão respondidas quando a coordenação estiver disponível.',
+      mensagemForaHorario:
+        data?.mensagem_fora_horario ??
+        'O canal de diálogo está fora do horário escolar. Mensagens enviadas agora serão respondidas quando a coordenação estiver disponível.',
     };
   } catch {
-    cacheConfigSistema = { critico: 25, preventivo: 10, mensagemForaHorario: 'O canal de diálogo está fora do horário escolar.' };
+    cacheConfigSistema = {
+      critico: 25,
+      preventivo: 10,
+      mensagemForaHorario: 'O canal de diálogo está fora do horário escolar.',
+    };
   }
 }
 
@@ -536,19 +546,25 @@ export function useMonitoramento() {
       const anexoIds = [...new Set(jaList.map((ja) => ja.anexo_id))];
       const anexoMap = new Map<
         string,
-        { nome_arquivo: string; storage_path: string; processado_em: string | null }
+        {
+          nome_arquivo: string;
+          storage_path: string;
+          mime_type: string;
+          processado_em: string | null;
+        }
       >();
 
       if (anexoIds.length) {
         const { data: anexosData } = await supabaseClient
           .from('anexos')
-          .select('id, nome_arquivo, storage_path, processado_em')
+          .select('id, nome_arquivo, storage_path, mime_type, processado_em')
           .in('id', anexoIds);
 
         const anexos = (anexosData ?? []) as unknown as Array<{
           id: string;
           nome_arquivo: string;
           storage_path: string;
+          mime_type: string;
           processado_em: string | null;
         }>;
         for (const a of anexos) {
@@ -558,7 +574,13 @@ export function useMonitoramento() {
 
       const justAnexoMap = new Map<
         string,
-        { anexoId: string; nome: string; storagePath: string; processadoEm: string | null }
+        {
+          anexoId: string;
+          nome: string;
+          storagePath: string;
+          mimeType: string;
+          processadoEm: string | null;
+        }
       >();
       for (const ja of jaList) {
         const a = anexoMap.get(ja.anexo_id);
@@ -567,6 +589,7 @@ export function useMonitoramento() {
             anexoId: ja.anexo_id,
             nome: a.nome_arquivo,
             storagePath: a.storage_path,
+            mimeType: a.mime_type,
             processadoEm: a.processado_em,
           });
         }
@@ -578,14 +601,6 @@ export function useMonitoramento() {
         const responsavel = responsaveis.find((r) => r.id === j.responsavel_id);
         const anexo = justAnexoMap.get(j.id);
 
-        let anexoUrl: string | undefined;
-        if (anexo?.storagePath) {
-          const { data: signedData } = await supabaseClient.storage
-            .from('justificativas')
-            .createSignedUrl(anexo.storagePath, 3600);
-          anexoUrl = signedData?.signedUrl ?? undefined;
-        }
-
         result.push({
           id: j.id,
           alunoNome: aluno?.nome ?? 'Aluno não encontrado',
@@ -593,8 +608,9 @@ export function useMonitoramento() {
           dataAusencia: formatarData(j.data_falta),
           dataFim: j.data_fim ? formatarData(j.data_fim) : null,
           motivo: j.motivo,
-          anexoUrl,
+          anexoPath: anexo?.storagePath,
           anexoNome: anexo?.nome,
+          anexoMime: anexo?.mimeType,
           anexoId: anexo?.anexoId ?? undefined,
           processadoEm: anexo?.processadoEm ?? undefined,
           status: j.status as JustificativaPendente['status'],
@@ -861,31 +877,32 @@ export function useMonitoramento() {
       const anexoIds = [...new Set(jaList.map((ja) => ja.anexo_id))];
       const { data: anexosData } = await supabaseClient
         .from('anexos')
-        .select('id, nome_arquivo, storage_path')
+        .select('id, nome_arquivo, storage_path, mime_type')
         .in('id', anexoIds);
       const anexos = (anexosData ?? []) as unknown as Array<{
         id: string;
         nome_arquivo: string;
         storage_path: string;
+        mime_type: string;
       }>;
       const anexoMap = new Map(anexos.map((a) => [a.id, a]));
 
-      const anexoPorJustKey = new Map<string, { nome: string; anexoUrl: string }>();
+      const anexoPorJustKey = new Map<
+        string,
+        { nome: string; storagePath: string; mimeType: string }
+      >();
       for (const ja of jaList) {
         const j = justs.find((x) => x.id === ja.justificativa_id);
         if (!j) continue;
         const a = anexoMap.get(ja.anexo_id);
         if (!a?.storage_path) continue;
-        const { data: signedData } = await supabaseClient.storage
-          .from('justificativas')
-          .createSignedUrl(a.storage_path, 7200);
-        if (!signedData?.signedUrl) continue;
         const start = new Date(j.data_falta);
         const end = new Date(j.data_fim ?? j.data_falta);
         for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
           anexoPorJustKey.set(`${j.aluno_id}:${d.toISOString().slice(0, 10)}`, {
             nome: a.nome_arquivo,
-            anexoUrl: signedData.signedUrl,
+            storagePath: a.storage_path,
+            mimeType: a.mime_type,
           });
         }
       }
@@ -933,8 +950,9 @@ export function useMonitoramento() {
             frequenciaId: aus.id,
             justificativaStatus,
             justificativaMotivo,
-            anexoUrl: anexoInfo?.anexoUrl,
+            anexoPath: anexoInfo?.storagePath,
             anexoNome: anexoInfo?.nome,
+            anexoMime: anexoInfo?.mimeType,
             urgente: false,
           });
         }
@@ -1038,18 +1056,18 @@ export function useMonitoramento() {
         throw anexoError;
       }
 
-      const { error: vinculoError } = await supabaseClient
-        .from('justificativa_anexos')
-        .insert({
-          justificativa_id: justificativaId,
-          anexo_id: anexoId,
-        });
+      const { error: vinculoError } = await supabaseClient.from('justificativa_anexos').insert({
+        justificativa_id: justificativaId,
+        anexo_id: anexoId,
+      });
       if (vinculoError) {
         // Compensação: remove o objeto do storage e tenta remover a linha de anexo
         // (se a permissão permitir). Linhas remanescentes são limpas pelo job de expurgo.
         try {
           await supabaseClient.from('anexos').delete().eq('id', anexoId);
-        } catch { /* sem permissão de deleção pelo cliente */ }
+        } catch {
+          /* sem permissão de deleção pelo cliente */
+        }
         await removerStorage();
         throw vinculoError;
       }
@@ -1525,7 +1543,8 @@ export function useMonitoramento() {
   async function carregarHorarios(): Promise<HorarioProtegido> {
     if (cacheHorarios) return cacheHorarios;
     await carregarConfigSistema();
-    const msg = cacheConfigSistema?.mensagemForaHorario ?? 'O canal de diálogo está fora do horário escolar.';
+    const msg =
+      cacheConfigSistema?.mensagemForaHorario ?? 'O canal de diálogo está fora do horário escolar.';
     try {
       const { data } = await supabaseClient
         .from('horarios_letivos')
@@ -1533,16 +1552,40 @@ export function useMonitoramento() {
         .eq('ativo', true)
         .order('dia_semana');
       if (!data || data.length === 0) {
-        cacheHorarios = { inicio: '07:00', fim: '17:00', diasSemana: [1, 2, 3, 4, 5], mensagemForaHorario: msg };
+        cacheHorarios = {
+          inicio: '07:00',
+          fim: '17:00',
+          diasSemana: [1, 2, 3, 4, 5],
+          mensagemForaHorario: msg,
+        };
         return cacheHorarios;
       }
       const dias = [...new Set(data.map((h: { dia_semana: number }) => h.dia_semana))].sort();
-      const horasInicio = data.filter((h: { dia_semana: number }) => h.dia_semana === dias[0]).map((h: { hora_inicio: string }) => h.hora_inicio.slice(0, 5)).sort()[0] ?? '07:00';
-      const horasFim = data.filter((h: { dia_semana: number }) => h.dia_semana === dias[dias.length - 1]).map((h: { hora_fim: string }) => h.hora_fim.slice(0, 5)).sort().reverse()[0] ?? '17:00';
-      cacheHorarios = { inicio: horasInicio, fim: horasFim, diasSemana: dias, mensagemForaHorario: msg };
+      const horasInicio =
+        data
+          .filter((h: { dia_semana: number }) => h.dia_semana === dias[0])
+          .map((h: { hora_inicio: string }) => h.hora_inicio.slice(0, 5))
+          .sort()[0] ?? '07:00';
+      const horasFim =
+        data
+          .filter((h: { dia_semana: number }) => h.dia_semana === dias[dias.length - 1])
+          .map((h: { hora_fim: string }) => h.hora_fim.slice(0, 5))
+          .sort()
+          .reverse()[0] ?? '17:00';
+      cacheHorarios = {
+        inicio: horasInicio,
+        fim: horasFim,
+        diasSemana: dias,
+        mensagemForaHorario: msg,
+      };
       return cacheHorarios;
     } catch {
-      cacheHorarios = { inicio: '07:00', fim: '17:00', diasSemana: [1, 2, 3, 4, 5], mensagemForaHorario: msg };
+      cacheHorarios = {
+        inicio: '07:00',
+        fim: '17:00',
+        diasSemana: [1, 2, 3, 4, 5],
+        mensagemForaHorario: msg,
+      };
       return cacheHorarios;
     }
   }
@@ -1554,7 +1597,9 @@ export function useMonitoramento() {
     const minutosTotais = hora * 60 + minuto;
 
     const h = cacheHorarios ?? {
-      inicio: '07:00', fim: '17:00', diasSemana: [1, 2, 3, 4, 5],
+      inicio: '07:00',
+      fim: '17:00',
+      diasSemana: [1, 2, 3, 4, 5],
       mensagemForaHorario: '',
     };
     if (!h.diasSemana.includes(dia)) return false;

@@ -65,10 +65,10 @@ Projeto em desenvolvimento ativo. A infraestrutura central está concluída e os
 - Registro de ocorrências graves com bloqueio de retorno
 - CRUD de usuários, alunos, turmas, disciplinas e atribuições
 - Sistema de código de redefinição de senha (geração, solicitação, validação, revogação, expiração em 1h)
-- Justificativas com validação (aceitar/recusar), anexo (upload com compressão e otimização serverless), suporte a múltiplos dias (data_fim) e auto-justify de frequências via trigger
+- Justificativas com validação (aceitar/recusar), anexo (upload com compressão e otimização serverless, visualização em modal via blob sem tokens na URL), suporte a múltiplos dias (data_fim) e auto-justify de frequências via trigger
 - Ranking de priorização de risco com filtros e busca em tempo real
 - Termômetro visual de atenção (verde/amarelo/vermelho)
-- Alertas para responsáveis (ausência e ocorrências) com status de justificativa, visualização de anexos e modal de detalhes
+- Alertas para responsáveis (ausência e ocorrências) com status de justificativa, visualização de anexos em modal (via blob) e modal de detalhes
 - Chat integrado com três papéis (gestão e responsável) e layout responsivo de dois painéis
 - Sistema de notificações em tempo real: sino com tipos separados (mensagens vs administrativas)
 - Chat com auto-resize de textarea, indicador de leitura (✓✓), merge incremental em tempo real
@@ -176,7 +176,7 @@ Projeto em desenvolvimento ativo. A infraestrutura central está concluída e os
 | Painel de monitoramento | Página central com cartões de navegação para todos os módulos administrativos |
 | Ranking de risco | Lista priorizada de alunos organizados do caso mais crítico ao mais leve. Filtros por nível de risco (crítico, atenção, estável). Busca em tempo real por nome. Atualização por subscription Realtime. Botão "Chat" em cada aluno que abre uma conversa com o responsável (sem envio automático de mensagens). |
 | Central de ocorrências | Lista de todas as ocorrências graves e suspensões com indicadores visuais de tipo, status e bloqueio. Alternância de bloqueio/desbloqueio de retorno em tempo real. |
-| Validação de justificativas | Fila de justificativas pendentes com exibição de anexos, intervalo de datas e opção de aceitar ou recusar. Ao aceitar, as frequências no período são auto-justificadas via trigger no banco. Atualização em tempo real. |
+| Validação de justificativas | Fila de justificativas pendentes com exibição de anexos em modal (imagem ou PDF carregados via blob), intervalo de datas e opção de aceitar ou recusar. Ao aceitar, as frequências no período são auto-justificadas via trigger no banco. Atualização em tempo real. |
 | CRUD de usuários | Cadastro, edição, ativação e inativação de usuários. Geração automática de código de redefinição de senha ao criar usuário. Criação sincronizada no auth.users e perfil. |
 | CRUD de alunos | Cadastro e edição de alunos com dados pseudonimizados. Criação simultânea de vínculo com responsável existente ou novo. |
 | CRUD de turmas | Cadastro, edição, ativação e inativação de turmas com série e letra. |
@@ -193,7 +193,7 @@ Projeto em desenvolvimento ativo. A infraestrutura central está concluída e os
 
 | Funcionalidade | Descrição |
 |----------------|-----------|
-| Alertas | Lista de alertas de ausência (portão e aula) e ocorrências (grave e suspensão), com distinção visual por tipo e badge de urgência. Botão para enviar justificativa diretamente do alerta. Modal de detalhes com status da justificativa, motivo, anexo e tags de comportamento. Indicador "Aguardando validação", "Aceita" ou "Recusada" conforme o andamento. |
+| Alertas | Lista de alertas de ausência (portão e aula) e ocorrências (grave e suspensão), com distinção visual por tipo e badge de urgência. Botão para enviar justificativa diretamente do alerta. Modal de detalhes com status da justificativa, motivo, anexo (aberto em modal via blob) e tags de comportamento. Indicador "Aguardando validação", "Aceita" ou "Recusada" conforme o andamento. |
 | Termômetro de atenção | Indicador visual com barra de progresso colorida (verde/amarelo/vermelho) que mostra o nível de risco acumulado do estudante. Cálculo baseado em ausências e ocorrências. Suporte a múltiplos filhos com seletor. |
 | Justificativas | Envio de justificativa de falta com suporte a múltiplos dias (checkbox "Justificativa para múltiplos dias"). Upload de anexo com compressão automática via Canvas API (redimensionamento para 1600px, qualidade JPEG 0.6) e otimização serverless via Edge Function. Envio fire-and-forget sem bloqueio da interface. Formulário permanece na tela após envio. |
 | Aviso de presença obrigatória | Badge urgente em alertas quando uma ocorrência exige a presença física do responsável na escola para liberar o retorno do estudante. |
@@ -229,7 +229,8 @@ buscapp/
 │   │   ├── ListaOcorrencias.vue         # Lista de ocorrências graves
 │   │   ├── NotificacoesPopover.vue      # Popover de notificações (sino)
 │   │   ├── SeletorIcone.vue            # Seletor visual de ícones Bootstrap com busca e categorias
-│   │   └── TermometroRisco.vue          # Termômetro visual de risco
+│   │   ├── TermometroRisco.vue          # Termômetro visual de risco
+│   │   └── VisualizadorAnexo.vue        # Modal de anexos (imagem/PDF) via blob — sem tokens na URL
 │   ├── composables/                     # Lógica de apresentação reutilizável
 │   │   ├── useAlturaUniformeCards.ts    # Mede e uniformiza a altura de cartões de seleção (CSS var)
 │   │   ├── useAutenticacao.ts           # Login, logout, sessão e redefinição de senha por código
@@ -313,10 +314,10 @@ buscapp/
 │       └── 0001_validacao_completa.sql # Testes PL/pgSQL transacionais (1039 linhas)
 ├── scripts/
 │   ├── seed-users.sh                   # Cria usuários de teste via Auth Admin API
-│   ├── test-api.sh                     # Testes de API com bash/curl (288 asserts)
+│   ├── test-api.sh                     # Testes de API com bash/curl (297 asserts)
 │   └── test-db.sh                      # Executa testes SQL no container Docker do Supabase
 ├── tests/
-│   └── app.spec.ts                     # Testes E2E Playwright (111 casos, 5 browsers)
+│   └── app.spec.ts                     # Testes E2E Playwright (115 casos, 5 browsers)
 ├── .github/
 │   ├── workflows/codeql.yml            # CodeQL security analysis
 │   └── dependabot.yml                  # Atualizações semanais do devcontainer
@@ -475,6 +476,7 @@ Todas as views utilizam `security_invoker = true` para respeitar as políticas R
 - Trigger `fn_auto_justificar_frequencias` que atualiza o status das frequências para `'justificado'` quando uma justificativa é aceita.
 - RLS em `storage.objects` para o bucket `justificativas`: gestão tem acesso total, responsável insere e lê apenas seus próprios anexos.
 - Políticas `"JustAnexos: responsavel le proprio"` e `"Anexos: responsavel le proprio"` que permitem ao responsável visualizar os anexos de suas próprias justificativas.
+- **Visualização de anexos sem tokens na URL**: o frontend baixa o arquivo com `storage.download()` autenticando com o JWT da sessão no header `Authorization` e renderiza via `URL.createObjectURL()` (blob). Não são usados signed URLs, portanto nenhum token aparece na barra de endereço ou nas requisições de rede.
 - Soft delete em `frequencias` para preservação de dados históricos.
 - Índices parciais para dados ativos (otimização de consultas frequentes).
 - **Integridade referencial do catálogo**: restrições `CHECK` validam toda escrita de chaves de `opcoes_configuracao` e nomes de `tags_comportamento` nas tabelas que as referenciam (turmas, vínculos, atribuições, frequências, perfis, alunos, ocorrências), impedindo a gravação de referências órfãs. As funções de validação são `SECURITY DEFINER` para funcionar com qualquer role.
@@ -651,8 +653,8 @@ O projeto possui quatro camadas de teste independentes.
 
 ### Testes de API (Bash + curl)
 
-- **Arquivo:** `scripts/test-api.sh` (288 asserts em 28 seções)
-- **Cobertura:** 288 asserts distribuídos em:
+- **Arquivo:** `scripts/test-api.sh` (297 asserts em 29 seções)
+- **Cobertura:** 297 asserts distribuídos em:
   - Autenticação (login, logout, claims do JWT)
   - Edge Functions (solicitar-codigo, redefinir-senha-codigo, criar-usuario, processar-anexo, limpar-anexos)
   - Funções RPC (gerar código, revogar código, relatório de órfãos)
@@ -667,14 +669,15 @@ O projeto possui quatro camadas de teste independentes.
   - Catálogo de configuração: CRUD completo da tabela `opcoes_configuracao`, verificação de RLS por papel e validação das restrições de catálogo (valores fora do catálogo — ex.: `serie="4º"`, `tipo_relacao="primo"`, `papel="monitor"` — são rejeitados; valores válidos e arrays vazios são aceitos)
   - CASCADE → RESTRICT: exclusão de turma com conversas/atribuições bloqueada no banco
   - Expurgo: remoção de anexos expirados e objetos de storage órfãos via `limpar-anexos`
+  - Visualizador de anexo: download autenticado via Storage API com o JWT no header `Authorization` (gestão com acesso total, responsável apenas os próprios anexos), integridade do conteúdo baixado e negação de acesso sem autenticação
 - **Execução:** `npm run test:api` (requer Supabase local + seed executado)
 
 ### Testes E2E (Playwright)
 
 - **Arquivo:** `tests/app.spec.ts`
-- **Cobertura:** 111 casos de teste em 5 configurações de navegador:
+- **Cobertura:** 115 casos de teste em 5 configurações de navegador:
   - Chromium, Firefox, WebKit, Mobile Chrome, Mobile Safari
-  - Fluxos testados: login, logout, credenciais inválidas, gestão (home, usuários, alunos, códigos, turmas, modal de atribuições, ranking com botão de chat), professor (frequência, ausência, ocorrências), responsável (chat, home, alertas, justificativas), notificações (popover, marcar lidas, limpar todas), chat completo (sidebar, mensagens, busca, header), resiliência, casos extremos
+  - Fluxos testados: login, logout, credenciais inválidas, gestão (home, usuários, alunos, códigos, turmas, modal de atribuições, ranking com botão de chat), professor (frequência, ausência, ocorrências), responsável (chat, home, alertas, justificativas), visualizador de anexo (modal blob em justificativas e alertas, com botões de baixar/fechar e ausência de token na URL), notificações (popover, marcar lidas, limpar todas), chat completo (sidebar, mensagens, busca, header), resiliência, casos extremos
   - **Configuração do sistema:** hub de configuração, CRUD de opções genéricas (incluindo restrições de entrada e exclusão bloqueada de opções referenciadas), gerenciamento de tags de comportamento (exclusão/renomeação de tags referenciadas bloqueadas), parâmetros do sistema, horários letivos, verificações de carregamento dinâmico de opções do banco de dados em formulários
   - **Integridade de catálogo:** exclusão de opção/tag referenciada bloqueada, transferência de enturmação mantendo uma enturmação ativa por aluno
 - **Execução:** `npm run test:e2e` (requer Supabase local + seed + servidor dev em execução)

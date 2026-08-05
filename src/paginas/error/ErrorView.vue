@@ -72,10 +72,12 @@ const textoContagem = computed(() => {
       </div>
 
       <div class="d-flex flex-column flex-sm-row gap-2 justify-content-center">
-        <button v-if="destino" type="button" class="btn btn-primary" @click="redirecionar">
-          {{ rotuloAcao || 'Redirecionar agora' }}
-        </button>
-        <router-link to="/" class="btn btn-outline-secondary"> Voltar ao início </router-link>
+        <slot name="acoes">
+          <button v-if="destino" type="button" class="btn btn-primary" @click="redirecionar">
+            {{ rotuloAcao || 'Redirecionar agora' }}
+          </button>
+          <router-link to="/" class="btn btn-outline-secondary"> Voltar ao início </router-link>
+        </slot>
       </div>
     </div>
   </div>

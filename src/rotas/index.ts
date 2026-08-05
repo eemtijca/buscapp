@@ -34,6 +34,7 @@ import ResponsavelChatView from '@/paginas/responsavel/ChatView.vue';
 import Status403View from '@/paginas/error/Status403View.vue';
 import Status404View from '@/paginas/error/Status404View.vue';
 import Status500View from '@/paginas/error/Status500View.vue';
+import StatusContaDesativadaView from '@/paginas/error/StatusContaDesativadaView.vue';
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -267,6 +268,11 @@ const router = createRouter({
       component: Status403View,
     },
     {
+      path: '/conta-desativada',
+      name: 'conta-desativada',
+      component: StatusContaDesativadaView,
+    },
+    {
       path: '/500',
       name: '500',
       component: Status500View,
@@ -285,12 +291,26 @@ router.beforeEach(async (to, _from) => {
   } = await supabaseClient.auth.getSession();
 
   let perfilPapel: string | null = null;
+  let perfilStatus: string | null = null;
 
   if (session) {
     // Lê o papel DIRETAMENTE do JWT via jwt-decode
     // sem consultar o banco de dados (Custom Access Token Hook)
     const claims = decodificarToken(session.access_token);
     perfilPapel = (claims?.papel as string) ?? null;
+
+    // Consulta o status atual do perfil para detectar contas desativadas
+    const { data } = await supabaseClient
+      .from('perfis')
+      .select('status')
+      .eq('id', session.user.id)
+      .single();
+    perfilStatus = (data as { status?: string } | null)?.status ?? null;
+  }
+
+  // Conta desativada só pode permanecer na tela de "conta desativada"
+  if (session && perfilStatus === 'inativo' && to.name !== 'conta-desativada') {
+    return { name: 'conta-desativada' };
   }
 
   if (session && to.path === '/') {

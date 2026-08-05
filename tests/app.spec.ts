@@ -166,6 +166,19 @@ test.describe('Gestão - Usuários', () => {
     await expect(page.getByText('Maria Silva')).not.toBeVisible();
   });
 
+  test('CT09b - Perfil de gestão não tem botão de desativar/ativar', async ({ page }) => {
+    await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
+    await page.goto('/gestao/usuarios');
+
+    const linhaGestao = page.locator('tr', { hasText: 'Carlos Administrador' });
+    await expect(linhaGestao).toBeVisible();
+    await expect(linhaGestao.getByTitle('Desativar')).toHaveCount(0);
+    await expect(linhaGestao.getByTitle('Ativar')).toHaveCount(0);
+
+    const linhaProfessor = page.locator('tr', { hasText: 'Ana Professora' });
+    await expect(linhaProfessor.getByTitle('Desativar')).toBeVisible();
+  });
+
   test('CT10 - Formulário de novo usuário carrega', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/usuarios/novo');

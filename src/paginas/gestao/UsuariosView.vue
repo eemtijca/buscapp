@@ -71,6 +71,8 @@ const statusBadge = (status: string) => {
 };
 
 async function toggleAtivacao(usuario: UsuarioItem) {
+  // Perfis de gestão não podem ser desativados pela interface (evita travar o sistema)
+  if (usuario.papel === 'gestao') return;
   if (usuario.status === 'ativo') {
     const ok = await desativarUsuario(usuario.id);
     if (ok) {
@@ -333,7 +335,7 @@ onMounted(async () => {
                     <i class="bi bi-pencil" aria-hidden="true"></i>
                   </router-link>
                   <button
-                    v-if="usuario.status === 'ativo'"
+                    v-if="usuario.status === 'ativo' && usuario.papel !== 'gestao'"
                     type="button"
                     class="btn btn-sm btn-outline-danger"
                     title="Desativar"
@@ -342,7 +344,7 @@ onMounted(async () => {
                     <i class="bi bi-pause-circle" aria-hidden="true"></i>
                   </button>
                   <button
-                    v-else-if="usuario.status === 'inativo'"
+                    v-else-if="usuario.status === 'inativo' && usuario.papel !== 'gestao'"
                     type="button"
                     class="btn btn-sm btn-outline-success"
                     title="Ativar"

@@ -1076,7 +1076,9 @@ export function useMonitoramento() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ storagePath, mimeType: arquivo.type, anexoId }),
-      }).catch((e) => console.error('[useMonitoramento] Falha no processamento do anexo (edge):', e));
+      }).catch((e) =>
+        console.error('[useMonitoramento] Falha no processamento do anexo (edge):', e),
+      );
     } catch (e) {
       console.error('[useMonitoramento] Falha no processamento assíncrono do anexo:', e);
     }

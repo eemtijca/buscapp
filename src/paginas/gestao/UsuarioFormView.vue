@@ -214,11 +214,13 @@ async function salvar() {
       acesso_modulos: acessoModulos.value,
     };
     if (modoEdicao.value && usuarioId.value) {
+      // Perfis de gestão ficam sempre ativos (defesa extra no salvamento)
+      const statusFinal: StatusPerfil = papel.value === 'gestao' ? 'ativo' : status.value;
       const ok = await atualizarUsuario(usuarioId.value, {
         nome: nome.value.trim(),
         telefone: telefone.value.trim() || undefined,
         cargo: cargo.value.trim() || undefined,
-        status: status.value,
+        status: statusFinal,
         ...dadosExtras,
       } as Parameters<typeof atualizarUsuario>[1] & typeof dadosExtras);
       if (ok) {
@@ -427,10 +429,18 @@ async function salvar() {
 
           <div v-if="modoEdicao" class="mt-3 mb-0">
             <label for="campoStatus" class="form-label small fw-medium">Status</label>
-            <select id="campoStatus" v-model="status" class="form-select form-select-sm">
+            <select
+              id="campoStatus"
+              v-model="status"
+              class="form-select form-select-sm"
+              :disabled="papel === 'gestao'"
+              :title="
+                papel === 'gestao' ? 'Perfis de gestão não podem ser desativados.' : undefined
+              "
+            >
               <option value="ativo">Ativo</option>
               <option value="pendente">Pendente</option>
-              <option value="inativo">Inativo</option>
+              <option v-if="papel !== 'gestao'" value="inativo">Inativo</option>
             </select>
           </div>
         </div>

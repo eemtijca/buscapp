@@ -395,6 +395,9 @@ verify_jwt = false
 [functions.criar-usuario]
 verify_jwt = true
 
+[functions.processar-anexo]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327

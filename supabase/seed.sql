@@ -8,7 +8,7 @@
 --   prof2@escola.edu.br   |  Bruno Professor       |  Prof123!
 --   prof3@escola.edu.br   |  Carla Docente         |  Prof123!
 --   resp1@email.com       |  Maria Silva           |  Resp123!
---   resp2@email.com       |  Joao Santos           |  Resp123!
+--   resp2@email.com       |  João Santos           |  Resp123!
 --   resp3@email.com       |  Lucia Oliveira        |  Resp123!
 -- ============================================================
 
@@ -45,7 +45,7 @@ begin
 
   if not exists (select 1 from auth.users where email = 'resp2@email.com') then
     insert into auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, confirmation_sent_at, confirmation_token, recovery_token, email_change_token_new, email_change, phone_change, email_change_token_current, reauthentication_token, raw_user_meta_data, raw_app_meta_data, is_sso_user, is_anonymous, created_at, updated_at)
-    values ('a0000000-0000-0000-0000-000000000006', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'resp2@email.com', crypt('Resp123!', gen_salt('bf', 10)), now(), now(), '', '', '', '', '', '', '', jsonb_build_object('email_verified', true, 'nome', 'Joao Santos', 'papel', 'responsavel'), jsonb_build_object('provider', 'email', 'providers', jsonb_build_array('email')), false, false, now(), now());
+    values ('a0000000-0000-0000-0000-000000000006', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'resp2@email.com', crypt('Resp123!', gen_salt('bf', 10)), now(), now(), '', '', '', '', '', '', '', jsonb_build_object('email_verified', true, 'nome', 'João Santos', 'papel', 'responsavel'), jsonb_build_object('provider', 'email', 'providers', jsonb_build_array('email')), false, false, now(), now());
   end if;
 
   if not exists (select 1 from auth.users where email = 'resp3@email.com') then
@@ -56,7 +56,7 @@ end;
 $$;
 
 -- ============================================================================
--- 1B. IDENTIDADES (necessario para que o GoTrue reconheca os usuarios)
+-- 1B. IDENTIDADES (necessário para que o GoTrue reconheça os usuários)
 -- ============================================================================
 do $$
 begin
@@ -115,7 +115,7 @@ update public.perfis set
 where id = 'a0000000-0000-0000-0000-000000000005' and nome = 'resp1';
 
 update public.perfis set
-  nome = 'Joao Santos', telefone = '(85) 99999-0006', status = 'pendente'
+  nome = 'João Santos', telefone = '(85) 99999-0006', status = 'pendente'
 where id = 'a0000000-0000-0000-0000-000000000006' and nome = 'resp2';
 
 update public.perfis set
@@ -174,16 +174,99 @@ on conflict (codigo_sige) do nothing;
 -- 7. TAGS DE COMPORTAMENTO (RF16)
 -- ============================================================================
 insert into public.tags_comportamento (nome, categoria, icone, descricao, peso_pontuacao) values
-  ('Participativo',   'positivo', 'bi-hand-thumbs-up', 'Aluno participou ativamente da aula', 10),
-  ('Colaborativo',    'positivo', 'bi-people',         'Trabalhou bem em grupo',             10),
-  ('Pontual',         'positivo', 'bi-clock',          'Chegou no horário',                  5),
-  ('Protagonista',    'positivo', 'bi-star',           'Demonstrou iniciativa e liderança',   15),
-  ('Desatenção',      'atencao',  'bi-eye-slash',      'Dificuldade de concentração pontual', 0),
-  ('Uso de celular',  'atencao',  'bi-phone',          'Uso não autorizado de celular',      0),
-  ('Conversa paralela', 'atencao', 'bi-chat-dots',     'Conversa fora do contexto da aula',   0),
-  ('Sem material',    'atencao',  'bi-book',            'Não trouxe material necessário',     0)
+  ('Participativo',   'positivo', 'hand-thumbs-up', 'Aluno participou ativamente da aula', 10),
+  ('Colaborativo',    'positivo', 'people',         'Trabalhou bem em grupo',             10),
+  ('Pontual',         'positivo', 'clock',          'Chegou no horário',                  5),
+  ('Protagonista',    'positivo', 'star',           'Demonstrou iniciativa e liderança',   15),
+  ('Desatenção',      'atencao',  'eye-slash',      'Dificuldade de concentração pontual', 0),
+  ('Uso de celular',  'atencao',  'phone',          'Uso não autorizado de celular',      0),
+  ('Conversa paralela', 'atencao', 'chat-dots',     'Conversa fora do contexto da aula',   0),
+  ('Sem material',    'atencao',  'book',            'Não trouxe material necessário',     0)
 on conflict (nome) do nothing;
 
+-- ============================================================================
+-- 9. OPCÕES DE CONFIGURAÇÃO (catálogo genérico)
+-- ============================================================================
+
+do $$
+begin
+  -- módulo
+  if not exists (select 1 from public.opcoes_configuracao where tipo = 'modulo') then
+    insert into public.opcoes_configuracao (tipo, chave, rotulo, icone, ordem, ativo) values
+      ('modulo', 'frequencia', 'Frequência', 'check2-square', 1, true),
+      ('modulo', 'ocorrencias', 'Ocorrências', 'exclamation-triangle', 2, true);
+  end if;
+  -- permissão (vazio por enquanto — todas as funcionalidades são controladas por papel, não por permissão granular)
+  -- documento
+  if not exists (select 1 from public.opcoes_configuracao where tipo = 'documento') then
+    insert into public.opcoes_configuracao (tipo, chave, rotulo, icone, ordem, ativo) values
+      ('documento', 'rg', 'RG', 'person-vcard', 1, true),
+      ('documento', 'cpf', 'CPF', 'credit-card', 2, true),
+      ('documento', 'certidao_nascimento', 'Certidão de Nascimento', 'file-earmark-text', 3, true),
+      ('documento', 'comprovante_residencia', 'Comprovante de Residência', 'house', 4, true),
+      ('documento', 'cartao_vacina', 'Cartão de Vacina', 'heart-pulse', 5, true),
+      ('documento', 'nis', 'NIS', 'person-badge', 6, true);
+  end if;
+  -- período
+  if not exists (select 1 from public.opcoes_configuracao where tipo = 'periodo') then
+    insert into public.opcoes_configuracao (tipo, chave, rotulo, icone, ordem, ativo) values
+      ('periodo', 'Dia completo', 'Dia completo', 'calendar-check', 1, true),
+      ('periodo', '1º Horário', '1º Horário', null, 2, true),
+      ('periodo', '2º Horário', '2º Horário', null, 3, true),
+      ('periodo', '3º Horário', '3º Horário', null, 4, true),
+      ('periodo', '4º Horário', '4º Horário', null, 5, true),
+      ('periodo', 'Manhã', 'Manhã', 'sun', 6, true),
+      ('periodo', 'Tarde', 'Tarde', 'sunset', 7, true);
+  end if;
+  -- motivo_ausencia
+  if not exists (select 1 from public.opcoes_configuracao where tipo = 'motivo_ausencia') then
+    insert into public.opcoes_configuracao (tipo, chave, rotulo, icone, ordem, ativo) values
+      ('motivo_ausencia', 'enfermaria', 'Enfermaria', 'heart-pulse', 1, true),
+      ('motivo_ausencia', 'orientacao', 'Orientação pedagógica', 'people', 2, true),
+      ('motivo_ausencia', 'saida_antecipada', 'Saída antecipada', 'door-open', 3, true),
+      ('motivo_ausencia', 'conselho_tutelar', 'Conselho tutelar', 'shield-check', 4, true),
+      ('motivo_ausencia', 'atendimento_psicologico', 'Atendimento psicológico', 'heart', 5, true),
+      ('motivo_ausencia', 'atividade_externa', 'Atividade externa', 'briefcase', 6, true);
+  end if;
+  -- tipo_ocorrencia
+  if not exists (select 1 from public.opcoes_configuracao where tipo = 'tipo_ocorrencia') then
+    insert into public.opcoes_configuracao (tipo, chave, rotulo, icone, ordem, ativo) values
+      ('tipo_ocorrencia', 'grave', 'Ocorrência grave', 'exclamation-triangle', 1, true),
+      ('tipo_ocorrencia', 'suspensao', 'Suspensão', 'shield-exclamation', 2, true);
+  end if;
+  -- tipo_vinculo
+  if not exists (select 1 from public.opcoes_configuracao where tipo = 'tipo_vinculo') then
+    insert into public.opcoes_configuracao (tipo, chave, rotulo, icone, ordem, ativo) values
+      ('tipo_vinculo', 'pai', 'Pai', null, 1, true),
+      ('tipo_vinculo', 'mae', 'Mãe', null, 2, true),
+      ('tipo_vinculo', 'tutor', 'Tutor', null, 3, true),
+      ('tipo_vinculo', 'avo', 'Avó/Avô', null, 4, true),
+      ('tipo_vinculo', 'irmao', 'Irmão/Irmã', null, 5, true),
+      ('tipo_vinculo', 'outro', 'Outro', null, 6, true);
+  end if;
+  -- papel_atribuicao
+  if not exists (select 1 from public.opcoes_configuracao where tipo = 'papel_atribuicao') then
+    insert into public.opcoes_configuracao (tipo, chave, rotulo, icone, ordem, ativo) values
+      ('papel_atribuicao', 'titular', 'Titular', null, 1, true),
+      ('papel_atribuicao', 'substituto', 'Substituto', null, 2, true);
+  end if;
+  -- serie_turma
+  if not exists (select 1 from public.opcoes_configuracao where tipo = 'serie_turma') then
+    insert into public.opcoes_configuracao (tipo, chave, rotulo, icone, ordem, ativo) values
+      ('serie_turma', '1º', '1º', null, 1, true),
+      ('serie_turma', '2º', '2º', null, 2, true),
+      ('serie_turma', '3º', '3º', null, 3, true);
+  end if;
+  -- letra_turma
+  if not exists (select 1 from public.opcoes_configuracao where tipo = 'letra_turma') then
+    insert into public.opcoes_configuracao (tipo, chave, rotulo, icone, ordem, ativo) values
+      ('letra_turma', 'A', 'A', null, 1, true),
+      ('letra_turma', 'B', 'B', null, 2, true),
+      ('letra_turma', 'C', 'C', null, 3, true),
+      ('letra_turma', 'D', 'D', null, 4, true);
+  end if;
+end;
+$$;
 -- ============================================================================
 -- 8. TURMAS
 -- ============================================================================
@@ -202,7 +285,7 @@ insert into public.alunos (id, nome, matricula, codigo_inep, status, data_nascim
   ('e0000000-0000-0000-0000-000000000003', 'Pedro Henrique Lima',     'MAT2026003', '23123458', 'ativo',       '2011-11-30', make_date(extract(year from current_date)::int, 2, 1), 'Aluno com histórico de faltas recorrentes'),
   ('e0000000-0000-0000-0000-000000000004', 'Ana Beatriz Costa',       'MAT2026004', '23123459', 'transferido', '2011-01-10', make_date(extract(year from current_date)::int, 2, 1), 'Transferida para escola estadual em abril/2026'),
   ('e0000000-0000-0000-0000-000000000005', 'Lucas Eduardo Pereira',   'MAT2026005', '23123460', 'ativo',       '2011-05-18', make_date(extract(year from current_date)::int, 2, 1), null),
-  ('e0000000-0000-0000-0000-000000000006', 'Julia Gabriela Oliveira', 'MAT2026006', '23123461', 'ativo',       '2010-09-25', make_date(extract(year from current_date)::int, 2, 1), null),
+  ('e0000000-0000-0000-0000-000000000006', 'Júlia Gabriela Oliveira', 'MAT2026006', '23123461', 'ativo',       '2010-09-25', make_date(extract(year from current_date)::int, 2, 1), null),
   ('e0000000-0000-0000-0000-000000000007', 'Rafael Augusto Almeida',  'MAT2026007', '23123462', 'ativo',       '2010-02-14', make_date(extract(year from current_date)::int, 2, 1), null),
   ('e0000000-0000-0000-0000-000000000008', 'Isabela Cristina Martins','MAT2026008', '23123463', 'ativo',       '2009-12-01', make_date(extract(year from current_date)::int, 2, 1), null),
   ('e0000000-0000-0000-0000-000000000009', 'Thiago Vinicius Barbosa', 'MAT2026009', '23123464', 'ativo',       '2010-06-08', make_date(extract(year from current_date)::int, 2, 1), 'Aluno com acompanhamento pedagógico')
@@ -300,7 +383,7 @@ begin
           v_status := 'ausente';
         end if;
 
-        -- Julia Gabriela (2º B): 4 ausências (dias 02, 03, 05, 06)
+        -- Júlia Gabriela (2º B): 4 ausências (dias 02, 03, 05, 06)
         if v_aluno.aluno_id = 'e0000000-0000-0000-0000-000000000006' and v_dia in ('2026-03-02'::date, '2026-03-03'::date, '2026-03-05'::date, '2026-03-06'::date) then
           v_status := 'ausente';
         end if;
@@ -384,7 +467,7 @@ insert into public.notificacoes (destinatario_id, tipo, titulo, corpo, metadados
     'a0000000-0000-0000-0000-000000000001',
     'codigo_redefinicao',
     'Solicitação de redefinição de senha',
-    'O usuário Maria Silva (resp1@email.com, responsavel) solicitou um código para redefinir a senha.',
+    'O usuário Maria Silva (resp1@email.com, responsável) solicitou um código para redefinir a senha.',
     jsonb_build_object('email', 'resp1@email.com', 'perfil_id', 'a0000000-0000-0000-0000-000000000005')
   ),
   (
@@ -475,3 +558,4 @@ insert into public.monitoramento_acoes (aluno_id, responsavel_id, tipo_contato, 
     '2026-07-15 14:00:00-03',
     null
   );
+

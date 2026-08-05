@@ -9,8 +9,8 @@ export type PapelUsuario = PapelPerfil;
 export type StatusPerfil = 'ativo' | 'pendente' | 'inativo';
 export type StatusAluno = 'ativo' | 'egresso' | 'transferido' | 'inativo';
 export type StatusAnoLetivo = 'planejado' | 'ativo' | 'arquivado';
-export type SerieTurma = '1º' | '2º' | '3º';
-export type LetraTurma = 'A' | 'B' | 'C';
+export type SerieTurma = string;
+export type LetraTurma = string;
 export type TipoRegistroFrequencia = 'entrada_portao' | 'chamada_aula' | 'saida';
 export type StatusFrequencia = 'presente' | 'ausente' | 'justificado';
 export type CategoriaTag = 'positivo' | 'atencao';
@@ -35,8 +35,8 @@ export type TipoNotificacao =
   | 'codigo_redefinicao';
 export type StatusImportacao = 'processando' | 'concluido' | 'parcial' | 'falhou';
 export type StatusExportacao = 'agendada' | 'processando' | 'concluida' | 'falhou';
-export type PapelAtribuicao = 'titular' | 'substituto';
-export type TipoVinculo = 'pai' | 'mae' | 'tutor' | 'avo' | 'irmao' | 'outro';
+export type PapelAtribuicao = string;
+export type TipoVinculo = string;
 
 // -------- Interfaces --------
 export interface AnoLetivo {
@@ -64,6 +64,19 @@ export interface ConfiguracaoSistema {
   limite_preventivo_faltas: number;
   dias_expurgo_anexos: number;
   escola_nome: string;
+  mensagem_fora_horario: string;
+  updated_at: string;
+}
+
+export interface OpcaoConfiguracao {
+  id: string;
+  tipo: string;
+  chave: string;
+  rotulo: string;
+  icone: string | null;
+  ordem: number;
+  ativo: boolean;
+  created_at: string;
   updated_at: string;
 }
 
@@ -417,7 +430,7 @@ export interface CodigoRedefinicao {
   updated_at: string;
 }
 
-// -------- Supabase Database Type Map --------
+// -------- Mapa de Tipos do Banco de Dados Supabase --------
 export interface Database {
   public: {
     Tables: {
@@ -545,6 +558,11 @@ export interface Database {
         Row: Notificacao;
         Insert: Omit<Notificacao, 'id' | 'lida' | 'lida_em' | 'created_at'>;
         Update: Partial<Omit<Notificacao, 'id'>>;
+      };
+      opcoes_configuracao: {
+        Row: OpcaoConfiguracao;
+        Insert: Omit<OpcaoConfiguracao, 'id' | 'created_at' | 'updated_at'>;
+        Update: Partial<Omit<OpcaoConfiguracao, 'id'>>;
       };
       importacoes_log: {
         Row: ImportacaoLog;

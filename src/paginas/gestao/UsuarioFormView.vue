@@ -2,6 +2,7 @@
 import { onMounted, ref, watch, nextTick } from 'vue';
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router';
 import { useGestaoUsuarios } from '@/composables/useGestaoUsuarios';
+import { useOpcoesConfiguracao } from '@/composables/useOpcoesConfiguracao';
 import { supabaseClient } from '@/servicos/supabase';
 import CampoFormulario from '@/componentes/CampoFormulario.vue';
 import GrupoCheckbox from '@/componentes/GrupoCheckbox.vue';
@@ -11,10 +12,12 @@ import type {
   AtribuicaoProfessor,
   VinculoResponsavel,
 } from '@/tipos/database';
+import type { OpcaoCheckbox } from '@/tipos/componentes';
 
 const route = useRoute();
 const router = useRouter();
 const { buscarUsuarios, criarUsuario, atualizarUsuario, carregando, erro } = useGestaoUsuarios();
+const { buscarOpcoes } = useOpcoesConfiguracao();
 
 const modoEdicao = ref(false);
 const usuarioId = ref<string | null>(null);
@@ -27,21 +30,8 @@ const cargo = ref('');
 const status = ref<StatusPerfil>('ativo');
 const notificacoesAtivas = ref(true);
 const acessoModulos = ref<string[]>(['frequencia']);
-const permissoes = ref<string[]>([]);
 
-const opcoesModulos = [
-  { valor: 'frequencia', rotulo: 'Frequência', icone: 'check2-square' },
-  { valor: 'ocorrencias', rotulo: 'Ocorrências', icone: 'exclamation-triangle' },
-  { valor: 'chat', rotulo: 'Chat', icone: 'chat-dots' },
-  { valor: 'relatorios', rotulo: 'Relatórios', icone: 'file-earmark-bar-graph' },
-  { valor: 'exportacao', rotulo: 'Exportação', icone: 'download' },
-];
-
-const opcoesPermissoes = [
-  { valor: 'exportar', rotulo: 'Exportar dados', icone: 'file-earmark-arrow-down' },
-  { valor: 'importar', rotulo: 'Importar planilhas', icone: 'file-earmark-arrow-up' },
-  { valor: 'gerenciar_usuarios', rotulo: 'Gerenciar usuários', icone: 'people' },
-];
+const opcoesModulos = ref<OpcaoCheckbox[]>([]);
 
 const atribuicoes = ref<(AtribuicaoProfessor & { turma_nome?: string })[]>([]);
 const vinculos = ref<(VinculoResponsavel & { aluno_nome?: string })[]>([]);
@@ -77,11 +67,10 @@ function salvarDraft() {
           cargo: cargo.value,
           notificacoesAtivas: notificacoesAtivas.value,
           acessoModulos: acessoModulos.value,
-          permissoes: permissoes.value,
         }),
       );
     } catch {
-      /* storage cheio ou indisponível */
+      /* armazenamento cheio ou indisponível */
     }
   }, 500);
 }
@@ -104,7 +93,7 @@ onBeforeRouteLeave((_to, _from, next) => {
 });
 
 watch(
-  [nome, email, telefone, cargo, notificacoesAtivas, acessoModulos, permissoes, papel],
+  [nome, email, telefone, cargo, notificacoesAtivas, acessoModulos, papel],
   () => {
     if (!formDirty.value && !usuarioCriado.value) formDirty.value = true;
     if (!usuarioCriado.value) salvarDraft();
@@ -134,6 +123,7 @@ async function copiarCodigoCriado() {
 }
 
 onMounted(async () => {
+  opcoesModulos.value = await buscarOpcoes('modulo');
   const id = route.params.id as string | undefined;
   if (id) {
     modoEdicao.value = true;
@@ -153,13 +143,12 @@ onMounted(async () => {
     }
     const { data: perfil } = await supabaseClient
       .from('perfis')
-      .select('notificacoes_ativas, acesso_modulos, permissoes')
+      .select('notificacoes_ativas, acesso_modulos')
       .eq('id', id)
       .single();
     if (perfil) {
       notificacoesAtivas.value = perfil.notificacoes_ativas;
       acessoModulos.value = perfil.acesso_modulos?.length ? perfil.acesso_modulos : ['frequencia'];
-      permissoes.value = perfil.permissoes ?? [];
     }
     if (usuario.papel === 'professor') {
       const { data: atribs } = await supabaseClient
@@ -202,7 +191,6 @@ onMounted(async () => {
       if (typeof parsed.notificacoesAtivas === 'boolean')
         notificacoesAtivas.value = parsed.notificacoesAtivas;
       if (parsed.acessoModulos) acessoModulos.value = parsed.acessoModulos;
-      if (parsed.permissoes) permissoes.value = parsed.permissoes;
     }
   } catch {
     /* ignorar dados corrompidos */
@@ -224,7 +212,6 @@ async function salvar() {
     const dadosExtras = {
       notificacoes_ativas: notificacoesAtivas.value,
       acesso_modulos: acessoModulos.value,
-      permissoes: permissoes.value,
     };
     if (modoEdicao.value && usuarioId.value) {
       const ok = await atualizarUsuario(usuarioId.value, {
@@ -465,27 +452,6 @@ async function salvar() {
               :modelo="acessoModulos"
               :colunas="2"
               @update:modelo="acessoModulos = $event"
-            />
-          </CampoFormulario>
-        </div>
-      </div>
-
-      <div v-if="papel === 'professor'" class="card border mb-3">
-        <div class="card-header bg-body-tertiary py-2">
-          <span class="fw-medium small">Permissões</span>
-        </div>
-        <div class="card-body">
-          <CampoFormulario
-            id="permissoes"
-            label="Permissões especiais"
-            dica="Conceda permissões adicionais a este professor"
-          >
-            <GrupoCheckbox
-              nome="permissao"
-              :opcoes="opcoesPermissoes"
-              :modelo="permissoes"
-              :colunas="2"
-              @update:modelo="permissoes = $event"
             />
           </CampoFormulario>
         </div>

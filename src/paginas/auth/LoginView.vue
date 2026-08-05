@@ -7,7 +7,6 @@ import { traduzirErro } from '@/utils/traduzirErro';
 
 const router = useRouter();
 const { usuario, login } = useAutenticacao();
-const recuperacaoHabilitada = import.meta.env.VITE_RECUPERACAO_SENHA_HABILITADA !== 'false';
 
 const email = ref('');
 const senha = ref('');
@@ -44,7 +43,7 @@ async function handleLogin(): Promise<void> {
       // Redirecionamento EXPLÍCITO baseado no papel do usuário
       await router.push(homePorPapel[papel]);
     } else {
-      // Caso o perfil não tenha papel definido (fallback de segurança)
+      // Caso o perfil não tenha papel definido (recurso de segurança alternativo)
       erro.value = 'Perfil não identificado. Contate a gestão escolar.';
     }
   } catch (erroDesconhecido: unknown) {
@@ -101,12 +100,12 @@ async function handleLogin(): Promise<void> {
           <label for="email">E-mail</label>
         </div>
 
-        <div class="form-floating position-relative">
+        <div class="form-floating">
           <input
             id="senha"
             v-model="senha"
             :type="mostrarSenha ? 'text' : 'password'"
-            class="form-control pe-5"
+            class="form-control"
             :class="{ 'is-invalid': erro && !senha.trim() }"
             placeholder="Senha"
             :disabled="carregando"
@@ -114,20 +113,19 @@ async function handleLogin(): Promise<void> {
             required
           />
           <label for="senha">Senha</label>
-          <button
-            type="button"
-            class="btn btn-link position-absolute end-0 top-50 translate-middle-y text-decoration-none p-1 pe-2"
-            style="z-index: 5"
-            @click="mostrarSenha = !mostrarSenha"
-            :aria-label="mostrarSenha ? 'Ocultar senha' : 'Mostrar senha'"
-            :aria-controls="'senha'"
-            tabindex="-1"
-          >
-            <i :class="mostrarSenha ? 'bi-eye-slash' : 'bi-eye'" class="fs-5 lh-1"></i>
-          </button>
         </div>
 
-        <div class="form-check text-start mb-3">
+        <div class="form-check text-start mt-3">
+          <input
+            id="mostrar-senha"
+            v-model="mostrarSenha"
+            type="checkbox"
+            class="form-check-input"
+          />
+          <label class="form-check-label" for="mostrar-senha">Mostrar senha</label>
+        </div>
+
+        <div class="form-check text-start mt-2 mb-3">
           <input id="lembrar" v-model="lembrar" type="checkbox" class="form-check-input" />
           <label class="form-check-label" for="lembrar">Manter-me conectado(a)</label>
         </div>
@@ -143,21 +141,14 @@ async function handleLogin(): Promise<void> {
         </button>
 
         <div class="text-center mt-3">
-          <div class="small text-body-secondary mb-2">Primeiro acesso?</div>
+          <div class="small text-body-secondary mb-2">
+            Esqueceu sua senha ou é seu primeiro acesso?
+          </div>
           <router-link to="/solicitar-codigo" class="btn btn-outline-primary btn-sm w-100">
             <i class="bi bi-key me-1" aria-hidden="true"></i>
             Solicitar código de acesso
           </router-link>
         </div>
-
-        <router-link
-          v-if="recuperacaoHabilitada"
-          to="/solicitar-recuperacao"
-          class="d-block text-center mt-2 small link-offset-2"
-          style="text-decoration: none"
-        >
-          Esqueci minha senha
-        </router-link>
 
         <p class="mt-4 mb-1 text-body-secondary text-center" style="font-size: 0.75rem">v0.1.0</p>
       </form>
@@ -182,7 +173,6 @@ async function handleLogin(): Promise<void> {
 }
 
 .form-signin input[type='password'] {
-  margin-bottom: 10px;
   border-top-left-radius: 0;
   border-top-right-radius: 0;
 }

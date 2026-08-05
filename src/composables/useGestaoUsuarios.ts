@@ -22,7 +22,7 @@ export function useGestaoUsuarios() {
   const erro: Ref<string | null> = ref(null);
 
   // ==========================================================================
-  // USUARIOS (Perfis)
+  // USUÁRIOS (Perfis)
   // ==========================================================================
 
   async function buscarUsuarios(filtro?: {
@@ -59,12 +59,11 @@ export function useGestaoUsuarios() {
         ultimo_acesso: p.ultimo_acesso_em,
         notificacoes_ativas: p.notificacoes_ativas,
         acesso_modulos: p.acesso_modulos ?? [],
-        permissoes: p.permissoes ?? [],
       }));
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      console.error('[useGestaoUsuarios] Erro ao buscar usuarios:', msg);
-      erro.value = 'Nao foi possivel carregar a lista de usuarios.';
+      console.error('[useGestaoUsuarios] Erro ao buscar usuários:', msg);
+      erro.value = 'Não foi possível carregar a lista de usuários.';
       return [];
     } finally {
       carregando.value = false;
@@ -79,7 +78,7 @@ export function useGestaoUsuarios() {
     try {
       const { data: sessionData } = await supabaseClient.auth.getSession();
       const token = sessionData?.session?.access_token;
-      if (!token) throw new Error('Sessao nao encontrada.');
+      if (!token) throw new Error('Sessão não encontrada.');
 
       const funcaoUrl =
         import.meta.env.VITE_EDGE_FUNCTIONS_URL ??
@@ -103,12 +102,12 @@ export function useGestaoUsuarios() {
 
       const resultado = await response.json();
       if (!response.ok) {
-        throw new Error(resultado.error ?? 'Erro ao criar usuario.');
+        throw new Error(resultado.error ?? 'Erro ao criar usuário.');
       }
       return { id: resultado.id as string, codigo: (resultado.codigo as string) ?? null };
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      console.error('[useGestaoUsuarios] Erro ao criar usuario:', msg);
+      console.error('[useGestaoUsuarios] Erro ao criar usuário:', msg);
       erro.value = msg;
       return { id: null, codigo: null };
     } finally {
@@ -131,8 +130,8 @@ export function useGestaoUsuarios() {
       return true;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      console.error('[useGestaoUsuarios] Erro ao atualizar usuario:', msg);
-      erro.value = 'Falha ao atualizar usuario.';
+      console.error('[useGestaoUsuarios] Erro ao atualizar usuário:', msg);
+      erro.value = 'Falha ao atualizar usuário.';
       return false;
     } finally {
       carregando.value = false;
@@ -206,7 +205,7 @@ export function useGestaoUsuarios() {
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       console.error('[useGestaoUsuarios] Erro ao buscar alunos:', msg);
-      erro.value = 'Nao foi possivel carregar a lista de alunos.';
+      erro.value = 'Não foi possível carregar a lista de alunos.';
       return [];
     } finally {
       carregando.value = false;
@@ -283,7 +282,7 @@ export function useGestaoUsuarios() {
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       console.error('[useGestaoUsuarios] Erro ao criar aluno:', msg);
-      erro.value = 'Falha ao criar aluno. Verifique se a matricula ja existe.';
+      erro.value = 'Falha ao criar aluno. Verifique se a matrícula já existe.';
       return null;
     } finally {
       carregando.value = false;
@@ -320,7 +319,7 @@ export function useGestaoUsuarios() {
   }
 
   // ==========================================================================
-  // CODIGOS DE REDEFINICAO
+  // CÓDIGOS DE REDEFINIÇÃO
   // ==========================================================================
 
   async function buscarNotificacoesCodigos(): Promise<SolicitacaoCodigo[]> {
@@ -380,8 +379,8 @@ export function useGestaoUsuarios() {
       return resultados;
     } catch (e) {
       const msg = e instanceof Error ? e.message : JSON.stringify(e);
-      console.error('[useGestaoUsuarios] Erro ao buscar notificacoes:', msg);
-      erro.value = 'Nao foi possivel carregar as notificacoes.';
+      console.error('[useGestaoUsuarios] Erro ao buscar notificações:', msg);
+      erro.value = 'Não foi possível carregar as notificações.';
       return [];
     } finally {
       carregando.value = false;
@@ -399,8 +398,8 @@ export function useGestaoUsuarios() {
       return data as string;
     } catch (e) {
       const msg = e instanceof Error ? e.message : JSON.stringify(e);
-      console.error('[useGestaoUsuarios] Erro ao gerar codigo:', msg);
-      erro.value = 'Falha ao gerar codigo de redefinicao.';
+      console.error('[useGestaoUsuarios] Erro ao gerar código:', msg);
+      erro.value = 'Falha ao gerar código de redefinição.';
       return null;
     } finally {
       carregando.value = false;
@@ -458,8 +457,8 @@ export function useGestaoUsuarios() {
       });
     } catch (e) {
       const msg = e instanceof Error ? e.message : JSON.stringify(e);
-      console.error('[useGestaoUsuarios] Erro ao buscar codigos:', msg);
-      erro.value = 'Nao foi possivel carregar os codigos.';
+      console.error('[useGestaoUsuarios] Erro ao buscar códigos:', msg);
+      erro.value = 'Não foi possível carregar os códigos.';
       return [];
     } finally {
       carregando.value = false;
@@ -473,7 +472,7 @@ export function useGestaoUsuarios() {
         .update({ lida: true, lida_em: new Date().toISOString() })
         .eq('id', notificacaoId);
     } catch (e) {
-      console.error('[useGestaoUsuarios] Erro ao marcar notificacao como lida:', e);
+      console.error('[useGestaoUsuarios] Erro ao marcar notificação como lida:', e);
     }
   }
 
@@ -508,7 +507,7 @@ export function useGestaoUsuarios() {
   }
 
   // ==========================================================================
-  // UTILITARIOS
+  // UTILITÁRIOS
   // ==========================================================================
 
   return {

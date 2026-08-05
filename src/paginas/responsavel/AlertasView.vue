@@ -5,8 +5,9 @@ import { useAutenticacao } from '@/composables/useAutenticacao';
 import { useMonitoramento } from '@/composables/useMonitoramento';
 import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh';
 import CartaoAlertaResponsavel from '@/componentes/CartaoAlertaResponsavel.vue';
+import VisualizadorAnexo from '@/componentes/VisualizadorAnexo.vue';
 import type { AlertaResponsavel } from '@/tipos/componentes';
-import { TAGS_COMPORTAMENTO } from '@/tipos/componentes';
+import { supabaseClient } from '@/servicos/supabase';
 
 const router = useRouter();
 const { usuario } = useAutenticacao();
@@ -16,6 +17,21 @@ const { ultimaAtualizacao, estaAtualizando, atualizar: refresh } = useRealtimeRe
 const alertas = ref<AlertaResponsavel[]>([]);
 const alertaSelecionado = ref<AlertaResponsavel | null>(null);
 const mostrarModal = ref(false);
+const anexoSelecionado = ref<{ path: string; nome: string; mime?: string } | null>(null);
+
+const tagsMap = ref<Record<string, { rotulo: string; icone: string }>>({});
+
+async function carregarTags() {
+  const { data } = await supabaseClient
+    .from('tags_comportamento')
+    .select('nome, icone, descricao')
+    .eq('ativo', true);
+  const map: Record<string, { rotulo: string; icone: string }> = {};
+  for (const t of data ?? []) {
+    map[t.nome] = { rotulo: t.descricao ?? t.nome, icone: t.icone ?? 'tag' };
+  }
+  tagsMap.value = map;
+}
 
 function abrirJustificativa(payload: { alertaId: string; frequenciaId?: string }) {
   const query: Record<string, string> = {};
@@ -23,8 +39,15 @@ function abrirJustificativa(payload: { alertaId: string; frequenciaId?: string }
   router.push({ path: '/responsavel/justificativa', query });
 }
 
-function verAnexo(anexoUrl: string) {
-  if (anexoUrl) window.open(anexoUrl, '_blank', 'noopener');
+function verAnexo(alertaId: string) {
+  const alerta = alertas.value.find((a) => a.id === alertaId);
+  if (alerta?.anexoPath) {
+    anexoSelecionado.value = {
+      path: alerta.anexoPath,
+      nome: alerta.anexoNome ?? 'anexo',
+      mime: alerta.anexoMime,
+    };
+  }
 }
 
 function verDetalhes(alertaId: string) {
@@ -51,6 +74,7 @@ async function atualizarManual() {
 }
 
 onMounted(async () => {
+  await carregarTags();
   await carregarAlertas();
 });
 </script>
@@ -254,10 +278,10 @@ onMounted(async () => {
                     {{ alertaSelecionado.justificativaMotivo }}
                   </p>
                   <button
-                    v-if="alertaSelecionado.anexoUrl"
+                    v-if="alertaSelecionado.anexoPath"
                     type="button"
                     class="btn btn-sm btn-outline-secondary mt-1"
-                    @click="verAnexo(alertaSelecionado!.anexoUrl!)"
+                    @click="verAnexo(alertaSelecionado!.id)"
                   >
                     <i class="bi bi-paperclip me-1" aria-hidden="true"></i>
                     Ver anexo
@@ -307,11 +331,8 @@ onMounted(async () => {
                     :key="tag"
                     class="badge text-bg-warning-subtle text-warning-emphasis small d-inline-flex align-items-center gap-1"
                   >
-                    <i
-                      :class="'bi bi-' + (TAGS_COMPORTAMENTO[tag]?.icone ?? 'tag')"
-                      aria-hidden="true"
-                    ></i>
-                    {{ TAGS_COMPORTAMENTO[tag]?.rotulo ?? tag }}
+                    <i :class="'bi bi-' + (tagsMap[tag]?.icone ?? 'tag')" aria-hidden="true"></i>
+                    {{ tagsMap[tag]?.rotulo ?? tag }}
                   </span>
                 </div>
               </div>
@@ -335,5 +356,13 @@ onMounted(async () => {
         </div>
       </div>
     </div>
+
+    <VisualizadorAnexo
+      :aberto="!!anexoSelecionado"
+      :storage-path="anexoSelecionado?.path ?? ''"
+      :nome-arquivo="anexoSelecionado?.nome ?? ''"
+      :mime-type="anexoSelecionado?.mime"
+      @fechar="anexoSelecionado = null"
+    />
   </div>
 </template>

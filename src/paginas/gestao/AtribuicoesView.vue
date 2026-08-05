@@ -2,14 +2,10 @@
 import { onMounted, ref, watch } from 'vue';
 import { useRouter, onBeforeRouteLeave } from 'vue-router';
 import { supabaseClient } from '@/servicos/supabase';
+import { useOpcoesConfiguracao } from '@/composables/useOpcoesConfiguracao';
 import CampoFormulario from '@/componentes/CampoFormulario.vue';
-import type {
-  AtribuicaoProfessor,
-  Perfil,
-  Turma,
-  Disciplina,
-  PapelAtribuicao,
-} from '@/tipos/database';
+import type { AtribuicaoProfessor, Perfil, Turma, Disciplina } from '@/tipos/database';
+import type { OpcaoCheckbox } from '@/tipos/componentes';
 
 interface AtribuicaoItem extends AtribuicaoProfessor {
   professor_nome?: string;
@@ -34,7 +30,10 @@ const editandoId = ref<string | null>(null);
 const formProfessorId = ref('');
 const formTurmaId = ref('');
 const formDisciplinaId = ref('');
-const formPapel = ref<PapelAtribuicao>('titular');
+const { buscarOpcoes } = useOpcoesConfiguracao();
+const opcoesPapel = ref<OpcaoCheckbox[]>([]);
+
+const formPapel = ref('titular');
 const formDataInicio = ref('');
 const formDataFim = ref('');
 const formAtivo = ref(true);
@@ -209,10 +208,15 @@ async function alternarAtivo(atribuicao: AtribuicaoItem) {
 }
 
 const papelBadge = (papel: string) => {
-  return papel === 'titular' ? 'text-bg-primary' : 'text-bg-info';
+  const idx = opcoesPapel.value.findIndex((p) => p.valor === papel);
+  const cores = ['text-bg-primary', 'text-bg-info', 'text-bg-success', 'text-bg-warning'];
+  return cores[idx % cores.length] || 'text-bg-secondary';
 };
 
-onMounted(carregarDados);
+onMounted(async () => {
+  opcoesPapel.value = await buscarOpcoes('papel_atribuicao');
+  await carregarDados();
+});
 </script>
 
 <template>
@@ -285,7 +289,7 @@ onMounted(carregarDados);
               <td>{{ a.disciplina_nome ?? '—' }}</td>
               <td>
                 <span class="badge" :class="papelBadge(a.papel)">
-                  {{ a.papel === 'titular' ? 'Titular' : 'Substituto' }}
+                  {{ opcoesPapel.find((p) => p.valor === a.papel)?.rotulo ?? a.papel }}
                 </span>
               </td>
               <td>{{ formatarData(a.data_inicio) }}</td>
@@ -382,8 +386,9 @@ onMounted(carregarDados);
               </CampoFormulario>
               <CampoFormulario id="campoPapel" label="Papel" :obrigatorio="true">
                 <select id="campoPapel" v-model="formPapel" class="form-select form-select-sm">
-                  <option value="titular">Titular</option>
-                  <option value="substituto">Substituto</option>
+                  <option v-for="p in opcoesPapel" :key="p.valor" :value="p.valor">
+                    {{ p.rotulo }}
+                  </option>
                 </select>
               </CampoFormulario>
               <CampoFormulario id="campoDataInicio" label="Data início" :obrigatorio="true">

@@ -24,7 +24,7 @@ create type public.serie_turma as enum ('1º', '2º', '3º');
 create type public.letra_turma as enum ('A', 'B', 'C');
 create type public.tipo_registro_frequencia as enum ('entrada_portao', 'chamada_aula', 'saida');
 create type public.status_frequencia as enum ('presente', 'ausente', 'justificado');
-create type public.categoria_tag as enum ('positivo', 'atencao');
+create type public.categoria_tag as enum ('positivo', 'atencao', 'critico');
 create type public.tipo_ocorrencia as enum ('grave', 'suspensao');
 create type public.status_ocorrencia as enum ('aberta', 'em_andamento', 'resolvida', 'arquivada');
 create type public.tipo_contato_busca as enum ('telefone', 'whatsapp', 'presencial', 'carta', 'outro');
@@ -90,6 +90,7 @@ create table public.configuracoes_sistema (
   limite_preventivo_faltas integer not null default 10,
   dias_expurgo_anexos      integer not null default 30,
   escola_nome              text    not null default 'EEMTI',
+  mensagem_fora_horario    text    not null default 'O canal de diálogo está fora do horário escolar. Mensagens enviadas agora serão respondidas quando a coordenação estiver disponível.',
   updated_at               timestamptz not null default now(),
   constraint chk_sistema_singleton check (id = 1)
 );
@@ -168,7 +169,7 @@ create table public.turmas (
 
 comment on table public.turmas is 'RF09/RD02: Turmas normalizadas. Máximo 9 por ano (1º-3º × A-C).';
 
--- Trigger: auto-set nome_completo from serie and letra
+-- Trigger: define nome_completo automaticamente a partir da série e da letra
 create or replace function public.fn_set_turma_nome()
 returns trigger
 language plpgsql
@@ -270,6 +271,25 @@ create table public.tags_comportamento (
 );
 
 comment on table public.tags_comportamento is 'RF16: Catálogo de chips/tags de comportamento. peso_pontuacao usado na gamificação (RF28).';
+
+-- ============================================================================
+-- 5.1 OPÇÕES DE CONFIGURAÇÃO (catálogo genérico)
+-- ============================================================================
+
+create table public.opcoes_configuracao (
+  id          uuid        primary key default gen_random_uuid(),
+  tipo        text        not null,
+  chave       text        not null,
+  rotulo      text        not null,
+  icone       text,
+  ordem       integer     not null default 0,
+  ativo       boolean     not null default true,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now(),
+  unique (tipo, chave)
+);
+
+comment on table public.opcoes_configuracao is 'Catálogo genérico de opções configuráveis pela gestão (módulos, permissões, documentos, períodos, motivos, vínculos, séries, letras, etc.).';
 
 -- ============================================================================
 -- 6. TABELAS — OPERACIONAIS (FREQUÊNCIA, COMPORTAMENTO, OCORRÊNCIAS)
@@ -590,7 +610,7 @@ begin
     'anos_letivos', 'configuracoes_escola', 'configuracoes_sistema',
     'horarios_letivos', 'disciplinas', 'perfis', 'turmas', 'alunos',
     'enturmacoes', 'vinculos_responsaveis', 'atribuicoes_professores',
-    'tags_comportamento', 'frequencias', 'registros_comportamento',
+    'tags_comportamento', 'opcoes_configuracao', 'frequencias', 'registros_comportamento',
     'ocorrencias', 'anexos', 'justificativas_faltas', 'conversas',
     'mensagens', 'monitoramento_acoes', 'pontuacao_turmas',
     'importacoes_log', 'exportacoes', 'convites'
@@ -599,7 +619,8 @@ begin
     execute format(
       'create trigger trg_set_updated_at before update on public.%I
        for each row execute function public.fn_set_updated_at();', t
-    );
+);
+
   end loop;
 end;
 $$;
@@ -843,6 +864,23 @@ create policy "Horarios: leitura autenticados"
 
 create policy "Horarios: gestao gerencia"
   on public.horarios_letivos for all
+  to authenticated
+  using (public.get_user_papel() = 'gestao')
+  with check (public.get_user_papel() = 'gestao');
+
+-- ============================================================================
+-- 18.4.1 OPÇÕES DE CONFIGURAÇÃO
+-- ============================================================================
+
+alter table public.opcoes_configuracao enable row level security;
+
+create policy "OpcoesConfig: leitura autenticados"
+  on public.opcoes_configuracao for select
+  to authenticated
+  using (true);
+
+create policy "OpcoesConfig: gestao gerencia"
+  on public.opcoes_configuracao for all
   to authenticated
   using (public.get_user_papel() = 'gestao')
   with check (public.get_user_papel() = 'gestao');
@@ -1272,6 +1310,11 @@ create policy "Conv: participante cria"
   to authenticated
   with check (responsavel_id = auth.uid());
 
+create policy "Conv: gestao cria"
+  on public.conversas for insert
+  to authenticated
+  with check (public.get_user_papel() = 'gestao');
+
 create policy "Conv: gestao oculta"
   on public.conversas for update
   to authenticated
@@ -1577,7 +1620,8 @@ select
     2
   ) as percentual_presenca,
   count(distinct rc.id) filter (where tc.categoria = 'positivo') as comportamentos_positivos,
-  count(distinct rc.id) filter (where tc.categoria = 'atencao') as comportamentos_atencao
+  count(distinct rc.id) filter (where tc.categoria = 'atencao') as comportamentos_atencao,
+  count(distinct rc.id) filter (where tc.categoria = 'critico') as comportamentos_criticos
 from public.turmas t
 join public.enturmacoes e on e.turma_id = t.id and e.status = 'matriculado'
 left join public.frequencias f on f.turma_id = t.id and f.deleted_at is null
@@ -1703,6 +1747,7 @@ grant insert, update on public.anos_letivos to authenticated;
 grant insert, update on public.atribuicoes_professores to authenticated;
 grant insert, update on public.tags_comportamento to authenticated;
 grant insert, update on public.horarios_letivos to authenticated;
+grant insert, update, delete on public.opcoes_configuracao to authenticated;
 grant insert, update on public.disciplinas to authenticated;
 grant insert, update on public.configuracoes_escola to authenticated;
 grant insert, update on public.importacoes_log to authenticated;
@@ -1771,7 +1816,7 @@ begin
     raise sqlstate 'PGRST' using
       message = json_build_object(
         'code',    'PGRST401',
-        'message', 'Token JWT ausente ou invalido. Autentique-se para acessar a API.'
+        'message', 'Token JWT ausente ou inválido. Autentique-se para acessar a API.'
       )::text,
       detail = json_build_object(
         'status',  401,
@@ -1792,8 +1837,8 @@ revoke execute on function public.is_responsavel_do_aluno from anon;
 revoke execute on function public.get_turma_do_aluno from anon;
 -- ============================================================================
 -- Migration: codigos_redefinicao
--- Descricao: Tabela de codigos para redefinicao de senha, funcoes auxiliares
---            e alteracao do enum tipo_notificacao.
+-- Descrição: Tabela de códigos para redefinição de senha, funções auxiliares
+--            e alteração do enum tipo_notificacao.
 -- ============================================================================
 
 -- ============================================================================
@@ -1817,13 +1862,13 @@ create table public.codigos_redefinicao (
 );
 
 comment on table public.codigos_redefinicao is
-  'Codigos de uso unico para redefinicao de senha via administracao. Expira em 1 hora.';
+  'Códigos de uso único para redefinição de senha via administração. Expira em 1 hora.';
 
 create index idx_codigos_redefinicao_email on public.codigos_redefinicao(email);
 create index idx_codigos_redefinicao_email_codigo on public.codigos_redefinicao(email, codigo);
 
 -- ============================================================================
--- 3. FUNCOES AUXILIARES
+-- 3. FUNÇÕES AUXILIARES
 -- ============================================================================
 
 create or replace function public.fn_gerar_codigo_redefinicao(
@@ -1839,7 +1884,7 @@ declare
   v_email  text;
 begin
   if public.get_user_papel() != 'gestao' then
-    raise exception 'Apenas a gestao pode gerar codigos de redefinicao.';
+    raise exception 'Apenas a gestão pode gerar códigos de redefinição.';
   end if;
 
   select email into v_email
@@ -1847,7 +1892,7 @@ begin
   where id = p_perfil_id and status = 'ativo';
 
   if v_email is null then
-    raise exception 'Perfil nao encontrado ou inativo.';
+    raise exception 'Perfil não encontrado ou inativo.';
   end if;
 
   v_codigo := lpad(floor(random() * 1000000)::text, 6, '0');
@@ -1860,7 +1905,7 @@ end;
 $$;
 
 comment on function public.fn_gerar_codigo_redefinicao is
-  'Gera um codigo de 6 digitos para redefinicao de senha. Apenas gestao.';
+  'Gera um código de 6 dígitos para redefinição de senha. Apenas gestão.';
 
 create or replace function public.fn_solicitar_codigo_redefinicao(p_email text)
 returns void
@@ -1882,8 +1927,8 @@ begin
     select
       p.id,
       'codigo_redefinicao',
-      'Solicitacao de redefinicao de senha',
-      'O usuario ' || v_nome || ' (' || p_email || ', ' || v_papel || ') solicitou um codigo para redefinir a senha.',
+      'Solicitação de redefinição de senha',
+      'O usuário ' || v_nome || ' (' || p_email || ', ' || v_papel || ') solicitou um código para redefinir a senha.',
       jsonb_build_object('email', p_email, 'perfil_id', v_perfil_id)
     from public.perfis p
     where p.papel = 'gestao' and p.status = 'ativo';
@@ -1892,10 +1937,10 @@ end;
 $$;
 
 comment on function public.fn_solicitar_codigo_redefinicao is
-  'Cria notificacoes para todos os usuarios de gestao quando alguem solicita redefinicao de senha.';
+  'Cria notificações para todos os usuários de gestão quando alguém solicita redefinição de senha.';
 
 -- ============================================================================
--- 3B. FUNCAO CRIAR USUARIO
+-- 3B. FUNÇÃO CRIAR USUÁRIO
 -- ============================================================================
 
 create or replace function public.fn_criar_usuario(
@@ -1914,7 +1959,7 @@ declare
   v_user_id uuid;
 begin
   if public.get_user_papel() != 'gestao' then
-    raise exception 'Apenas gestao pode criar usuarios.';
+    raise exception 'Apenas gestão pode criar usuários.';
   end if;
 
   v_user_id := gen_random_uuid();
@@ -1952,7 +1997,7 @@ end;
 $$;
 
 comment on function public.fn_criar_usuario is
-  'Cria usuario em auth.users com perfil pendente. Apenas gestao. O trigger fn_handle_new_user cria o perfil automaticamente.';
+  'Cria usuário em auth.users com perfil pendente. Apenas gestão. O trigger fn_handle_new_user cria o perfil automaticamente.';
 
 -- ============================================================================
 -- 4. ROW LEVEL SECURITY
@@ -1986,19 +2031,36 @@ create trigger trg_set_updated_at
   execute function public.fn_set_updated_at();
 
 -- ============================================================================
--- 6. GRANTS — EXPOR TABELAS E FUNCOES VIA DATA API
+-- 6. GRANTS — EXPOR TABELAS E FUNÇÕES VIA DATA API
 -- ============================================================================
 
 grant select, insert, update on public.codigos_redefinicao to authenticated, service_role;
 
--- Permissao DELETE para frequencias (usada pelo fluxo de DELETE+INSERT)
+-- Permissão DELETE para frequências (usada pelo fluxo de DELETE+INSERT)
 grant delete on public.frequencias to authenticated;
 
--- Permissao UPDATE para notificacoes (marcar como lida)
+-- Permissão UPDATE para notificações (marcar como lida)
 grant update, delete on public.notificacoes to authenticated;
 
--- Permissao INSERT para justificativas (gestao inserir manualmente)
+-- Permissão INSERT para justificativas (gestão inserir manualmente)
 grant insert on public.justificativas_faltas to authenticated;
+
+-- Permissões para o service_role (chave de serviço) nas tabelas de chat,
+-- usadas pela Edge Function e pelo setup de testes via REST API.
+grant select, insert, update, delete on public.conversas to service_role;
+grant select, insert, update, delete on public.mensagens to service_role;
+grant select, insert, update, delete on public.notificacoes to service_role;
+
+-- Permissões para o service_role nas tabelas usadas pelas Edge Functions
+-- (criar-usuario, redefinir-senha-codigo, processar-anexo, limpar-anexos)
+-- e pelo setup de testes via REST API.
+grant select, insert, update, delete on public.perfis to service_role;
+grant select, insert, update, delete on public.anexos to service_role;
+grant select, insert, update, delete on public.ocorrencias to service_role;
+
+-- O service_role é a chave administrativa de backend: espelha o comportamento
+-- do Supabase hospedado, com acesso total a todas as tabelas (bypass de RLS).
+grant all privileges on all tables in schema public to service_role;
 
 grant execute on function public.fn_gerar_codigo_redefinicao to authenticated;
 grant execute on function public.fn_criar_usuario to authenticated;
@@ -2035,10 +2097,10 @@ create policy "Notif: destinatario deleta proprias"
   using (destinatario_id = auth.uid());
 -- ============================================================================
 -- Migration: codigos_lifecycle
--- Descricao: Aprimora o ciclo de vida dos codigos de redefinicao:
---   1. Aceita perfil pendente na geracao
---   2. Evita duplicacao de codigos ativos para o mesmo perfil
---   3. Adiciona funcao de revogacao
+-- Descrição: Aprimora o ciclo de vida dos códigos de redefinição:
+--   1. Aceita perfil pendente na geração
+--   2. Evita duplicação de códigos ativos para o mesmo perfil
+--   3. Adiciona função de revogação
 --   4. Adiciona coluna revogado_em para auditoria
 -- ============================================================================
 
@@ -2049,14 +2111,14 @@ alter table public.codigos_redefinicao
   add column if not exists revogado_em timestamptz;
 
 comment on column public.codigos_redefinicao.revogado_em is
-  'Preenchido quando um admin revoga manualmente o codigo antes da expiracao natural.';
+  'Preenchido quando um admin revoga manualmente o código antes da expiração natural.';
 
 -- ============================================================================
--- 2. FUNCAO — GERAR CODIGO (REVISADA)
+-- 2. FUNÇÃO — GERAR CÓDIGO (REVISADA)
 -- ============================================================================
--- Mudancas:
+-- Mudanças:
 --   - Aceita perfis com status 'ativo' ou 'pendente'
---   - Retorna codigo ativo existente em vez de criar duplicata
+--   - Retorna código ativo existente em vez de criar duplicata
 -- ============================================================================
 
 create or replace function public.fn_gerar_codigo_redefinicao(
@@ -2073,10 +2135,10 @@ declare
   v_existente text;
 begin
   if public.get_user_papel() != 'gestao' then
-    raise exception 'Apenas a gestao pode gerar codigos de redefinicao.';
+    raise exception 'Apenas a gestão pode gerar códigos de redefinição.';
   end if;
 
-  -- Verifica se ja existe codigo ativo para este perfil
+  -- Verifica se já existe código ativo para este perfil
   select codigo into v_existente
   from public.codigos_redefinicao
   where perfil_id = p_perfil_id
@@ -2095,7 +2157,7 @@ begin
   where id = p_perfil_id and status in ('ativo', 'pendente');
 
   if v_email is null then
-    raise exception 'Perfil nao encontrado ou inativo.';
+    raise exception 'Perfil não encontrado ou inativo.';
   end if;
 
   v_codigo := lpad(floor(random() * 1000000)::text, 6, '0');
@@ -2108,10 +2170,10 @@ end;
 $$;
 
 comment on function public.fn_gerar_codigo_redefinicao is
-  'Gera codigo de 6 digitos ou retorna codigo ativo existente. Aceita perfis ativo ou pendente. Apenas gestao.';
+  'Gera código de 6 dígitos ou retorna código ativo existente. Aceita perfis ativo ou pendente. Apenas gestão.';
 
 -- ============================================================================
--- 3. FUNCAO — REVOGAR CODIGO
+-- 3. FUNÇÃO — REVOGAR CÓDIGO
 -- ============================================================================
 
 create or replace function public.fn_revogar_codigo(p_codigo_id uuid)
@@ -2122,7 +2184,7 @@ set search_path = ''
 as $$
 begin
   if public.get_user_papel() != 'gestao' then
-    raise exception 'Apenas a gestao pode revogar codigos.';
+    raise exception 'Apenas a gestão pode revogar códigos.';
   end if;
 
   update public.codigos_redefinicao
@@ -2133,13 +2195,13 @@ begin
     and expira_em > now();
 
   if not found then
-    raise exception 'Codigo ja foi usado ou ja expirou.';
+    raise exception 'Código já foi usado ou já expirou.';
   end if;
 end;
 $$;
 
 comment on function public.fn_revogar_codigo is
-  'Revogacao manual de codigo ativo. Define expira_em = now() e registra revogado_em. Lanca erro se ja usado ou expirado.';
+  'Revogação manual de código ativo. Define expira_em = now() e registra revogado_em. Lança erro se já usado ou expirado.';
 
 -- ============================================================================
 -- 4. GRANTS
@@ -2149,7 +2211,7 @@ grant execute on function public.fn_gerar_codigo_redefinicao to authenticated;
 grant execute on function public.fn_revogar_codigo to authenticated;
 -- ============================================================================
 -- Migration: enable_realtime
--- Descricao: Adiciona tabelas necessarias a publication supabase_realtime
+-- Descrição: Adiciona tabelas necessárias à publication supabase_realtime
 --            para que os eventos postgres_changes funcionem.
 -- ============================================================================
 
@@ -2197,7 +2259,7 @@ alter table ocorrencias
   add column if not exists notificar_responsavel boolean not null default false;
 
 -- -------- frequencias --------
--- observacao já existe; adicionar coluna para os motivos rápidos
+-- observação já existe; adicionar coluna para os motivos rápidos
 alter table frequencias
   add column if not exists motivos_ausencia text[] not null default '{}';
 
@@ -2219,6 +2281,80 @@ alter table ocorrencias
 
 -- drop do enum já que não é mais usado
 drop type if exists public.tipo_ocorrencia;
+
+-- ============================================================================
+-- Migration: Conversão de enums de catálogo para text
+-- Permite que a gestão configure valores via opcoes_configuracao
+-- ============================================================================
+
+-- views que dependem das colunas precisam ser recriadas
+drop view if exists public.v_gamificacao_ranking;
+drop view if exists public.v_pontuacao_diaria_turmas;
+
+alter table public.turmas alter column serie type text;
+alter table public.turmas alter column letra type text;
+
+alter table public.vinculos_responsaveis
+  alter column tipo_relacao drop default,
+  alter column tipo_relacao type text,
+  alter column tipo_relacao set default 'outro';
+
+alter table public.atribuicoes_professores
+  alter column papel drop default,
+  alter column papel type text,
+  alter column papel set default 'titular';
+
+drop type if exists public.serie_turma;
+drop type if exists public.letra_turma;
+drop type if exists public.tipo_vinculo;
+drop type if exists public.papel_atribuicao;
+
+-- recria as views que dependiam das colunas
+create or replace view public.v_gamificacao_ranking
+with (security_invoker = true)
+as
+select
+  t.id as turma_id,
+  t.nome_completo as turma_nome,
+  t.serie,
+  t.letra,
+  al.ano,
+  coalesce(sum(pt.pontos_total), 0) as pontos_total,
+  coalesce(avg(pt.pontos_presenca), 0) as media_presenca,
+  coalesce(avg(pt.pontos_comportamento), 0) as media_comportamento,
+  rank() over (partition by al.ano order by coalesce(sum(pt.pontos_total), 0) desc) as posicao_ranking
+from public.turmas t
+join public.anos_letivos al on al.id = t.ano_letivo_id and al.ativo = true
+left join public.pontuacao_turmas pt on pt.turma_id = t.id and pt.ano_letivo_id = al.id
+group by t.id, t.nome_completo, t.serie, t.letra, al.ano;
+
+create or replace view public.v_pontuacao_diaria_turmas
+with (security_invoker = true)
+as
+select
+  t.id as turma_id,
+  t.nome_completo as turma_nome,
+  f.data_aula as data_referencia,
+  count(distinct f.aluno_id) filter (where f.status = 'presente') as total_presentes,
+  count(distinct e.aluno_id) as total_alunos,
+  round(
+    (count(distinct f.aluno_id) filter (where f.status = 'presente'))::numeric /
+    nullif(count(distinct e.aluno_id), 0) * 100,
+    2
+  ) as percentual_presenca,
+  count(distinct rc.id) filter (where tc.categoria = 'positivo') as comportamentos_positivos,
+  count(distinct rc.id) filter (where tc.categoria = 'atencao') as comportamentos_atencao,
+  count(distinct rc.id) filter (where tc.categoria = 'critico') as comportamentos_criticos
+from public.turmas t
+join public.enturmacoes e on e.turma_id = t.id and e.status = 'matriculado'
+left join public.frequencias f on f.turma_id = t.id and f.deleted_at is null
+left join public.registros_comportamento rc on rc.turma_id = t.id
+left join public.registro_comportamento_tags rct on rct.registro_id = rc.id
+left join public.tags_comportamento tc on tc.id = rct.tag_id
+group by t.id, t.nome_completo, f.data_aula;
+
+comment on view public.v_gamificacao_ranking is 'RF28: Leaderboard interturmas baseado na pontuação mensal acumulada.';
+comment on view public.v_pontuacao_diaria_turmas is 'RF28: Base para cálculo dos snapshots mensais de gamificação.';
 
 -- recria a view com o novo tipo
 create or replace view public.v_feed_aluno
@@ -2322,7 +2458,7 @@ create policy "JustBucket: gestao update"
   with check (bucket_id = 'justificativas' and public.get_user_papel() = 'gestao');
 
 -- ============================================================================
--- RLS: Guardian attachment read access
+-- RLS: Acesso de leitura de anexos pelo responsável
 -- ============================================================================
 
 create policy "JustAnexos: responsavel le proprio"
@@ -2346,7 +2482,7 @@ create policy "Anexos: responsavel le proprio"
   );
 
 -- ============================================================================
--- Trigger: auto-justify frequencies on justification acceptance
+-- Trigger: justifica automaticamente as frequências ao aceitar a justificativa
 -- ============================================================================
 
 create or replace function public.fn_auto_justificar_frequencias()
@@ -2376,7 +2512,7 @@ create trigger trg_auto_justificar_frequencias
 
 -- ============================================================================
 -- Migration: chat_notificacoes
--- Descricao: Trigger que cria notificacao automatica ao receber mensagem no chat.
+-- Descrição: Trigger que cria notificação automática ao receber mensagem no chat.
 -- ============================================================================
 
 create or replace function public.fn_notificar_nova_mensagem()
@@ -2397,7 +2533,7 @@ begin
 
   select nome into v_nome_remetente from public.perfis where id = new.remetente_id;
 
-  -- Reabrir conversa se estava oculta (responsavel enviou)
+  -- Reabrir conversa se estava oculta (responsável enviou)
   update public.conversas
   set ativa = true
   where id = new.conversa_id and ativa = false;
@@ -2426,3 +2562,248 @@ create trigger trg_notificar_nova_mensagem
   after insert on public.mensagens
   for each row
   execute function public.fn_notificar_nova_mensagem();
+
+-- ============================================================================
+-- 26. INTEGRIDADE — PREVENÇÃO DE DADOS ÓRFÃOS
+-- ============================================================================
+
+-- 26.1 Reparo idempotente: recria opções de catálogo e tags referenciadas que
+-- estejam ausentes, para que as constraints abaixo possam ser ativadas sem
+-- quebrar dados existentes.
+insert into public.opcoes_configuracao (tipo, chave, rotulo, icone, ordem, ativo)
+select distinct 'modulo', c, c, null, 200, true
+from public.perfis, unnest(acesso_modulos) as c
+where not exists (select 1 from public.opcoes_configuracao o where o.tipo = 'modulo' and o.chave = c);
+
+insert into public.opcoes_configuracao (tipo, chave, rotulo, icone, ordem, ativo)
+select distinct 'documento', c, c, null, 200, true
+from public.alunos, unnest(documentos_recebidos) as c
+where not exists (select 1 from public.opcoes_configuracao o where o.tipo = 'documento' and o.chave = c);
+
+insert into public.opcoes_configuracao (tipo, chave, rotulo, icone, ordem, ativo)
+select distinct 'periodo', periodo, periodo, null, 200, true
+from public.frequencias
+where not exists (select 1 from public.opcoes_configuracao o where o.tipo = 'periodo' and o.chave = frequencias.periodo);
+
+insert into public.opcoes_configuracao (tipo, chave, rotulo, icone, ordem, ativo)
+select distinct 'motivo_ausencia', c, c, null, 200, true
+from public.frequencias, unnest(motivos_ausencia) as c
+where not exists (select 1 from public.opcoes_configuracao o where o.tipo = 'motivo_ausencia' and o.chave = c);
+
+insert into public.opcoes_configuracao (tipo, chave, rotulo, icone, ordem, ativo)
+select distinct 'tipo_ocorrencia', c, c, null, 200, true
+from public.ocorrencias, unnest(tipo) as c
+where not exists (select 1 from public.opcoes_configuracao o where o.tipo = 'tipo_ocorrencia' and o.chave = c);
+
+insert into public.opcoes_configuracao (tipo, chave, rotulo, icone, ordem, ativo)
+select distinct 'tipo_vinculo', tipo_relacao, tipo_relacao, null, 200, true
+from public.vinculos_responsaveis
+where not exists (select 1 from public.opcoes_configuracao o where o.tipo = 'tipo_vinculo' and o.chave = vinculos_responsaveis.tipo_relacao);
+
+insert into public.opcoes_configuracao (tipo, chave, rotulo, icone, ordem, ativo)
+select distinct 'papel_atribuicao', papel, papel, null, 200, true
+from public.atribuicoes_professores
+where not exists (select 1 from public.opcoes_configuracao o where o.tipo = 'papel_atribuicao' and o.chave = atribuicoes_professores.papel);
+
+insert into public.opcoes_configuracao (tipo, chave, rotulo, icone, ordem, ativo)
+select distinct 'serie_turma', serie, serie, null, 200, true
+from public.turmas
+where not exists (select 1 from public.opcoes_configuracao o where o.tipo = 'serie_turma' and o.chave = turmas.serie);
+
+insert into public.opcoes_configuracao (tipo, chave, rotulo, icone, ordem, ativo)
+select distinct 'letra_turma', letra, letra, null, 200, true
+from public.turmas
+where not exists (select 1 from public.opcoes_configuracao o where o.tipo = 'letra_turma' and o.chave = turmas.letra);
+
+insert into public.tags_comportamento (nome, categoria, icone, descricao, peso_pontuacao, ativo)
+select distinct t, 'atencao'::public.categoria_tag, null, null, 0, true
+from public.ocorrencias, unnest(tags_comportamento) as t
+where not exists (select 1 from public.tags_comportamento tc where tc.nome = t);
+
+-- 26.2 Funções auxiliares de validação de catálogo (usadas nas CHECKs).
+-- SECURITY DEFINER: as CHECKs são avaliadas com a role que grava (incluindo
+-- service_role nas Edge Functions), que pode não ter SELECT no catálogo.
+create or replace function public.fn_chave_catalogo_valida(p_tipo text, p_chave text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (
+    select 1 from public.opcoes_configuracao
+    where tipo = p_tipo and chave = p_chave
+  )
+$$;
+
+create or replace function public.fn_chaves_catalogo_validas(p_tipo text, p_chaves text[])
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(cardinality(p_chaves), 0) = 0
+      or not exists (
+        select 1 from unnest(p_chaves) as c(chave)
+        where not exists (
+          select 1 from public.opcoes_configuracao
+          where tipo = p_tipo and chave = c.chave
+        )
+      )
+$$;
+
+create or replace function public.fn_tags_validas(p_nomes text[])
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(cardinality(p_nomes), 0) = 0
+      or not exists (
+        select 1 from unnest(p_nomes) as t(nome)
+        where not exists (
+          select 1 from public.tags_comportamento
+          where nome = t.nome
+        )
+      )
+$$;
+
+grant execute on function public.fn_chave_catalogo_valida(text, text) to authenticated;
+grant execute on function public.fn_chaves_catalogo_validas(text, text[]) to authenticated;
+grant execute on function public.fn_tags_validas(text[]) to authenticated;
+
+-- 26.3 Constraints que impedem a gravação de chaves/nomes sem correspondência
+-- no catálogo (impede a criação de referências órfãs a partir de novas escritas).
+alter table public.turmas
+  add constraint chk_turmas_serie_catalogo
+  check (public.fn_chave_catalogo_valida('serie_turma', serie));
+alter table public.turmas
+  add constraint chk_turmas_letra_catalogo
+  check (public.fn_chave_catalogo_valida('letra_turma', letra));
+alter table public.vinculos_responsaveis
+  add constraint chk_vinculos_tipo_relacao_catalogo
+  check (public.fn_chave_catalogo_valida('tipo_vinculo', tipo_relacao));
+alter table public.atribuicoes_professores
+  add constraint chk_atribuicoes_papel_catalogo
+  check (public.fn_chave_catalogo_valida('papel_atribuicao', papel));
+alter table public.frequencias
+  add constraint chk_frequencias_periodo_catalogo
+  check (public.fn_chave_catalogo_valida('periodo', periodo));
+alter table public.perfis
+  add constraint chk_perfis_modulos_catalogo
+  check (public.fn_chaves_catalogo_validas('modulo', acesso_modulos));
+alter table public.alunos
+  add constraint chk_alunos_documentos_catalogo
+  check (public.fn_chaves_catalogo_validas('documento', documentos_recebidos));
+alter table public.frequencias
+  add constraint chk_frequencias_motivos_catalogo
+  check (public.fn_chaves_catalogo_validas('motivo_ausencia', motivos_ausencia));
+alter table public.ocorrencias
+  add constraint chk_ocorrencias_tipo_catalogo
+  check (public.fn_chaves_catalogo_validas('tipo_ocorrencia', tipo));
+alter table public.ocorrencias
+  add constraint chk_ocorrencias_tags_validas
+  check (public.fn_tags_validas(tags_comportamento));
+
+-- 26.4 Exclusão de turma não deve apagar silenciosamente chat/atribuições.
+alter table public.conversas
+  drop constraint conversas_turma_id_fkey,
+  add constraint conversas_turma_id_fkey
+  foreign key (turma_id) references public.turmas(id) on delete restrict;
+
+alter table public.atribuicoes_professores
+  drop constraint atribuicoes_professores_turma_id_fkey,
+  add constraint atribuicoes_professores_turma_id_fkey
+  foreign key (turma_id) references public.turmas(id) on delete restrict;
+
+-- 26.5 Expurgo de anexos e objetos de storage órfãos.
+-- O Supabase não permite deletar storage.objects via SQL; o expurgo é feito pela
+-- Edge Function "limpar-anexos" (usa a Storage API). O relatório de órfãos abaixo
+-- (fn_relatorio_orfas) permite monitorar/auditar as pendências.
+-- Agendamento sugerido: cron diário no Dashboard do Supabase chamando
+-- /functions/v1/limpar-anexos (com header cron-secret).
+
+-- 26.6 Relatório de referências órfãs (monitoramento).
+create or replace function public.fn_relatorio_orfas()
+returns table (categoria text, detalhe text, quantidade bigint)
+language sql
+security definer
+set search_path = ''
+as $$
+  select 'catalogo', 'perfis.acesso_modulos sem opção de modulo', count(*)::bigint
+  from public.perfis p
+  where exists (
+    select 1 from unnest(p.acesso_modulos) c
+    where not exists (select 1 from public.opcoes_configuracao o where o.tipo = 'modulo' and o.chave = c)
+  )
+  union all
+  select 'catalogo', 'alunos.documentos_recebidos sem opção de documento', count(*)::bigint
+  from public.alunos a
+  where exists (
+    select 1 from unnest(a.documentos_recebidos) c
+    where not exists (select 1 from public.opcoes_configuracao o where o.tipo = 'documento' and o.chave = c)
+  )
+  union all
+  select 'catalogo', 'frequencias.periodo sem opção de periodo', count(*)::bigint
+  from public.frequencias f
+  where not exists (select 1 from public.opcoes_configuracao o where o.tipo = 'periodo' and o.chave = f.periodo)
+  union all
+  select 'catalogo', 'frequencias.motivos_ausencia sem opção de motivo', count(*)::bigint
+  from public.frequencias f
+  where exists (
+    select 1 from unnest(f.motivos_ausencia) c
+    where not exists (select 1 from public.opcoes_configuracao o where o.tipo = 'motivo_ausencia' and o.chave = c)
+  )
+  union all
+  select 'catalogo', 'ocorrencias.tipo sem opção de tipo_ocorrencia', count(*)::bigint
+  from public.ocorrencias o
+  where exists (
+    select 1 from unnest(o.tipo) c
+    where not exists (select 1 from public.opcoes_configuracao oc where oc.tipo = 'tipo_ocorrencia' and oc.chave = c)
+  )
+  union all
+  select 'catalogo', 'ocorrencias.tags_comportamento sem tag existente', count(*)::bigint
+  from public.ocorrencias o
+  where exists (
+    select 1 from unnest(o.tags_comportamento) t
+    where not exists (select 1 from public.tags_comportamento tc where tc.nome = t)
+  )
+  union all
+  select 'catalogo', 'turmas.serie sem opção de serie_turma', count(*)::bigint
+  from public.turmas t
+  where not exists (select 1 from public.opcoes_configuracao o where o.tipo = 'serie_turma' and o.chave = t.serie)
+  union all
+  select 'catalogo', 'turmas.letra sem opção de letra_turma', count(*)::bigint
+  from public.turmas t
+  where not exists (select 1 from public.opcoes_configuracao o where o.tipo = 'letra_turma' and o.chave = t.letra)
+  union all
+  select 'catalogo', 'vinculos.tipo_relacao sem opção de tipo_vinculo', count(*)::bigint
+  from public.vinculos_responsaveis v
+  where not exists (select 1 from public.opcoes_configuracao o where o.tipo = 'tipo_vinculo' and o.chave = v.tipo_relacao)
+  union all
+  select 'catalogo', 'atribuicoes.papel sem opção de papel_atribuicao', count(*)::bigint
+  from public.atribuicoes_professores a
+  where not exists (select 1 from public.opcoes_configuracao o where o.tipo = 'papel_atribuicao' and o.chave = a.papel)
+  union all
+  select 'perfil', 'auth.users sem perfil', count(*)::bigint
+  from auth.users u
+  left join public.perfis p on p.id = u.id
+  where p.id is null
+  union all
+  select 'enturmacao', 'alunos ativos sem enturmacao matriculado', count(*)::bigint
+  from public.alunos a
+  where a.status = 'ativo'
+    and not exists (
+      select 1 from public.enturmacoes e
+      where e.aluno_id = a.id and e.status = 'matriculado'
+    )
+  union all
+  select 'anexos', 'anexos sem vinculo (justificativa_anexos/ocorrencia_anexos)', count(*)::bigint
+  from public.anexos a
+  where not exists (select 1 from public.justificativa_anexos ja where ja.anexo_id = a.id)
+    and not exists (select 1 from public.ocorrencia_anexos oa where oa.anexo_id = a.id)
+$$;
+
+grant execute on function public.fn_relatorio_orfas to authenticated;

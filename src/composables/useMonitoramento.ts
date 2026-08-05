@@ -25,9 +25,39 @@ import type {
   HorarioProtegido,
 } from '@/tipos/componentes';
 
+let cacheConfigSistema: {
+  critico: number;
+  preventivo: number;
+  mensagemForaHorario: string;
+} | null = null;
+
+async function carregarConfigSistema(): Promise<void> {
+  if (cacheConfigSistema) return;
+  try {
+    const { data } = await supabaseClient
+      .from('configuracoes_sistema')
+      .select('limite_critico_faltas, limite_preventivo_faltas, mensagem_fora_horario')
+      .single();
+    cacheConfigSistema = {
+      critico: data?.limite_critico_faltas ?? 25,
+      preventivo: data?.limite_preventivo_faltas ?? 10,
+      mensagemForaHorario:
+        data?.mensagem_fora_horario ??
+        'O canal de diálogo está fora do horário escolar. Mensagens enviadas agora serão respondidas quando a coordenação estiver disponível.',
+    };
+  } catch {
+    cacheConfigSistema = {
+      critico: 25,
+      preventivo: 10,
+      mensagemForaHorario: 'O canal de diálogo está fora do horário escolar.',
+    };
+  }
+}
+
 function calcularNivelRisco(totalAusencias: number, totalOcorrencias: number): NivelRisco {
-  if (totalAusencias >= 5 || totalOcorrencias >= 1) return 'alto';
-  if (totalAusencias >= 3) return 'medio';
+  const l = cacheConfigSistema ?? { critico: 25, preventivo: 10, mensagemForaHorario: '' };
+  if (totalAusencias >= l.critico || totalOcorrencias >= 1) return 'alto';
+  if (totalAusencias >= l.preventivo) return 'medio';
   return 'baixo';
 }
 
@@ -248,7 +278,7 @@ export function useMonitoramento() {
         .eq('status', 'matriculado')
         .single();
 
-      if (!enturmacao) throw new Error('Aluno nao encontrado em nenhuma turma.');
+      if (!enturmacao) throw new Error('Aluno não encontrado em nenhuma turma.');
       const tId = (enturmacao as unknown as { turma_id: string }).turma_id;
       const aId = (enturmacao as unknown as { ano_letivo_id: string }).ano_letivo_id;
 
@@ -334,6 +364,7 @@ export function useMonitoramento() {
   }
 
   async function buscarRankingRisco(): Promise<AlunoRisco[]> {
+    await carregarConfigSistema();
     carregando.value = true;
     erro.value = null;
     try {
@@ -515,19 +546,25 @@ export function useMonitoramento() {
       const anexoIds = [...new Set(jaList.map((ja) => ja.anexo_id))];
       const anexoMap = new Map<
         string,
-        { nome_arquivo: string; storage_path: string; processado_em: string | null }
+        {
+          nome_arquivo: string;
+          storage_path: string;
+          mime_type: string;
+          processado_em: string | null;
+        }
       >();
 
       if (anexoIds.length) {
         const { data: anexosData } = await supabaseClient
           .from('anexos')
-          .select('id, nome_arquivo, storage_path, processado_em')
+          .select('id, nome_arquivo, storage_path, mime_type, processado_em')
           .in('id', anexoIds);
 
         const anexos = (anexosData ?? []) as unknown as Array<{
           id: string;
           nome_arquivo: string;
           storage_path: string;
+          mime_type: string;
           processado_em: string | null;
         }>;
         for (const a of anexos) {
@@ -537,7 +574,13 @@ export function useMonitoramento() {
 
       const justAnexoMap = new Map<
         string,
-        { anexoId: string; nome: string; storagePath: string; processadoEm: string | null }
+        {
+          anexoId: string;
+          nome: string;
+          storagePath: string;
+          mimeType: string;
+          processadoEm: string | null;
+        }
       >();
       for (const ja of jaList) {
         const a = anexoMap.get(ja.anexo_id);
@@ -546,6 +589,7 @@ export function useMonitoramento() {
             anexoId: ja.anexo_id,
             nome: a.nome_arquivo,
             storagePath: a.storage_path,
+            mimeType: a.mime_type,
             processadoEm: a.processado_em,
           });
         }
@@ -557,14 +601,6 @@ export function useMonitoramento() {
         const responsavel = responsaveis.find((r) => r.id === j.responsavel_id);
         const anexo = justAnexoMap.get(j.id);
 
-        let anexoUrl: string | undefined;
-        if (anexo?.storagePath) {
-          const { data: signedData } = await supabaseClient.storage
-            .from('justificativas')
-            .createSignedUrl(anexo.storagePath, 3600);
-          anexoUrl = signedData?.signedUrl ?? undefined;
-        }
-
         result.push({
           id: j.id,
           alunoNome: aluno?.nome ?? 'Aluno não encontrado',
@@ -572,8 +608,9 @@ export function useMonitoramento() {
           dataAusencia: formatarData(j.data_falta),
           dataFim: j.data_fim ? formatarData(j.data_fim) : null,
           motivo: j.motivo,
-          anexoUrl,
+          anexoPath: anexo?.storagePath,
           anexoNome: anexo?.nome,
+          anexoMime: anexo?.mimeType,
           anexoId: anexo?.anexoId ?? undefined,
           processadoEm: anexo?.processadoEm ?? undefined,
           status: j.status as JustificativaPendente['status'],
@@ -746,6 +783,7 @@ export function useMonitoramento() {
     alunoNome: string,
     alunoTurma: string | null,
   ): Promise<TermometroAtencao> {
+    await carregarConfigSistema();
     try {
       const { data: freqs, error: errF } = await supabaseClient
         .from('frequencias')
@@ -839,31 +877,32 @@ export function useMonitoramento() {
       const anexoIds = [...new Set(jaList.map((ja) => ja.anexo_id))];
       const { data: anexosData } = await supabaseClient
         .from('anexos')
-        .select('id, nome_arquivo, storage_path')
+        .select('id, nome_arquivo, storage_path, mime_type')
         .in('id', anexoIds);
       const anexos = (anexosData ?? []) as unknown as Array<{
         id: string;
         nome_arquivo: string;
         storage_path: string;
+        mime_type: string;
       }>;
       const anexoMap = new Map(anexos.map((a) => [a.id, a]));
 
-      const anexoPorJustKey = new Map<string, { nome: string; anexoUrl: string }>();
+      const anexoPorJustKey = new Map<
+        string,
+        { nome: string; storagePath: string; mimeType: string }
+      >();
       for (const ja of jaList) {
         const j = justs.find((x) => x.id === ja.justificativa_id);
         if (!j) continue;
         const a = anexoMap.get(ja.anexo_id);
         if (!a?.storage_path) continue;
-        const { data: signedData } = await supabaseClient.storage
-          .from('justificativas')
-          .createSignedUrl(a.storage_path, 7200);
-        if (!signedData?.signedUrl) continue;
         const start = new Date(j.data_falta);
         const end = new Date(j.data_fim ?? j.data_falta);
         for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
           anexoPorJustKey.set(`${j.aluno_id}:${d.toISOString().slice(0, 10)}`, {
             nome: a.nome_arquivo,
-            anexoUrl: signedData.signedUrl,
+            storagePath: a.storage_path,
+            mimeType: a.mime_type,
           });
         }
       }
@@ -911,8 +950,9 @@ export function useMonitoramento() {
             frequenciaId: aus.id,
             justificativaStatus,
             justificativaMotivo,
-            anexoUrl: anexoInfo?.anexoUrl,
+            anexoPath: anexoInfo?.storagePath,
             anexoNome: anexoInfo?.nome,
+            anexoMime: anexoInfo?.mimeType,
             urgente: false,
           });
         }
@@ -979,55 +1019,74 @@ export function useMonitoramento() {
     }
   }
 
-  function processarAnexoAsync(justificativaId: string, responsavelId: string, arquivo: File) {
+  async function processarAnexoAsync(
+    justificativaId: string,
+    responsavelId: string,
+    arquivo: File,
+  ) {
     const edgeFunctionUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/processar-anexo`;
     const ext = arquivo.type === 'image/jpeg' ? 'jpg' : (arquivo.name.split('.').pop() ?? 'bin');
     const storagePath = `${responsavelId}/${justificativaId}/${Date.now()}-${justificativaId.slice(0, 8)}.${ext}`;
 
-    comprimirImagem(arquivo)
-      .then(({ blob, mimeType, tamanhoComprimido }) =>
-        supabaseClient.storage
-          .from('justificativas')
-          .upload(storagePath, blob, { contentType: mimeType, upsert: false })
-          .then(() => ({ blob, mimeType, tamanhoComprimido })),
-      )
-      .then(({ mimeType, tamanhoComprimido }) => {
-        const anexoId = crypto.randomUUID();
-        return supabaseClient
-          .from('anexos')
-          .insert({
-            id: anexoId,
-            storage_path: storagePath,
-            nome_arquivo: arquivo.name,
-            mime_type: mimeType,
-            tamanho_bytes: tamanhoComprimido,
-            criado_por: responsavelId,
-          })
-          .then(() => anexoId);
-      })
-      .then((anexoId) =>
-        supabaseClient
-          .from('justificativa_anexos')
-          .insert({
-            justificativa_id: justificativaId,
-            anexo_id: anexoId,
-          })
-          .then(() => anexoId),
-      )
-      .then((anexoId) => {
-        fetch(edgeFunctionUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ storagePath, mimeType: arquivo.type, anexoId }),
-        }).catch(() => {});
-      })
-      .catch((e) => console.error('[useMonitoramento] Anexo async processing failed:', e));
+    const removerStorage = () =>
+      supabaseClient.storage
+        .from('justificativas')
+        .remove([storagePath])
+        .catch(() => {});
+
+    try {
+      const { blob, mimeType, tamanhoComprimido } = await comprimirImagem(arquivo);
+
+      await supabaseClient.storage.from('justificativas').upload(storagePath, blob, {
+        contentType: mimeType,
+        upsert: false,
+      });
+
+      const anexoId = crypto.randomUUID();
+      const { error: anexoError } = await supabaseClient.from('anexos').insert({
+        id: anexoId,
+        storage_path: storagePath,
+        nome_arquivo: arquivo.name,
+        mime_type: mimeType,
+        tamanho_bytes: tamanhoComprimido,
+        criado_por: responsavelId,
+      });
+      if (anexoError) {
+        await removerStorage();
+        throw anexoError;
+      }
+
+      const { error: vinculoError } = await supabaseClient.from('justificativa_anexos').insert({
+        justificativa_id: justificativaId,
+        anexo_id: anexoId,
+      });
+      if (vinculoError) {
+        // Compensação: remove o objeto do armazenamento e tenta remover a linha de anexo
+        // (se a permissão permitir). Linhas remanescentes são limpas pelo job de expurgo.
+        try {
+          await supabaseClient.from('anexos').delete().eq('id', anexoId);
+        } catch {
+          /* sem permissão de deleção pelo cliente */
+        }
+        await removerStorage();
+        throw vinculoError;
+      }
+
+      fetch(edgeFunctionUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ storagePath, mimeType: arquivo.type, anexoId }),
+      }).catch((e) => console.error('[useMonitoramento] Falha no processamento do anexo (edge):', e));
+    } catch (e) {
+      console.error('[useMonitoramento] Falha no processamento assíncrono do anexo:', e);
+    }
   }
 
   async function criarOuObterConversa(
     responsavelId: string,
     alunoId: string,
     turmaId: string,
+    comMensagemSistema = true,
   ): Promise<string | null> {
     try {
       const { data: existing } = await supabaseClient
@@ -1055,22 +1114,60 @@ export function useMonitoramento() {
       if (error) throw error;
       const convId = (data as unknown as { id: string }).id;
 
-      const agora = new Date().toISOString();
-      await supabaseClient.from('mensagens').insert({
-        conversa_id: convId,
-        remetente_id: responsavelId,
-        conteudo: 'Conversa iniciada para acompanhamento escolar.',
-        is_system_message: true,
-        created_at: agora,
-      });
+      if (comMensagemSistema) {
+        const agora = new Date().toISOString();
+        await supabaseClient.from('mensagens').insert({
+          conversa_id: convId,
+          remetente_id: responsavelId,
+          conteudo: 'Conversa iniciada para acompanhamento escolar.',
+          is_system_message: true,
+          created_at: agora,
+        });
 
-      await supabaseClient.from('conversas').update({ ultima_mensagem_em: agora }).eq('id', convId);
+        await supabaseClient
+          .from('conversas')
+          .update({ ultima_mensagem_em: agora })
+          .eq('id', convId);
+      }
 
       return convId;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       console.error('[useMonitoramento] Erro ao criar/obter conversa:', msg);
       erro.value = 'Falha ao iniciar conversa.';
+      return null;
+    }
+  }
+
+  async function abrirConversaResponsavel(alunoId: string): Promise<string | null> {
+    try {
+      const { data: vinculos } = await supabaseClient
+        .from('vinculos_responsaveis')
+        .select('responsavel_id')
+        .eq('aluno_id', alunoId)
+        .eq('ativo', true)
+        .order('contato_prioritario', { ascending: false })
+        .limit(1);
+
+      const responsavelId = (vinculos?.[0] as { responsavel_id: string } | undefined)
+        ?.responsavel_id;
+      if (!responsavelId) return null;
+
+      const { data: enturmacoes } = await supabaseClient
+        .from('enturmacoes')
+        .select('turma_id')
+        .eq('aluno_id', alunoId)
+        .eq('status', 'matriculado')
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      const turmaId = (enturmacoes?.[0] as { turma_id: string } | undefined)?.turma_id;
+      if (!turmaId) return null;
+
+      return await criarOuObterConversa(responsavelId, alunoId, turmaId, false);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error('[useMonitoramento] Erro ao abrir conversa com responsável:', msg);
       return null;
     }
   }
@@ -1280,7 +1377,7 @@ export function useMonitoramento() {
       return contatos;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      console.error('[useMonitoramento] Erro ao buscar contatos do responsavel:', msg);
+      console.error('[useMonitoramento] Erro ao buscar contatos do responsável:', msg);
       return [];
     }
   }
@@ -1380,7 +1477,7 @@ export function useMonitoramento() {
       return contatos.filter((c) => c.ultimaMensagem !== 'Nenhuma mensagem ainda');
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      console.error('[useMonitoramento] Erro ao buscar contatos staff:', msg);
+      console.error('[useMonitoramento] Erro ao buscar contatos da equipe:', msg);
       return [];
     }
   }
@@ -1441,26 +1538,82 @@ export function useMonitoramento() {
     }
   }
 
+  let cacheHorarios: HorarioProtegido | null = null;
+
+  async function carregarHorarios(): Promise<HorarioProtegido> {
+    if (cacheHorarios) return cacheHorarios;
+    await carregarConfigSistema();
+    const msg =
+      cacheConfigSistema?.mensagemForaHorario ?? 'O canal de diálogo está fora do horário escolar.';
+    try {
+      const { data } = await supabaseClient
+        .from('horarios_letivos')
+        .select('dia_semana, hora_inicio, hora_fim')
+        .eq('ativo', true)
+        .order('dia_semana');
+      if (!data || data.length === 0) {
+        cacheHorarios = {
+          inicio: '07:00',
+          fim: '17:00',
+          diasSemana: [1, 2, 3, 4, 5],
+          mensagemForaHorario: msg,
+        };
+        return cacheHorarios;
+      }
+      const dias = [...new Set(data.map((h: { dia_semana: number }) => h.dia_semana))].sort();
+      const horasInicio =
+        data
+          .filter((h: { dia_semana: number }) => h.dia_semana === dias[0])
+          .map((h: { hora_inicio: string }) => h.hora_inicio.slice(0, 5))
+          .sort()[0] ?? '07:00';
+      const horasFim =
+        data
+          .filter((h: { dia_semana: number }) => h.dia_semana === dias[dias.length - 1])
+          .map((h: { hora_fim: string }) => h.hora_fim.slice(0, 5))
+          .sort()
+          .reverse()[0] ?? '17:00';
+      cacheHorarios = {
+        inicio: horasInicio,
+        fim: horasFim,
+        diasSemana: dias,
+        mensagemForaHorario: msg,
+      };
+      return cacheHorarios;
+    } catch {
+      cacheHorarios = {
+        inicio: '07:00',
+        fim: '17:00',
+        diasSemana: [1, 2, 3, 4, 5],
+        mensagemForaHorario: msg,
+      };
+      return cacheHorarios;
+    }
+  }
+
   function horarioProtegidoAtivo(agora: Date = new Date()): boolean {
     const dia = agora.getDay();
     const hora = agora.getHours();
     const minuto = agora.getMinutes();
     const minutosTotais = hora * 60 + minuto;
 
-    if (dia < 1 || dia > 5) return false;
-
-    return minutosTotais >= 7 * 60 && minutosTotais <= 17 * 60;
-  }
-
-  function obterHorarioProtegido(): HorarioProtegido {
-    return {
+    const h = cacheHorarios ?? {
       inicio: '07:00',
       fim: '17:00',
       diasSemana: [1, 2, 3, 4, 5],
-      mensagemForaHorario:
-        'O canal de diálogo está fora do horário escolar (segunda a sexta, das 7h às 17h). ' +
-        'Mensagens enviadas agora serão respondidas quando a coordenação estiver disponível.',
+      mensagemForaHorario: '',
     };
+    if (!h.diasSemana.includes(dia)) return false;
+
+    const [hInicio = 0, mInicio = 0] = h.inicio.split(':').map(Number);
+    const [hFim = 0, mFim = 0] = h.fim.split(':').map(Number);
+    const inicioMinutos = hInicio * 60 + mInicio;
+    const fimMinutos = hFim * 60 + mFim;
+
+    return minutosTotais >= inicioMinutos && minutosTotais <= fimMinutos;
+  }
+
+  async function obterHorarioProtegido(): Promise<HorarioProtegido> {
+    return await carregarHorarios();
   }
 
   return {
@@ -1486,6 +1639,7 @@ export function useMonitoramento() {
     buscarContatosResponsavel,
     buscarContatosGestao,
     criarOuObterConversa,
+    abrirConversaResponsavel,
     enviarMensagem,
     marcarMensagensComoLidas,
     ocultarConversa,

@@ -2,12 +2,18 @@
 import { onMounted, ref, watch } from 'vue';
 import { useRouter, onBeforeRouteLeave } from 'vue-router';
 import { supabaseClient } from '@/servicos/supabase';
+import { useOpcoesConfiguracao } from '@/composables/useOpcoesConfiguracao';
 import CampoFormulario from '@/componentes/CampoFormulario.vue';
-import type { Turma, SerieTurma, LetraTurma } from '@/tipos/database';
+import type { Turma } from '@/tipos/database';
+import type { OpcaoCheckbox } from '@/tipos/componentes';
 
 const router = useRouter();
 
+const { buscarOpcoes } = useOpcoesConfiguracao();
+
 const turmas = ref<Turma[]>([]);
+const opcoesSerie = ref<OpcaoCheckbox[]>([]);
+const opcoesLetra = ref<OpcaoCheckbox[]>([]);
 const carregando = ref(false);
 const mensagemSucesso = ref<string | null>(null);
 const mensagemErro = ref<string | null>(null);
@@ -16,8 +22,8 @@ const modalAberto = ref(false);
 const modoEdicao = ref(false);
 const editandoId = ref<string | null>(null);
 
-const formSerie = ref<SerieTurma>('1º');
-const formLetra = ref<LetraTurma>('A');
+const formSerie = ref('1º');
+const formLetra = ref('A');
 const formCapacidade = ref<number | null>(null);
 const formAtivo = ref(true);
 const formDirty = ref(false);
@@ -57,6 +63,8 @@ function resetForm() {
 async function carregarTurmas() {
   carregando.value = true;
   try {
+    opcoesSerie.value = await buscarOpcoes('serie_turma');
+    opcoesLetra.value = await buscarOpcoes('letra_turma');
     const { data } = await supabaseClient.from('turmas').select('*').order('nome_completo');
     turmas.value = data ?? [];
   } catch {
@@ -274,16 +282,16 @@ onMounted(carregarTurmas);
             <div class="modal-body">
               <CampoFormulario id="campoSerie" label="Série" :obrigatorio="true">
                 <select id="campoSerie" v-model="formSerie" class="form-select form-select-sm">
-                  <option value="1º">1º</option>
-                  <option value="2º">2º</option>
-                  <option value="3º">3º</option>
+                  <option v-for="s in opcoesSerie" :key="s.valor" :value="s.valor">
+                    {{ s.rotulo }}
+                  </option>
                 </select>
               </CampoFormulario>
               <CampoFormulario id="campoLetra" label="Letra" :obrigatorio="true">
                 <select id="campoLetra" v-model="formLetra" class="form-select form-select-sm">
-                  <option value="A">A</option>
-                  <option value="B">B</option>
-                  <option value="C">C</option>
+                  <option v-for="l in opcoesLetra" :key="l.valor" :value="l.valor">
+                    {{ l.rotulo }}
+                  </option>
                 </select>
               </CampoFormulario>
               <CampoFormulario id="campoCapacidade" label="Capacidade">

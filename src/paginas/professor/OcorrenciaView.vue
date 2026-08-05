@@ -3,11 +3,13 @@ import { computed, onMounted, ref, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAutenticacao } from '@/composables/useAutenticacao';
 import { useMonitoramento } from '@/composables/useMonitoramento';
+import { useOpcoesConfiguracao } from '@/composables/useOpcoesConfiguracao';
+import { useAlturaUniformeCards } from '@/composables/useAlturaUniformeCards';
+import { supabaseClient } from '@/servicos/supabase';
 import CampoFormulario from '@/componentes/CampoFormulario.vue';
 import GrupoCheckbox from '@/componentes/GrupoCheckbox.vue';
 import CartaoSelecao from '@/componentes/CartaoSelecao.vue';
-import type { AlunoFrequencia } from '@/tipos/componentes';
-import { TAGS_COMPORTAMENTO } from '@/tipos/componentes';
+import type { AlunoFrequencia, OpcaoCheckbox } from '@/tipos/componentes';
 
 const router = useRouter();
 const { usuario } = useAutenticacao();
@@ -24,16 +26,19 @@ const notificarResponsavel = ref(false);
 const mensagemSucesso = ref<string | null>(null);
 const mensagemErro = ref<string | null>(null);
 
-const opcoesTipo = [
-  { valor: 'grave', rotulo: 'Ocorrência grave', icone: 'exclamation-triangle' },
-  { valor: 'suspensao', rotulo: 'Suspensão', icone: 'shield-exclamation' },
-];
+const { buscarOpcoes } = useOpcoesConfiguracao();
+const opcoesTipo = ref<OpcaoCheckbox[]>([]);
+const opcoesTags = ref<OpcaoCheckbox[]>([]);
 
-const opcoesTags = Object.entries(TAGS_COMPORTAMENTO).map(([valor, info]) => ({
-  valor,
-  rotulo: info.rotulo,
-  icone: info.icone,
-}));
+const tipoOcorrenciaRef = ref<HTMLElement | null>(null);
+const { altura: alturaCartaoTipo } = useAlturaUniformeCards(tipoOcorrenciaRef);
+
+function corOcorrencia(valor: string): 'warning' | 'danger' | 'info' | 'success' | 'primary' {
+  const idx = opcoesTipo.value.findIndex((t) => t.valor === valor);
+  const cols = ['warning', 'danger', 'info', 'success', 'primary'];
+  const pos = idx >= 0 ? idx % cols.length : 0;
+  return cols[pos] as 'warning' | 'danger' | 'info' | 'success' | 'primary';
+}
 
 const rotuloTipo = computed(() => {
   if (tipos.value.includes('suspensao')) return 'suspensão';
@@ -43,7 +48,7 @@ const rotuloTipo = computed(() => {
 
 const descricaoSugerida = computed(() => {
   if (!tags.value.length) return '';
-  const nomes = tags.value.map((t) => opcoesTags.find((o) => o.valor === t)?.rotulo ?? t);
+  const nomes = tags.value.map((t) => opcoesTags.value.find((o) => o.valor === t)?.rotulo ?? t);
   return `Relato de ${rotuloTipo.value}: ${nomes.join(', ')}. `;
 });
 
@@ -102,6 +107,19 @@ async function confirmar() {
 }
 
 onMounted(async () => {
+  opcoesTipo.value = await buscarOpcoes('tipo_ocorrencia');
+  const { data: tagsData } = await supabaseClient
+    .from('tags_comportamento')
+    .select('nome, icone, descricao')
+    .eq('ativo', true)
+    .order('nome');
+  opcoesTags.value = (tagsData ?? []).map(
+    (t: { nome: string; icone: string | null; descricao: string | null }) => ({
+      valor: t.nome,
+      rotulo: t.descricao ?? t.nome,
+      icone: t.icone ?? undefined,
+    }),
+  );
   alunos.value = await buscarAlunosParaFrequencia();
 });
 </script>
@@ -157,12 +175,16 @@ onMounted(async () => {
         </CampoFormulario>
 
         <CampoFormulario id="tipoOcorrencia" label="Tipo de ocorrência" :obrigatorio="true">
-          <div class="d-flex gap-2">
+          <div
+            class="d-flex gap-2 flex-wrap"
+            ref="tipoOcorrenciaRef"
+            :style="{ '--altura-cartao': alturaCartaoTipo ? `${alturaCartaoTipo}px` : undefined }"
+          >
             <CartaoSelecao
               v-for="op in opcoesTipo"
               :key="op.valor"
               :selecionado="tipos.includes(op.valor)"
-              :variante="op.valor === 'suspensao' ? 'danger' : 'warning'"
+              :variante="corOcorrencia(op.valor)"
               @click="
                 tipos = tipos.includes(op.valor)
                   ? tipos.filter((t) => t !== op.valor)

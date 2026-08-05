@@ -99,6 +99,8 @@ export function traduzirErro(erroDesconhecido: unknown): ErroTraduzido {
 
   if (
     mensagemOriginal.includes('Cadastro ja existe') ||
+    mensagemOriginal.includes('já está cadastrado') ||
+    mensagemOriginal.includes('ja esta cadastrado') ||
     mensagemOriginal.includes('already exists') ||
     mensagemOriginal.includes('duplicate key')
   ) {

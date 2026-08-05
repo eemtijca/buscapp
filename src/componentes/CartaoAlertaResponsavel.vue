@@ -9,7 +9,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   'ver-detalhes': [alertaId: string];
   'enviar-justificativa': [{ alertaId: string; frequenciaId?: string }];
-  'ver-anexo': [anexoUrl: string];
+  'ver-anexo': [alertaId: string];
 }>();
 
 const configTipo: Record<
@@ -119,10 +119,10 @@ const classeBordaEspecifica = computed(() => {
             Enviar justificativa
           </button>
           <button
-            v-if="alerta.anexoUrl"
+            v-if="alerta.anexoPath"
             type="button"
             class="btn btn-sm btn-outline-secondary"
-            @click="emit('ver-anexo', alerta.anexoUrl!)"
+            @click="emit('ver-anexo', alerta.id)"
           >
             <i class="bi bi-paperclip me-1" aria-hidden="true"></i>
             Ver anexo

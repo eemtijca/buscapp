@@ -3,9 +3,10 @@ import { computed, onMounted, ref, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAutenticacao } from '@/composables/useAutenticacao';
 import { useMonitoramento } from '@/composables/useMonitoramento';
+import { useOpcoesConfiguracao } from '@/composables/useOpcoesConfiguracao';
 import CampoFormulario from '@/componentes/CampoFormulario.vue';
 import GrupoCheckbox from '@/componentes/GrupoCheckbox.vue';
-import type { AlunoFrequencia } from '@/tipos/componentes';
+import type { AlunoFrequencia, OpcaoCheckbox } from '@/tipos/componentes';
 
 const router = useRouter();
 const { usuario } = useAutenticacao();
@@ -18,30 +19,18 @@ const justificativa = ref('');
 const mensagemSucesso = ref<string | null>(null);
 const mensagemErro = ref<string | null>(null);
 
-const opcoesPeriodos = [
-  { valor: '1º Horário', rotulo: '1º Horário' },
-  { valor: '2º Horário', rotulo: '2º Horário' },
-  { valor: '3º Horário', rotulo: '3º Horário' },
-  { valor: '4º Horário', rotulo: '4º Horário' },
-  { valor: 'Manhã', rotulo: 'Manhã' },
-  { valor: 'Tarde', rotulo: 'Tarde' },
-];
-
-const opcoesMotivos = [
-  { valor: 'enfermaria', rotulo: 'Enfermaria', icone: 'heart-pulse' },
-  { valor: 'orientacao', rotulo: 'Orientação pedagógica', icone: 'people' },
-  { valor: 'saida_antecipada', rotulo: 'Saída antecipada', icone: 'door-open' },
-  { valor: 'conselho_tutelar', rotulo: 'Conselho tutelar', icone: 'shield-check' },
-  { valor: 'atendimento_psicologico', rotulo: 'Atendimento psicológico', icone: 'heart' },
-  { valor: 'atividade_externa', rotulo: 'Atividade externa', icone: 'briefcase' },
-];
+const { buscarOpcoes } = useOpcoesConfiguracao();
+const opcoesPeriodos = ref<OpcaoCheckbox[]>([]);
+const opcoesMotivos = ref<OpcaoCheckbox[]>([]);
 
 const motivos = ref<string[]>([]);
 const dataAula = ref(new Date().toISOString().slice(0, 10));
 
 const justificativaSugerida = computed(() => {
   if (!motivos.value.length) return '';
-  const nomes = motivos.value.map((m) => opcoesMotivos.find((o) => o.valor === m)?.rotulo ?? m);
+  const nomes = motivos.value.map(
+    (m) => opcoesMotivos.value.find((o) => o.valor === m)?.rotulo ?? m,
+  );
   return `Aluno encaminhado para ${nomes.join(', ')}.`;
 });
 
@@ -92,6 +81,8 @@ async function confirmar() {
 }
 
 onMounted(async () => {
+  opcoesPeriodos.value = await buscarOpcoes('periodo');
+  opcoesMotivos.value = await buscarOpcoes('motivo_ausencia');
   alunos.value = await buscarAlunosParaFrequencia();
 });
 </script>

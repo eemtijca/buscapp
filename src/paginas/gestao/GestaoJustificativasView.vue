@@ -5,6 +5,7 @@ import { useMonitoramento } from '@/composables/useMonitoramento';
 import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh';
 import { useAutenticacao } from '@/composables/useAutenticacao';
 import FilaJustificativas from '@/componentes/FilaJustificativas.vue';
+import VisualizadorAnexo from '@/componentes/VisualizadorAnexo.vue';
 import type { JustificativaPendente } from '@/tipos/componentes';
 
 const router = useRouter();
@@ -15,6 +16,7 @@ const { ultimaAtualizacao, estaAtualizando, atualizar: refresh } = useRealtimeRe
 const justificativas = ref<JustificativaPendente[]>([]);
 const mensagemSucesso = ref<string | null>(null);
 const mensagemErro = ref<string | null>(null);
+const anexoSelecionado = ref<{ path: string; nome: string; mime?: string } | null>(null);
 
 function mostrarSucesso(msg: string) {
   mensagemSucesso.value = msg;
@@ -32,8 +34,12 @@ const justificativasPendentes = computed(() =>
 
 function verAnexoJustificativa(justId: string) {
   const j = justificativas.value.find((x) => x.id === justId);
-  if (j?.anexoUrl) {
-    window.open(j.anexoUrl, '_blank', 'noopener');
+  if (j?.anexoPath) {
+    anexoSelecionado.value = {
+      path: j.anexoPath,
+      nome: j.anexoNome ?? 'anexo',
+      mime: j.anexoMime,
+    };
   } else {
     mostrarErro('Anexo não disponível.');
   }
@@ -137,5 +143,13 @@ onMounted(async () => {
         />
       </div>
     </div>
+
+    <VisualizadorAnexo
+      :aberto="!!anexoSelecionado"
+      :storage-path="anexoSelecionado?.path ?? ''"
+      :nome-arquivo="anexoSelecionado?.nome ?? ''"
+      :mime-type="anexoSelecionado?.mime"
+      @fechar="anexoSelecionado = null"
+    />
   </div>
 </template>

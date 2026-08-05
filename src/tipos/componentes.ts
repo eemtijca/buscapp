@@ -1,15 +1,5 @@
 import type { PapelPerfil, StatusPerfil, StatusAluno } from './database';
 
-export const TAGS_COMPORTAMENTO: Record<string, { rotulo: string; icone: string }> = {
-  agressao_verbal: { rotulo: 'Agressão verbal', icone: 'chat-quote' },
-  agressao_fisica: { rotulo: 'Agressão física', icone: 'hand-index' },
-  desacato: { rotulo: 'Desacato', icone: 'person-fill-exclamation' },
-  dano_patrimonio: { rotulo: 'Dano ao patrimônio', icone: 'building-dash' },
-  bullying: { rotulo: 'Bullying', icone: 'people-fill' },
-  descumprimento_regras: { rotulo: 'Descumprimento de regras', icone: 'file-earmark-x' },
-  saida_nao_autorizada: { rotulo: 'Saída não autorizada', icone: 'door-open' },
-};
-
 export interface LinkNav {
   rotulo: string;
   url: string;
@@ -177,7 +167,7 @@ export interface OcorrenciaGrave {
   notificar_responsavel: boolean;
   data: string;
   professorNome?: string;
-  anexoUrl?: string | null;
+  anexoPath?: string | null;
   anexoNome?: string;
   exigePresencaResponsavel: boolean;
   bloqueado: boolean;
@@ -194,8 +184,9 @@ export interface JustificativaPendente {
   dataAusencia: string;
   dataFim: string | null;
   motivo: string;
-  anexoUrl?: string;
+  anexoPath?: string;
   anexoNome?: string;
+  anexoMime?: string;
   anexoId?: string;
   processadoEm?: string;
   status: 'pendente' | 'aceita' | 'recusada';
@@ -226,8 +217,9 @@ export interface AlertaResponsavel {
   frequenciaId?: string;
   justificativaStatus?: 'pendente' | 'aceita' | 'recusada';
   justificativaMotivo?: string;
-  anexoUrl?: string;
+  anexoPath?: string;
   anexoNome?: string;
+  anexoMime?: string;
   ocorrenciaTipo?: string[];
   tagsComportamento?: string[];
   exigePresencaResponsavel?: boolean;
@@ -247,7 +239,7 @@ export interface TermometroAtencao {
 }
 
 /**
- * Item da lista de conversas (sidebar do chat).
+ * Item da lista de conversas (barra lateral do chat).
  */
 export interface ContatoChat {
   conversaId: string;
@@ -282,7 +274,7 @@ export interface MensagemChat {
 }
 
 /**
- * Notificação renderizada no popover do header.
+ * Notificação renderizada no popover do cabeçalho.
  */
 export interface NotificacaoItem {
   id: string;
@@ -305,7 +297,7 @@ export interface HorarioProtegido {
 }
 
 /**
- * Item de usuario para listagem na gestao.
+ * Item de usuário para listagem na gestão.
  */
 export interface UsuarioItem {
   id: string;
@@ -318,11 +310,10 @@ export interface UsuarioItem {
   ultimo_acesso: string | null;
   notificacoes_ativas: boolean;
   acesso_modulos: string[];
-  permissoes: string[];
 }
 
 /**
- * Item de aluno para listagem na gestao.
+ * Item de aluno para listagem na gestão.
  */
 export interface AlunoItem {
   id: string;
@@ -341,7 +332,7 @@ export interface AlunoItem {
 }
 
 /**
- * Solicitacao de codigo de redefinicao pendente.
+ * Solicitação de código de redefinição pendente.
  */
 export interface SolicitacaoCodigo {
   id: string;
@@ -353,7 +344,7 @@ export interface SolicitacaoCodigo {
 }
 
 /**
- * Codigo de redefinicao gerado (para exibicao na listagem).
+ * Código de redefinição gerado (para exibição na listagem).
  */
 export interface CodigoGerado {
   id: string;
@@ -369,7 +360,7 @@ export interface CodigoGerado {
 }
 
 /**
- * Dados para criacao de usuario.
+ * Dados para criação de usuário.
  */
 export interface DadosCriacaoUsuario {
   nome: string;
@@ -380,7 +371,7 @@ export interface DadosCriacaoUsuario {
 }
 
 /**
- * Opcao para GrupoCheckbox.
+ * Opção para GrupoCheckbox.
  */
 export interface OpcaoCheckbox {
   valor: string;
@@ -390,7 +381,7 @@ export interface OpcaoCheckbox {
 }
 
 /**
- * Dados para criacao de aluno.
+ * Dados para criação de aluno.
  */
 export interface DadosCriacaoAluno {
   nome: string;

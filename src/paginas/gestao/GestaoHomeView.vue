@@ -112,6 +112,15 @@ const nomeGestor = usuario.value?.nome || 'Gestor';
           cor="success"
         />
       </div>
+      <div class="col-12 col-md-6 col-lg-4">
+        <CartaoNavegacao
+          icone="gear"
+          titulo="Configurações"
+          descricao="Gerencie módulos, permissões, períodos e demais opções do sistema."
+          rota="/gestao/configuracao"
+          cor="success"
+        />
+      </div>
     </div>
   </div>
 </template>

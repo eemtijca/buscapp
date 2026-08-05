@@ -88,7 +88,7 @@ const rotuloTag: Record<string, string> = {
 
       <div class="d-flex flex-wrap gap-2 justify-content-end">
         <button
-          v-if="oc.anexoUrl"
+          v-if="oc.anexoPath"
           type="button"
           class="btn btn-sm btn-outline-secondary"
           @click="emit('ver-anexo', oc.id)"

@@ -54,7 +54,7 @@ const rotuloStatus: Record<JustificativaPendente['status'], string> = {
 
       <p class="mb-2 small">{{ just.motivo }}</p>
 
-      <div v-if="just.anexoUrl" class="mb-2">
+      <div v-if="just.anexoPath" class="mb-2">
         <button
           type="button"
           class="btn btn-sm btn-outline-secondary"

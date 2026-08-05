@@ -1083,12 +1083,22 @@ test.describe('Gestão - Integridade de catálogo', () => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/alunos/e0000000-0000-0000-0000-000000000001');
     const card = page.locator('.card').filter({ hasText: 'Enturmação atual' });
-    await card.locator('button:has-text("Alterar enturmação")').click();
-    await expect(card.locator('#campoNovaTurma')).toBeVisible({ timeout: 10000 });
+    // Aguarda os dados assíncronos do onMounted terminarem de renderizar
+    // (o parágrafo só existe após carregarEnturmacao) antes de interagir,
+    // evitando cliques perdidos durante re-renderização do Vue.
+    await expect(card.getByText(/Matrícula em:/)).toBeVisible();
+    // Re-clica caso o clique original seja engolido por um patch de DOM
+    // entre o hit-test e o dispatch do evento.
+    await expect(async () => {
+      if ((await card.locator('#campoNovaTurma').count()) === 0) {
+        await card.getByRole('button', { name: 'Alterar enturmação' }).click();
+      }
+      await expect(card.locator('#campoNovaTurma')).toBeVisible({ timeout: 3000 });
+    }).toPass();
     await card.locator('#campoNovaTurma').selectOption({ label: '3º C' });
     await card.locator('#campoNovaDataMat').fill('2026-08-01');
-    await card.locator('button:has-text("Salvar")').click();
-    await expect(card.locator('button:has-text("Alterar enturmação")')).toBeVisible({
+    await card.getByRole('button', { name: 'Salvar' }).click();
+    await expect(card.getByRole('button', { name: 'Alterar enturmação' })).toBeVisible({
       timeout: 15000,
     });
     await expect(card).toContainText('3º C');

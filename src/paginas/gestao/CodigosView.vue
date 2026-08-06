@@ -12,6 +12,7 @@ const {
   gerarCodigoRedefinicao,
   buscarCodigosGerados,
   marcarNotificacaoLida,
+  limparCodigosNaoAtivos,
   carregando,
   erro,
 } = useGestaoUsuarios();
@@ -39,10 +40,14 @@ const itensPorPagina = ref(8);
 const modalConfirmacaoGerar = ref(false);
 const modalCodigoGerado = ref(false);
 const modalRevogar = ref(false);
+const modalLimpar = ref(false);
 const solicitacaoSelecionada = ref<SolicitacaoCodigo | null>(null);
 const codigoGeradoAtual = ref<string | null>(null);
 const codigoParaRevogar = ref<CodigoGerado | null>(null);
 const gerandoCodigo = ref(false);
+const limpandoCodigos = ref(false);
+const codigoCopiado = ref(false);
+let timerCopiado: ReturnType<typeof setTimeout> | null = null;
 
 const idsConhecidosNotificacoes = ref(new Set<string>());
 const idsConhecidosCodigos = ref(new Set<string>());
@@ -80,7 +85,13 @@ const papelBadge = (papel: string) => {
 };
 
 const codigoStatusBadge = (status: string) => {
-  const map: Record<string, string> = { ativo: 'success', usado: 'secondary', expirado: 'warning' };
+  const map: Record<string, string> = {
+    ativo: 'success',
+    usado: 'secondary',
+    expirado: 'warning',
+    revogado: 'danger',
+    bloqueado: 'danger',
+  };
   return map[status] ?? 'secondary';
 };
 
@@ -162,8 +173,10 @@ async function confirmarGerar() {
       codigoGeradoAtual.value = codigo;
       modalCodigoGerado.value = true;
       await marcarNotificacaoLida(solicitacaoSelecionada.value.id);
+      // A função fn_gerar_codigo_redefinicao marca todas as solicitações do
+      // perfil como atendidas; remove todas as entradas locais correspondentes.
       solicitacoes.value = solicitacoes.value.filter(
-        (s) => s.id !== solicitacaoSelecionada.value!.id,
+        (s) => s.perfil_id !== solicitacaoSelecionada.value!.perfil_id,
       );
       const novos = await buscarCodigosGerados();
       codigosGerados.value = novos;
@@ -184,6 +197,23 @@ async function copiarCodigo() {
   } catch {
     const el = document.createElement('textarea');
     el.value = codigoGeradoAtual.value;
+    document.body.appendChild(el);
+    el.select();
+    document.execCommand('copy');
+    document.body.removeChild(el);
+  }
+  mostrarSucesso('Código copiado!');
+  codigoCopiado.value = true;
+  if (timerCopiado) clearTimeout(timerCopiado);
+  timerCopiado = setTimeout(() => (codigoCopiado.value = false), 1500);
+}
+
+async function copiarCodigoDaTabela(codigo: string) {
+  try {
+    await navigator.clipboard.writeText(codigo);
+  } catch {
+    const el = document.createElement('textarea');
+    el.value = codigo;
     document.body.appendChild(el);
     el.select();
     document.execCommand('copy');
@@ -221,6 +251,35 @@ async function confirmarRevogar() {
     mostrarErro(e instanceof Error ? e.message : 'Erro ao revogar código.');
   }
   codigoParaRevogar.value = null;
+}
+
+const codigosNaoAtivos = computed(
+  () => codigosGerados.value.filter((c) => c.status !== 'ativo').length,
+);
+
+function abrirConfirmacaoLimpar() {
+  if (codigosNaoAtivos.value === 0) return;
+  modalLimpar.value = true;
+}
+
+async function confirmarLimpar() {
+  modalLimpar.value = false;
+  limpandoCodigos.value = true;
+  try {
+    const removidos = await limparCodigosNaoAtivos();
+    const novos = await buscarCodigosGerados();
+    codigosGerados.value = novos;
+    novos.forEach((c) => idsConhecidosCodigos.value.add(c.id));
+    mostrarSucesso(
+      removidos > 0
+        ? `${removidos} código${removidos !== 1 ? 's' : ''} removido${removidos !== 1 ? 's' : ''}.`
+        : 'Nenhum código não ativo para limpar.',
+    );
+  } catch (e) {
+    mostrarErro(e instanceof Error ? e.message : 'Erro ao limpar códigos.');
+  } finally {
+    limpandoCodigos.value = false;
+  }
 }
 
 async function atualizarManual() {
@@ -308,6 +367,7 @@ onUnmounted(() => {
   if (canalNotificacoes) supabaseClient.removeChannel(canalNotificacoes);
   if (canalCodigos) supabaseClient.removeChannel(canalCodigos);
   if (timerGlobal) clearInterval(timerGlobal);
+  if (timerCopiado) clearTimeout(timerCopiado);
   document.removeEventListener('visibilitychange', recalcularTimers);
 });
 </script>
@@ -459,8 +519,8 @@ onUnmounted(() => {
     </div>
 
     <div v-else>
-      <div class="mb-3">
-        <div class="input-group input-group-sm">
+      <div class="mb-3 d-flex gap-2">
+        <div class="input-group input-group-sm flex-grow-1">
           <span class="input-group-text bg-body-tertiary border-end-0">
             <i class="bi bi-search text-body-secondary" aria-hidden="true"></i>
           </span>
@@ -480,6 +540,29 @@ onUnmounted(() => {
             <i class="bi bi-x-lg" aria-hidden="true"></i>
           </button>
         </div>
+        <button
+          type="button"
+          class="btn btn-sm btn-outline-danger text-nowrap"
+          :disabled="codigosNaoAtivos === 0 || limpandoCodigos"
+          :title="
+            codigosNaoAtivos === 0
+              ? 'Nenhum código não ativo para limpar'
+              : 'Remover permanentemente os códigos não ativos'
+          "
+          @click="abrirConfirmacaoLimpar"
+        >
+          <span
+            v-if="limpandoCodigos"
+            class="spinner-border spinner-border-sm me-1"
+            role="status"
+            aria-hidden="true"
+          ></span>
+          <i v-else class="bi bi-trash me-1" aria-hidden="true"></i>
+          Limpar não ativos
+          <span v-if="codigosNaoAtivos" class="badge text-bg-danger ms-1">{{
+            codigosNaoAtivos
+          }}</span>
+        </button>
       </div>
 
       <div v-if="carregando && !codigosGerados.length" class="text-center py-5">
@@ -533,9 +616,17 @@ onUnmounted(() => {
                   <td class="text-body-secondary small d-none d-md-table-cell">{{ c.email }}</td>
                   <td>
                     <div class="d-flex align-items-center gap-2">
-                      <code v-if="codigosVisiveis.has(c.id)" class="user-select-all">{{
-                        c.codigo
-                      }}</code>
+                      <code
+                        v-if="codigosVisiveis.has(c.id)"
+                        class="user-select-all text-primary"
+                        role="button"
+                        tabindex="0"
+                        title="Copiar código"
+                        style="cursor: pointer"
+                        @click="copiarCodigoDaTabela(c.codigo)"
+                        @keydown.enter="copiarCodigoDaTabela(c.codigo)"
+                        >{{ c.codigo }}</code
+                      >
                       <span v-else class="text-body-tertiary">••••••</span>
                       <button
                         type="button"
@@ -706,12 +797,25 @@ onUnmounted(() => {
             <p class="small text-body-secondary mb-2">
               Código de acesso para {{ solicitacaoSelecionada?.nome ?? 'usuário' }}
             </p>
-            <code
-              class="d-inline-block fs-1 fw-bold font-monospace text-success bg-body-tertiary px-3 py-2 rounded user-select-all mb-3"
-              style="letter-spacing: 0.15em"
-            >
-              {{ codigoGeradoAtual }}
-            </code>
+            <div class="position-relative d-inline-block mb-3">
+              <code
+                class="d-inline-block fs-1 fw-bold font-monospace text-primary bg-body-tertiary px-3 py-2 rounded user-select-all"
+                role="button"
+                tabindex="0"
+                title="Clique para copiar"
+                style="letter-spacing: 0.15em; cursor: pointer"
+                @click="copiarCodigo"
+                @keydown.enter="copiarCodigo"
+              >
+                {{ codigoGeradoAtual }}
+              </code>
+              <span
+                v-if="codigoCopiado"
+                class="position-absolute top-0 end-0 translate-middle badge rounded-pill text-bg-success small"
+              >
+                <i class="bi bi-check2 me-1" aria-hidden="true"></i>Copiado
+              </span>
+            </div>
             <div
               v-if="solicitacaoSelecionada"
               class="small"
@@ -779,7 +883,7 @@ onUnmounted(() => {
               </p>
               <p class="mb-0">
                 <span class="text-body-secondary">Código:</span>
-                <code class="ms-1">{{ codigoParaRevogar.codigo }}</code>
+                <code class="ms-1 text-primary">{{ codigoParaRevogar.codigo }}</code>
               </p>
             </div>
             <p class="small text-danger mt-2 mb-0">
@@ -798,6 +902,71 @@ onUnmounted(() => {
             <button type="button" class="btn btn-sm btn-danger" @click="confirmarRevogar">
               <i class="bi bi-x-circle me-1" aria-hidden="true"></i>
               Sim, revogar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div
+      v-if="modalLimpar"
+      class="modal d-block"
+      tabindex="-1"
+      style="background-color: rgba(0, 0, 0, 0.5)"
+    >
+      <div class="modal-dialog modal-dialog-centered modal-md">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title small fw-bold">
+              <i class="bi bi-trash text-danger me-1" aria-hidden="true"></i>
+              Limpar códigos não ativos
+            </h5>
+            <button
+              type="button"
+              class="btn-close"
+              @click="modalLimpar = false"
+              aria-label="Fechar"
+            ></button>
+          </div>
+          <div class="modal-body">
+            <p class="small mb-2">
+              Tem certeza que deseja remover permanentemente
+              <strong>{{ codigosNaoAtivos }}</strong>
+              código{{ codigosNaoAtivos !== 1 ? 's' : '' }} não ativo{{
+                codigosNaoAtivos !== 1 ? 's' : ''
+              }}
+              (usado{{ codigosNaoAtivos !== 1 ? 's' : '' }}, expirado{{
+                codigosNaoAtivos !== 1 ? 's' : ''
+              }}
+              ou revogado{{ codigosNaoAtivos !== 1 ? 's' : '' }})?
+            </p>
+            <p class="small text-danger mb-0">
+              <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
+              Os códigos ativos serão preservados. O histórico permanece na auditoria.
+            </p>
+          </div>
+          <div class="modal-footer">
+            <button
+              type="button"
+              class="btn btn-sm btn-outline-secondary"
+              @click="modalLimpar = false"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              class="btn btn-sm btn-danger"
+              :disabled="limpandoCodigos"
+              @click="confirmarLimpar"
+            >
+              <span
+                v-if="limpandoCodigos"
+                class="spinner-border spinner-border-sm me-1"
+                role="status"
+                aria-hidden="true"
+              ></span>
+              <i v-else class="bi bi-trash me-1" aria-hidden="true"></i>
+              Sim, limpar
             </button>
           </div>
         </div>

@@ -13,6 +13,10 @@ const limiteCritico = ref(25);
 const limitePreventivo = ref(10);
 const diasExpurgo = ref(30);
 const mensagemForaHorario = ref('');
+const minutosValidadeCodigo = ref(60);
+const maxTentativasCodigo = ref(5);
+const minutosBloqueioCodigo = ref(15);
+const diasRetencaoCodigos = ref(30);
 
 const erros = ref<Record<string, string | null>>({});
 
@@ -21,6 +25,10 @@ const podeSalvar = computed(() => {
   if (limiteCritico.value < 1 || limitePreventivo.value < 1) return false;
   if (diasExpurgo.value < 1) return false;
   if (limitePreventivo.value >= limiteCritico.value) return false;
+  if (minutosValidadeCodigo.value < 1) return false;
+  if (maxTentativasCodigo.value < 1) return false;
+  if (minutosBloqueioCodigo.value < 1) return false;
+  if (diasRetencaoCodigos.value < 1) return false;
   return true;
 });
 
@@ -38,6 +46,10 @@ function validar() {
     err.limitePreventivo = `Deve ser menor que o limite crítico (${limiteCritico.value}).`;
   }
   if (mensagemForaHorario.value.length > 500) err.mensagemForaHorario = 'Máximo de 500 caracteres.';
+  if (minutosValidadeCodigo.value < 1) err.minutosValidadeCodigo = 'Deve ser um número positivo.';
+  if (maxTentativasCodigo.value < 1) err.maxTentativasCodigo = 'Deve ser um número positivo.';
+  if (minutosBloqueioCodigo.value < 1) err.minutosBloqueioCodigo = 'Deve ser um número positivo.';
+  if (diasRetencaoCodigos.value < 1) err.diasRetencaoCodigos = 'Deve ser pelo menos 1 dia.';
   erros.value = err;
   return Object.keys(err).length === 0;
 }
@@ -61,6 +73,10 @@ async function carregar() {
       limitePreventivo.value = data.limite_preventivo_faltas;
       diasExpurgo.value = data.dias_expurgo_anexos;
       mensagemForaHorario.value = data.mensagem_fora_horario ?? '';
+      minutosValidadeCodigo.value = data.minutos_validade_codigo ?? 60;
+      maxTentativasCodigo.value = data.max_tentativas_codigo ?? 5;
+      minutosBloqueioCodigo.value = data.minutos_bloqueio_codigo ?? 15;
+      diasRetencaoCodigos.value = data.dias_retencao_codigos ?? 30;
     }
   } catch {
     mostrarErro('Falha ao carregar.');
@@ -73,7 +89,7 @@ async function salvar() {
   if (!validar()) return;
   salvando.value = true;
   try {
-    await supabaseClient
+    const { error } = await supabaseClient
       .from('configuracoes_sistema')
       .update({
         escola_nome: escolaNome.value.trim(),
@@ -81,8 +97,13 @@ async function salvar() {
         limite_preventivo_faltas: limitePreventivo.value,
         dias_expurgo_anexos: diasExpurgo.value,
         mensagem_fora_horario: mensagemForaHorario.value.trim(),
+        minutos_validade_codigo: minutosValidadeCodigo.value,
+        max_tentativas_codigo: maxTentativasCodigo.value,
+        minutos_bloqueio_codigo: minutosBloqueioCodigo.value,
+        dias_retencao_codigos: diasRetencaoCodigos.value,
       })
       .eq('id', 1);
+    if (error) throw error;
     mostrarSucesso('Configurações salvas.');
   } catch (e) {
     mostrarErro(e instanceof Error ? e.message : String(e));
@@ -221,6 +242,95 @@ onMounted(carregar);
             >{{ mensagemForaHorario.length }}/500</small
           >
         </CampoFormulario>
+
+        <h2 class="h6 fw-bold mt-4 mb-2">Códigos de acesso</h2>
+
+        <div class="row g-3">
+          <div class="col-md-6">
+            <CampoFormulario
+              id="cfg-validade-codigo"
+              label="Validade do código"
+              :erro="erros.minutosValidadeCodigo"
+            >
+              <div class="input-group">
+                <input
+                  id="cfg-validade-codigo"
+                  v-model.number="minutosValidadeCodigo"
+                  type="number"
+                  class="form-control"
+                  :class="{ 'is-invalid': erros.minutosValidadeCodigo }"
+                  :disabled="salvando"
+                  min="1"
+                  @input="validar"
+                />
+                <span class="input-group-text">minutos</span>
+              </div>
+            </CampoFormulario>
+          </div>
+          <div class="col-md-6">
+            <CampoFormulario
+              id="cfg-max-tentativas"
+              label="Tentativas antes de bloquear"
+              :erro="erros.maxTentativasCodigo"
+            >
+              <div class="input-group">
+                <input
+                  id="cfg-max-tentativas"
+                  v-model.number="maxTentativasCodigo"
+                  type="number"
+                  class="form-control"
+                  :class="{ 'is-invalid': erros.maxTentativasCodigo }"
+                  :disabled="salvando"
+                  min="1"
+                  @input="validar"
+                />
+                <span class="input-group-text">tentativas</span>
+              </div>
+            </CampoFormulario>
+          </div>
+          <div class="col-md-6">
+            <CampoFormulario
+              id="cfg-bloqueio"
+              label="Duração do bloqueio"
+              :erro="erros.minutosBloqueioCodigo"
+            >
+              <div class="input-group">
+                <input
+                  id="cfg-bloqueio"
+                  v-model.number="minutosBloqueioCodigo"
+                  type="number"
+                  class="form-control"
+                  :class="{ 'is-invalid': erros.minutosBloqueioCodigo }"
+                  :disabled="salvando"
+                  min="1"
+                  @input="validar"
+                />
+                <span class="input-group-text">minutos</span>
+              </div>
+            </CampoFormulario>
+          </div>
+          <div class="col-md-6">
+            <CampoFormulario
+              id="cfg-retencao"
+              label="Limpar códigos antigos após"
+              :erro="erros.diasRetencaoCodigos"
+            >
+              <div class="input-group">
+                <input
+                  id="cfg-retencao"
+                  v-model.number="diasRetencaoCodigos"
+                  type="number"
+                  class="form-control"
+                  :class="{ 'is-invalid': erros.diasRetencaoCodigos }"
+                  :disabled="salvando"
+                  min="1"
+                  @input="validar"
+                />
+                <span class="input-group-text">dias</span>
+              </div>
+            </CampoFormulario>
+          </div>
+        </div>
 
         <div class="d-flex justify-content-end mt-4">
           <button type="submit" class="btn btn-success" :disabled="!podeSalvar || salvando">

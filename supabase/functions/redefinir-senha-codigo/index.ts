@@ -26,6 +26,24 @@ export default {
         )
       }
 
+      // Anti força bruta: e-mail bloqueado por excesso de tentativas falhas
+      const { data: bloqueado } = await supabaseAdmin.rpc('fn_codigo_email_bloqueado', {
+        p_email: email,
+      })
+      if (bloqueado === true) {
+        return Response.json(
+          {
+            error:
+              'Muitas tentativas com este e-mail. Solicite um novo código com a administração.',
+          },
+          { status: 400 },
+        )
+      }
+
+      const registrarTentativa = async () => {
+        await supabaseAdmin.rpc('fn_registrar_tentativa_email', { p_email: email })
+      }
+
       const { data: codigoData, error: codigoError } = await supabaseAdmin
         .from('codigos_redefinicao')
         .select('*')
@@ -35,6 +53,7 @@ export default {
         .single()
 
       if (codigoError || !codigoData) {
+        await registrarTentativa()
         return Response.json(
           { error: 'Código inválido. Verifique o código informado.' },
           { status: 400 },
@@ -42,6 +61,7 @@ export default {
       }
 
       if (new Date(codigoData.expira_em) < new Date()) {
+        await registrarTentativa()
         return Response.json(
           { error: 'Código expirado. Solicite um novo código com a administração.' },
           { status: 400 },
@@ -58,6 +78,7 @@ export default {
         .select('id')
 
       if (marcarError || !marcado || marcado.length === 0) {
+        await registrarTentativa()
         return Response.json(
           { error: 'Código já utilizado. Solicite um novo código.' },
           { status: 400 },
@@ -92,6 +113,17 @@ export default {
       if (ativarError) {
         console.error('[redefinir-senha-codigo] Erro ao ativar perfil:', ativarError.message)
       }
+
+      await supabaseAdmin.rpc('fn_limpar_tentativas_email', { p_email: email })
+
+      // Auditoria LGPD do uso do código
+      await supabaseAdmin.from('auditoria').insert({
+        usuario_id: codigoData.perfil_id,
+        acao: 'USAR_CODIGO',
+        entidade: 'codigos_redefinicao',
+        entidade_id: codigoData.id,
+        dados_novos: { email },
+      })
 
       return Response.json({ success: true })
     } catch (error) {

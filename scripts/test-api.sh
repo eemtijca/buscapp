@@ -220,6 +220,48 @@ assert "redefinir email vazio 400" "400" "$HTTP"
 HTTP=$(edge_code "redefinir-senha-codigo" '{"email":"prof1@escola.edu.br","codigo":"123456","novaSenha":"abc"}')
 assert "redefinir senha fraca 400" "400" "$HTTP"
 
+# 2.15 solicitar-codigo para perfil pendente gera notificação (regressão)
+# O usuário criado em 2.7 permanece 'pendente' (código expirado em 2.11) — o
+# pedido de novo código deve aparecer para a gestão.
+HTTP=$(edge_code "solicitar-codigo" "{\"email\":\"codigo$$@escola.edu.br\"}")
+assert "solicitar-codigo pendente 200" "200" "$HTTP"
+
+# 2.16 notificação de codigo_redefinicao criada para o perfil pendente
+NOTIF_PENDENTE=$(npx supabase db query "SELECT count(*) FROM notificacoes WHERE tipo='codigo_redefinicao' AND lida=false AND metadados->>'perfil_id'='$NOVO_ID_CODE';" 2>/dev/null | grep -o '[0-9]\+' | head -1)
+assert "solicitar-codigo pendente cria notificação" 1 "$( [ -n "$NOTIF_PENDENTE" ] && [ "$NOTIF_PENDENTE" -ge 1 ] && echo 1 || echo 0 )"
+
+# 2.17 nova solicitação não duplica notificação pendente (anti-spam)
+HTTP=$(edge_code "solicitar-codigo" "{\"email\":\"codigo$$@escola.edu.br\"}")
+assert "solicitar-codigo pendente repetido 200" "200" "$HTTP"
+NOTIF_PENDENTE_2=$(npx supabase db query "SELECT count(*) FROM notificacoes WHERE tipo='codigo_redefinicao' AND lida=false AND metadados->>'perfil_id'='$NOVO_ID_CODE';" 2>/dev/null | grep -o '[0-9]\+' | head -1)
+assert "solicitar-codigo não duplica notificação" "$NOTIF_PENDENTE" "$NOTIF_PENDENTE_2"
+
+# 2.18 gerar código para o usuário pendente (via RPC com token de gestão)
+HTTP=$(api_code POST "/rest/v1/rpc/fn_gerar_codigo_redefinicao" "{\"p_perfil_id\":\"$NOVO_ID_CODE\"}" "$TG")
+assert "gerar código pendente (RPC) 200" "200" "$HTTP"
+CODIGO_ATIVO=$(api_body | tr -d '"')
+assert "código pendente 6 dígitos" 6 "$(echo -n "$CODIGO_ATIVO" | wc -c)"
+
+# 2.19 gerar código limpa as solicitações pendentes do perfil (auto-atendimento)
+NOTIF_APOS_GERAR=$(npx supabase db query "SELECT count(*) FROM notificacoes WHERE tipo='codigo_redefinicao' AND lida=false AND metadados->>'perfil_id'='$NOVO_ID_CODE';" 2>/dev/null | grep -o '[0-9]\+' | head -1)
+assert "gerar código limpa solicitações pendentes" 0 "$NOTIF_APOS_GERAR"
+
+# 2.20 geração audita
+AUDIT_GERAR=$(npx supabase db query "SELECT count(*) FROM auditoria WHERE acao='GERAR_CODIGO';" 2>/dev/null | grep -o '[0-9]\+' | head -1)
+assert "auditoria GERAR_CODIGO registrada" 1 "$( [ -n "$AUDIT_GERAR" ] && [ "$AUDIT_GERAR" -ge 1 ] && echo 1 || echo 0 )"
+
+# 2.21 bloqueio por tentativas — 5 códigos errados bloqueiam o e-mail
+for i in 1 2 3 4 5; do
+  HTTP=$(edge_code "redefinir-senha-codigo" "{\"email\":\"codigo$$@escola.edu.br\",\"codigo\":\"000000\",\"novaSenha\":\"NovaSenha456!\"}")
+  assert "redefinir tentativa $i (código inválido) 400" "400" "$HTTP"
+done
+HTTP=$(edge_code "redefinir-senha-codigo" "{\"email\":\"codigo$$@escola.edu.br\",\"codigo\":\"000000\",\"novaSenha\":\"NovaSenha456!\"}")
+assert "redefinir bloqueado 400" "400" "$HTTP"
+assert_contains "mensagem: muitas tentativas" "$(api_body)" "Muitas tentativas"
+
+# 2.22 desbloqueia o e-mail de teste (limpeza)
+npx supabase db query "SELECT public.fn_limpar_tentativas_email('codigo$$@escola.edu.br');" 2>/dev/null >/dev/null
+
 echo ""; echo "=== 3. RPC ==="
 
 HTTP=$(api_code POST "/rest/v1/rpc/fn_gerar_codigo_redefinicao" '{"p_perfil_id":"a0000000-0000-0000-0000-000000000002"}' "$TG")
@@ -241,17 +283,21 @@ fi
 
 echo ""; echo "=== 3.3-3.12 RPC — CÓDIGOS ==="
 
-# 3.3 Deduplicação: gerar código 2x para o mesmo perfil retorna o mesmo
+# 3.3 Geração sempre emite código NOVO e revoga o anterior
 HTTP=$(api_code POST "/rest/v1/rpc/fn_gerar_codigo_redefinicao" '{"p_perfil_id":"a0000000-0000-0000-0000-000000000002"}' "$TG")
-assert "gerar código dedup 1 200" "200" "$HTTP"
+assert "gerar código 3.3a 200" "200" "$HTTP"
 CODIGO_A=$(api_body | tr -d '"')
 assert "codigo_a 6 digitos" 6 "$(echo -n "$CODIGO_A" | wc -c)"
 
 sleep 1
 HTTP=$(api_code POST "/rest/v1/rpc/fn_gerar_codigo_redefinicao" '{"p_perfil_id":"a0000000-0000-0000-0000-000000000002"}' "$TG")
 CODIGO_B=$(api_body | tr -d '"')
-assert "gerar código dedup 2 200" "200" "$HTTP"
-assert "dedup mesmo código" "$CODIGO_A" "$CODIGO_B"
+assert "gerar código 3.3b 200" "200" "$HTTP"
+assert "2ª geração emite código novo" 1 "$( [ "$CODIGO_A" != "$CODIGO_B" ] && echo 1 || echo 0 )"
+REVOGADO_A=$(npx supabase db query "SELECT count(*) FROM codigos_redefinicao WHERE codigo='$CODIGO_A' AND revogado_em IS NOT NULL;" 2>/dev/null | grep -o '[0-9]\+' | head -1)
+assert "código anterior revogado automaticamente" 1 "$REVOGADO_A"
+AUDIT_REV=$(npx supabase db query "SELECT count(*) FROM auditoria a JOIN codigos_redefinicao c ON c.id=a.entidade_id WHERE a.acao='REVOGAR_CODIGO' AND a.entidade='codigos_redefinicao' AND c.codigo='$CODIGO_A';" 2>/dev/null | grep -o '[0-9]\+' | head -1)
+assert "revogação automática auditada" 1 "$AUDIT_REV"
 
 # 3.4 Gerar código para perfil pendente
 # prof3 (000004) foi setado como 'pendente' no caso extremo (linha 276)
@@ -302,6 +348,28 @@ assert "gerar código inativo 400" "400" "$HTTP"
 
 # 3.12 Restaurar status do prof3
 npx supabase db query "UPDATE perfis SET status='pendente' WHERE id='a0000000-0000-0000-0000-000000000004';" 2>&1 | tail -1
+
+# 3.13 limpar códigos não ativos (gestão) — preserva os ativos
+HTTP=$(api_code POST "/rest/v1/rpc/fn_gerar_codigo_redefinicao" '{"p_perfil_id":"a0000000-0000-0000-0000-000000000002"}' "$TG")
+assert "limpar: gerar código ativo 200" "200" "$HTTP"
+CODIGO_ATIVO_LIMPAR=$(api_body | tr -d '"')
+HTTP=$(api_code POST "/rest/v1/rpc/fn_limpar_codigos_nao_ativos" '{}' "$TG")
+assert "limpar códigos não ativos 200" "200" "$HTTP"
+LIMPAR_COUNT=$(api_body | tr -d '"')
+assert "limpar retorna quantidade" 1 "$( [ -n "$LIMPAR_COUNT" ] && [ "$LIMPAR_COUNT" -ge 1 ] && echo 1 || echo 0 )"
+
+# 3.14 código ativo preservado após limpar
+HTTP=$(api_code GET "/rest/v1/codigos_redefinicao?select=id&codigo=eq.$CODIGO_ATIVO_LIMPAR" '' "$TG")
+assert "código ativo preservado 200" "200" "$HTTP"
+assert "código ativo existe" 1 "$(api_body | py "d=json.load(sys.stdin); print(1 if len(d)==1 else 0)")"
+
+# 3.15 limpar como professor rejeitado
+HTTP=$(api_code POST "/rest/v1/rpc/fn_limpar_codigos_nao_ativos" '{}' "$TP")
+assert "limpar como professor 400" "400" "$HTTP"
+
+# 3.16 auditoria LIMPAR_CODIGOS registrada
+AUDIT_LIMPAR=$(npx supabase db query "SELECT count(*) FROM auditoria WHERE acao='LIMPAR_CODIGOS';" 2>/dev/null | grep -o '[0-9]\+' | head -1)
+assert "auditoria LIMPAR_CODIGOS registrada" 1 "$( [ -n "$AUDIT_LIMPAR" ] && [ "$AUDIT_LIMPAR" -ge 1 ] && echo 1 || echo 0 )"
 
 echo ""; echo "=== 4. CRUD ==="
 
@@ -528,15 +596,17 @@ assert "7.2 buscar perfil 200" "200" "$HTTP"
 VIDA_STATUS=$(api_body | py "d=json.load(sys.stdin); print(d[0]['status'] if d else '')" 2>/dev/null)
 assert "7.2 perfil existe" 1 "$( [ -n "$VIDA_STATUS" ] && echo 1 || echo 0 )"
 
-# 7.3 Deduplicação: gerar segundo código retorna o mesmo
+# 7.3 Geração sempre emite código NOVO e revoga o anterior
 HTTP=$(api_code POST "/rest/v1/rpc/fn_gerar_codigo_redefinicao" "{\"p_perfil_id\":\"$VIDA_ID\"}" "$TG")
-assert "7.3 gerar código dedup 200" "200" "$HTTP"
+assert "7.3 gerar código novo 200" "200" "$HTTP"
 VIDA_CODIGO_2=$(api_body | tr -d '"')
-assert "7.3 dedup mesmo código" "$VIDA_CODIGO" "$VIDA_CODIGO_2"
+assert "7.3 2ª geração emite código novo" 1 "$( [ "$VIDA_CODIGO" != "$VIDA_CODIGO_2" ] && echo 1 || echo 0 )"
+VIDA_REVOGADO=$(npx supabase db query "SELECT count(*) FROM codigos_redefinicao WHERE codigo='$VIDA_CODIGO' AND revogado_em IS NOT NULL;" 2>/dev/null | grep -o '[0-9]\+' | head -1)
+assert "7.3 código anterior revogado automaticamente" 1 "$VIDA_REVOGADO"
 
-# 7.4 Usar código válido → redefinir senha
+# 7.4 Usar código válido (o novo) → redefinir senha
 sleep 1
-HTTP=$(edge_code "redefinir-senha-codigo" "{\"email\":\"$EMAIL_VIDA\",\"codigo\":\"$VIDA_CODIGO\",\"novaSenha\":\"Vida123!@#\"}")
+HTTP=$(edge_code "redefinir-senha-codigo" "{\"email\":\"$EMAIL_VIDA\",\"codigo\":\"$VIDA_CODIGO_2\",\"novaSenha\":\"Vida123!@#\"}")
 assert "7.4 usar código válido 200" "200" "$HTTP"
 
 # 7.5 Perfil foi ativado (pendente → ativo)
@@ -546,7 +616,7 @@ VIDA_STATUS2=$(api_body | py "d=json.load(sys.stdin); print(d[0]['status'] if d 
 assert "7.5 perfil ativado após uso" "ativo" "$VIDA_STATUS2"
 
 # 7.6 Reusar código rejeitado
-HTTP=$(edge_code "redefinir-senha-codigo" "{\"email\":\"$EMAIL_VIDA\",\"codigo\":\"$VIDA_CODIGO\",\"novaSenha\":\"Vida456!@#\"}")
+HTTP=$(edge_code "redefinir-senha-codigo" "{\"email\":\"$EMAIL_VIDA\",\"codigo\":\"$VIDA_CODIGO_2\",\"novaSenha\":\"Vida456!@#\"}")
 assert "7.6 reusar código rejeitado 400" "400" "$HTTP"
 
 # 7.7 Login com nova senha

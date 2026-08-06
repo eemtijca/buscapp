@@ -18,6 +18,10 @@ export default {
 
       if (error) {
         console.error('[solicitar-codigo] Erro ao processar:', error.message)
+        return Response.json(
+          { error: 'Erro interno do servidor. Tente novamente.' },
+          { status: 500 },
+        )
       }
 
       return Response.json({

@@ -356,7 +356,7 @@ export interface CodigoGerado {
   revogado_em: string | null;
   expira_em: string;
   criado_em: string;
-  status: 'ativo' | 'usado' | 'expirado';
+  status: 'ativo' | 'usado' | 'expirado' | 'revogado' | 'bloqueado';
 }
 
 /**

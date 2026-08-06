@@ -43,6 +43,8 @@ const mensagemErro = ref<string | null>(null);
 const mensagemToast = ref<string | null>(null);
 const usuarioCriado = ref(false);
 const codigoCriado = ref<string | null>(null);
+const codigoCriadoCopiado = ref(false);
+let timerCodigoCopiado: ReturnType<typeof setTimeout> | null = null;
 
 let timeoutDraft: ReturnType<typeof setTimeout> | null = null;
 
@@ -120,6 +122,9 @@ async function copiarCodigoCriado() {
   }
   mensagemToast.value = 'Código copiado!';
   setTimeout(() => (mensagemToast.value = null), 2000);
+  codigoCriadoCopiado.value = true;
+  if (timerCodigoCopiado) clearTimeout(timerCodigoCopiado);
+  timerCodigoCopiado = setTimeout(() => (codigoCriadoCopiado.value = false), 1500);
 }
 
 onMounted(async () => {
@@ -317,12 +322,25 @@ async function salvar() {
         <p class="small text-body-secondary mb-2">
           Compartilhe o código com {{ nome }} para redefinir a senha.
         </p>
-        <code
-          class="d-inline-block fs-1 fw-bold font-monospace text-success bg-body-tertiary px-3 py-2 rounded user-select-all mb-3"
-          style="letter-spacing: 0.15em"
-        >
-          {{ codigoCriado }}
-        </code>
+        <div class="position-relative d-inline-block mb-3">
+          <code
+            class="d-inline-block fs-1 fw-bold font-monospace text-primary bg-body-tertiary px-3 py-2 rounded user-select-all"
+            role="button"
+            tabindex="0"
+            title="Clique para copiar"
+            style="letter-spacing: 0.15em; cursor: pointer"
+            @click="copiarCodigoCriado"
+            @keydown.enter="copiarCodigoCriado"
+          >
+            {{ codigoCriado }}
+          </code>
+          <span
+            v-if="codigoCriadoCopiado"
+            class="position-absolute top-0 end-0 translate-middle badge rounded-pill text-bg-success small"
+          >
+            <i class="bi bi-check2 me-1" aria-hidden="true"></i>Copiado
+          </span>
+        </div>
         <div class="d-flex gap-2 justify-content-center mb-3">
           <button
             type="button"

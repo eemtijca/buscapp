@@ -65,6 +65,10 @@ export interface ConfiguracaoSistema {
   dias_expurgo_anexos: number;
   escola_nome: string;
   mensagem_fora_horario: string;
+  minutos_validade_codigo: number;
+  max_tentativas_codigo: number;
+  minutos_bloqueio_codigo: number;
+  dias_retencao_codigos: number;
   updated_at: string;
 }
 
@@ -430,6 +434,13 @@ export interface CodigoRedefinicao {
   updated_at: string;
 }
 
+export interface CodigoRedefinicaoTentativa {
+  email: string;
+  tentativas: number;
+  bloqueado_ate: string | null;
+  updated_at: string;
+}
+
 // -------- Mapa de Tipos do Banco de Dados Supabase --------
 export interface Database {
   public: {
@@ -588,6 +599,11 @@ export interface Database {
         Row: CodigoRedefinicao;
         Insert: Omit<CodigoRedefinicao, 'id' | 'created_at' | 'updated_at'>;
         Update: Partial<Omit<CodigoRedefinicao, 'id'>>;
+      };
+      codigos_redefinicao_tentativas: {
+        Row: CodigoRedefinicaoTentativa;
+        Insert: Partial<CodigoRedefinicaoTentativa>;
+        Update: Partial<CodigoRedefinicaoTentativa>;
       };
     };
   };

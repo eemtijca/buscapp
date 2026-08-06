@@ -683,24 +683,39 @@ begin
     perform public.test_msg('L1: gerar código para perfil ativo', false);
   end;
 
-  -- L2: Deduplicação — gerar 2ª vez retorna mesmo código
+  -- L2: Gerar 2ª vez emite código NOVO e revoga o anterior
   begin
     v_codigo2 := public.fn_gerar_codigo_redefinicao(v_perfil_id);
-    perform public.test_msg('L2: deduplicação retorna mesmo código', v_codigo1 = v_codigo2);
+    perform public.test_msg('L2: 2ª geração emite código novo e revoga o anterior',
+      v_codigo1 <> v_codigo2
+      and exists (
+        select 1 from public.codigos_redefinicao
+        where codigo = v_codigo1 and revogado_em is not null
+      ));
   exception when others then
-    perform public.test_msg('L2: deduplicação retorna mesmo código', false);
+    perform public.test_msg('L2: 2ª geração emite código novo e revoga o anterior', false);
   end;
 
-  -- L3: Deduplicação — apenas 1 registro ativo no banco
+  -- L2b: a revogação automática (substituição) foi auditada
+  perform public.test_msg('L2b: revogação automática auditada',
+    exists (
+      select 1 from public.auditoria a
+      join public.codigos_redefinicao c on c.id = a.entidade_id
+      where a.entidade = 'codigos_redefinicao'
+        and a.acao = 'REVOGAR_CODIGO'
+        and c.codigo = v_codigo1
+    ));
+
+  -- L3: Apenas 1 registro ativo no banco (o anterior foi revogado)
   select count(*) into v_antes
   from public.codigos_redefinicao
   where perfil_id = v_perfil_id and usado_em is null and expira_em > now();
   perform public.test_msg('L3: apenas 1 código ativo no banco', v_antes = 1);
 
-  -- L4: Revogar código ativo
+  -- L4: Revogar o código ativo (v_codigo2)
   select id into v_codigo_id
   from public.codigos_redefinicao
-  where codigo = v_codigo1 limit 1;
+  where codigo = v_codigo2 limit 1;
 
   begin
     perform public.fn_revogar_codigo(v_codigo_id);
@@ -824,6 +839,367 @@ begin
   raise notice '[OK] Fase 7: Códigos - Ciclo de Vida concluída';
 end;
 $p7$;
+
+-- ============================================================================
+-- Fase 7.5: Códigos — Solicitação para perfis pendentes (regressão)
+-- Descrição: Verifica que um usuário criado pela gestão (status 'pendente') que
+--            solicita um novo código pela tela de login gera notificação para a
+--            gestão. Também cobre cooldown (solicitações repetidas dentro da
+--            janela) e deduplicação por destinatário.
+-- ============================================================================
+
+do $p75$
+declare
+  v_pendente_id uuid;
+  v_gestao_id   uuid;
+  v_qtd_gestao  int;
+  v_qtd_notif   int;
+  v_qtd_antes   int;
+begin
+  raise notice '[TESTE] Fase 7.5: Solicitação de código para perfis pendentes';
+
+  select id into v_pendente_id from public.perfis where email = 'pendente@escola.edu.br' limit 1;
+  select id into v_gestao_id   from public.perfis where email = 'gestao_teste@escola.edu.br' limit 1;
+
+  select count(*) into v_qtd_gestao
+  from public.perfis where papel = 'gestao' and status = 'ativo';
+
+  -- M1: garantir que o perfil de teste está pendente
+  perform public.test_msg('M1: perfil de teste está pendente',
+    exists (select 1 from public.perfis where id = v_pendente_id and status = 'pendente'));
+
+  -- M2: solicitação para perfil pendente cria notificação para cada gestão ativa
+  perform public.fn_solicitar_codigo_redefinicao('pendente@escola.edu.br');
+  select count(*) into v_qtd_notif
+  from public.notificacoes
+  where tipo = 'codigo_redefinicao'
+    and lida = false
+    and metadados->>'perfil_id' = v_pendente_id::text;
+  perform public.test_msg(
+    format('M2: pendente gera notificação para gestão ativa (%s notif, %s gestores)', v_qtd_notif, v_qtd_gestao),
+    v_qtd_notif > 0 and v_qtd_notif = v_qtd_gestao);
+
+  -- M3: solicitação pendente (não lida) suprime solicitação repetida
+  select count(*) into v_qtd_antes
+  from public.notificacoes
+  where tipo = 'codigo_redefinicao' and lida = false and metadados->>'perfil_id' = v_pendente_id::text;
+  perform public.fn_solicitar_codigo_redefinicao('pendente@escola.edu.br');
+  select count(*) into v_qtd_notif
+  from public.notificacoes
+  where tipo = 'codigo_redefinicao' and lida = false and metadados->>'perfil_id' = v_pendente_id::text;
+  perform public.test_msg('M3: solicitação pendente não duplica (anti-spam)', v_qtd_notif = v_qtd_antes);
+
+  -- M4: notificação não lida continua suprimindo, independentemente da idade
+  update public.notificacoes set created_at = now() - interval '10 minutes'
+  where tipo = 'codigo_redefinicao' and metadados->>'perfil_id' = v_pendente_id::text;
+  select count(*) into v_qtd_antes
+  from public.notificacoes
+  where tipo = 'codigo_redefinicao' and lida = false and metadados->>'perfil_id' = v_pendente_id::text;
+  perform public.fn_solicitar_codigo_redefinicao('pendente@escola.edu.br');
+  select count(*) into v_qtd_notif
+  from public.notificacoes
+  where tipo = 'codigo_redefinicao' and lida = false and metadados->>'perfil_id' = v_pendente_id::text;
+  perform public.test_msg('M4: notificação não lida não duplica (anti-spam)', v_qtd_notif = v_qtd_antes);
+
+  -- M5: após atender (marcar como lida) e passar o cooldown, nova solicitação gera nova notificação
+  update public.notificacoes set lida = true, lida_em = now()
+  where tipo = 'codigo_redefinicao' and metadados->>'perfil_id' = v_pendente_id::text;
+  perform public.fn_solicitar_codigo_redefinicao('pendente@escola.edu.br');
+  select count(*) into v_qtd_notif
+  from public.notificacoes
+  where tipo = 'codigo_redefinicao' and lida = false and metadados->>'perfil_id' = v_pendente_id::text;
+  perform public.test_msg('M5: nova solicitação após leitura gera nova notificação',
+    v_qtd_notif > 0 and v_qtd_notif = v_qtd_gestao);
+
+  -- M6: perfil ativo continua gerando notificação (comportamento preservado)
+  select count(*) into v_qtd_antes
+  from public.notificacoes
+  where tipo = 'codigo_redefinicao' and metadados->>'perfil_id' = v_gestao_id::text;
+  perform public.fn_solicitar_codigo_redefinicao('gestao_teste@escola.edu.br');
+  select count(*) into v_qtd_notif
+  from public.notificacoes
+  where tipo = 'codigo_redefinicao' and metadados->>'perfil_id' = v_gestao_id::text;
+  perform public.test_msg('M6: perfil ativo ainda gera notificação', v_qtd_notif > v_qtd_antes);
+
+  -- M7: perfil inativo não gera notificação
+  update public.perfis set status = 'inativo' where id = v_pendente_id;
+  select count(*) into v_qtd_antes
+  from public.notificacoes
+  where tipo = 'codigo_redefinicao' and metadados->>'perfil_id' = v_pendente_id::text;
+  perform public.fn_solicitar_codigo_redefinicao('pendente@escola.edu.br');
+  select count(*) into v_qtd_notif
+  from public.notificacoes
+  where tipo = 'codigo_redefinicao' and metadados->>'perfil_id' = v_pendente_id::text;
+  perform public.test_msg('M7: perfil inativo não gera notificação', v_qtd_notif = v_qtd_antes);
+  update public.perfis set status = 'pendente' where id = v_pendente_id;
+
+  -- Limpa notificações criadas para não interferir em outras fases
+  delete from public.notificacoes
+  where tipo = 'codigo_redefinicao'
+    and (metadados->>'perfil_id' = v_pendente_id::text or metadados->>'perfil_id' = v_gestao_id::text);
+
+  raise notice '[OK] Fase 7.5: Solicitação de código para perfis pendentes concluída';
+end;
+$p75$;
+
+-- ============================================================================
+-- Fase 7.6: Códigos — Endurecimento (cooldown, bloqueio, validade, auditoria)
+-- Descrição: Verifica bloqueio por tentativas por e-mail, validade configurável,
+--            auto-limpeza de solicitações ao gerar, auditoria de geração/revogação
+--            e configurabilidade do cooldown.
+-- ============================================================================
+
+do $p76$
+declare
+  v_gestao_id    uuid;
+  v_pendente_id  uuid;
+  v_codigo_id    uuid;
+  v_codigo       text;
+  v_bloqueou     boolean;
+  v_email_test   text := 'tentativa@teste.com';
+  v_orig_max     int;
+  v_orig_min_blo int;
+  v_orig_val     int;
+  v_qtd_antes    int;
+  v_qtd_depois   int;
+begin
+  raise notice '[TESTE] Fase 7.6: Códigos - Endurecimento';
+
+  select id into v_gestao_id   from public.perfis where email = 'gestao_teste@escola.edu.br' limit 1;
+  select id into v_pendente_id from public.perfis where email = 'pendente@escola.edu.br' limit 1;
+
+  -- Garante o contexto de gestão para fn_gerar/fn_revogar (set local persiste na transação)
+  execute format('set local request.jwt.claims to ''{"sub":"%s","role":"authenticated"}''', v_gestao_id);
+
+  -- Guarda valores originais de configuração
+  select max_tentativas_codigo, minutos_bloqueio_codigo, minutos_validade_codigo
+  into v_orig_max, v_orig_min_blo, v_orig_val
+  from public.configuracoes_sistema where id = 1;
+
+  -- H1: colunas de configuração existem
+  perform public.test_msg('H1: configurações de código existem',
+    exists (select 1 from information_schema.columns
+      where table_name = 'configuracoes_sistema' and column_name = 'minutos_validade_codigo'));
+
+  -- H2: validade configurável — expira_em ~ now() + 2h quando configurado
+  begin
+    update public.configuracoes_sistema set minutos_validade_codigo = 120 where id = 1;
+    update public.codigos_redefinicao set expira_em = now()
+    where perfil_id = v_gestao_id and expira_em > now() and usado_em is null;
+    v_codigo := public.fn_gerar_codigo_redefinicao(v_gestao_id);
+    select id into v_codigo_id from public.codigos_redefinicao
+    where codigo = v_codigo and perfil_id = v_gestao_id order by created_at desc limit 1;
+    select (expira_em > now() + interval '110 minutes' and expira_em < now() + interval '130 minutes')
+    into v_bloqueou from public.codigos_redefinicao where id = v_codigo_id;
+    perform public.test_msg('H2: validade configurável (120 min)', v_bloqueou);
+  exception when others then
+    perform public.test_msg('H2: validade configurável (120 min)', false);
+  end;
+
+  -- H3: auditoria de geração
+  perform public.test_msg('H3: auditoria GERAR_CODIGO criada',
+    exists (select 1 from public.auditoria
+      where entidade = 'codigos_redefinicao' and entidade_id = v_codigo_id and acao = 'GERAR_CODIGO'));
+
+  -- H4: revogação audita
+  begin
+    perform public.fn_revogar_codigo(v_codigo_id);
+    perform public.test_msg('H4: auditoria REVOGAR_CODIGO criada',
+      exists (select 1 from public.auditoria
+        where entidade = 'codigos_redefinicao' and entidade_id = v_codigo_id and acao = 'REVOGAR_CODIGO'));
+  exception when others then
+    perform public.test_msg('H4: auditoria REVOGAR_CODIGO criada', false);
+  end;
+
+  -- H5: gerar código limpa solicitações pendentes do perfil
+  delete from public.notificacoes
+  where tipo = 'codigo_redefinicao' and metadados->>'perfil_id' = v_pendente_id::text;
+  perform public.fn_solicitar_codigo_redefinicao('pendente@escola.edu.br');
+  select count(*) into v_qtd_antes
+  from public.notificacoes
+  where tipo = 'codigo_redefinicao' and lida = false and metadados->>'perfil_id' = v_pendente_id::text;
+  update public.codigos_redefinicao set expira_em = now()
+  where perfil_id = v_pendente_id and expira_em > now() and usado_em is null;
+  v_codigo := public.fn_gerar_codigo_redefinicao(v_pendente_id);
+  select count(*) into v_qtd_depois
+  from public.notificacoes
+  where tipo = 'codigo_redefinicao' and lida = false and metadados->>'perfil_id' = v_pendente_id::text;
+  perform public.test_msg(format('H5: gerar código limpa solicitações pendentes (%s -> %s)', v_qtd_antes, v_qtd_depois),
+    v_qtd_antes > 0 and v_qtd_depois = 0);
+
+  -- H6: bloqueio por tentativas por e-mail
+  update public.configuracoes_sistema set max_tentativas_codigo = 3, minutos_bloqueio_codigo = 15 where id = 1;
+  delete from public.codigos_redefinicao_tentativas where email = v_email_test;
+  v_bloqueou := public.fn_registrar_tentativa_email(v_email_test);
+  perform public.test_msg('H6a: 1ª tentativa não bloqueia', v_bloqueou = false);
+  v_bloqueou := public.fn_registrar_tentativa_email(v_email_test);
+  perform public.test_msg('H6b: 2ª tentativa não bloqueia', v_bloqueou = false);
+  v_bloqueou := public.fn_registrar_tentativa_email(v_email_test);
+  perform public.test_msg('H6c: 3ª tentativa bloqueia', v_bloqueou = true);
+  perform public.test_msg('H6d: e-mail aparece bloqueado',
+    public.fn_codigo_email_bloqueado(v_email_test) = true);
+  v_bloqueou := public.fn_registrar_tentativa_email(v_email_test);
+  perform public.test_msg('H6e: bloqueado continua bloqueado (não incrementa)', v_bloqueou = true);
+
+  -- H7: bloqueio expira e contador reseta
+  update public.codigos_redefinicao_tentativas set bloqueado_ate = now() - interval '1 minute'
+  where email = v_email_test;
+  v_bloqueou := public.fn_registrar_tentativa_email(v_email_test);
+  perform public.test_msg('H7a: após expirar bloqueio, 1ª tentativa não bloqueia', v_bloqueou = false);
+  perform public.test_msg('H7b: e-mail desbloqueado após expirar bloqueio',
+    public.fn_codigo_email_bloqueado(v_email_test) = false);
+
+  -- H8: limpar tentativas por e-mail
+  perform public.fn_limpar_tentativas_email(v_email_test);
+  perform public.test_msg('H8: limpar tentativas remove registro',
+    not exists (select 1 from public.codigos_redefinicao_tentativas where email = v_email_test));
+
+  -- H9: código ATIVO não bloqueia nova solicitação (sem pendência)
+  delete from public.notificacoes
+  where tipo = 'codigo_redefinicao' and metadados->>'perfil_id' = v_pendente_id::text;
+  update public.codigos_redefinicao set expira_em = now(), revogado_em = now()
+  where perfil_id = v_pendente_id and usado_em is null;
+  v_codigo := public.fn_gerar_codigo_redefinicao(v_pendente_id);
+  select count(*) into v_qtd_antes
+  from public.notificacoes
+  where tipo = 'codigo_redefinicao' and lida = false and metadados->>'perfil_id' = v_pendente_id::text;
+  perform public.fn_solicitar_codigo_redefinicao('pendente@escola.edu.br');
+  select count(*) into v_qtd_depois
+  from public.notificacoes
+  where tipo = 'codigo_redefinicao' and lida = false and metadados->>'perfil_id' = v_pendente_id::text;
+  perform public.test_msg(format('H9: código ativo não bloqueia nova solicitação (%s -> %s)', v_qtd_antes, v_qtd_depois),
+    v_qtd_antes = 0 and v_qtd_depois > 0);
+
+  -- H10: gerar atende e limpa pendências; nova solicitação aparece imediatamente
+  select count(*) into v_qtd_antes
+  from public.notificacoes
+  where tipo = 'codigo_redefinicao' and lida = false and metadados->>'perfil_id' = v_pendente_id::text;
+  v_codigo := public.fn_gerar_codigo_redefinicao(v_pendente_id);
+  select count(*) into v_qtd_depois
+  from public.notificacoes
+  where tipo = 'codigo_redefinicao' and lida = false and metadados->>'perfil_id' = v_pendente_id::text;
+  perform public.test_msg(format('H10a: gerar atende e limpa pendências (%s -> %s)', v_qtd_antes, v_qtd_depois),
+    v_qtd_antes > 0 and v_qtd_depois = 0);
+  perform public.fn_solicitar_codigo_redefinicao('pendente@escola.edu.br');
+  select count(*) into v_qtd_depois
+  from public.notificacoes
+  where tipo = 'codigo_redefinicao' and lida = false and metadados->>'perfil_id' = v_pendente_id::text;
+  perform public.test_msg('H10b: nova solicitação após gerar aparece imediatamente', v_qtd_depois > 0);
+
+  -- H11: código REVOGADO não bloqueia nova solicitação (sem pendência)
+  update public.notificacoes set lida = true, lida_em = now()
+  where tipo = 'codigo_redefinicao' and metadados->>'perfil_id' = v_pendente_id::text;
+  update public.codigos_redefinicao set expira_em = now(), revogado_em = now()
+  where perfil_id = v_pendente_id and usado_em is null and expira_em > now();
+  select count(*) into v_qtd_antes
+  from public.notificacoes
+  where tipo = 'codigo_redefinicao' and lida = false and metadados->>'perfil_id' = v_pendente_id::text;
+  perform public.fn_solicitar_codigo_redefinicao('pendente@escola.edu.br');
+  select count(*) into v_qtd_depois
+  from public.notificacoes
+  where tipo = 'codigo_redefinicao' and lida = false and metadados->>'perfil_id' = v_pendente_id::text;
+  perform public.test_msg(format('H11: código revogado não bloqueia nova solicitação (%s -> %s)', v_qtd_antes, v_qtd_depois),
+    v_qtd_antes = 0 and v_qtd_depois > 0);
+
+  -- Restaura configurações
+  update public.configuracoes_sistema
+  set max_tentativas_codigo = coalesce(v_orig_max, 5),
+      minutos_bloqueio_codigo = coalesce(v_orig_min_blo, 15),
+      minutos_validade_codigo = coalesce(v_orig_val, 60)
+  where id = 1;
+
+  -- Limpa dados de teste
+  delete from public.codigos_redefinicao_tentativas where email = v_email_test;
+  delete from public.notificacoes
+  where tipo = 'codigo_redefinicao'
+    and (metadados->>'perfil_id' = v_pendente_id::text or metadados->>'perfil_id' = v_gestao_id::text);
+
+  raise notice '[OK] Fase 7.6: Códigos - Endurecimento concluída';
+end;
+$p76$;
+
+-- ============================================================================
+-- Fase 7.7: Códigos — Limpeza de códigos não ativos
+-- Descrição: Verifica que fn_limpar_codigos_nao_ativos remove apenas códigos
+--            usados/expirados/revogados, preserva os ativos, audita a operação
+--            e rejeita chamadas de não-gestão.
+-- ============================================================================
+
+do $p77$
+declare
+  v_gestao_id  uuid;
+  v_prof_id    uuid;
+  v_cod_uso    text;
+  v_cod_exp    text;
+  v_cod_rev    text;
+  v_cod_ati    text;
+  v_ativos     int;
+  v_removidos  int;
+begin
+  raise notice '[TESTE] Fase 7.7: Códigos - Limpeza de não ativos';
+
+  select id into v_gestao_id from public.perfis where email = 'gestao_teste@escola.edu.br' limit 1;
+  select id into v_prof_id   from public.perfis where email = 'professor_teste@escola.edu.br' limit 1;
+
+  execute format('set local request.jwt.claims to ''{"sub":"%s","role":"authenticated"}''', v_gestao_id);
+
+  delete from public.codigos_redefinicao where perfil_id = v_gestao_id;
+
+  -- Usado
+  v_cod_uso := public.fn_gerar_codigo_redefinicao(v_gestao_id);
+  update public.codigos_redefinicao set usado_em = now()
+  where codigo = v_cod_uso and perfil_id = v_gestao_id;
+
+  -- Expirado
+  v_cod_exp := public.fn_gerar_codigo_redefinicao(v_gestao_id);
+  update public.codigos_redefinicao set expira_em = now() - interval '1 minute'
+  where codigo = v_cod_exp and perfil_id = v_gestao_id;
+
+  -- Revogado
+  v_cod_rev := public.fn_gerar_codigo_redefinicao(v_gestao_id);
+  update public.codigos_redefinicao set expira_em = now() - interval '1 minute', revogado_em = now()
+  where codigo = v_cod_rev and perfil_id = v_gestao_id;
+
+  -- Ativo (gerado por último: a geração sempre revoga o ativo anterior)
+  v_cod_ati := public.fn_gerar_codigo_redefinicao(v_gestao_id);
+
+  select public.fn_limpar_codigos_nao_ativos() into v_removidos;
+
+  -- C1: só o ativo do perfil sobrevive; os não ativos do perfil são removidos
+  perform public.test_msg(
+    format('C1: limpar preserva ativos e remove não ativos (%s removidos no total)', v_removidos),
+    v_removidos >= 3
+      and not exists (select 1 from public.codigos_redefinicao where codigo = v_cod_uso)
+      and not exists (select 1 from public.codigos_redefinicao where codigo = v_cod_exp)
+      and not exists (select 1 from public.codigos_redefinicao where codigo = v_cod_rev)
+      and exists (select 1 from public.codigos_redefinicao where codigo = v_cod_ati)
+  );
+
+  select count(*) into v_ativos
+  from public.codigos_redefinicao
+  where perfil_id = v_gestao_id
+    and usado_em is null and revogado_em is null and expira_em > now();
+  perform public.test_msg('C1b: apenas o código ativo do perfil permanece', v_ativos = 1);
+
+  perform public.test_msg('C2: auditoria LIMPAR_CODIGOS criada',
+    exists (select 1 from public.auditoria
+      where acao = 'LIMPAR_CODIGOS' and entidade = 'codigos_redefinicao'));
+
+  -- Não-gestão não pode limpar
+  execute format('set local request.jwt.claims to ''{"sub":"%s","role":"authenticated"}''', v_prof_id);
+  begin
+    perform public.fn_limpar_codigos_nao_ativos();
+    perform public.test_msg('C3: professor não pode limpar', false);
+  exception when others then
+    perform public.test_msg('C3: professor não pode limpar', true);
+  end;
+
+  execute format('set local request.jwt.claims to ''{"sub":"%s","role":"authenticated"}''', v_gestao_id);
+  delete from public.codigos_redefinicao where perfil_id = v_gestao_id;
+
+  raise notice '[OK] Fase 7.7: Códigos - Limpeza de não ativos concluída';
+end;
+$p77$;
 
 -- ============================================================================
 -- Fase 8: Opções de Configuração (catálogo genérico)

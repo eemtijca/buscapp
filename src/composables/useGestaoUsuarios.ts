@@ -434,12 +434,24 @@ export function useGestaoUsuarios() {
         }
       }
 
+      // E-mails com bloqueio ativo por excesso de tentativas
+      const emailsBloqueados = new Set<string>();
+      const { data: bloqueados } = await supabaseClient
+        .from('codigos_redefinicao_tentativas')
+        .select('email')
+        .gt('bloqueado_ate', new Date().toISOString());
+      for (const b of bloqueados ?? []) {
+        emailsBloqueados.add((b as unknown as { email: string }).email);
+      }
+
       return codigos.map((c) => {
         const agora = new Date();
         const expira = new Date(c.expira_em);
-        let status: 'ativo' | 'usado' | 'expirado';
+        let status: 'ativo' | 'usado' | 'expirado' | 'revogado' | 'bloqueado';
         if (c.usado_em) status = 'usado';
-        else if (c.revogado_em || expira < agora) status = 'expirado';
+        else if (c.revogado_em) status = 'revogado';
+        else if (expira < agora) status = 'expirado';
+        else if (emailsBloqueados.has(c.email)) status = 'bloqueado';
         else status = 'ativo';
 
         return {
@@ -473,6 +485,18 @@ export function useGestaoUsuarios() {
         .eq('id', notificacaoId);
     } catch (e) {
       console.error('[useGestaoUsuarios] Erro ao marcar notificação como lida:', e);
+    }
+  }
+
+  async function limparCodigosNaoAtivos(): Promise<number> {
+    try {
+      const { data, error: err } = await supabaseClient.rpc('fn_limpar_codigos_nao_ativos');
+      if (err) throw err;
+      return (data as number) ?? 0;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : JSON.stringify(e);
+      console.error('[useGestaoUsuarios] Erro ao limpar códigos:', msg);
+      throw e;
     }
   }
 
@@ -525,6 +549,7 @@ export function useGestaoUsuarios() {
     gerarCodigoRedefinicao,
     buscarCodigosGerados,
     marcarNotificacaoLida,
+    limparCodigosNaoAtivos,
     buscarTurmas,
     buscarDisciplinas,
   };

@@ -98,6 +98,17 @@ export function traduzirErro(erroDesconhecido: unknown): ErroTraduzido {
   }
 
   if (
+    mensagemOriginal.includes('Codigo ja utilizado') ||
+    mensagemOriginal.includes('Código já utilizado')
+  ) {
+    return { mensagem: 'Código já utilizado. Solicite um novo código.' };
+  }
+
+  if (mensagemOriginal.includes('Muitas tentativas')) {
+    return { mensagem: 'Muitas tentativas. Solicite um novo código com a administração.' };
+  }
+
+  if (
     mensagemOriginal.includes('Cadastro ja existe') ||
     mensagemOriginal.includes('já está cadastrado') ||
     mensagemOriginal.includes('ja esta cadastrado') ||

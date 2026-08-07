@@ -121,8 +121,8 @@ export default {
 function gerarSenhaTemporaria(): string {
   const maiusculas = 'ABCDEFGHJKLMNPQRSTUVWXYZ'
   const minusculas = 'abcdefghjkmnpqrstuvwxyz'
-  const numeros = '23456789'
-  const especiais = '!@#$%&'
+  const numeros = '0123456789'
+  const especiais = '!#$%&()*+-./:=?@^_~'
 
   const getRandom = (chars: string) => chars.charAt(Math.floor(Math.random() * chars.length))
 

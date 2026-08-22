@@ -10,8 +10,11 @@ import 'bootstrap-icons/font/bootstrap-icons.css';
 import '@/assets/cores.css';
 
 import { createApp } from 'vue';
+import { registerSW } from 'virtual:pwa-register';
 import App from './App.vue';
 import router from './rotas';
+
+registerSW({ immediate: true });
 
 const app = createApp(App);
 

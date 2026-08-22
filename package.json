@@ -16,6 +16,8 @@
     "test": "run-s test:typecheck test:lint test:build test:api",
     "test:api": "bash scripts/test-api.sh",
     "test:e2e": "npx playwright test",
+    "test:pwa": "VITE_SUPABASE_URL=http://localhost:54321 VITE_SUPABASE_PUBLISHABLE_KEY=test-anon-key run-s build-only test:pwa:run",
+    "test:pwa:run": "playwright test --config=playwright.pwa.config.ts",
     "test:db": "bash scripts/test-db.sh",
     "test:typecheck": "vue-tsc --build",
     "test:lint": "run-s lint:*",
@@ -53,6 +55,7 @@
     "supabase": "^2.109.1",
     "typescript": "~6.0.0",
     "vite": "^8.0.8",
+    "vite-plugin-pwa": "^1.3.0",
     "vite-plugin-vue-devtools": "^8.1.1",
     "vue-tsc": "^3.2.6"
   },

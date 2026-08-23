@@ -115,6 +115,19 @@ export function useGestaoUsuarios() {
     }
   }
 
+  function mensagemErroAtualizacao(e: unknown): string {
+    const err = e as { code?: string; constraint?: string } | null;
+    if (err?.code === '23514') {
+      if (err.constraint === 'chk_perfis_modulos_catalogo') {
+        return (
+          'Módulo de acesso inválido. Recarregue a página e revise os módulos selecionados.'
+        );
+      }
+      return 'Dados inválidos. Verifique os campos e tente novamente.';
+    }
+    return 'Falha ao atualizar usuário.';
+  }
+
   async function atualizarUsuario(
     id: string,
     dados: Partial<{ nome: string; telefone: string; cargo: string; status: string }>,
@@ -129,9 +142,9 @@ export function useGestaoUsuarios() {
       if (err) throw err;
       return true;
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
+      const msg = e instanceof Error ? e.message : JSON.stringify(e);
       console.error('[useGestaoUsuarios] Erro ao atualizar usuário:', msg);
-      erro.value = 'Falha ao atualizar usuário.';
+      erro.value = mensagemErroAtualizacao(e);
       return false;
     } finally {
       carregando.value = false;

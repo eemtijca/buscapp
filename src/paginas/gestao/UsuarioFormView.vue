@@ -33,6 +33,22 @@ const acessoModulos = ref<string[]>(['frequencia']);
 
 const opcoesModulos = ref<OpcaoCheckbox[]>([]);
 
+function chavesCatalogoModulo(): Set<string> {
+  return new Set(opcoesModulos.value.map((o) => o.valor));
+}
+
+function filtrarModulosValidos(chaves: unknown): string[] {
+  if (!Array.isArray(chaves)) return [];
+  const validas = chavesCatalogoModulo();
+  return chaves.filter((c): c is string => typeof c === 'string' && validas.has(c));
+}
+
+function moduloPadrao(): string[] {
+  const validas = opcoesModulos.value.map((o) => o.valor);
+  if (validas.includes('frequencia')) return ['frequencia'];
+  return validas.length ? [validas[0]!] : [];
+}
+
 const atribuicoes = ref<(AtribuicaoProfessor & { turma_nome?: string })[]>([]);
 const vinculos = ref<(VinculoResponsavel & { aluno_nome?: string })[]>([]);
 
@@ -153,7 +169,8 @@ onMounted(async () => {
       .single();
     if (perfil) {
       notificacoesAtivas.value = perfil.notificacoes_ativas;
-      acessoModulos.value = perfil.acesso_modulos?.length ? perfil.acesso_modulos : ['frequencia'];
+      const salvas = filtrarModulosValidos(perfil.acesso_modulos);
+      acessoModulos.value = salvas.length ? salvas : moduloPadrao();
     }
     if (usuario.papel === 'professor') {
       const { data: atribs } = await supabaseClient
@@ -195,7 +212,8 @@ onMounted(async () => {
       if (parsed.cargo) cargo.value = parsed.cargo ?? '';
       if (typeof parsed.notificacoesAtivas === 'boolean')
         notificacoesAtivas.value = parsed.notificacoesAtivas;
-      if (parsed.acessoModulos) acessoModulos.value = parsed.acessoModulos;
+      if (Array.isArray(parsed.acessoModulos))
+        acessoModulos.value = filtrarModulosValidos(parsed.acessoModulos);
     }
   } catch {
     /* ignorar dados corrompidos */
@@ -214,10 +232,14 @@ async function salvar() {
   }
   salvando.value = true;
   try {
-    const dadosExtras = {
+    // acesso_modulos só é enviado para professores e apenas com chaves
+    // presentes no catálogo (evita violar chk_perfis_modulos_catalogo).
+    const dadosExtras: Record<string, unknown> = {
       notificacoes_ativas: notificacoesAtivas.value,
-      acesso_modulos: acessoModulos.value,
     };
+    if (papel.value === 'professor') {
+      dadosExtras.acesso_modulos = filtrarModulosValidos(acessoModulos.value);
+    }
     if (modoEdicao.value && usuarioId.value) {
       // Perfis de gestão ficam sempre ativos (defesa extra no salvamento)
       const statusFinal: StatusPerfil = papel.value === 'gestao' ? 'ativo' : status.value;

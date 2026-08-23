@@ -18,6 +18,7 @@ import GestaoAlunosView from '@/paginas/gestao/AlunosView.vue';
 import GestaoAlunoFormView from '@/paginas/gestao/AlunoFormView.vue';
 import GestaoCodigosView from '@/paginas/gestao/CodigosView.vue';
 import GestaoTurmasView from '@/paginas/gestao/TurmasView.vue';
+import AnosLetivosView from '@/paginas/gestao/AnosLetivosView.vue';
 import GestaoDisciplinasView from '@/paginas/gestao/DisciplinasView.vue';
 import GestaoAtribuicoesView from '@/paginas/gestao/AtribuicoesView.vue';
 import GestaoChatView from '@/paginas/gestao/GestaoChatView.vue';
@@ -175,6 +176,12 @@ const router = createRouter({
           name: 'gestao-turmas',
           meta: { requerAutenticacao: true, papeisPermitidos: ['gestao'] },
           component: GestaoTurmasView,
+        },
+        {
+          path: 'anos-letivos',
+          name: 'gestao-anos-letivos',
+          meta: { requerAutenticacao: true, papeisPermitidos: ['gestao'] },
+          component: AnosLetivosView,
         },
         {
           path: 'disciplinas',

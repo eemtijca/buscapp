@@ -101,7 +101,7 @@ export const REGRA_TIPOS: Record<string, RegraCampo> = {
   serie_turma: {
     titulo: 'Séries',
     rotulo: 'Série',
-    placeholder: 'ex.: 4º',
+    placeholder: 'ex.: 4ª',
     icone: 'book',
     campo: 'ordinal',
     minlength: 1,
@@ -109,10 +109,10 @@ export const REGRA_TIPOS: Record<string, RegraCampo> = {
     filtrar: (v) => v.replace(/\D/g, '').slice(0, 2),
     transformar: (v) => {
       const digitos = v.replace(/\D/g, '');
-      return digitos ? `${digitos}º` : v.trim();
+      return digitos ? `${digitos}ª` : v.trim();
     },
-    padrao: /^\d{1,2}º$/,
-    mensagemPadrao: 'Digite apenas o número da série (ex.: 4º).',
+    padrao: /^\d{1,2}ª$/,
+    mensagemPadrao: 'Digite apenas o número da série (ex.: 4ª).',
     verificarUso: [{ tabela: 'turmas', coluna: 'serie', isArray: false }],
   },
   letra_turma: {

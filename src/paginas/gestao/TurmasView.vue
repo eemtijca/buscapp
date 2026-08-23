@@ -3,6 +3,7 @@ import { onMounted, ref, watch } from 'vue';
 import { useRouter, onBeforeRouteLeave } from 'vue-router';
 import { supabaseClient } from '@/servicos/supabase';
 import { useOpcoesConfiguracao } from '@/composables/useOpcoesConfiguracao';
+import { useAnoLetivo } from '@/composables/useAnoLetivo';
 import CampoFormulario from '@/componentes/CampoFormulario.vue';
 import type { Turma } from '@/tipos/database';
 import type { OpcaoCheckbox } from '@/tipos/componentes';
@@ -10,6 +11,7 @@ import type { OpcaoCheckbox } from '@/tipos/componentes';
 const router = useRouter();
 
 const { buscarOpcoes } = useOpcoesConfiguracao();
+const { buscarAnoLetivoAtivo } = useAnoLetivo();
 
 const turmas = ref<Turma[]>([]);
 const opcoesSerie = ref<OpcaoCheckbox[]>([]);
@@ -22,7 +24,7 @@ const modalAberto = ref(false);
 const modoEdicao = ref(false);
 const editandoId = ref<string | null>(null);
 
-const formSerie = ref('1º');
+const formSerie = ref('1ª');
 const formLetra = ref('A');
 const formCapacidade = ref<number | null>(null);
 const formAtivo = ref(true);
@@ -51,7 +53,7 @@ function mostrarErro(msg: string) {
 }
 
 function resetForm() {
-  formSerie.value = '1º';
+  formSerie.value = '1ª';
   formLetra.value = 'A';
   formCapacidade.value = null;
   formAtivo.value = true;
@@ -109,13 +111,8 @@ async function salvar() {
       }
       mostrarSucesso('Turma atualizada.');
     } else {
-      const { data: anos } = await supabaseClient
-        .from('anos_letivos')
-        .select('id')
-        .eq('status', 'ativo')
-        .limit(1);
-      const anoLetivoId = anos?.[0]?.id;
-      if (!anoLetivoId) {
+      const anoLetivo = await buscarAnoLetivoAtivo();
+      if (!anoLetivo) {
         mostrarErro('Nenhum ano letivo ativo encontrado.');
         return;
       }
@@ -124,7 +121,7 @@ async function salvar() {
         letra: formLetra.value,
         capacidade: formCapacidade.value,
         ativo: formAtivo.value,
-        ano_letivo_id: anoLetivoId,
+        ano_letivo_id: anoLetivo.id,
       });
       if (error) {
         mostrarErro('Falha ao criar turma.');

@@ -401,10 +401,10 @@ assert "turmas SELECT 200" "200" "$HTTP"
 
 TID=$(UUID)
 # Limpar dados de execuções anteriores (FK: frequências → turma ← enturmações)
-npx supabase db query "DELETE FROM public.frequencias WHERE turma_id IN (SELECT id FROM public.turmas WHERE ano_letivo_id='b0000000-0000-0000-0000-000000000001' AND serie='1º' AND letra='B');" 2>/dev/null
-npx supabase db query "DELETE FROM public.enturmacoes WHERE turma_id IN (SELECT id FROM public.turmas WHERE ano_letivo_id='b0000000-0000-0000-0000-000000000001' AND serie='1º' AND letra='B');" 2>/dev/null
-npx supabase db query "DELETE FROM public.turmas WHERE ano_letivo_id='b0000000-0000-0000-0000-000000000001' AND serie='1º' AND letra='B';" 2>/dev/null
-HTTP=$(api_code POST "/rest/v1/turmas" "{\"id\":\"$TID\",\"ano_letivo_id\":\"b0000000-0000-0000-0000-000000000001\",\"serie\":\"1º\",\"letra\":\"B\"}" "$TG")
+npx supabase db query "DELETE FROM public.frequencias WHERE turma_id IN (SELECT id FROM public.turmas WHERE ano_letivo_id='b0000000-0000-0000-0000-000000000001' AND serie='1ª' AND letra='B');" 2>/dev/null
+npx supabase db query "DELETE FROM public.enturmacoes WHERE turma_id IN (SELECT id FROM public.turmas WHERE ano_letivo_id='b0000000-0000-0000-0000-000000000001' AND serie='1ª' AND letra='B');" 2>/dev/null
+npx supabase db query "DELETE FROM public.turmas WHERE ano_letivo_id='b0000000-0000-0000-0000-000000000001' AND serie='1ª' AND letra='B';" 2>/dev/null
+HTTP=$(api_code POST "/rest/v1/turmas" "{\"id\":\"$TID\",\"ano_letivo_id\":\"b0000000-0000-0000-0000-000000000001\",\"serie\":\"1ª\",\"letra\":\"B\"}" "$TG")
 assert "turmas INSERT 201" "201" "$HTTP"
 
 npx supabase db query "DELETE FROM public.enturmacoes WHERE aluno_id='$AID';" 2>/dev/null
@@ -511,7 +511,7 @@ HTTP=$(api_code POST "/rest/v1/turmas" "{\"id\":\"$TID3\",\"serie\":\"2º\",\"le
 assert "turma sem ano_letivo 400" "400" "$HTTP"
 
 echo ""; echo "=== 6. FREQUÊNCIA — IDEMPOTÊNCIA E PERSISTÊNCIA ==="
-# Usa aluno + turma do seed: João Miguel (e...001) na turma 1º A (d...001)
+# Usa aluno + turma do seed: João Miguel (e...001) na turma 1ª A (d...001)
 FA="e0000000-0000-0000-0000-000000000001"
 FT="d0000000-0000-0000-0000-000000000001"
 FP="a0000000-0000-0000-0000-000000000002"
@@ -716,7 +716,7 @@ if [ -z "$TP" ]; then
   TP=$(api_body | py "d=json.load(sys.stdin); print(d.get('access_token',''))")
 fi
 # Garantir que o aluno seed existe e está enturmado
-# (João Miguel — e0000000-0000-0000-0000-000000000001 na turma 1º A — d0000000-0000-0000-0000-000000000001)
+# (João Miguel — e0000000-0000-0000-0000-000000000001 na turma 1ª A — d0000000-0000-0000-0000-000000000001)
 HTTP=$(api_code GET "/rest/v1/enturmacoes?select=id&aluno_id=eq.$FA&turma_id=eq.$FT&status=eq.matriculado&limit=1" '' "$TG")
 ENTURM_OK=$(api_body | py "d=json.load(sys.stdin); print(1 if isinstance(d,list) and len(d)>0 else 0)" 2>/dev/null)
 if [ "$ENTURM_OK" != "1" ]; then
@@ -789,7 +789,7 @@ echo ""; echo "=== 13. JUSTIFICATIVAS — CICLO COMPLETO COM ANEXOS ==="
 
 # IDs do seed
 FA13="e0000000-0000-0000-0000-000000000001"  # João Miguel
-FT13="d0000000-0000-0000-0000-000000000001"  # 1º A
+FT13="d0000000-0000-0000-0000-000000000001"  # 1ª A
 FP13="a0000000-0000-0000-0000-000000000002"  # Prof 1
 FR13="a0000000-0000-0000-0000-000000000005"  # Responsável 1
 
@@ -1310,10 +1310,10 @@ HTTP=$(api_code POST "/rest/v1/turmas" "{\"id\":\"$TID_NOVA\",\"ano_letivo_id\":
 assert "25.8 série fora do catálogo rejeitada" 1 "$( [ "$HTTP" = "400" ] || [ "$HTTP" = "422" ] && echo 1 || echo 0 )"
 # série/letra do catálogo -> aceita
 TID_OK=$(UUID)
-HTTP=$(api_code POST "/rest/v1/turmas" "{\"id\":\"$TID_OK\",\"ano_letivo_id\":\"b0000000-0000-0000-0000-000000000001\",\"serie\":\"1º\",\"letra\":\"D\"}" "$TG")
+HTTP=$(api_code POST "/rest/v1/turmas" "{\"id\":\"$TID_OK\",\"ano_letivo_id\":\"b0000000-0000-0000-0000-000000000001\",\"serie\":\"1ª\",\"letra\":\"D\"}" "$TG")
 assert "25.8 turma série do catálogo aceita 201" "201" "$HTTP"
 HTTP=$(api_code GET "/rest/v1/turmas?select=serie,letra&id=eq.$TID_OK" '' "$TG")
-assert_contains "25.8 serie salva" "$(api_body)" "1º"
+assert_contains "25.8 serie salva" "$(api_body)" "1ª"
 npx supabase db query "DELETE FROM public.turmas WHERE id='$TID_OK';" 2>/dev/null
 
 # 25.9 Vínculos validam tipo_relacao contra o catálogo
@@ -1351,7 +1351,7 @@ assert "26.3 turma serie 9o rejeitada" 1 "$( [ "$HTTP" = "400" ] || [ "$HTTP" = 
 
 # 26.4 turmas.letra fora do catálogo
 TID_BAD2=$(UUID)
-HTTP=$(api_code POST "/rest/v1/turmas" "{\"id\":\"$TID_BAD2\",\"ano_letivo_id\":\"b0000000-0000-0000-0000-000000000001\",\"serie\":\"1º\",\"letra\":\"Z\"}" "$TG")
+HTTP=$(api_code POST "/rest/v1/turmas" "{\"id\":\"$TID_BAD2\",\"ano_letivo_id\":\"b0000000-0000-0000-0000-000000000001\",\"serie\":\"1ª\",\"letra\":\"Z\"}" "$TG")
 assert "26.4 turma letra Z rejeitada" 1 "$( [ "$HTTP" = "400" ] || [ "$HTTP" = "422" ] && echo 1 || echo 0 )"
 
 # 26.5 vínculos.tipo_relacao fora do catálogo

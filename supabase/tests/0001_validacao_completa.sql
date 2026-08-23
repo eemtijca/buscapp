@@ -117,15 +117,15 @@ begin
   perform public.test_set('ano_id', v_ano_id::text);
 
   insert into public.turmas (ano_letivo_id, serie, letra, capacidade)
-  values (v_ano_id, '1º', 'A', 40)
+  values (v_ano_id, '1ª', 'A', 40)
   on conflict (ano_letivo_id, serie, letra) do update set capacidade = 40
   returning id into v_turma_a_id;
   insert into public.turmas (ano_letivo_id, serie, letra, capacidade)
-  values (v_ano_id, '2º', 'B', 40)
+  values (v_ano_id, '2ª', 'B', 40)
   on conflict (ano_letivo_id, serie, letra) do update set capacidade = 40
   returning id into v_turma_b_id;
   insert into public.turmas (ano_letivo_id, serie, letra, capacidade)
-  values (v_ano_id, '3º', 'C', 40)
+  values (v_ano_id, '3ª', 'C', 40)
   on conflict (ano_letivo_id, serie, letra) do update set capacidade = 40
   returning id into v_turma_c_id;
 
@@ -330,7 +330,7 @@ begin
   -- C7: turma única ano+série+letra
   begin
     insert into public.turmas (ano_letivo_id, serie, letra)
-    values ((public.test_get('ano_id'))::uuid, '1º', 'A');
+    values ((public.test_get('ano_id'))::uuid, '1ª', 'A');
     perform public.test_msg('C7: turma única ano+série+letra', false);
   exception when unique_violation then
     perform public.test_msg('C7: turma única ano+série+letra', true);
@@ -338,7 +338,7 @@ begin
 
   -- C8: FK RESTRICT — deletar turma com enturmações bloqueia
   begin
-    delete from public.turmas where nome_completo = '1º A';
+    delete from public.turmas where nome_completo = '1ª A';
     perform public.test_msg('C8: FK RESTRICT turma-enturmacoes', false);
   exception when foreign_key_violation then
     perform public.test_msg('C8: FK RESTRICT turma-enturmacoes', true);
@@ -406,8 +406,8 @@ begin
   perform public.test_msg('T1: auth.users insert cria perfil', v_count = 1);
 
   -- T2: fn_set_turma_nome
-  select nome_completo into v_nome from public.turmas where nome_completo = '1º A';
-  perform public.test_msg('T2: trigger set_turma_nome', v_nome = '1º A');
+  select nome_completo into v_nome from public.turmas where nome_completo = '1ª A';
+  perform public.test_msg('T2: trigger set_turma_nome', v_nome = '1ª A');
 
   -- T3: updated_at trigger (verifica existencia)
   select count(*) into v_count
@@ -588,7 +588,7 @@ begin
   begin
     insert into public.frequencias (aluno_id, professor_id, turma_id, ano_letivo_id, data_aula, tipo_registro, periodo, status, client_request_id)
     values ((public.test_get('aluno1_id'))::uuid, (public.test_get('professor_id'))::uuid,
-            (select id from public.turmas where nome_completo = '1º A'),
+            (select id from public.turmas where nome_completo = '1ª A'),
             (public.test_get('ano_id'))::uuid,
             current_date, 'chamada_aula', '4º Horário', 'presente',
             'a0000000-0000-0000-0000-000000000001');
@@ -638,8 +638,8 @@ begin
   end;
 
   -- E9: nome_completo da turma formado corretamente
-  perform public.test_msg('E9: turma 1º A nome_completo',
-    exists (select 1 from public.turmas where nome_completo = '1º A'));
+  perform public.test_msg('E9: turma 1ª A nome_completo',
+    exists (select 1 from public.turmas where nome_completo = '1ª A'));
 
   -- E10: views com security_invoker = true — consulta sem erro
   begin
@@ -1256,9 +1256,9 @@ begin
   where typname in ('serie_turma', 'letra_turma', 'tipo_vinculo', 'papel_atribuicao');
   perform public.test_msg('C7: enums antigos removidos', v_qtd = 0);
 
-  -- C8: série/letra validam contra o catálogo de opções (série "4º" não cadastrada)
+  -- C8: série/letra validam contra o catálogo de opções (série "4ª" não cadastrada)
   begin
-    insert into public.turmas (ano_letivo_id, serie, letra) values ('b0000000-0000-0000-0000-000000000001', '4º', 'D');
+    insert into public.turmas (ano_letivo_id, serie, letra) values ('b0000000-0000-0000-0000-000000000001', '4ª', 'D');
     perform public.test_msg('C8: série fora do catálogo rejeitada', false);
   exception when check_violation then
     perform public.test_msg('C8: série fora do catálogo rejeitada', true);
@@ -1266,7 +1266,7 @@ begin
 
   -- C8b: série/letra cadastradas no catálogo são aceitas
   begin
-    insert into public.turmas (ano_letivo_id, serie, letra) values ('b0000000-0000-0000-0000-000000000001', '1º', 'D');
+    insert into public.turmas (ano_letivo_id, serie, letra) values ('b0000000-0000-0000-0000-000000000001', '1ª', 'D');
     perform public.test_msg('C8b: série do catálogo aceita', true);
   exception when others then
     perform public.test_msg('C8b: série do catálogo aceita', false);
@@ -1402,7 +1402,7 @@ begin
   raise notice '  Views:         %', v_views;
   raise notice '  RLS ativo:     % tabelas', v_rls;
   raise notice '  Seeds tags:    %', (select count(*) from public.tags_comportamento);
-  raise notice '  Seeds config:  %', (select count(*) from public.configuracoes_escola);
+  raise notice '  Catálogo:      %', (select count(*) from public.opcoes_configuracao);
   raise notice '============================================================';
   raise notice '  Todos os testes concluídos com sucesso!';
   raise notice '============================================================';

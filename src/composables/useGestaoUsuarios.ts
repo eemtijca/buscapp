@@ -1,5 +1,6 @@
 import { ref, type Ref } from 'vue';
 import { supabaseClient } from '@/servicos/supabase';
+import { useAnoLetivo } from '@/composables/useAnoLetivo';
 import type {
   Aluno,
   CodigoRedefinicao,
@@ -20,6 +21,7 @@ import type {
 export function useGestaoUsuarios() {
   const carregando: Ref<boolean> = ref(false);
   const erro: Ref<string | null> = ref(null);
+  const { buscarAnoLetivoAtivo } = useAnoLetivo();
 
   // ==========================================================================
   // USUÁRIOS (Perfis)
@@ -244,17 +246,12 @@ export function useGestaoUsuarios() {
       const alunoId = (aluno as unknown as Aluno).id;
 
       if (dados.turma_id) {
-        const { data: ano } = await supabaseClient
-          .from('anos_letivos')
-          .select('id')
-          .eq('ativo', true)
-          .single();
-
+        const ano = await buscarAnoLetivoAtivo();
         if (ano) {
           await supabaseClient.from('enturmacoes').insert({
             aluno_id: alunoId,
             turma_id: dados.turma_id,
-            ano_letivo_id: (ano as unknown as { id: string }).id,
+            ano_letivo_id: ano.id,
             data_matricula: new Date().toISOString().split('T')[0],
           });
         }

@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch, nextTick } from 'vue';
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router';
 import { useGestaoUsuarios } from '@/composables/useGestaoUsuarios';
 import { useOpcoesConfiguracao } from '@/composables/useOpcoesConfiguracao';
+import { useAnoLetivo } from '@/composables/useAnoLetivo';
 import { supabaseClient } from '@/servicos/supabase';
 import CampoFormulario from '@/componentes/CampoFormulario.vue';
 import GrupoCheckbox from '@/componentes/GrupoCheckbox.vue';
@@ -14,6 +15,7 @@ const router = useRouter();
 const { buscarAlunos, buscarTurmas, criarAluno, atualizarAluno, carregando, erro } =
   useGestaoUsuarios();
 const { buscarOpcoes } = useOpcoesConfiguracao();
+const { buscarAnoLetivoAtivo } = useAnoLetivo();
 
 const modoEdicao = ref(false);
 const alunoId = ref<string | null>(null);
@@ -185,16 +187,12 @@ async function salvarAlterarEnturmacao() {
   }
   salvando.value = true;
   try {
-    const { data: anos } = await supabaseClient
-      .from('anos_letivos')
-      .select('id')
-      .eq('status', 'ativo')
-      .limit(1);
-    const anoLetivoId = anos?.[0]?.id;
-    if (!anoLetivoId) {
+    const anoLetivo = await buscarAnoLetivoAtivo();
+    if (!anoLetivo) {
       mostrarErro('Nenhum ano letivo ativo encontrado.');
       return;
     }
+    const anoLetivoId = anoLetivo.id;
 
     if (enturmacaoAtual.value && enturmacaoAtual.value.ano_letivo_id === anoLetivoId) {
       // Mesmo ano letivo: reutiliza a linha existente (evita violar a unicidade

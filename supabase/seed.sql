@@ -121,20 +121,8 @@ where id = 'a0000000-0000-0000-0000-000000000006' and nome = 'resp2';
 update public.perfis set
   nome = 'Lucia Oliveira', telefone = '(85) 99999-0007', status = 'ativo'
 where id = 'a0000000-0000-0000-0000-000000000007' and nome = 'resp3';
-
 -- ============================================================================
--- 3. CONFIGURAÇÕES DA ESCOLA
--- ============================================================================
-insert into public.configuracoes_escola (chave, valor, descricao) values
-  ('chat_hora_inicio',     '07:00',  'Horário de início do chat (RF27)'),
-  ('chat_hora_fim',        '17:00',  'Horário de encerramento do chat (RF27)'),
-  ('chat_permitir_sabado', 'false',  'Permitir chat aos sábados'),
-  ('chat_permitir_domingo','false',  'Permitir chat aos domingos'),
-  ('nome_escola',          'EEMTI',  'Nome da unidade escolar')
-on conflict (chave) do nothing;
-
--- ============================================================================
--- 4. ANO LETIVO VIGENTE
+-- 3. ANO LETIVO VIGENTE
 -- ============================================================================
 insert into public.anos_letivos (id, ano, status, data_inicio, data_fim, ativo)
 values (
@@ -146,59 +134,22 @@ values (
   true
 )
 on conflict (ano) do nothing;
+-- Configurações, catálogos, horários letivos, tags de comportamento,
+-- disciplinas e o ano letivo vigente NÃO são populados aqui: fazem parte dos
+-- dados canônicos da migration única (supabase/migrations/0001_schema_completo.sql).
+-- Este seed contém EXCLUSIVAMENTE dados de pessoas e atividade para desenvolvimento.
 
 -- ============================================================================
--- 5. HORÁRIOS LETIVOS
--- ============================================================================
-insert into public.horarios_letivos (dia_semana, hora_inicio, hora_fim) values
-  (1, '07:00', '17:00'),
-  (2, '07:00', '17:00'),
-  (3, '07:00', '17:00'),
-  (4, '07:00', '17:00'),
-  (5, '07:00', '17:00')
-on conflict (dia_semana, hora_inicio, hora_fim) do nothing;
-
--- ============================================================================
--- 6. DISCIPLINAS
--- ============================================================================
-insert into public.disciplinas (id, nome, codigo_sige, carga_horaria) values
-  ('c0000000-0000-0000-0000-000000000001', 'Português',    'PORT', 160),
-  ('c0000000-0000-0000-0000-000000000002', 'Matemática',   'MAT',  160),
-  ('c0000000-0000-0000-0000-000000000003', 'História',     'HIST', 120),
-  ('c0000000-0000-0000-0000-000000000004', 'Ciências',     'CIEN', 120),
-  ('c0000000-0000-0000-0000-000000000005', 'Geografia',    'GEO',  120),
-  ('c0000000-0000-0000-0000-000000000006', 'Artes',        'ART',  80)
-on conflict (codigo_sige) do nothing;
-
--- ============================================================================
--- 7. TAGS DE COMPORTAMENTO (RF16)
--- ============================================================================
-insert into public.tags_comportamento (nome, categoria, icone, descricao, peso_pontuacao) values
-  ('Participativo',   'positivo', 'hand-thumbs-up', 'Aluno participou ativamente da aula', 10),
-  ('Colaborativo',    'positivo', 'people',         'Trabalhou bem em grupo',             10),
-  ('Pontual',         'positivo', 'clock',          'Chegou no horário',                  5),
-  ('Protagonista',    'positivo', 'star',           'Demonstrou iniciativa e liderança',   15),
-  ('Desatenção',      'atencao',  'eye-slash',      'Dificuldade de concentração pontual', 0),
-  ('Uso de celular',  'atencao',  'phone',          'Uso não autorizado de celular',      0),
-  ('Conversa paralela', 'atencao', 'chat-dots',     'Conversa fora do contexto da aula',   0),
-  ('Sem material',    'atencao',  'book',            'Não trouxe material necessário',     0)
-on conflict (nome) do nothing;
-
--- As opções de configuração (catálogo genérico em opcoes_configuracao) são
--- inseridas pela migration 0003_catalogo_configuracao.sql e não mais aqui,
--- pois o projeto remoto recebe apenas migrations (sem seed).
-
--- ============================================================================
--- 8. TURMAS
+-- 4. TURMAS
 -- ============================================================================
 insert into public.turmas (id, ano_letivo_id, serie, letra, capacidade) values
-  ('d0000000-0000-0000-0000-000000000001', 'b0000000-0000-0000-0000-000000000001', '1º', 'A', 40),
-  ('d0000000-0000-0000-0000-000000000002', 'b0000000-0000-0000-0000-000000000001', '2º', 'B', 40),
-  ('d0000000-0000-0000-0000-000000000003', 'b0000000-0000-0000-0000-000000000001', '3º', 'C', 40)
+  ('d0000000-0000-0000-0000-000000000001', 'b0000000-0000-0000-0000-000000000001', '1ª', 'A', 40),
+  ('d0000000-0000-0000-0000-000000000002', 'b0000000-0000-0000-0000-000000000001', '2ª', 'B', 40),
+  ('d0000000-0000-0000-0000-000000000003', 'b0000000-0000-0000-0000-000000000001', '3ª', 'C', 40)
 on conflict (ano_letivo_id, serie, letra) do nothing;
 
 -- ============================================================================
--- 9. ALUNOS
+-- 5. ALUNOS
 -- ============================================================================
 insert into public.alunos (id, nome, matricula, codigo_inep, status, data_nascimento, data_matricula, observacoes) values
   ('e0000000-0000-0000-0000-000000000001', 'João Miguel da Silva',    'MAT2026001', '23123456', 'ativo',       '2012-03-15', make_date(extract(year from current_date)::int, 2, 1), null),
@@ -213,7 +164,7 @@ insert into public.alunos (id, nome, matricula, codigo_inep, status, data_nascim
 on conflict (matricula) do nothing;
 
 -- ============================================================================
--- 10. ENTURMAÇÕES
+-- 6. ENTURMAÇÕES
 -- ============================================================================
 insert into public.enturmacoes (aluno_id, turma_id, ano_letivo_id, status, data_matricula, data_encerramento) values
   ('e0000000-0000-0000-0000-000000000001', 'd0000000-0000-0000-0000-000000000001', 'b0000000-0000-0000-0000-000000000001', 'matriculado',  make_date(extract(year from current_date)::int, 2, 1), null),
@@ -228,7 +179,7 @@ insert into public.enturmacoes (aluno_id, turma_id, ano_letivo_id, status, data_
 on conflict (aluno_id, ano_letivo_id) do nothing;
 
 -- ============================================================================
--- 11. ATRIBUIÇÕES PROFESSORES
+-- 7. ATRIBUIÇÕES PROFESSORES
 -- ============================================================================
 insert into public.atribuicoes_professores (professor_id, turma_id, disciplina_id, papel) values
   ('a0000000-0000-0000-0000-000000000002', 'd0000000-0000-0000-0000-000000000001', null, 'titular'),
@@ -241,7 +192,7 @@ insert into public.atribuicoes_professores (professor_id, turma_id, disciplina_i
   ('a0000000-0000-0000-0000-000000000003', 'd0000000-0000-0000-0000-000000000003', 'c0000000-0000-0000-0000-000000000002', 'titular');
 
 -- ============================================================================
--- 12. VÍNCULOS RESPONSÁVEIS
+-- 8. VÍNCULOS RESPONSÁVEIS
 -- ============================================================================
 insert into public.vinculos_responsaveis (responsavel_id, aluno_id, tipo_relacao, contato_prioritario) values
   ('a0000000-0000-0000-0000-000000000005', 'e0000000-0000-0000-0000-000000000001', 'mae',  true),
@@ -251,7 +202,7 @@ insert into public.vinculos_responsaveis (responsavel_id, aluno_id, tipo_relacao
 on conflict (responsavel_id, aluno_id) do nothing;
 
 -- ============================================================================
--- 13. FREQUÊNCIAS
+-- 9. FREQUÊNCIAS
 -- Gera 5 dias de aula (02 a 06 de março) para alunos ativos,
 -- com diferentes padrões de ausência para testar ranking de risco.
 -- ============================================================================
@@ -285,38 +236,38 @@ begin
         else 'a0000000-0000-0000-0000-000000000002'
       end;
 
-      -- 3 aulas por dia (Português/Matemática, História/Ciências, Geografia/Artes)
+      -- 3 aulas por dia (Língua Portuguesa/Arte, Educação Física/Matemática, Física/Química)
       for v_aula_count in 1..3 loop
         v_status := 'presente';
 
-        -- João Miguel (1º A): 3 ausências (dias 02, 04, 06)
+        -- João Miguel (1ª A): 3 ausências (dias 02, 04, 06)
         if v_aluno.aluno_id = 'e0000000-0000-0000-0000-000000000001' and v_dia in ('2026-03-02'::date, '2026-03-04'::date, '2026-03-06'::date) then
           v_status := 'ausente';
         end if;
 
-        -- Pedro Henrique (1º A): 5 ausências (todos os dias) = risco alto
+        -- Pedro Henrique (1ª A): 5 ausências (todos os dias) = risco alto
         if v_aluno.aluno_id = 'e0000000-0000-0000-0000-000000000003' then
           v_status := 'ausente';
         end if;
 
-        -- Lucas Eduardo (2º B): 2 ausências (dias 03, 05)
+        -- Lucas Eduardo (2ª B): 2 ausências (dias 03, 05)
         if v_aluno.aluno_id = 'e0000000-0000-0000-0000-000000000005' and v_dia in ('2026-03-03'::date, '2026-03-05'::date) then
           v_status := 'ausente';
         end if;
 
-        -- Júlia Gabriela (2º B): 4 ausências (dias 02, 03, 05, 06)
+        -- Júlia Gabriela (2ª B): 4 ausências (dias 02, 03, 05, 06)
         if v_aluno.aluno_id = 'e0000000-0000-0000-0000-000000000006' and v_dia in ('2026-03-02'::date, '2026-03-03'::date, '2026-03-05'::date, '2026-03-06'::date) then
           v_status := 'ausente';
         end if;
 
-        -- Rafael Augusto (3º C): 0 ausências (perfeita frequência)
+        -- Rafael Augusto (3ª C): 0 ausências (perfeita frequência)
 
-        -- Isabela Cristina (3º C): 1 ausência (dia 04)
+        -- Isabela Cristina (3ª C): 1 ausência (dia 04)
         if v_aluno.aluno_id = 'e0000000-0000-0000-0000-000000000008' and v_dia = '2026-03-04'::date then
           v_status := 'ausente';
         end if;
 
-        -- Thiago Vinicius (3º C): 3 ausências (dias 02, 04, 06)
+        -- Thiago Vinicius (3ª C): 3 ausências (dias 02, 04, 06)
         if v_aluno.aluno_id = 'e0000000-0000-0000-0000-000000000009' and v_dia in ('2026-03-02'::date, '2026-03-04'::date, '2026-03-06'::date) then
           v_status := 'ausente';
         end if;
@@ -340,7 +291,7 @@ end;
 $$;
 
 -- ============================================================================
--- 14. OCORRÊNCIAS
+-- 10. OCORRÊNCIAS
 -- ============================================================================
 insert into public.ocorrencias (aluno_id, professor_id, turma_id, ano_letivo_id, titulo, descricao, tipo, status, data_ocorrencia) values
   (
@@ -367,7 +318,7 @@ insert into public.ocorrencias (aluno_id, professor_id, turma_id, ano_letivo_id,
   );
 
 -- ============================================================================
--- 15. NOTIFICAÇÕES
+-- 11. NOTIFICAÇÕES
 -- ============================================================================
 insert into public.notificacoes (destinatario_id, tipo, titulo, corpo, metadados) values
   (
@@ -381,7 +332,7 @@ insert into public.notificacoes (destinatario_id, tipo, titulo, corpo, metadados
     'a0000000-0000-0000-0000-000000000001',
     'ausencia_aula',
     'Aluno com faltas críticas detectado',
-    'Pedro Henrique Lima (1º A) atingiu 5 faltas consecutivas. Recomenda-se acionar o protocolo de monitoramento.',
+    'Pedro Henrique Lima (1ª A) atingiu 5 faltas consecutivas. Recomenda-se acionar o protocolo de monitoramento.',
     null
   ),
   (
@@ -395,7 +346,7 @@ insert into public.notificacoes (destinatario_id, tipo, titulo, corpo, metadados
     'a0000000-0000-0000-0000-000000000002',
     'sistema',
     'Bem-vinda ao sistema',
-    'Seu perfil de professora foi ativado. Você está vinculada à turma 1º A como titular.',
+    'Seu perfil de professora foi ativado. Você está vinculada à turma 1ª A como titular.',
     null
   ),
   (
@@ -407,7 +358,7 @@ insert into public.notificacoes (destinatario_id, tipo, titulo, corpo, metadados
   );
 
 -- ============================================================================
--- 16. CÓDIGOS DE REDEFINIÇÃO
+-- 12. CÓDIGOS DE REDEFINIÇÃO
 -- ============================================================================
 insert into public.codigos_redefinicao (email, perfil_id, codigo, criado_por, usado_em, expira_em) values
   (
@@ -436,7 +387,7 @@ insert into public.codigos_redefinicao (email, perfil_id, codigo, criado_por, us
   );
 
 -- ============================================================================
--- 17. MONITORAMENTO AÇÕES
+-- 13. MONITORAMENTO AÇÕES
 -- ============================================================================
 insert into public.monitoramento_acoes (aluno_id, responsavel_id, tipo_contato, status, realizado_por, observacao, agendado_para, realizado_em) values
   (

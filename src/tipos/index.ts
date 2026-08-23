@@ -20,7 +20,6 @@ export type {
   PapelAtribuicao,
   TipoVinculo,
   AnoLetivo,
-  ConfiguracaoEscola,
   ConfiguracaoSistema,
   HorarioLetivo,
   Disciplina,

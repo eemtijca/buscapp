@@ -81,7 +81,7 @@ Projeto em desenvolvimento ativo. A infraestrutura central está concluída e os
 - Tratamento e tradução de erros do Supabase Auth para português
 - Páginas de erro personalizadas (403, 404, 500) com redirecionamento automático
 - Páginas responsivas com Bootstrap 5
-- Sistema de configuração 100% data-driven com catálogo genérico `opcoes_configuracao`: módulos, documentos, períodos, motivos de ausência, tipos de ocorrência, vínculos, papéis de atribuição, séries e letras de turma — todos configuráveis via interface de administração
+- Sistema de configuração 100% data-driven com catálogo genérico `opcoes_configuracao`: módulos, documentos, períodos, motivos de ausência, tipos de ocorrência, vínculos, papéis de atribuição, séries e letras de turma, todos configuráveis via interface de administração
 - Tags de comportamento gerenciáveis via interface dedicada (anteriormente hardcoded no código-fonte)
 - Parâmetros globais do sistema (limite crítico de faltas, limite preventivo, dias de expurgo de anexos, nome da escola) configuráveis via interface
 - Horários letivos (janelas de atendimento do chat) gerenciáveis via CRUD
@@ -129,12 +129,12 @@ Projeto em desenvolvimento ativo. A infraestrutura central está concluída e os
 | ESLint | ^10.2.1 | Linter com configuração flat para Vue + TypeScript |
 | Prettier | 3.8.3 | Formatador de código |
 | Playwright | ^1.61.1 | Testes E2E multiplataforma (Chromium, Firefox, WebKit, mobile) |
-| PL/pgSQL | — | Testes de banco de dados transacionais |
-| GitHub Actions | — | CI com CodeQL security analysis |
-| Dependabot | — | Atualização automática de dependências do devcontainer |
-| Vercel | — | Deploy contínuo com SPA rewrites |
-| GitHub Codespaces | — | Ambiente de desenvolvimento em nuvem |
-| Dev Containers | — | Ambiente de desenvolvimento containerizado |
+| PL/pgSQL |  | Testes de banco de dados transacionais |
+| GitHub Actions |  | CI com CodeQL security analysis |
+| Dependabot |  | Atualização automática de dependências do devcontainer |
+| Vercel |  | Deploy contínuo com SPA rewrites |
+| GitHub Codespaces |  | Ambiente de desenvolvimento em nuvem |
+| Dev Containers |  | Ambiente de desenvolvimento containerizado |
 
 ## Funcionalidades Implementadas
 
@@ -180,11 +180,12 @@ Projeto em desenvolvimento ativo. A infraestrutura central está concluída e os
 | CRUD de usuários | Cadastro, edição, ativação e inativação de usuários. Geração automática de código de redefinição de senha ao criar usuário. Criação sincronizada no auth.users e perfil. |
 | CRUD de alunos | Cadastro e edição de alunos com dados pseudonimizados. Criação simultânea de vínculo com responsável existente ou novo. |
 | CRUD de turmas | Cadastro, edição, ativação e inativação de turmas com série e letra. |
+| Anos letivos | CRUD de anos letivos com período (datas de início/fim) e status (planejado, ativo, arquivado). A "virada de ano" é feita pelo botão Ativar: arquiva atomicamente o ano vigente e ativa o novo via RPC `ativar_ano_letivo`, com trilha de auditoria. Novos anos são criados como planejados. |
 | CRUD de disciplinas | Cadastro e edição de disciplinas com código SIGE para integração com SEDUC. |
 | Atribuições | Vínculo professor-turma-disciplina com suporte a professor titular e substituto e período de vigência. |
 | Gestão de códigos | Tela com fila de solicitações de código, lista de códigos ativos com status, opção de revogação e expiração automática após 1 hora. |
 | Notificações em tempo real | Badge de notificações não lidas atualizado via Supabase Realtime. |
-| Catálogos genéricos | CRUD completo para módulos, documentos, períodos, motivos de ausência, tipos de ocorrência, vínculos, papéis de atribuição, séries e letras de turma via interface unificada sobre a tabela `opcoes_configuracao`. A chave interna é gerada automaticamente a partir do nome. Validação de entrada específica por tipo (séries numéricas com sufixo `º`, letras únicas maiúsculas), bloqueio de duplicatas e exclusão de opções ainda referenciadas. Reordenação por arrastar com modo protegido (salvar ou cancelar, sem escrita automática no banco). Seletor visual de ícones com busca e categorias. |
+| Catálogos genéricos | CRUD completo para módulos, documentos, períodos, motivos de ausência, tipos de ocorrência, vínculos, papéis de atribuição, séries e letras de turma via interface unificada sobre a tabela `opcoes_configuracao`. A chave interna é gerada automaticamente a partir do nome. Validação de entrada específica por tipo (séries numéricas com sufixo `ª`, letras únicas maiúsculas), bloqueio de duplicatas e exclusão de opções ainda referenciadas. Reordenação por arrastar com modo protegido (salvar ou cancelar, sem escrita automática no banco). Seletor visual de ícones com busca e categorias. |
 | Tags de comportamento | Interface dedicada para gerenciar o catálogo de tags comportamentais com nome, categoria, ícone, descrição e peso de pontuação. Exclusão e renomeação de tags referenciadas em ocorrências são bloqueadas. |
 | Parâmetros do sistema | Edição dos limites crítico e preventivo de faltas, dias de expurgo de anexos e nome da escola. |
 | Horários letivos | CRUD de janelas de atendimento do chat com suporte a dias da semana e horários customizáveis. |
@@ -230,9 +231,10 @@ buscapp/
 │   │   ├── NotificacoesPopover.vue      # Popover de notificações (sino)
 │   │   ├── SeletorIcone.vue            # Seletor visual de ícones Bootstrap com busca e categorias
 │   │   ├── TermometroRisco.vue          # Termômetro visual de risco
-│   │   └── VisualizadorAnexo.vue        # Modal de anexos (imagem/PDF) via blob — sem tokens na URL
+│   │   └── VisualizadorAnexo.vue        # Modal de anexos (imagem/PDF) via blob, sem tokens na URL
 │   ├── composables/                     # Lógica de apresentação reutilizável
 │   │   ├── useAlturaUniformeCards.ts    # Mede e uniformiza a altura de cartões de seleção (CSS var)
+│   │   ├── useAnoLetivo.ts              # Busca padronizada do ano letivo ativo (status + flag)
 │   │   ├── useAutenticacao.ts           # Login, logout, sessão e redefinição de senha por código
 │   │   ├── useGestaoUsuarios.ts         # CRUD de usuários, alunos, turmas, disciplinas, atribuições, códigos
 │   │   ├── useMonitoramento.ts          # Frequência, comportamento, ocorrências, ranking, risco, termômetro, chat. Limites e horários lidos do banco com cache em memória.
@@ -263,6 +265,7 @@ buscapp/
 │   │   │   ├── AlunoFormView.vue
 │   │   │   ├── CodigosView.vue
 │   │   │   ├── TurmasView.vue
+│   │   │   ├── AnosLetivosView.vue                      # Gestão de anos letivos e virada de ano
 │   │   │   ├── DisciplinasView.vue
 │   │   │   ├── AtribuicoesView.vue
 │   │   │   ├── GestaoChatView.vue                      # Chat da gestão com pais/responsáveis
@@ -299,9 +302,9 @@ buscapp/
 │       └── traduzirErro.ts             # Tradução de erros do Supabase Auth para português
 ├── supabase/
 │   ├── config.toml                     # Configuração local do Supabase (portas, auth, storage, edge)
-│   ├── seed.sql                        # Dados de teste (7 usuários, 3 turmas, 9 alunos, 3 disciplinas, catálogo)
+│   ├── seed.sql                        # Dados de teste de desenvolvimento (7 usuários, 3 turmas, 9 alunos, frequências e ocorrências de exemplo)
 │   ├── migrations/
-│   │   └── 0001_schema_completo.sql    # Schema completo: 31 tabelas, enums, triggers, RLS, views, índices, integridade de catálogo
+│   │   └── 0001_schema_completo.sql    # Migration única: schema completo + dados canônicos out-of-the-box (squash das antigas migrations 0001 a 0005)
 │   ├── functions/                      # Edge Functions (Deno)
 │   │   ├── solicitar-codigo/           # Notifica admins sobre solicitação de código
 │   │   ├── redefinir-senha-codigo/     # Valida código e atualiza senha
@@ -311,13 +314,14 @@ buscapp/
 │   ├── templates/                      # Templates de email
 │   │   └── senha_alterada_notificacao.html
 │   └── tests/
-│       └── 0001_validacao_completa.sql # Testes PL/pgSQL transacionais (1039 linhas)
+│       ├── 0001_validacao_completa.sql # Testes PL/pgSQL transacionais do schema completo
+│       └── 0002_anos_letivos.sql       # Testes da virada de ano letivo (RPC, RLS por papel, auditoria)
 ├── scripts/
 │   ├── seed-users.sh                   # Cria usuários de teste via Auth Admin API
 │   ├── test-api.sh                     # Testes de API com bash/curl (297 asserts)
 │   └── test-db.sh                      # Executa testes SQL no container Docker do Supabase
 ├── tests/
-│   └── app.spec.ts                     # Testes E2E Playwright (115 casos, 5 browsers)
+│   └── app.spec.ts                     # Testes E2E Playwright (128 casos, 5 browsers)
 ├── .github/
 │   ├── workflows/codeql.yml            # CodeQL security analysis
 │   └── dependabot.yml                  # Atualizações semanais do devcontainer
@@ -436,6 +440,7 @@ O banco de dados é gerenciado pelo Supabase (PostgreSQL 17) com 31 tabelas, 5 v
 | `ocorrencia_anexos` | Join N:N ocorrência-anexo. |
 | `justificativa_anexos` | Join N:N justificativa-anexo. |
 | `codigos_redefinicao` | Códigos de 6 dígitos para redefinição de senha (expiração 1h, revogável). |
+| `codigos_redefinicao_tentativas` | Anti força bruta: tentativas erradas por e-mail e bloqueio temporário. Escrita apenas via funções `SECURITY DEFINER`; leitura pela gestão. |
 | `horarios_letivos` | Horários de aula (para chat anti-burnout). |
 
 **Administrativas e Auditoria**
@@ -451,7 +456,6 @@ O banco de dados é gerenciado pelo Supabase (PostgreSQL 17) com 31 tabelas, 5 v
 
 | Tabela | Descrição |
 |--------|-----------|
-| `configuracoes_escola` | Configurações chave-valor da escola (horários de chat, etc.). |
 | `configuracoes_sistema` | Parâmetros do sistema (limites de ausência crítica, dias de expiração). |
 | `opcoes_configuracao` | Catálogo genérico de opções configuráveis pela gestão (módulos, documentos, períodos, motivos de ausência, tipos de ocorrência, vínculos, papéis de atribuição, séries e letras de turma). Chaves validadas por restrições `CHECK` nas tabelas que as referenciam. |
 
@@ -480,14 +484,14 @@ Todas as views utilizam `security_invoker = true` para respeitar as políticas R
 - Soft delete em `frequencias` para preservação de dados históricos.
 - Índices parciais para dados ativos (otimização de consultas frequentes).
 - **Integridade referencial do catálogo**: restrições `CHECK` validam toda escrita de chaves de `opcoes_configuracao` e nomes de `tags_comportamento` nas tabelas que as referenciam (turmas, vínculos, atribuições, frequências, perfis, alunos, ocorrências), impedindo a gravação de referências órfãs. As funções de validação são `SECURITY DEFINER` para funcionar com qualquer role.
-- **Exclusão protegida na interface**: opções de catálogo e tags ainda referenciadas não podem ser excluídas (ou renomeadas, no caso de tags) — a interface orienta a desativação.
+- **Exclusão protegida na interface**: opções de catálogo e tags ainda referenciadas não podem ser excluídas (ou renomeadas, no caso de tags); a interface orienta a desativação.
 - **Exclusão de turmas com `ON DELETE RESTRICT`** em conversas e atribuições, evitando apagamento silencioso de histórico de chat.
-- **`service_role` com acesso administrativo total** (espelha o Supabase hospedado); a chave é usada somente no servidor (Edge Functions) e nos testes — nunca no frontend.
+- **`service_role` com acesso administrativo total** (espelha o Supabase hospedado); a chave é usada somente no servidor (Edge Functions) e nos testes, nunca no frontend.
 - Relatório de órfãos `fn_relatorio_orfas()` para auditoria de referências pendentes.
 
 ## Edge Functions
 
-Cinco funções serverless implementadas em Deno, utilizadas para operações que exigem a chave `service_role` do Supabase ou processamento pesado de mídia. A chave `service_role` é usada apenas no servidor (Edge Functions) e na suíte de testes — nunca é exposta ao navegador.
+Cinco funções serverless implementadas em Deno, utilizadas para operações que exigem a chave `service_role` do Supabase ou processamento pesado de mídia. A chave `service_role` é usada apenas no servidor (Edge Functions) e na suíte de testes, nunca exposta ao navegador.
 
 | Função | Rota | Método | Autenticação | Descrição |
 |--------|------|--------|--------------|-----------|
@@ -523,7 +527,7 @@ Cinco funções serverless implementadas em Deno, utilizadas para operações qu
 | Variável | Obrigatória | Descrição | Valor Padrão |
 |----------|-------------|-----------|--------------|
 | `VITE_SUPABASE_URL` | Sim | URL do projeto Supabase | `http://127.0.0.1:54321` (desenvolvimento local) |
-| `VITE_SUPABASE_PUBLISHABLE_KEY` | Sim | Chave anônima/publishable do Supabase | — |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | Sim | Chave anônima/publishable do Supabase |  |
 | `VITE_EDGE_FUNCTIONS_URL` | Não | URL base das Edge Functions (utilizado quando o proxy do Supabase não está disponível) | `{VITE_SUPABASE_URL}/functions/v1` |
 
 ## Como Executar o Projeto
@@ -606,6 +610,12 @@ npm run dev
 npx supabase stop
 ```
 
+### Solução de Problemas do Ambiente Local
+
+- **Versão do CLI:** use Supabase CLI **≥ 2.115** (`npx supabase --version`). Versões antigas falham ao subir a stack local em Docker recentes (healthchecks de storage/realtime).
+- **Analytics desabilitado:** o `supabase/config.toml` mantém `[analytics] enabled = false`. O Logflare não aquece dentro da janela de healthcheck em devcontainers e nenhum módulo do BuscApp depende do Studio Analytics. Se precisar dele, reabilite a chave e execute `npx supabase stop && npx supabase start`.
+- **Reset com dados canônicos:** o `db reset` já popula catálogos, horários, tags, disciplinas, parâmetros e o ano letivo ativo pela migration única; o seed adiciona apenas pessoas e atividade de exemplo.
+
 ## Scripts Disponíveis
 
 | Comando | Descrição |
@@ -636,20 +646,24 @@ O projeto possui quatro camadas de teste independentes.
 
 ### Testes de Banco de Dados (PL/pgSQL)
 
-- **Arquivo:** `supabase/tests/0001_validacao_completa.sql`
-- **Cobertura:** 1039 linhas de testes transacionais (executados dentro de uma transação e revertidos ao final). Inclui:
+- **Arquivos:** `supabase/tests/*.sql`, em que cada arquivo roda dentro de uma transação própria com `ROLLBACK` final (não altera o banco); `scripts/test-db.sh` executa todos em sequência e falha se houver qualquer `[FAIL]`.
+- **`0001_validacao_completa.sql`:** validação completa do schema. Inclui:
   - Testes de constraints (chaves estrangeiras, unicidade, check)
-  - Testes de triggers (criação automática de perfil)
+  - Testes de triggers (criação automática de perfil, nome_completo da turma)
   - Testes de RLS para todos os papéis (gestão, professor, responsável, usuário não autenticado)
   - Testes de soft delete em frequências
   - Testes de todas as views analíticas
   - Testes de geração, expiração, revogação e validação de códigos de redefinição
   - Testes de casos extremos (limites, dados maliciosos)
-  - Testes de validação da tabela `opcoes_configuracao` (estrutura, RLS, UNIQUE, seed)
-  - Testes de verificação de conversão de colunas enum para text
-  - Testes de remoção dos tipos enum antigos
-  - Testes de integridade de catálogo (ausência de referências órfãs, `auth.users`↔`perfis` 1:1, enturmação ativa por aluno, anexos sem vínculo) e validação das restrições `CHECK` de catálogo
-- **Execução:** `npm run test:db` (executa dentro do container Docker do Supabase)
+  - Testes da tabela `opcoes_configuracao` (estrutura, RLS, UNIQUE) e das restrições `CHECK` de catálogo
+  - Testes de que as colunas de catálogo são `text` validado (séries/letras fora do catálogo são rejeitadas)
+  - Testes de integridade de catálogo (ausência de referências órfãs, `auth.users`↔`perfis` 1:1, enturmação ativa por aluno, anexos sem vínculo)
+- **`0002_anos_letivos.sql`:** virada de ano letivo (RF13/RF25). Inclui:
+  - Ano corrente ativo garantido pela migration, com flags `status`/`ativo` consistentes
+  - RPC `ativar_ano_letivo`: gestão ativa, professor é bloqueado, ano vigente é arquivado atomicamente
+  - Rejeição de reativação do ano corrente e de ano inexistente
+  - Trilha de auditoria (`ARQUIVAR_ANO_LETIVO` / `ATIVAR_ANO_LETIVO`) e virada de retorno
+- **Execução:** `npm run test:db` (requer `npx supabase start`; executa via `psql` no container Docker do Supabase)
 
 ### Testes de API (Bash + curl)
 
@@ -666,7 +680,7 @@ O projeto possui quatro camadas de teste independentes.
   - Ciclo completo de justificativas com anexos (upload, RLS, auto-justify via trigger)
   - Compressão de anexos via Edge Function (upload, processamento, verificação de metadados)
   - Chat: CRUD de conversas, envio de mensagens, RLS, trigger de notificação, integridade (unicode, SQL injection, 10k caracteres), concorrência
-  - Catálogo de configuração: CRUD completo da tabela `opcoes_configuracao`, verificação de RLS por papel e validação das restrições de catálogo (valores fora do catálogo — ex.: `serie="4º"`, `tipo_relacao="primo"`, `papel="monitor"` — são rejeitados; valores válidos e arrays vazios são aceitos)
+  - Catálogo de configuração: CRUD completo da tabela `opcoes_configuracao`, verificação de RLS por papel e validação das restrições de catálogo (valores fora do catálogo, como `serie="4ª"`, `tipo_relacao="primo"` e `papel="monitor"`, são rejeitados; valores válidos e arrays vazios são aceitos)
   - CASCADE → RESTRICT: exclusão de turma com conversas/atribuições bloqueada no banco
   - Expurgo: remoção de anexos expirados e objetos de storage órfãos via `limpar-anexos`
   - Visualizador de anexo: download autenticado via Storage API com o JWT no header `Authorization` (gestão com acesso total, responsável apenas os próprios anexos), integridade do conteúdo baixado e negação de acesso sem autenticação
@@ -675,8 +689,9 @@ O projeto possui quatro camadas de teste independentes.
 ### Testes E2E (Playwright)
 
 - **Arquivo:** `tests/app.spec.ts`
-- **Cobertura:** 115 casos de teste em 5 configurações de navegador:
+- **Cobertura:** 128 casos de teste em 5 configurações de navegador:
   - Chromium, Firefox, WebKit, Mobile Chrome, Mobile Safari
+  - Gestão: anos letivos (listagem com ano ativo, criação de ano planejado, virada de ano via RPC, reversão, botão desabilitado no ano vigente)
   - Fluxos testados: login, logout, credenciais inválidas, gestão (home, usuários, alunos, códigos, turmas, modal de atribuições, ranking com botão de chat), professor (frequência, ausência, ocorrências), responsável (chat, home, alertas, justificativas), visualizador de anexo (modal blob em justificativas e alertas, com botões de baixar/fechar e ausência de token na URL), notificações (popover, marcar lidas, limpar todas), chat completo (sidebar, mensagens, busca, header), resiliência, casos extremos
   - **Configuração do sistema:** hub de configuração, CRUD de opções genéricas (incluindo restrições de entrada e exclusão bloqueada de opções referenciadas), gerenciamento de tags de comportamento (exclusão/renomeação de tags referenciadas bloqueadas), parâmetros do sistema, horários letivos, verificações de carregamento dinâmico de opções do banco de dados em formulários
   - **Integridade de catálogo:** exclusão de opção/tag referenciada bloqueada, transferência de enturmação mantendo uma enturmação ativa por aluno
@@ -696,6 +711,17 @@ O projeto possui quatro camadas de teste independentes.
 
 - **Configuração:** `.github/dependabot.yml`
 - **Escopo:** Atualizações semanais para o ecossistema `devcontainers`
+
+### Reset Database (workflow manual)
+
+- **Workflow:** `.github/workflows/reset-database.yml`
+- **Gatilho:** `workflow_dispatch` (execução manual na aba Actions)
+- **O que faz:** executa `supabase db reset --linked --no-seed --yes`, que **apaga e recria o banco de produção** aplicando a migration única (`0001_schema_completo.sql`), que já inclui todos os dados canônicos out-of-the-box (catálogos, horários, tags, disciplinas, parâmetros e ano letivo ativo). O seed de desenvolvimento não é aplicado.
+
+> [!CAUTION]
+> Operação destrutiva: remove todos os dados, usuários e storage do ambiente. Use apenas quando a reconstrução completa for intencional.
+
+- **Após o reset:** recriar a conta de gestão no Dashboard (Authentication → Add Users), definindo o *Raw User Meta Data* com `{"nome": "...", "papel": "gestao"}`; o trigger `fn_handle_new_user` cria o perfil correspondente no primeiro acesso. Os demais usuários podem se cadastrar normalmente pela tela de login.
 
 ### Deploy (Vercel)
 

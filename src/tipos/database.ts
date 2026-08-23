@@ -50,14 +50,6 @@ export interface AnoLetivo {
   updated_at: string;
 }
 
-export interface ConfiguracaoEscola {
-  id: string;
-  chave: string;
-  valor: string;
-  descricao: string | null;
-  updated_at: string;
-}
-
 export interface ConfiguracaoSistema {
   id: number;
   limite_critico_faltas: number;
@@ -449,11 +441,6 @@ export interface Database {
         Row: AnoLetivo;
         Insert: Omit<AnoLetivo, 'id' | 'created_at' | 'updated_at'>;
         Update: Partial<Omit<AnoLetivo, 'id'>>;
-      };
-      configuracoes_escola: {
-        Row: ConfiguracaoEscola;
-        Insert: Omit<ConfiguracaoEscola, 'id' | 'updated_at'>;
-        Update: Partial<Omit<ConfiguracaoEscola, 'id'>>;
       };
       configuracoes_sistema: {
         Row: ConfiguracaoSistema;

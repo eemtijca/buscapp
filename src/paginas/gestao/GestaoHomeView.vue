@@ -87,6 +87,15 @@ const nomeGestor = usuario.value?.nome || 'Gestor';
       </div>
       <div class="col-12 col-md-6 col-lg-4">
         <CartaoNavegacao
+          icone="calendar3"
+          titulo="Anos letivos"
+          descricao="Gerencie anos letivos e realize a virada do ano."
+          rota="/gestao/anos-letivos"
+          cor="success"
+        />
+      </div>
+      <div class="col-12 col-md-6 col-lg-4">
+        <CartaoNavegacao
           icone="bookmark-star"
           titulo="Disciplinas"
           descricao="Cadastre as disciplinas oferecidas pela escola."

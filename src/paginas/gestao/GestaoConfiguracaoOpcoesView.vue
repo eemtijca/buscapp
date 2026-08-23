@@ -138,7 +138,7 @@ function aoDigitar(e: Event) {
 function aoDigitarSerie(e: Event) {
   const el = e.target as HTMLInputElement;
   const d = regra.value.filtrar ? regra.value.filtrar(el.value) : el.value;
-  formNome.value = d ? `${d}º` : '';
+  formNome.value = d ? `${d}ª` : '';
   if (el.value !== d) el.value = d;
   validarNome();
 }
@@ -535,7 +535,7 @@ onUnmounted(destroySortable);
                     :maxlength="regra.maxlength"
                     @input="aoDigitarSerie($event)"
                   />
-                  <span class="input-group-text">º</span>
+                  <span class="input-group-text">ª</span>
                 </div>
                 <input
                   v-else

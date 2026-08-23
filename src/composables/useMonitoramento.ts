@@ -1,5 +1,6 @@
 import { ref, type Ref } from 'vue';
 import { supabaseClient } from '@/servicos/supabase';
+import { useAnoLetivo } from '@/composables/useAnoLetivo';
 import { comprimirImagem } from '@/utils/comprimirImagem';
 import { safeDate } from '@/utils/chatUtils';
 import type {
@@ -94,6 +95,7 @@ function formatarDataHorario(iso: string): { data: string; horario: string } {
 export function useMonitoramento() {
   const carregando: Ref<boolean> = ref(false);
   const erro: Ref<string | null> = ref(null);
+  const { buscarAnoLetivoAtivo } = useAnoLetivo();
 
   async function buscarAlunosParaFrequencia(dataAula?: string): Promise<AlunoFrequencia[]> {
     carregando.value = true;
@@ -209,14 +211,10 @@ export function useMonitoramento() {
         return { registradas: 0, erro: null };
       }
 
-      const { data: anoLetivo } = await supabaseClient
-        .from('anos_letivos')
-        .select('id')
-        .eq('ativo', true)
-        .single();
+      const anoLetivo = await buscarAnoLetivoAtivo();
 
       if (!anoLetivo) throw new Error('Nenhum ano letivo ativo encontrado.');
-      const anoLetivoId = (anoLetivo as unknown as { id: string }).id;
+      const anoLetivoId = anoLetivo.id;
 
       let totalRegistradas = 0;
 

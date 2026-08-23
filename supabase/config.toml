@@ -399,8 +399,10 @@ verify_jwt = true
 verify_jwt = false
 
 [analytics]
-enabled = true
-port = 54327
+# Desabilitado localmente: o Logflare não aquece dentro da janela de healthcheck
+# deste ambiente e os testes do projeto não dependem do Studio Analytics.
+enabled = false
+# port = 54327
 # Configure one of the supported backends: `postgres`, `bigquery`.
 backend = "postgres"
 

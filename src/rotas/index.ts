@@ -322,12 +322,11 @@ router.beforeEach(async (to, _from) => {
   let perfilModulos: string[] = [];
 
   if (session) {
-    // Lê o papel DIRETAMENTE do JWT via jwt-decode
-    // sem consultar o banco de dados (Custom Access Token Hook)
+    // Lê o papel das claims do JWT emitidas pelo Custom Access Token Hook.
     const claims = decodificarToken(session.access_token);
     perfilPapel = (claims?.papel as string) ?? null;
 
-    // Consulta o status atual do perfil para detectar contas desativadas
+    // Consulta status e módulos do perfil para as validações da rota.
     const { data } = await supabaseClient
       .from('perfis')
       .select('status, acesso_modulos')
@@ -337,7 +336,7 @@ router.beforeEach(async (to, _from) => {
     perfilModulos = (data as { acesso_modulos?: string[] } | null)?.acesso_modulos ?? [];
   }
 
-  // Conta desativada só pode permanecer na tela de "conta desativada"
+  // Conta desativada permanece apenas na tela própria.
   if (session && perfilStatus === 'inativo' && to.name !== 'conta-desativada') {
     return { name: 'conta-desativada' };
   }
@@ -366,8 +365,7 @@ router.beforeEach(async (to, _from) => {
       }
     }
 
-    // Módulos de acesso (perfis.acesso_modulos): fail-closed — lista vazia
-    // significa nenhum módulo habilitado.
+    // Módulos de acesso com fail-closed: lista vazia nega rotas com moduloPermitido.
     const moduloPermitido = to.meta?.moduloPermitido;
     if (moduloPermitido && perfilPapel === 'professor') {
       if (!perfilModulos.includes(moduloPermitido)) {

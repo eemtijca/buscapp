@@ -11,8 +11,13 @@ import type { JustificativaPendente } from '@/tipos/componentes';
 const router = useRouter();
 const { usuario } = useAutenticacao();
 const { buscarJustificativasPendentes, validarJustificativa } = useMonitoramento();
-const { ultimaAtualizacao, estaAtualizando, atualizar: refresh, inscrever, encerrar } =
-  useRealtimeRefresh();
+const {
+  ultimaAtualizacao,
+  estaAtualizando,
+  atualizar: refresh,
+  inscrever,
+  encerrar,
+} = useRealtimeRefresh();
 
 const justificativas = ref<JustificativaPendente[]>([]);
 const mensagemSucesso = ref<string | null>(null);

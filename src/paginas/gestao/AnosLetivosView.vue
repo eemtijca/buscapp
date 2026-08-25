@@ -118,9 +118,7 @@ async function salvar() {
         }
         return;
       }
-      mostrarSucesso(
-        'Ano letivo criado como planejado. Use "Ativar" para realizar a virada.',
-      );
+      mostrarSucesso('Ano letivo criado como planejado. Use "Ativar" para realizar a virada.');
     }
     modalAberto.value = false;
     resetForm();

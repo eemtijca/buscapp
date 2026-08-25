@@ -367,9 +367,7 @@ test.describe('Gestão - Ranking e Ocorrências', () => {
   });
 });
 
-// ============================================================================
-// VISUALIZADOR DE ANEXO (BLOB) — gestão justificativas + responsável alertas
-// ============================================================================
+// Visualizador de anexos em blob
 test.describe('Gestão/Responsável — Visualizador de anexo (blob)', () => {
   const JUST_ID = '10000000-0000-0000-0000-000000000001';
   const ANEXO_ID = '20000000-0000-0000-0000-000000000001';
@@ -574,7 +572,7 @@ test.describe('Professor - Frequência', () => {
     }
     await page.click('button:has-text("Salvar frequência")');
     await expect(page.locator('.alert-success').first()).toBeVisible({ timeout: 10000 });
-    // Sai e volta — verifica se a página carrega
+    // Sai e volta para verificar o recarregamento da página
     await page.goto('/professor');
     await page.goto('/professor/frequencia');
     await expect(page.getByText('Registrar frequência')).toBeVisible();
@@ -610,8 +608,7 @@ test.describe('Gestão - Usuários - Código no cadastro', () => {
   test('CT29 - Criar usuário valida campos obrigatórios', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/usuarios/novo');
-    // O formulário só existe após o carregamento das opções (v-else); sem essa
-    // espera o novalidate não é injetado e a validação nativa bloqueia o envio.
+    // Aguarda o formulário renderizar para o novalidate ser injetado antes do envio.
     await page.waitForSelector('form');
     await page.evaluate(() => {
       const form = document.querySelector('form');
@@ -835,8 +832,7 @@ test.describe('Professor - Ocorrência com tags', () => {
     await login(page, 'prof1@escola.edu.br', SENHA_PROF);
     await page.goto('/professor/ocorrencia');
     await page.waitForSelector('input[type="checkbox"]', { timeout: 10000 });
-    // Re-tenta: sob carga da suíte o Vue pode re-renderizar a lista de tags
-    // entre o clique e a atualização da descrição
+    // Re-tenta porque o Vue pode re-renderizar a lista de tags sob carga.
     await expect(async () => {
       const checkbox = page.locator('input[type="checkbox"]').first();
       if (!(await checkbox.isChecked())) {
@@ -1095,13 +1091,10 @@ test.describe('Gestão - Configuração', () => {
   });
 });
 
-// ============================================================================
-// INTEGRIDADE DE CATÁLOGO — bloqueio de exclusão/renomeação e enturmação
-// ============================================================================
+// Integridade de catálogo e enturmação
 test.describe('Gestão - Integridade de catálogo', () => {
   test.beforeAll(async () => {
-    // Referencia a tag de seed "Desatenção" em uma ocorrência para testar o
-    // bloqueio de exclusão/renomeação.
+    // Referencia a tag de seed "Desatenção" para testar bloqueio de exclusão e renomeação.
     const headers = {
       'Content-Type': 'application/json',
       apikey: SERVICE_KEY,
@@ -1178,12 +1171,9 @@ test.describe('Gestão - Integridade de catálogo', () => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/alunos/e0000000-0000-0000-0000-000000000001');
     const card = page.locator('.card').filter({ hasText: 'Enturmação atual' });
-    // Aguarda os dados assíncronos do onMounted terminarem de renderizar
-    // (o parágrafo só existe após carregarEnturmacao) antes de interagir,
-    // evitando cliques perdidos durante re-renderização do Vue.
+    // Aguarda os dados assíncronos renderizarem para evitar cliques perdidos.
     await expect(card.getByText(/Matrícula em:/)).toBeVisible();
-    // Re-clica caso o clique original seja engolido por um patch de DOM
-    // entre o hit-test e o dispatch do evento.
+    // Re-clica caso o primeiro clique seja perdido durante re-renderização do DOM.
     await expect(async () => {
       if ((await card.locator('#campoNovaTurma').count()) === 0) {
         await card.getByRole('button', { name: 'Alterar enturmação' }).click();
@@ -1219,15 +1209,10 @@ test.describe('Gestão - Integridade de catálogo', () => {
   });
 });
 
-// ============================================================================
-// CHAT — Setup de dados de teste
-// ============================================================================
+// Setup de dados de chat
 test.beforeAll(async () => {
-  // Cria conversas e mensagens de teste via API com service role.
-  // Usa upsert (merge-duplicates) para que seja seguro sob execução paralela
-  // de vários workers: cada beforeAll converge para o mesmo estado. As conversas
-  // são reutilizadas (sem reescrever o id), evitando violação de FK de mensagens
-  // quando existem conversas órfãs de execuções anteriores.
+  // Cria conversas e mensagens via API com service role usando upsert idempotente.
+  // As conversas são reutilizadas entre execuções para evitar violação de FK.
   const headers = {
     'Content-Type': 'application/json',
     apikey: SERVICE_KEY,
@@ -1325,9 +1310,7 @@ test.beforeAll(async () => {
   });
 });
 
-// ============================================================================
-// CT67–CT72: CHAT — Responsável
-// ============================================================================
+// Chat do responsável
 test.describe('Responsável — Chat', () => {
   test('CT67 - Pagina de chat carrega com lista de contatos', async ({ page }) => {
     await login(page, 'resp1@email.com', SENHA_RESP);
@@ -1412,9 +1395,7 @@ test.describe('Responsável — Chat', () => {
   });
 });
 
-// ============================================================================
-// CT73–CT79: CHAT — Gestão
-// ============================================================================
+// Chat da gestão
 test.describe('Gestão — Chat', () => {
   test('CT73 - Página de chat carrega com sidebar e placeholder', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 720 });
@@ -1444,8 +1425,7 @@ test.describe('Gestão — Chat', () => {
     const items = page.locator('.chat-sidebar button');
     if ((await items.count()) > 0) {
       await items.first().click();
-      // O histórico da conversa selecionada deve exibir ao menos uma mensagem
-      // (não assumimos indicador de leitura: só aparece em mensagens próprias)
+      // O histórico deve exibir ao menos uma mensagem da conversa selecionada.
       await expect(
         page.locator('.chat-messages .rounded-3').first(),
       ).toBeVisible({ timeout: 10000 });
@@ -1471,9 +1451,7 @@ test.describe('Gestão — Chat', () => {
   });
 });
 
-// ============================================================================
-// CT84–CT88: NOTIFICAÇÕES
-// ============================================================================
+// Notificações
 test.describe('Notificações — Popover', () => {
   test('CT84 - Sino visível para gestão', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
@@ -1521,9 +1499,7 @@ test.describe('Notificações — Popover', () => {
   });
 });
 
-// ============================================================================
-// CT89–CT91: MOBILE / RESPONSIVIDADE
-// ============================================================================
+// Mobile e responsividade
 test.describe('Chat — Mobile', () => {
   test('CT89 - Mobile: lista ocupa tela cheia inicialmente', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 });
@@ -1558,9 +1534,7 @@ test.describe('Chat — Mobile', () => {
   });
 });
 
-// ============================================================================
-// CT92–CT94: EDGE CASES — CHAT
-// ============================================================================
+// Casos extremos do chat
 test.describe('Chat — Casos Extremos', () => {
   test('CT92 - Rota /gestao/chat exige autenticação', async ({ page }) => {
     await page.goto('/gestao/chat');
@@ -1573,9 +1547,7 @@ test.describe('Chat — Casos Extremos', () => {
   });
 });
 
-// ============================================================================
-// CT95–CT98: RESILIÊNCIA
-// ============================================================================
+// Resiliência
 test.describe('Chat — Resiliência', () => {
   test('CT95 - Sidebar contatos visível na gestão', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
@@ -1612,9 +1584,7 @@ test.describe('Chat — Resiliência', () => {
   });
 });
 
-// ============================================================================
-// CT99–CT103: INPUT EDGE CASES
-// ============================================================================
+// Casos extremos de entrada
 test.describe('Chat — Input', () => {
   test('CT99 - Botão enviar desabilitado com input vazio', async ({ page }) => {
     await login(page, 'resp1@email.com', SENHA_RESP);
@@ -1667,7 +1637,7 @@ test.describe('Chat — Input', () => {
     if ((await items.count()) > 0) {
       await items.first().click();
       await page.waitForTimeout(1000);
-      // Mensagens de sistema aparecem centralizadas - apenas verifica se não há erros de JS
+      // Renderização centralizada de mensagens de sistema sem erros de JavaScript
       const pageErrors: string[] = [];
       page.on('pageerror', (err) => pageErrors.push(err.message));
       await page.waitForTimeout(500);
@@ -1676,9 +1646,7 @@ test.describe('Chat — Input', () => {
   });
 });
 
-// ============================================================================
-// CT103–CT106: NOTIFICAÇÕES — CASOS EXTREMOS
-// ============================================================================
+// Casos extremos das notificações
 test.describe('Notificações — Casos Extremos', () => {
   test('CT103 - Popover fecha e reabre sem erros', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
@@ -1738,11 +1706,7 @@ test.describe('Notificações — Casos Extremos', () => {
   });
 });
 
-// ============================================================================
-// CT121–CT125: CÓDIGOS — WORKFLOW COMPLETO E ENDURECIMENTO
-// Cobre a regressão do código pendente (0002), dedupe, bloqueio por
-// tentativas, auto-limpeza de solicitações, auditoria, revogação e configurações.
-// ============================================================================
+// Workflow completo dos códigos de redefinição
 test.describe('Códigos — Workflow completo (regressão pendente)', () => {
   test('CT121 - Pendente: código expirado → solicitação aparece → gera → redefinir senha', async ({
     page,
@@ -1988,7 +1952,7 @@ test.describe('Códigos — Revogação e nova solicitação (regressão)', () =
       await page.locator('.modal button:has-text("Concluído")').click();
 
       // 3. Código inicial exibido como revogado (badge vermelho)
-      // (o código fica mascarado na tabela; filtra por e-mail + status)
+      // O código fica mascarado na tabela; o filtro usa email e status.
       await page.goto('/gestao/codigos');
       await page.locator('button:has-text("Códigos")').click();
       const linhasEmail = page.locator('tr').filter({ hasText: email });
@@ -2196,9 +2160,7 @@ test.describe('Códigos — Copiar ao clicar', () => {
   });
 });
 
-// ============================================================================
-// ANOS LETIVOS — gestão, virada de ano (RF13/RF25)
-// ============================================================================
+// Anos letivos e virada de ano
 test.describe('Gestão - Anos Letivos', () => {
   // Ano planejado usado nos testes da virada (não colide com o seed)
   const ANO_CORRENTE = new Date().getFullYear();
@@ -2321,11 +2283,7 @@ test.describe('Gestão - Anos Letivos', () => {
   });
 });
 
-// ============================================================================
-// TEMPO REAL (Supabase Realtime) — atualizações sem recarregar a página
-// Insere dados via service role com a tela aberta e verifica que a UI
-// reage sozinha (via postgres_changes), sem interação do usuário.
-// ============================================================================
+// Atualizações em tempo real via Supabase Realtime
 test.describe('Tempo real — Atualizações sem reload', () => {
   const GESTAO_ID = 'a0000000-0000-0000-0000-000000000001';
   const ALUNO_ID = 'e0000000-0000-0000-0000-000000000001';
@@ -2382,7 +2340,7 @@ test.describe('Tempo real — Atualizações sem reload', () => {
         }),
       });
 
-      // O card deve surgir SEM reload (assinatura postgres_changes)
+      // O card deve surgir sem reload via assinatura postgres_changes.
       await expect(page.locator('.card').filter({ hasText: '05/12/2026' })).toBeVisible({
         timeout: 15000,
       });
@@ -2517,12 +2475,7 @@ test.describe('Tempo real — Atualizações sem reload', () => {
   });
 });
 
-// ============================================================================
-// CHAT DA COORDENAÇÃO VIA RANKING — exceção ao horário protegido
-// Conversa criada pela coordenação: aparece na sidebar mesmo sem mensagens,
-// gestão pode enviar a primeira mensagem fora do horário letivo e o
-// responsável recebe notificação.
-// ============================================================================
+// Chat da coordenação iniciado pelo ranking
 test.describe('Chat da coordenação via ranking', () => {
   const LUCAS_ID = 'e0000000-0000-0000-0000-000000000005';
   const JOAO_SANTOS_ID = 'a0000000-0000-0000-0000-000000000006';
@@ -2547,7 +2500,7 @@ test.describe('Chat da coordenação via ranking', () => {
     // Estado limpo: sem conversa prévia para Lucas
     await restApi(`/rest/v1/conversas?aluno_id=eq.${LUCAS_ID}`, { method: 'DELETE' });
 
-    // Fecha a janela letiva: só a exceção (conversa iniciada pela gestão) permite enviar
+    // Fecha a janela letiva; só a conversa iniciada pela gestão permite enviar.
     await fecharJanelaLetiva();
 
     let conversaId = '';

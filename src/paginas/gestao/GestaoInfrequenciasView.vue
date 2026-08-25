@@ -53,7 +53,10 @@ const justificativaSugerida = computed(() => {
 });
 
 function aplicarMotivo() {
-  if (!justificativaIndividual.value || justificativaIndividual.value === justificativaSugerida.value) {
+  if (
+    !justificativaIndividual.value ||
+    justificativaIndividual.value === justificativaSugerida.value
+  ) {
     justificativaIndividual.value = justificativaSugerida.value;
   }
 }
@@ -302,10 +305,14 @@ watch(dataAula, () => {
       </CampoFormulario>
 
       <div v-if="abaAtiva === 'turma'" class="card border">
-        <div class="card-header bg-body-tertiary d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div
+          class="card-header bg-body-tertiary d-flex flex-wrap justify-content-between align-items-center gap-2"
+        >
           <span class="fw-semibold small">Chamada por exceção</span>
           <div class="d-flex align-items-center gap-2">
-            <label for="seletorTurma" class="col-form-label col-form-label-sm text-body-secondary mb-0"
+            <label
+              for="seletorTurma"
+              class="col-form-label col-form-label-sm text-body-secondary mb-0"
               >Turma</label
             >
             <select
@@ -424,7 +431,11 @@ watch(dataAula, () => {
           </p>
 
           <CampoFormulario id="alunoIndividual" label="Aluno" :obrigatorio="true">
-            <select id="alunoIndividual" v-model="alunoIdIndividual" class="form-select form-select-sm">
+            <select
+              id="alunoIndividual"
+              v-model="alunoIdIndividual"
+              class="form-select form-select-sm"
+            >
               <option value="" disabled>Selecione um aluno</option>
               <option v-for="a in alunos" :key="a.id" :value="a.id">
                 {{ a.nome }}<span v-if="a.turma"> — {{ a.turma }}</span>

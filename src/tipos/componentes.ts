@@ -102,26 +102,17 @@ export type VarianteBadge =
   | 'removivel'
   | 'avatar-removivel';
 
-/**
- * Nível de risco calculado a partir do acúmulo de ausências
- * e ocorrências graves. Usado pelo Termômetro de Atenção.
- */
+/** Nível de risco calculado a partir do acúmulo de ausências e ocorrências graves. Usado pelo Termômetro de Atenção. */
 export type NivelRisco = 'baixo' | 'medio' | 'alto';
 
-/**
- * Período de aula (manhã, tarde, noite) ou nome específico
- * do horário (ex.: "1º Horário", "Almoço").
- */
+/** Período de aula (manhã, tarde, noite) ou nome específico do horário (ex.: "1º Horário", "Almoço"). */
 export interface PeriodoAula {
   id: string;
   rotulo: string;
   horario?: string;
 }
 
-/**
- * Aluno com estado de frequência para a tela de Registro
- * por Exceção do professor.
- */
+/** Aluno com estado de frequência para a tela de Registro por Exceção do professor. */
 export interface AlunoFrequencia {
   id: string;
   nome: string;
@@ -134,10 +125,7 @@ export interface AlunoFrequencia {
   motivosAusencia?: string[];
 }
 
-/**
- * Aluno com contagem de ausências e ocorrências para o
- * Ranking de Priorização de Risco da gestão.
- */
+/** Aluno com contagem de ausências e ocorrências para o Ranking de Priorização de Risco da gestão. */
 export interface AlunoRisco {
   id: string;
   nome: string;
@@ -151,10 +139,7 @@ export interface AlunoRisco {
   exigePresencaResponsavel?: boolean;
 }
 
-/**
- * Ocorrência grave ou suspensão exibida na Central de
- * Ocorrências Graves da gestão.
- */
+/** Ocorrência grave ou suspensão exibida na Central de Ocorrências Graves da gestão. */
 export interface OcorrenciaGrave {
   id: string;
   alunoNome: string;
@@ -173,10 +158,7 @@ export interface OcorrenciaGrave {
   bloqueado: boolean;
 }
 
-/**
- * Justificativa enviada pelo responsável e pendente de
- * validação pela gestão.
- */
+/** Justificativa enviada pelo responsável e pendente de validação pela gestão. */
 export interface JustificativaPendente {
   id: string;
   alunoNome: string;
@@ -192,9 +174,7 @@ export interface JustificativaPendente {
   status: 'pendente' | 'aceita' | 'recusada';
 }
 
-/**
- * Item de estatística do Painel Confidencial de Monitoramento.
- */
+/** Item de estatística do Painel Confidencial de Monitoramento. */
 export interface EstatisticaPainel {
   id: string;
   rotulo: string;
@@ -204,9 +184,7 @@ export interface EstatisticaPainel {
   rodape?: string;
 }
 
-/**
- * Alerta exibido no painel do responsável.
- */
+/** Alerta exibido no painel do responsável. */
 export interface AlertaResponsavel {
   id: string;
   tipo: 'ausencia_escola' | 'ausencia_aula' | 'suspensao' | 'comunicado';
@@ -226,9 +204,7 @@ export interface AlertaResponsavel {
   urgente: boolean;
 }
 
-/**
- * Termômetro de Atenção Visual exibido para o responsável.
- */
+/** Termômetro de Atenção Visual exibido para o responsável. */
 export interface TermometroAtencao {
   nivel: NivelRisco;
   alunoNome: string;
@@ -238,9 +214,7 @@ export interface TermometroAtencao {
   mensagem: string;
 }
 
-/**
- * Item da lista de conversas (barra lateral do chat).
- */
+/** Item da lista de conversas (barra lateral do chat). */
 export interface ContatoChat {
   conversaId: string;
   nomeContato: string;
@@ -256,9 +230,7 @@ export interface ContatoChat {
   turmaId?: string;
 }
 
-/**
- * Mensagem do canal de diálogo com horário protegido.
- */
+/** Mensagem do canal de diálogo com horário protegido. */
 export interface MensagemChat {
   id: string;
   conversaId: string;
@@ -274,9 +246,7 @@ export interface MensagemChat {
   lida: boolean;
 }
 
-/**
- * Notificação renderizada no popover do cabeçalho.
- */
+/** Notificação renderizada no popover do cabeçalho. */
 export interface NotificacaoItem {
   id: string;
   tipo: string;
@@ -287,9 +257,7 @@ export interface NotificacaoItem {
   rota: string;
 }
 
-/**
- * Configuração do horário protegido do canal de diálogo.
- */
+/** Configuração do horário protegido do canal de diálogo. */
 export interface HorarioProtegido {
   inicio: string; // formato "HH:MM"
   fim: string; // formato "HH:MM"
@@ -297,9 +265,7 @@ export interface HorarioProtegido {
   mensagemForaHorario: string;
 }
 
-/**
- * Item de usuário para listagem na gestão.
- */
+/** Item de usuário para listagem na gestão. */
 export interface UsuarioItem {
   id: string;
   nome: string;
@@ -313,9 +279,7 @@ export interface UsuarioItem {
   acesso_modulos: string[];
 }
 
-/**
- * Item de aluno para listagem na gestão.
- */
+/** Item de aluno para listagem na gestão. */
 export interface AlunoItem {
   id: string;
   nome: string;
@@ -332,9 +296,7 @@ export interface AlunoItem {
   documentos_recebidos: string[];
 }
 
-/**
- * Solicitação de código de redefinição pendente.
- */
+/** Solicitação de código de redefinição pendente. */
 export interface SolicitacaoCodigo {
   id: string;
   email: string;
@@ -344,9 +306,7 @@ export interface SolicitacaoCodigo {
   criado_em: string;
 }
 
-/**
- * Código de redefinição gerado (para exibição na listagem).
- */
+/** Código de redefinição gerado (para exibição na listagem). */
 export interface CodigoGerado {
   id: string;
   email: string;
@@ -360,9 +320,7 @@ export interface CodigoGerado {
   status: 'ativo' | 'usado' | 'expirado' | 'revogado' | 'bloqueado';
 }
 
-/**
- * Dados para criação de usuário.
- */
+/** Dados para criação de usuário. */
 export interface DadosCriacaoUsuario {
   nome: string;
   email: string;
@@ -371,9 +329,7 @@ export interface DadosCriacaoUsuario {
   cargo?: string;
 }
 
-/**
- * Opção para GrupoCheckbox.
- */
+/** Opção para GrupoCheckbox. */
 export interface OpcaoCheckbox {
   valor: string;
   rotulo: string;
@@ -381,9 +337,7 @@ export interface OpcaoCheckbox {
   desabilitado?: boolean;
 }
 
-/**
- * Dados para criação de aluno.
- */
+/** Dados para criação de aluno. */
 export interface DadosCriacaoAluno {
   nome: string;
   matricula: string;

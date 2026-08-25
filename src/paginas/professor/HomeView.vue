@@ -8,9 +8,7 @@ const route = useRoute();
 const { usuario } = useAutenticacao();
 const nomeProfessor = usuario.value?.nome || 'Professor';
 
-const podeFrequencia = computed(() =>
-  (usuario.value?.acesso_modulos ?? []).includes('frequencia'),
-);
+const podeFrequencia = computed(() => (usuario.value?.acesso_modulos ?? []).includes('frequencia'));
 const podeOcorrencias = computed(() =>
   (usuario.value?.acesso_modulos ?? []).includes('ocorrencias'),
 );

@@ -23,9 +23,7 @@ export function useGestaoUsuarios() {
   const erro: Ref<string | null> = ref(null);
   const { buscarAnoLetivoAtivo } = useAnoLetivo();
 
-  // ==========================================================================
-  // USUÁRIOS (Perfis)
-  // ==========================================================================
+  // Usuários (perfis)
 
   async function buscarUsuarios(filtro?: {
     papel?: string;
@@ -121,9 +119,7 @@ export function useGestaoUsuarios() {
     const err = e as { code?: string; constraint?: string } | null;
     if (err?.code === '23514') {
       if (err.constraint === 'chk_perfis_modulos_catalogo') {
-        return (
-          'Módulo de acesso inválido. Recarregue a página e revise os módulos selecionados.'
-        );
+        return 'Módulo de acesso inválido. Recarregue a página e revise os módulos selecionados.';
       }
       return 'Dados inválidos. Verifique os campos e tente novamente.';
     }
@@ -167,9 +163,7 @@ export function useGestaoUsuarios() {
     return atualizarUsuario(id, { status: 'inativo' });
   }
 
-  // ==========================================================================
-  // ALUNOS
-  // ==========================================================================
+  // Alunos
 
   async function buscarAlunos(filtro?: { status?: string; busca?: string }): Promise<AlunoItem[]> {
     carregando.value = true;
@@ -334,9 +328,7 @@ export function useGestaoUsuarios() {
     }
   }
 
-  // ==========================================================================
-  // CÓDIGOS DE REDEFINIÇÃO
-  // ==========================================================================
+  // Códigos de redefinição
 
   async function buscarNotificacoesCodigos(): Promise<SolicitacaoCodigo[]> {
     carregando.value = true;
@@ -516,9 +508,7 @@ export function useGestaoUsuarios() {
     }
   }
 
-  // ==========================================================================
-  // DADOS AUXILIARES
-  // ==========================================================================
+  // Dados auxiliares
 
   async function buscarTurmas(): Promise<Turma[]> {
     try {
@@ -546,9 +536,7 @@ export function useGestaoUsuarios() {
     }
   }
 
-  // ==========================================================================
-  // UTILITÁRIOS
-  // ==========================================================================
+  // Utilitários
 
   return {
     carregando,

@@ -270,7 +270,7 @@ const linkClasse = computed(() => {
   outline: 0;
 }
 
-/* Variante de painel: barra de navegação compacta inspirada no exemplo do Bootstrap */
+/* Barra de navegação compacta da variante de painel. */
 .navbar-dark.bg-dark {
   min-height: 56px;
 }

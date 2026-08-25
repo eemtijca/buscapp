@@ -30,10 +30,7 @@ interface TokenClaims {
   [key: string]: unknown;
 }
 
-/**
- * Decodifica o JWT sem latência de rede (diferente de getSession()).
- * Usado pelo router guard para ler 'papel' da claim do token.
- */
+/** Decodifica o JWT localmente, sem latência de rede; usado pelo router guard. */
 export { armazenamento };
 
 export function decodificarToken(accessToken: string): TokenClaims | null {

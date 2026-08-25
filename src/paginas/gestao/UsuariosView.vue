@@ -21,9 +21,7 @@ const confirmacaoPendente = ref<{ usuario: UsuarioItem; acao: 'ativar' | 'desati
 );
 
 const tituloConfirmacao = computed(() =>
-  confirmacaoPendente.value?.acao === 'desativar'
-    ? 'Desativar usuário'
-    : 'Ativar usuário',
+  confirmacaoPendente.value?.acao === 'desativar' ? 'Desativar usuário' : 'Ativar usuário',
 );
 const mensagemConfirmacao = computed(() => {
   const pendente = confirmacaoPendente.value;
@@ -88,7 +86,7 @@ const statusBadge = (status: string) => {
 };
 
 function toggleAtivacao(usuario: UsuarioItem) {
-  // Perfis de gestão não podem ser desativados pela interface (evita travar o sistema)
+  // Perfis de papel gestao não podem ser desativados pela interface.
   if (usuario.papel === 'gestao') return;
   confirmacaoPendente.value = {
     usuario,
@@ -393,9 +391,7 @@ onMounted(async () => {
       :titulo="tituloConfirmacao"
       :mensagem="mensagemConfirmacao"
       :rotulo-confirmar="confirmacaoPendente?.acao === 'desativar' ? 'Desativar' : 'Ativar'"
-      :icone="
-        confirmacaoPendente?.acao === 'desativar' ? 'pause-circle' : 'play-circle'
-      "
+      :icone="confirmacaoPendente?.acao === 'desativar' ? 'pause-circle' : 'play-circle'"
       :variante="confirmacaoPendente?.acao === 'desativar' ? 'danger' : 'success'"
       @confirmar="executarToggleAtivacao"
       @cancelar="confirmacaoPendente = null"

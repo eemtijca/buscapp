@@ -36,7 +36,7 @@ const configNivel: Record<
 const config = computed(() => configNivel[props.termometro.nivel]);
 
 const porcentagem = computed(() => {
-  // Cada falta conta 10 pontos, cada ocorrência 20 pontos, limitado a 100.
+  // Pontuação: 10 por falta, 20 por ocorrência, limitada a 100.
   const pontos = Math.min(
     100,
     props.termometro.totalAusencias * 10 + props.termometro.totalOcorrencias * 20,

@@ -5,10 +5,7 @@ import type { Perfil, PapelUsuario } from '@/tipos/database';
 const usuario: Ref<Perfil | null> = ref(null);
 const carregando: Ref<boolean> = ref(true);
 
-/**
- * Recurso alternativo para tokens emitidos antes do Custom Access Token Hook.
- * Em operação normal as claims do JWT já contêm nome e papel.
- */
+/** Fallback para tokens sem claims de nome e papel emitidos antes do Custom Access Token Hook. */
 async function carregarPerfil() {
   const {
     data: { session },
@@ -30,10 +27,7 @@ async function carregarPerfil() {
   }
 }
 
-/**
- * Os módulos de acesso não viajam no JWT: busca o valor real de
- * perfis.acesso_modulos e mescla no usuário já montado pelas claims.
- */
+/** Carrega acesso_modulos do perfil no banco e mescla no usuário montado pelas claims do JWT. */
 async function carregarModulosDoPerfil(id: string) {
   try {
     const { data } = await supabaseClient
@@ -46,15 +40,11 @@ async function carregarModulosDoPerfil(id: string) {
       usuario.value = { ...usuario.value, acesso_modulos: modulos ?? [] };
     }
   } catch {
-    /* falha silenciosa: mantém lista vazia (fail-closed) */
+    /* mantém a lista vazia em caso de falha */
   }
 }
 
-/**
- * Ouvinte global registrado UMA vez no escopo de módulo.
- * Reage a INITIAL_SESSION, SIGNED_IN, TOKEN_REFRESHED e SIGNED_OUT
- * sem necessidade de onMounted ou verificação periódica.
- */
+/** Ouvinte global único para INITIAL_SESSION, SIGNED_IN, TOKEN_REFRESHED e SIGNED_OUT. */
 supabaseClient.auth.onAuthStateChange((event, session) => {
   if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
     if (session?.access_token) {
@@ -118,10 +108,7 @@ supabaseClient.auth.onAuthStateChange((event, session) => {
 });
 
 export function useAutenticacao() {
-  /**
-   * Autentica com email/senha. O ouvinte onAuthStateChange
-   * preenche usuario.value automaticamente via JWT.
-   */
+  /** Autentica com email e senha; o ouvinte onAuthStateChange preenche o usuário via claims do JWT. */
   async function login(email: string, senha: string) {
     const { data, error } = await supabaseClient.auth.signInWithPassword({
       email,
@@ -137,7 +124,7 @@ export function useAutenticacao() {
     return data;
   }
 
-  /** Encerra a sessão atual (scope: 'local' = não afeta outras abas). */
+  /** Encerra a sessão local sem afetar outras abas. */
   async function logout() {
     supabaseClient.removeAllChannels();
     await supabaseClient.auth.signOut({ scope: 'local' });

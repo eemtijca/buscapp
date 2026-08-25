@@ -90,8 +90,7 @@ test.describe('Gestão - Registro de infrequências', () => {
   });
 
   test('CT-N3 - Chamada por turma registra faltas com confirmação', async ({ page }) => {
-    // Estado limpo: remove faltas de hoje antes e depois do teste (a suíte
-    // completa move enturmações sem restaurar e pode deixar resíduos).
+    // Remove faltas de hoje antes e depois do teste para estado determinístico.
     const limparFaltasDeHoje = () =>
       fetch(
         `${URL_SUPABASE}/rest/v1/frequencias?data_aula=eq.${new Date()
@@ -110,9 +109,7 @@ test.describe('Gestão - Registro de infrequências', () => {
     await expect(page.locator('#seletorTurma')).toBeVisible();
 
     try {
-      // A turma padrão sempre tem alunos (o seletor é construído a partir dos
-      // próprios alunos); não dependemos de um aluno específico porque outros
-      // testes da suíte movem enturmações sem restaurar.
+      // A turma padrão sempre tem alunos; evita depender de aluno específico porque outros testes movem enturmações.
       const botaoAusente = page.getByRole('button', { name: /Marcar .+ como ausente/ }).first();
       await expect(botaoAusente).toBeVisible({ timeout: 15000 });
       await botaoAusente.click();

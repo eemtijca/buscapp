@@ -8,8 +8,13 @@ import type { OcorrenciaGrave } from '@/tipos/componentes';
 
 const router = useRouter();
 const { buscarOcorrenciasGraves, alternarBloqueioRetorno } = useMonitoramento();
-const { ultimaAtualizacao, estaAtualizando, atualizar: refresh, inscrever, encerrar } =
-  useRealtimeRefresh();
+const {
+  ultimaAtualizacao,
+  estaAtualizando,
+  atualizar: refresh,
+  inscrever,
+  encerrar,
+} = useRealtimeRefresh();
 
 const ocorrencias = ref<OcorrenciaGrave[]>([]);
 const mensagemSucesso = ref<string | null>(null);

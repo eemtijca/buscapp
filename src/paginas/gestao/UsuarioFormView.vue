@@ -234,14 +234,13 @@ async function salvar() {
   }
   salvando.value = true;
   try {
-    // acesso_modulos é enviado para qualquer papel, apenas com chaves
-    // presentes no catálogo (evita violar chk_perfis_modulos_catalogo).
+    // Envia acesso_modulos para qualquer papel com chaves validadas pelo catálogo.
     const dadosExtras: Record<string, unknown> = {
       notificacoes_ativas: notificacoesAtivas.value,
       acesso_modulos: filtrarModulosValidos(acessoModulos.value),
     };
     if (modoEdicao.value && usuarioId.value) {
-      // Perfis de gestão ficam sempre ativos (defesa extra no salvamento)
+      // Perfis de papel gestao permanecem sempre ativos no salvamento.
       const statusFinal: StatusPerfil = papel.value === 'gestao' ? 'ativo' : status.value;
       const ok = await atualizarUsuario(usuarioId.value, {
         nome: nome.value.trim(),

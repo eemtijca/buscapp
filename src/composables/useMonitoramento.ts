@@ -804,8 +804,7 @@ export function useMonitoramento() {
       const mensagens: Record<NivelRisco, string> = {
         baixo: 'Continue acompanhando a vida escolar do seu filho.',
         medio: 'Há registros de faltas e/ou ocorrências. Entre em contato com a escola.',
-        alto:
-          'Acúmulo importante de faltas e/ou ocorrências. Procure a coordenação imediatamente.',
+        alto: 'Acúmulo importante de faltas e/ou ocorrências. Procure a coordenação imediatamente.',
       };
 
       return {
@@ -1060,8 +1059,7 @@ export function useMonitoramento() {
         anexo_id: anexoId,
       });
       if (vinculoError) {
-        // Compensação: remove o objeto do armazenamento e tenta remover a linha de anexo
-        // (se a permissão permitir). Linhas remanescentes são limpas pelo job de expurgo.
+        // Remove o anexo como compensação; linhas remanescentes são limpas pelo job de expurgo.
         try {
           await supabaseClient.from('anexos').delete().eq('id', anexoId);
         } catch {
@@ -1254,37 +1252,37 @@ export function useMonitoramento() {
       );
 
       const mensagens: MensagemChat[] = (msgsData ?? []).map((m: unknown) => {
-          const msg = m as {
-            id: string;
-            conversa_id: string;
-            remetente_id: string;
-            conteudo: string;
-            is_system_message: boolean;
-            lida_em: string | null;
-            created_at: string;
-          };
-          const autor = autores.get(msg.remetente_id);
-          const raw = msg.created_at;
-          const d = safeDate(raw);
-          return {
-            id: msg.id,
-            conversaId: msg.conversa_id,
-            remetenteId: msg.remetente_id,
-            autor: autor?.tipo ?? 'gestao',
-            nomeAutor: autor?.nome ?? (msg.is_system_message ? 'Sistema' : 'Equipe escolar'),
-            texto: msg.conteudo,
-            horario: d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-            data: d.toLocaleDateString('pt-BR', {
-              day: '2-digit',
-              month: '2-digit',
-              year: 'numeric',
-            }),
-            dataIso: raw,
-            isSistema: msg.is_system_message,
-            minha: msg.remetente_id === userId,
-            lida: msg.lida_em !== null,
-          };
-        });
+        const msg = m as {
+          id: string;
+          conversa_id: string;
+          remetente_id: string;
+          conteudo: string;
+          is_system_message: boolean;
+          lida_em: string | null;
+          created_at: string;
+        };
+        const autor = autores.get(msg.remetente_id);
+        const raw = msg.created_at;
+        const d = safeDate(raw);
+        return {
+          id: msg.id,
+          conversaId: msg.conversa_id,
+          remetenteId: msg.remetente_id,
+          autor: autor?.tipo ?? 'gestao',
+          nomeAutor: autor?.nome ?? (msg.is_system_message ? 'Sistema' : 'Equipe escolar'),
+          texto: msg.conteudo,
+          horario: d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+          data: d.toLocaleDateString('pt-BR', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+          }),
+          dataIso: raw,
+          isSistema: msg.is_system_message,
+          minha: msg.remetente_id === userId,
+          lida: msg.lida_em !== null,
+        };
+      });
 
       return {
         contato: {

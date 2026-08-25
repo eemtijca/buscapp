@@ -173,8 +173,7 @@ async function confirmarGerar() {
       codigoGeradoAtual.value = codigo;
       modalCodigoGerado.value = true;
       await marcarNotificacaoLida(solicitacaoSelecionada.value.id);
-      // A função fn_gerar_codigo_redefinicao marca todas as solicitações do
-      // perfil como atendidas; remove todas as entradas locais correspondentes.
+      // fn_gerar_codigo_redefinicao atende as solicitações; remove as entradas locais.
       solicitacoes.value = solicitacoes.value.filter(
         (s) => s.perfil_id !== solicitacaoSelecionada.value!.perfil_id,
       );

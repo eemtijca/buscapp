@@ -10,8 +10,13 @@ import type { AlunoRisco } from '@/tipos/componentes';
 const router = useRouter();
 const { usuario } = useAutenticacao();
 const { buscarRankingRisco, abrirConversaResponsavel, carregando } = useMonitoramento();
-const { ultimaAtualizacao, estaAtualizando, atualizar: refresh, inscrever, encerrar } =
-  useRealtimeRefresh();
+const {
+  ultimaAtualizacao,
+  estaAtualizando,
+  atualizar: refresh,
+  inscrever,
+  encerrar,
+} = useRealtimeRefresh();
 
 const ranking = ref<AlunoRisco[]>([]);
 const filtroRisco = ref<'todos' | 'alto' | 'medio' | 'baixo'>('todos');

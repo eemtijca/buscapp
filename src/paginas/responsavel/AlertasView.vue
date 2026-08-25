@@ -12,8 +12,13 @@ import { supabaseClient } from '@/servicos/supabase';
 const router = useRouter();
 const { usuario } = useAutenticacao();
 const { buscarAlertasResponsavel } = useMonitoramento();
-const { ultimaAtualizacao, estaAtualizando, atualizar: refresh, inscrever, encerrar } =
-  useRealtimeRefresh();
+const {
+  ultimaAtualizacao,
+  estaAtualizando,
+  atualizar: refresh,
+  inscrever,
+  encerrar,
+} = useRealtimeRefresh();
 
 const alertas = ref<AlertaResponsavel[]>([]);
 const alertaSelecionado = ref<AlertaResponsavel | null>(null);
@@ -78,11 +83,7 @@ onMounted(async () => {
   await carregarTags();
   await carregarAlertas();
   await inscrever(
-    [
-      { tabela: 'frequencias' },
-      { tabela: 'ocorrencias' },
-      { tabela: 'justificativas_faltas' },
-    ],
+    [{ tabela: 'frequencias' }, { tabela: 'ocorrencias' }, { tabela: 'justificativas_faltas' }],
     carregarAlertas,
   );
 });

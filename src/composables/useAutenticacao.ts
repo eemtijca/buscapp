@@ -31,6 +31,26 @@ async function carregarPerfil() {
 }
 
 /**
+ * Os módulos de acesso não viajam no JWT: busca o valor real de
+ * perfis.acesso_modulos e mescla no usuário já montado pelas claims.
+ */
+async function carregarModulosDoPerfil(id: string) {
+  try {
+    const { data } = await supabaseClient
+      .from('perfis')
+      .select('acesso_modulos')
+      .eq('id', id)
+      .single();
+    const modulos = (data as { acesso_modulos?: string[] } | null)?.acesso_modulos;
+    if (usuario.value && usuario.value.id === id) {
+      usuario.value = { ...usuario.value, acesso_modulos: modulos ?? [] };
+    }
+  } catch {
+    /* falha silenciosa: mantém lista vazia (fail-closed) */
+  }
+}
+
+/**
  * Ouvinte global registrado UMA vez no escopo de módulo.
  * Reage a INITIAL_SESSION, SIGNED_IN, TOKEN_REFRESHED e SIGNED_OUT
  * sem necessidade de onMounted ou verificação periódica.
@@ -41,6 +61,9 @@ supabaseClient.auth.onAuthStateChange((event, session) => {
       const claims = decodificarToken(session.access_token);
 
       if (claims?.papel && claims?.nome) {
+        // Preserva módulos já carregados do banco em refreshes do token
+        const modulosConhecidos =
+          usuario.value?.id === claims.sub ? usuario.value.acesso_modulos : [];
         usuario.value = {
           id: claims.sub,
           nome: claims.nome,
@@ -49,13 +72,14 @@ supabaseClient.auth.onAuthStateChange((event, session) => {
           telefone: null,
           cargo: null,
           notificacoes_ativas: true,
-          acesso_modulos: ['frequencia'],
+          acesso_modulos: modulosConhecidos,
           permissoes: [],
           status: 'ativo',
           ultimo_acesso_em: null,
           created_at: '',
           updated_at: '',
         };
+        void carregarModulosDoPerfil(claims.sub);
       } else {
         carregarPerfil();
       }
@@ -65,6 +89,8 @@ supabaseClient.auth.onAuthStateChange((event, session) => {
     if (session?.access_token) {
       const claims = decodificarToken(session.access_token);
       if (claims?.papel && claims?.nome) {
+        const modulosConhecidos =
+          usuario.value?.id === claims.sub ? usuario.value.acesso_modulos : [];
         usuario.value = {
           id: claims.sub,
           nome: claims.nome,
@@ -73,13 +99,14 @@ supabaseClient.auth.onAuthStateChange((event, session) => {
           telefone: null,
           cargo: null,
           notificacoes_ativas: true,
-          acesso_modulos: ['frequencia'],
+          acesso_modulos: modulosConhecidos,
           permissoes: [],
           status: 'ativo',
           ultimo_acesso_em: null,
           created_at: '',
           updated_at: '',
         };
+        void carregarModulosDoPerfil(claims.sub);
       }
     }
     carregando.value = false;

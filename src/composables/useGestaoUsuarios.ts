@@ -132,7 +132,13 @@ export function useGestaoUsuarios() {
 
   async function atualizarUsuario(
     id: string,
-    dados: Partial<{ nome: string; telefone: string; cargo: string; status: string }>,
+    dados: Partial<{
+      nome: string;
+      telefone: string;
+      cargo: string;
+      status: string;
+      acesso_modulos: string[];
+    }>,
   ): Promise<boolean> {
     carregando.value = true;
     erro.value = null;

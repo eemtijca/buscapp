@@ -42,6 +42,7 @@ declare module 'vue-router' {
   interface RouteMeta {
     requerAutenticacao?: boolean;
     papeisPermitidos?: string[];
+    moduloPermitido?: string;
   }
 }
 
@@ -85,19 +86,31 @@ const router = createRouter({
         {
           path: 'frequencia',
           name: 'professor-frequencia',
-          meta: { requerAutenticacao: true, papeisPermitidos: ['professor'] },
+          meta: {
+            requerAutenticacao: true,
+            papeisPermitidos: ['professor'],
+            moduloPermitido: 'frequencia',
+          },
           component: ProfessorFrequenciaView,
         },
         {
           path: 'ausencia',
           name: 'professor-ausencia',
-          meta: { requerAutenticacao: true, papeisPermitidos: ['professor'] },
+          meta: {
+            requerAutenticacao: true,
+            papeisPermitidos: ['professor'],
+            moduloPermitido: 'frequencia',
+          },
           component: ProfessorAusenciaView,
         },
         {
           path: 'ocorrencia',
           name: 'professor-ocorrencia',
-          meta: { requerAutenticacao: true, papeisPermitidos: ['professor'] },
+          meta: {
+            requerAutenticacao: true,
+            papeisPermitidos: ['professor'],
+            moduloPermitido: 'ocorrencias',
+          },
           component: ProfessorOcorrenciaView,
         },
       ],
@@ -306,6 +319,7 @@ router.beforeEach(async (to, _from) => {
 
   let perfilPapel: string | null = null;
   let perfilStatus: string | null = null;
+  let perfilModulos: string[] = [];
 
   if (session) {
     // Lê o papel DIRETAMENTE do JWT via jwt-decode
@@ -316,10 +330,11 @@ router.beforeEach(async (to, _from) => {
     // Consulta o status atual do perfil para detectar contas desativadas
     const { data } = await supabaseClient
       .from('perfis')
-      .select('status')
+      .select('status, acesso_modulos')
       .eq('id', session.user.id)
       .single();
     perfilStatus = (data as { status?: string } | null)?.status ?? null;
+    perfilModulos = (data as { acesso_modulos?: string[] } | null)?.acesso_modulos ?? [];
   }
 
   // Conta desativada só pode permanecer na tela de "conta desativada"
@@ -348,6 +363,18 @@ router.beforeEach(async (to, _from) => {
       }
       if (!papeisPermitidos.includes(perfilPapel)) {
         return { name: '403', query: { destino: homePorPapel[perfilPapel] ?? '/' } };
+      }
+    }
+
+    // Módulos de acesso (perfis.acesso_modulos): fail-closed — lista vazia
+    // significa nenhum módulo habilitado.
+    const moduloPermitido = to.meta?.moduloPermitido;
+    if (moduloPermitido && perfilPapel === 'professor') {
+      if (!perfilModulos.includes(moduloPermitido)) {
+        return {
+          name: 'professor',
+          query: { moduloNegado: moduloPermitido },
+        };
       }
     }
   }

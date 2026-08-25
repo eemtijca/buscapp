@@ -29,7 +29,7 @@ const telefone = ref('');
 const cargo = ref('');
 const status = ref<StatusPerfil>('ativo');
 const notificacoesAtivas = ref(true);
-const acessoModulos = ref<string[]>(['frequencia']);
+const acessoModulos = ref<string[]>([]);
 
 const opcoesModulos = ref<OpcaoCheckbox[]>([]);
 
@@ -43,10 +43,9 @@ function filtrarModulosValidos(chaves: unknown): string[] {
   return chaves.filter((c): c is string => typeof c === 'string' && validas.has(c));
 }
 
+/** Padrão do formulário: todos os módulos existentes no catálogo. */
 function moduloPadrao(): string[] {
-  const validas = opcoesModulos.value.map((o) => o.valor);
-  if (validas.includes('frequencia')) return ['frequencia'];
-  return validas.length ? [validas[0]!] : [];
+  return opcoesModulos.value.map((o) => o.valor);
 }
 
 const atribuicoes = ref<(AtribuicaoProfessor & { turma_nome?: string })[]>([]);
@@ -146,6 +145,9 @@ async function copiarCodigoCriado() {
 onMounted(async () => {
   opcoesModulos.value = await buscarOpcoes('modulo');
   const id = route.params.id as string | undefined;
+  if (!id) {
+    acessoModulos.value = moduloPadrao();
+  }
   if (id) {
     modoEdicao.value = true;
     usuarioId.value = id;
@@ -232,14 +234,12 @@ async function salvar() {
   }
   salvando.value = true;
   try {
-    // acesso_modulos só é enviado para professores e apenas com chaves
+    // acesso_modulos é enviado para qualquer papel, apenas com chaves
     // presentes no catálogo (evita violar chk_perfis_modulos_catalogo).
     const dadosExtras: Record<string, unknown> = {
       notificacoes_ativas: notificacoesAtivas.value,
+      acesso_modulos: filtrarModulosValidos(acessoModulos.value),
     };
-    if (papel.value === 'professor') {
-      dadosExtras.acesso_modulos = filtrarModulosValidos(acessoModulos.value);
-    }
     if (modoEdicao.value && usuarioId.value) {
       // Perfis de gestão ficam sempre ativos (defesa extra no salvamento)
       const statusFinal: StatusPerfil = papel.value === 'gestao' ? 'ativo' : status.value;
@@ -486,14 +486,14 @@ async function salvar() {
         </div>
       </div>
 
-      <div v-if="papel === 'professor'" class="card border mb-3">
+      <div class="card border mb-3">
         <div class="card-header bg-body-tertiary py-2">
           <span class="fw-medium small">Módulos de acesso</span>
         </div>
         <div class="card-body">
           <CampoFormulario
             id="acessoModulos"
-            label="Módulos disponíveis para este professor"
+            label="Módulos disponíveis para este usuário"
             dica="Marque quais módulos o usuário poderá acessar"
           >
             <GrupoCheckbox

@@ -147,6 +147,7 @@ Projeto em desenvolvimento ativo. A infraestrutura central está concluída e os
 | Recuperação de senha | Fluxo unificado com o primeiro acesso: código de 6 dígitos para redefinir a senha sem depender de email (gerado por admin, solicitado pelo usuário) |
 | JWT com custom claims | Token JWT contém nome e papel do usuário, injetado via Custom Access Token Hook do Supabase |
 | RBAC | Guardas de rota no Vue Router que redirecionam usuários não autenticados e bloqueiam acesso a rotas não autorizadas |
+| Módulos de acesso | Catálogo em `perfis.acesso_modulos` gerenciado pela gestão na criação e edição de qualquer usuário, com aplicação fail-closed em políticas RLS, guardas de rota do professor e filtragem dos cartões da home |
 | Redirecionamento pós-login | Redirecionamento automático para a página inicial do perfil após login bem-sucedido |
 | Força de senha | Validação de requisitos mínimos de senha no frontend |
 | Visibilidade de senha | Checkbox "Mostrar senha(s)" nas telas de login e redefinição de senha (substitui o ícone de olho) |
@@ -168,6 +169,7 @@ Projeto em desenvolvimento ativo. A infraestrutura central está concluída e os
 | Frequência por exceção | Todos os alunos são considerados presentes por padrão. O professor marca apenas quem faltou. Suporte à seleção por período e busca por nome. |
 | Ausência em período | Registro de aluno que esteve presente na escola mas ausentou-se de um período específico de aula. Inclui seleção de período e campo opcional de observação. |
 | Ocorrências graves | Registro de comportamento extremo que ameace a permanência do aluno na escola. Opção de classificar como grave ou suspensão, com campo de descrição e opção de exigir presença do responsável. |
+| Módulos de acesso | Home exibe apenas os cartões dos módulos habilitados em `perfis.acesso_modulos`; rotas sem o módulo correspondente redirecionam para a home com aviso e a escrita no banco é negada por RLS |
 
 ### Módulo Gestão
 
@@ -176,8 +178,9 @@ Projeto em desenvolvimento ativo. A infraestrutura central está concluída e os
 | Painel de monitoramento | Página central com cartões de navegação para todos os módulos administrativos |
 | Ranking de risco | Lista priorizada de alunos organizados do caso mais crítico ao mais leve. Filtros por nível de risco (crítico, atenção, estável). Busca em tempo real por nome. Atualização por subscription Realtime. Botão "Chat" em cada aluno que abre uma conversa com o responsável (sem envio automático de mensagens). |
 | Central de ocorrências | Lista de todas as ocorrências graves e suspensões com indicadores visuais de tipo, status e bloqueio. Alternância de bloqueio/desbloqueio de retorno em tempo real. |
+| Registro de infrequências | Aba de chamada por exceção para qualquer turma e aba de registro individual de ausências por período com motivo e observação. Confirmação em modal antes de salvar. Acessível pelo card próprio e pelo botão "Falta" no ranking, que pré-seleciona o aluno |
 | Validação de justificativas | Fila de justificativas pendentes com exibição de anexos em modal (imagem ou PDF carregados via blob), intervalo de datas e opção de aceitar ou recusar. Ao aceitar, as frequências no período são auto-justificadas via trigger no banco. Atualização em tempo real. |
-| CRUD de usuários | Cadastro, edição, ativação e inativação de usuários. Geração automática de código de redefinição de senha ao criar usuário. Criação sincronizada no auth.users e perfil. |
+| CRUD de usuários | Cadastro, edição, ativação e inativação de usuários com confirmação em modal nas mudanças de status. Geração automática de código de redefinição de senha ao criar usuário. Criação sincronizada no auth.users e perfil. Módulos de acesso editáveis para todos os papéis. |
 | CRUD de alunos | Cadastro e edição de alunos com dados pseudonimizados. Criação simultânea de vínculo com responsável existente ou novo. |
 | CRUD de turmas | Cadastro, edição, ativação e inativação de turmas com série e letra. |
 | Anos letivos | CRUD de anos letivos com período (datas de início/fim) e status (planejado, ativo, arquivado). A "virada de ano" é feita pelo botão Ativar: arquiva atomicamente o ano vigente e ativa o novo via RPC `ativar_ano_letivo`, com trilha de auditoria. Novos anos são criados como planejados. |
@@ -228,6 +231,7 @@ buscapp/
 │   │   ├── GrupoCheckbox.vue            # Grupo de checkboxes reutilizável
 │   │   ├── IndicadorConexao.vue         # Indicador de status da conexão (verde/amarelo/vermelho)
 │   │   ├── ListaOcorrencias.vue         # Lista de ocorrências graves
+│   │   ├── ModalConfirmacao.vue         # Modal genérico de confirmação
 │   │   ├── NotificacoesPopover.vue      # Popover de notificações (sino)
 │   │   ├── SeletorIcone.vue            # Seletor visual de ícones Bootstrap com busca e categorias
 │   │   ├── TermometroRisco.vue          # Termômetro visual de risco
@@ -258,6 +262,7 @@ buscapp/
 │   │   │   ├── GestaoHomeView.vue
 │   │   │   ├── GestaoRankingView.vue
 │   │   │   ├── GestaoOcorrenciasView.vue
+│   │   │   ├── GestaoInfrequenciasView.vue              # Chamada por turma e registro individual de faltas
 │   │   │   ├── GestaoJustificativasView.vue
 │   │   │   ├── UsuariosView.vue
 │   │   │   ├── UsuarioFormView.vue
@@ -321,7 +326,8 @@ buscapp/
 │   ├── test-api.sh                     # Testes de API com bash/curl (297 asserts)
 │   └── test-db.sh                      # Executa testes SQL no container Docker do Supabase
 ├── tests/
-│   └── app.spec.ts                     # Testes E2E Playwright (128 casos, 5 browsers)
+│   ├── app.spec.ts                     # Testes E2E Playwright (128 casos, 5 browsers)
+│   └── modulos-infrequencias.spec.ts   # Testes E2E de módulos, infrequências, confirmação e termômetro (9 casos)
 ├── .github/
 │   ├── workflows/codeql.yml            # CodeQL security analysis
 │   └── dependabot.yml                  # Atualizações semanais do devcontainer
@@ -474,7 +480,8 @@ Todas as views utilizam `security_invoker = true` para respeitar as políticas R
 ### Segurança
 
 - RLS habilitado em todas as tabelas.
-- Funções auxiliares para políticas: `get_user_papel()`, `is_professor_da_turma()`, `is_responsavel_do_aluno()`.
+- Funções auxiliares para políticas: `get_user_papel()`, `get_user_acesso_modulos()`, `is_professor_da_turma()`, `is_responsavel_do_aluno()`.
+- Módulos de acesso (`perfis.acesso_modulos`) com semântica fail-closed: as políticas de professor em `frequencias` e `ocorrencias` exigem o módulo correspondente e lista vazia significa nenhum acesso.
 - Trigger `requisicao_exige_jwt()` no gancho `request.jwt.claim` do PostgREST para rejeitar requisições sem JWT válido.
 - Trigger de criação automática de perfil ao inserir usuário em `auth.users`.
 - Trigger `fn_auto_justificar_frequencias` que atualiza o status das frequências para `'justificado'` quando uma justificativa é aceita.
@@ -688,11 +695,11 @@ O projeto possui quatro camadas de teste independentes.
 
 ### Testes E2E (Playwright)
 
-- **Arquivo:** `tests/app.spec.ts`
-- **Cobertura:** 128 casos de teste em 5 configurações de navegador:
+- **Arquivos:** `tests/app.spec.ts` (128 casos) e `tests/modulos-infrequencias.spec.ts` (9 casos)
+- **Cobertura:** 137 casos de teste em 5 configurações de navegador:
   - Chromium, Firefox, WebKit, Mobile Chrome, Mobile Safari
   - Gestão: anos letivos (listagem com ano ativo, criação de ano planejado, virada de ano via RPC, reversão, botão desabilitado no ano vigente)
-  - Fluxos testados: login, logout, credenciais inválidas, gestão (home, usuários, alunos, códigos, turmas, modal de atribuições, ranking com botão de chat), professor (frequência, ausência, ocorrências), responsável (chat, home, alertas, justificativas), visualizador de anexo (modal blob em justificativas e alertas, com botões de baixar/fechar e ausência de token na URL), notificações (popover, marcar lidas, limpar todas), chat completo (sidebar, mensagens, busca, header), resiliência, casos extremos
+  - Fluxos testados: login, logout, credenciais inválidas, gestão (home, usuários com confirmação de ativação/desativação, módulos de acesso, infrequências com chamada por turma e registro individual, alunos, códigos, turmas, modal de atribuições, ranking com botões de chat e falta), professor (frequência, ausência, ocorrências), responsável (chat, home, alertas, justificativas), visualizador de anexo (modal blob em justificativas e alertas, com botões de baixar/fechar e ausência de token na URL), notificações (popover, marcar lidas, limpar todas), chat completo (sidebar, mensagens, busca, header), resiliência, casos extremos
   - **Configuração do sistema:** hub de configuração, CRUD de opções genéricas (incluindo restrições de entrada e exclusão bloqueada de opções referenciadas), gerenciamento de tags de comportamento (exclusão/renomeação de tags referenciadas bloqueadas), parâmetros do sistema, horários letivos, verificações de carregamento dinâmico de opções do banco de dados em formulários
   - **Integridade de catálogo:** exclusão de opção/tag referenciada bloqueada, transferência de enturmação mantendo uma enturmação ativa por aluno
 - **Execução:** `npm run test:e2e` (requer Supabase local + seed + servidor dev em execução)

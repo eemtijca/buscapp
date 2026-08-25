@@ -9,6 +9,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   chat: [alunoId: string];
   'ver-detalhes': [alunoId: string];
+  'registrar-falta': [alunoId: string];
 }>();
 
 const classeBorda = computed(() => {
@@ -83,17 +84,29 @@ const inicialAluno = computed(() =>
           </div>
         </div>
 
-        <button
-          type="button"
-          class="btn btn-sm flex-shrink-0"
-          :class="aluno.nivel === 'alto' ? 'btn-danger' : 'btn-outline-success'"
-          title="Abrir conversa com o responsável"
-          @click="emit('chat', aluno.id)"
-        >
-          <i class="bi bi-chat-dots me-1" aria-hidden="true"></i>
-          <span class="d-none d-sm-inline">Chat</span>
-          <span class="d-sm-none visually-hidden">Abrir conversa com o responsável</span>
-        </button>
+        <div class="d-flex gap-2 flex-shrink-0">
+          <button
+            type="button"
+            class="btn btn-sm btn-outline-danger"
+            title="Registrar falta"
+            @click="emit('registrar-falta', aluno.id)"
+          >
+            <i class="bi bi-calendar-x me-1" aria-hidden="true"></i>
+            <span class="d-none d-sm-inline">Falta</span>
+            <span class="d-sm-none visually-hidden">Registrar falta do aluno</span>
+          </button>
+          <button
+            type="button"
+            class="btn btn-sm"
+            :class="aluno.nivel === 'alto' ? 'btn-danger' : 'btn-outline-success'"
+            title="Abrir conversa com o responsável"
+            @click="emit('chat', aluno.id)"
+          >
+            <i class="bi bi-chat-dots me-1" aria-hidden="true"></i>
+            <span class="d-none d-sm-inline">Chat</span>
+            <span class="d-sm-none visually-hidden">Abrir conversa com o responsável</span>
+          </button>
+        </div>
       </div>
     </div>
   </div>

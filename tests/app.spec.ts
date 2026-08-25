@@ -201,12 +201,13 @@ test.describe('Gestão - Home', () => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await expect(page.locator('h3.card-nav-title').first()).toHaveText('Ranking de risco');
     await expect(page.locator('h3.card-nav-title').nth(1)).toHaveText('Ocorrências graves');
-    await expect(page.locator('h3.card-nav-title').nth(2)).toHaveText('Justificativas');
-    await expect(page.locator('h3.card-nav-title').nth(3)).toHaveText('Usuários');
-    await expect(page.locator('h3.card-nav-title').nth(4)).toHaveText('Alunos');
-    await expect(page.locator('h3.card-nav-title').nth(5)).toHaveText('Códigos');
-    await expect(page.locator('h3.card-nav-title').nth(7)).toHaveText('Anos letivos');
-    await expect(page.locator('h3.card-nav-title').nth(11)).toHaveText('Configurações');
+    await expect(page.locator('h3.card-nav-title').nth(2)).toHaveText('Infrequências');
+    await expect(page.locator('h3.card-nav-title').nth(3)).toHaveText('Justificativas');
+    await expect(page.locator('h3.card-nav-title').nth(4)).toHaveText('Usuários');
+    await expect(page.locator('h3.card-nav-title').nth(5)).toHaveText('Alunos');
+    await expect(page.locator('h3.card-nav-title').nth(6)).toHaveText('Códigos');
+    await expect(page.locator('h3.card-nav-title').nth(8)).toHaveText('Anos letivos');
+    await expect(page.locator('h3.card-nav-title').nth(12)).toHaveText('Configurações');
   });
 
   test('CT07 - Notificação de código aparece no header', async ({ page }) => {

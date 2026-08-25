@@ -56,6 +56,10 @@ async function abrirChat(alunoId: string) {
   await router.push({ path: '/gestao/chat', query: { conversa: conversaId } });
 }
 
+async function registrarFalta(alunoId: string) {
+  await router.push({ path: '/gestao/infrequencias', query: { aluno: alunoId } });
+}
+
 async function carregarRanking() {
   ranking.value = await buscarRankingRisco();
 }
@@ -221,6 +225,7 @@ onUnmounted(() => {
         :key="aluno.id"
         :aluno="aluno"
         @chat="abrirChat"
+        @registrar-falta="registrarFalta"
       />
     </div>
   </div>

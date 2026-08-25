@@ -42,6 +42,15 @@ const nomeGestor = usuario.value?.nome || 'Gestor';
       </div>
       <div class="col-12 col-md-6 col-lg-4">
         <CartaoNavegacao
+          icone="calendar-x"
+          titulo="Infrequências"
+          descricao="Registre faltas pontuais ou realize a chamada de qualquer turma."
+          rota="/gestao/infrequencias"
+          cor="success"
+        />
+      </div>
+      <div class="col-12 col-md-6 col-lg-4">
+        <CartaoNavegacao
           icone="clipboard-check"
           titulo="Justificativas"
           descricao="Valide ou recuse justificativas enviadas pelos responsáveis."

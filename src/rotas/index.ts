@@ -11,6 +11,7 @@ import ProfessorOcorrenciaView from '@/paginas/professor/OcorrenciaView.vue';
 import GestaoHomeView from '@/paginas/gestao/GestaoHomeView.vue';
 import GestaoRankingView from '@/paginas/gestao/GestaoRankingView.vue';
 import GestaoOcorrenciasView from '@/paginas/gestao/GestaoOcorrenciasView.vue';
+import GestaoInfrequenciasView from '@/paginas/gestao/GestaoInfrequenciasView.vue';
 import GestaoJustificativasView from '@/paginas/gestao/GestaoJustificativasView.vue';
 import GestaoUsuariosView from '@/paginas/gestao/UsuariosView.vue';
 import GestaoUsuarioFormView from '@/paginas/gestao/UsuarioFormView.vue';
@@ -122,6 +123,12 @@ const router = createRouter({
           name: 'gestao-ocorrencias',
           meta: { requerAutenticacao: true, papeisPermitidos: ['gestao'] },
           component: GestaoOcorrenciasView,
+        },
+        {
+          path: 'infrequencias',
+          name: 'gestao-infrequencias',
+          meta: { requerAutenticacao: true, papeisPermitidos: ['gestao'] },
+          component: GestaoInfrequenciasView,
         },
         {
           path: 'justificativas',

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useMonitoramento } from '@/composables/useMonitoramento';
 import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh';
@@ -11,7 +11,8 @@ import type { JustificativaPendente } from '@/tipos/componentes';
 const router = useRouter();
 const { usuario } = useAutenticacao();
 const { buscarJustificativasPendentes, validarJustificativa } = useMonitoramento();
-const { ultimaAtualizacao, estaAtualizando, atualizar: refresh } = useRealtimeRefresh();
+const { ultimaAtualizacao, estaAtualizando, atualizar: refresh, inscrever, encerrar } =
+  useRealtimeRefresh();
 
 const justificativas = ref<JustificativaPendente[]>([]);
 const mensagemSucesso = ref<string | null>(null);
@@ -78,6 +79,11 @@ async function atualizarManual() {
 
 onMounted(async () => {
   await processarJustificativas();
+  await inscrever([{ tabela: 'justificativas_faltas' }], processarJustificativas);
+});
+
+onUnmounted(() => {
+  encerrar();
 });
 </script>
 

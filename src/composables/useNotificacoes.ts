@@ -9,8 +9,15 @@ const naoLidasOutros: Ref<number> = ref(0);
 const notificacoes: Ref<NotificacaoItem[]> = ref([]);
 const carregando: Ref<boolean> = ref(false);
 
+const ATRASO_DEBOUNCE_MS = 500;
+const ATRASO_MAXIMO_RECONEXAO_MS = 15000;
+
 let canal: ReturnType<typeof supabaseClient.channel> | null = null;
 let usuarioId: string | null = null;
+let timerRecarga: ReturnType<typeof setTimeout> | null = null;
+let timerReconexao: ReturnType<typeof setTimeout> | null = null;
+let tentativasReconexao = 0;
+let ouvinteVisibilidadeRegistrado = false;
 
 const ICONE_TIPO: Record<string, string> = {
   mensagem: 'chat-dots',
@@ -75,6 +82,109 @@ async function carregar() {
   }
 }
 
+function recarregarDebounced() {
+  if (!usuarioId || timerRecarga) return;
+  timerRecarga = setTimeout(() => {
+    timerRecarga = null;
+    void carregar();
+  }, ATRASO_DEBOUNCE_MS);
+}
+
+async function garantirTokenRealtime() {
+  const {
+    data: { session },
+  } = await supabaseClient.auth.getSession();
+  if (session?.access_token) {
+    supabaseClient.realtime.setAuth(session.access_token);
+  }
+}
+
+function aoMudarVisibilidade() {
+  if (document.visibilityState === 'visible' && usuarioId) {
+    void carregar();
+  }
+}
+
+function agendarReconexao() {
+  if (!usuarioId || timerReconexao) return;
+  const atraso = Math.min(1000 * 2 ** tentativasReconexao, ATRASO_MAXIMO_RECONEXAO_MS);
+  tentativasReconexao += 1;
+  timerReconexao = setTimeout(() => {
+    timerReconexao = null;
+    if (!usuarioId) return;
+    const id = usuarioId;
+    desinscreverCanal();
+    void inscrever(id);
+  }, atraso);
+}
+
+function desinscreverCanal() {
+  if (canal) {
+    supabaseClient.removeChannel(canal);
+    canal = null;
+  }
+}
+
+async function inscrever(userId: string) {
+  if (canal && usuarioId === userId) return;
+  usuarioId = userId;
+  tentativasReconexao = 0;
+
+  await garantirTokenRealtime();
+
+  canal = supabaseClient
+    .channel('notificacoes-global')
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'notificacoes',
+        filter: `destinatario_id=eq.${userId}`,
+      },
+      recarregarDebounced,
+    )
+    .subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        tentativasReconexao = 0;
+        void carregar();
+      } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        agendarReconexao();
+      }
+    });
+}
+
+async function iniciar(userId: string) {
+  if (canal && usuarioId === userId) return;
+  desinscreverCanal();
+  usuarioId = userId;
+  carregar();
+
+  if (!ouvinteVisibilidadeRegistrado && typeof document !== 'undefined') {
+    ouvinteVisibilidadeRegistrado = true;
+    document.addEventListener('visibilitychange', aoMudarVisibilidade);
+  }
+
+  await inscrever(userId);
+}
+
+function parar() {
+  if (timerRecarga) {
+    clearTimeout(timerRecarga);
+    timerRecarga = null;
+  }
+  if (timerReconexao) {
+    clearTimeout(timerReconexao);
+    timerReconexao = null;
+  }
+  desinscreverCanal();
+  usuarioId = null;
+  tentativasReconexao = 0;
+  naoLidasMensagens.value = 0;
+  naoLidasOutros.value = 0;
+  notificacoes.value = [];
+}
+
 async function marcarTodasComoLidas() {
   if (!usuarioId) return;
   await supabaseClient
@@ -97,37 +207,6 @@ async function marcarLida(id: string) {
     .update({ lida: true, lida_em: new Date().toISOString() })
     .eq('id', id);
   await carregar();
-}
-
-function iniciar(userId: string) {
-  if (canal) return;
-  usuarioId = userId;
-  carregar();
-
-  canal = supabaseClient
-    .channel('notificacoes-global')
-    .on(
-      'postgres_changes',
-      {
-        event: '*',
-        schema: 'public',
-        table: 'notificacoes',
-        filter: `destinatario_id=eq.${userId}`,
-      },
-      () => carregar(),
-    )
-    .subscribe();
-}
-
-function parar() {
-  if (canal) {
-    supabaseClient.removeChannel(canal);
-    canal = null;
-  }
-  usuarioId = null;
-  naoLidasMensagens.value = 0;
-  naoLidasOutros.value = 0;
-  notificacoes.value = [];
 }
 
 export function useNotificacoes() {

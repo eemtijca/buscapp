@@ -13,6 +13,12 @@ if (!supabaseUrl || !supabasePublishableKey) {
 
 export const supabaseClient: SupabaseClient = createClient(supabaseUrl, supabasePublishableKey, {
   auth: { storage: armazenamento },
+  realtime: {
+    worker: true,
+    heartbeatCallback(status) {
+      if (status === 'disconnected') void supabaseClient.realtime.connect();
+    },
+  },
 });
 
 /** Claims injetadas no JWT via Custom Access Token Hook. */

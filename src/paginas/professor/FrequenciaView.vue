@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch, nextTick } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAutenticacao } from '@/composables/useAutenticacao';
 import { useMonitoramento } from '@/composables/useMonitoramento';
 import { useOpcoesConfiguracao } from '@/composables/useOpcoesConfiguracao';
+import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh';
 import CartaoAlunoFrequencia from '@/componentes/CartaoAlunoFrequencia.vue';
 import GrupoCheckbox from '@/componentes/GrupoCheckbox.vue';
 import type { AlunoFrequencia, OpcaoCheckbox } from '@/tipos/componentes';
@@ -21,6 +22,7 @@ const salvando = ref(false);
 
 const { buscarOpcoes } = useOpcoesConfiguracao();
 const opcoesPeriodos = ref<OpcaoCheckbox[]>([]);
+const { inscrever, encerrar } = useRealtimeRefresh();
 
 const alunosFiltrados = computed(() => {
   if (!buscaAluno.value.trim()) return alunos.value;
@@ -89,6 +91,11 @@ async function carregarAlunos() {
 onMounted(async () => {
   opcoesPeriodos.value = await buscarOpcoes('periodo');
   await carregarAlunos();
+  await inscrever([{ tabela: 'frequencias' }], carregarAlunos);
+});
+
+onUnmounted(() => {
+  encerrar();
 });
 
 watch(dataAula, () => {

@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { onMounted, onUnmounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAutenticacao } from '@/composables/useAutenticacao';
 import { useMonitoramento } from '@/composables/useMonitoramento';
+import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh';
 import TermometroRisco from '@/componentes/TermometroRisco.vue';
 import type { Aluno } from '@/tipos/database';
 import type { TermometroAtencao } from '@/tipos/componentes';
@@ -10,6 +11,7 @@ import type { TermometroAtencao } from '@/tipos/componentes';
 const router = useRouter();
 const { usuario } = useAutenticacao();
 const { buscarFilhosDoResponsavel, buscarTermometroAluno } = useMonitoramento();
+const { inscrever, encerrar } = useRealtimeRefresh();
 
 const filhos = ref<Aluno[]>([]);
 const filhoSelecionado = ref<Aluno | null>(null);
@@ -21,6 +23,16 @@ async function selecionarFilho(filho: Aluno) {
   termometro.value = await buscarTermometroAluno(filho.id, filho.nome, '');
 }
 
+async function recarregarTermometro() {
+  if (filhoSelecionado.value) {
+    termometro.value = await buscarTermometroAluno(
+      filhoSelecionado.value.id,
+      filhoSelecionado.value.nome,
+      '',
+    );
+  }
+}
+
 onMounted(async () => {
   if (usuario.value) {
     filhos.value = await buscarFilhosDoResponsavel(usuario.value.id);
@@ -28,8 +40,13 @@ onMounted(async () => {
     if (primeiro) {
       await selecionarFilho(primeiro);
     }
+    await inscrever([{ tabela: 'frequencias' }, { tabela: 'ocorrencias' }], recarregarTermometro);
   }
   carregando.value = false;
+});
+
+onUnmounted(() => {
+  encerrar();
 });
 </script>
 

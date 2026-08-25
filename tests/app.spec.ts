@@ -606,6 +606,9 @@ test.describe('Gestão - Usuários - Código no cadastro', () => {
   test('CT29 - Criar usuário valida campos obrigatórios', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/usuarios/novo');
+    // O formulário só existe após o carregamento das opções (v-else); sem essa
+    // espera o novalidate não é injetado e a validação nativa bloqueia o envio.
+    await page.waitForSelector('form');
     await page.evaluate(() => {
       const form = document.querySelector('form');
       if (form) form.setAttribute('novalidate', '');
@@ -1177,13 +1180,13 @@ test.describe('Gestão - Integridade de catálogo', () => {
       }
       await expect(card.locator('#campoNovaTurma')).toBeVisible({ timeout: 3000 });
     }).toPass();
-    await card.locator('#campoNovaTurma').selectOption({ label: '3º C' });
+    await card.locator('#campoNovaTurma').selectOption({ label: '3ª C' });
     await card.locator('#campoNovaDataMat').fill('2026-08-01');
     await card.getByRole('button', { name: 'Salvar' }).click();
     await expect(card.getByRole('button', { name: 'Alterar enturmação' })).toBeVisible({
       timeout: 15000,
     });
-    await expect(card).toContainText('3º C');
+    await expect(card).toContainText('3ª C');
 
     const query =
       `${URL_SUPABASE}/rest/v1/enturmacoes?select=turma_id,status,ano_letivo_id` +
@@ -1424,8 +1427,11 @@ test.describe('Gestão — Chat', () => {
     const items = page.locator('.chat-sidebar button');
     if ((await items.count()) > 0) {
       await items.first().click();
-      await page.waitForTimeout(1000);
-      await expect(page.locator('i.bi-check2-all, i.bi-check2').first()).toBeVisible();
+      // O histórico da conversa selecionada deve exibir ao menos uma mensagem
+      // (não assumimos indicador de leitura: só aparece em mensagens próprias)
+      await expect(
+        page.locator('.chat-messages .rounded-3').first(),
+      ).toBeVisible({ timeout: 10000 });
     }
   });
 
@@ -2097,6 +2103,9 @@ test.describe('Códigos — Limpar não ativos', () => {
 });
 
 test.describe('Códigos — Copiar ao clicar', () => {
+  // grantPermissions de clipboard só é suportado pelo Chromium no Playwright
+  test.skip(({ browserName }) => browserName !== 'chromium', 'Clipboard API apenas no Chromium');
+
   test('CT127 - Clique no código do modal copia e dá feedback', async ({ page, context }) => {
     await context.grantPermissions(['clipboard-read', 'clipboard-write'], {
       origin: 'http://localhost:5173',
@@ -2292,5 +2301,202 @@ test.describe('Gestão - Anos Letivos', () => {
       .filter({ hasText: String(new Date().getFullYear()) });
     await expect(linhaCorrente.locator('.badge')).toHaveText(/Ativo/i);
     await expect(linhaCorrente.locator('button[title="Ativar (virada de ano)"]')).toBeDisabled();
+  });
+});
+
+// ============================================================================
+// TEMPO REAL (Supabase Realtime) — atualizações sem recarregar a página
+// Insere dados via service role com a tela aberta e verifica que a UI
+// reage sozinha (via postgres_changes), sem interação do usuário.
+// ============================================================================
+test.describe('Tempo real — Atualizações sem reload', () => {
+  const GESTAO_ID = 'a0000000-0000-0000-0000-000000000001';
+  const ALUNO_ID = 'e0000000-0000-0000-0000-000000000001';
+  const TURMA_ID = 'd0000000-0000-0000-0000-000000000001';
+  const PROF_ID = 'a0000000-0000-0000-0000-000000000002';
+  const ANO_ID = 'b0000000-0000-0000-0000-000000000001';
+
+  async function apiSeed(url: string, options: RequestInit = {}) {
+    const res = await fetch(`${URL_SUPABASE}${url}`, {
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: SERVICE_KEY,
+        Authorization: `Bearer ${SERVICE_KEY}`,
+        Prefer: 'resolution=merge-duplicates,return=representation',
+      },
+      ...options,
+    });
+    if (!res.ok) throw new Error(`Setup ${options.method ?? 'GET'} ${url}: ${res.status}`);
+    return res;
+  }
+
+  test('CT140 - Alertas do responsável aparecem em tempo real', async ({ page }) => {
+    const DATA = '2026-12-05';
+    const FREQ_ID = '30000000-0000-0000-0000-000000001401';
+
+    // Estado limpo para a data do teste
+    await apiSeed(
+      `/rest/v1/frequencias?aluno_id=eq.${ALUNO_ID}&data_aula=eq.${DATA}`,
+      { method: 'DELETE' },
+    );
+
+    await login(page, 'resp1@email.com', SENHA_RESP);
+    await page.goto('/responsavel/alertas');
+    await expect(page.getByRole('heading', { name: 'Alertas' })).toBeVisible();
+    // Aguarda o handshake do canal Realtime antes de inserir o evento
+    await page.waitForTimeout(2500);
+    await expect(page.locator('.card').filter({ hasText: '05/12/2026' })).toHaveCount(0);
+
+    // Simula registro externo de ausência (professor/gestão)
+    try {
+      await apiSeed('/rest/v1/frequencias?on_conflict=client_request_id', {
+        method: 'POST',
+        body: JSON.stringify({
+          id: FREQ_ID,
+          client_request_id: FREQ_ID,
+          aluno_id: ALUNO_ID,
+          professor_id: PROF_ID,
+          turma_id: TURMA_ID,
+          ano_letivo_id: ANO_ID,
+          data_aula: DATA,
+          periodo: 'Manhã',
+          tipo_registro: 'chamada_aula',
+          status: 'ausente',
+        }),
+      });
+
+      // O card deve surgir SEM reload (assinatura postgres_changes)
+      await expect(page.locator('.card').filter({ hasText: '05/12/2026' })).toBeVisible({
+        timeout: 15000,
+      });
+    } finally {
+      await apiSeed(
+        `/rest/v1/frequencias?id=eq.${FREQ_ID}&aluno_id=eq.${ALUNO_ID}&data_aula=eq.${DATA}`,
+        { method: 'DELETE' },
+      );
+    }
+  });
+
+  test('CT141 - Notificações chegam em tempo real no sino', async ({ page }) => {
+    const TITULO = `E2E Realtime ${Date.now()}`;
+
+    await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
+    await page.goto('/gestao');
+    await expect(page.getByText('Ranking de risco')).toBeVisible();
+    // Aguarda o handshake do canal Realtime antes de inserir o evento
+    await page.waitForTimeout(2500);
+
+    // Abre o popover ANTES de inserir: o item deve chegar com o canal aberto
+    await page.locator('button[aria-label="Notificações"]').click();
+    const notifMenu = page.locator('.notif-menu');
+    await expect(notifMenu).toBeVisible();
+
+    try {
+      await apiSeed('/rest/v1/notificacoes', {
+        method: 'POST',
+        body: JSON.stringify({
+          destinatario_id: GESTAO_ID,
+          tipo: 'sistema',
+          titulo: TITULO,
+          corpo: 'Teste de chegada em tempo real.',
+        }),
+      });
+
+      await expect(notifMenu.getByText(TITULO)).toBeVisible({ timeout: 15000 });
+    } finally {
+      await apiSeed(`/rest/v1/notificacoes?titulo=eq.${encodeURIComponent(TITULO)}`, {
+        method: 'DELETE',
+      }).catch(() => {});
+    }
+  });
+
+  test('CT142 - Ocorrências da gestão atualizam em tempo real', async ({ page }) => {
+    const TITULO = 'E2E Realtime';
+    const DESCRICAO = `Fluxo em tempo real ${Date.now()}`;
+
+    // Limpa artefatos de execuções anteriores
+    await apiSeed(`/rest/v1/ocorrencias?titulo=eq.${TITULO}`, { method: 'DELETE' });
+
+    await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
+    await page.goto('/gestao/ocorrencias');
+    await expect(page.getByText('Ocorrências graves e suspensões')).toBeVisible();
+    // Aguarda o handshake do canal Realtime antes de inserir o evento
+    await page.waitForTimeout(2500);
+    await expect(page.locator('article').filter({ hasText: DESCRICAO })).toHaveCount(0);
+
+    try {
+      await apiSeed('/rest/v1/ocorrencias', {
+        method: 'POST',
+        body: JSON.stringify({
+          aluno_id: ALUNO_ID,
+          professor_id: PROF_ID,
+          turma_id: TURMA_ID,
+          ano_letivo_id: ANO_ID,
+          titulo: TITULO,
+          descricao: DESCRICAO,
+          tipo: ['grave'],
+          tags_comportamento: [],
+        }),
+      });
+
+      await expect(page.locator('article').filter({ hasText: DESCRICAO })).toBeVisible({
+        timeout: 15000,
+      });
+    } finally {
+      await apiSeed(`/rest/v1/ocorrencias?titulo=eq.${TITULO}`, { method: 'DELETE' });
+    }
+  });
+
+  test('CT143 - Lista de frequência do professor atualiza em tempo real', async ({ page }) => {
+    await login(page, 'prof1@escola.edu.br', SENHA_PROF);
+    await page.goto('/professor/frequencia');
+    await page.waitForSelector('.card-body .card');
+
+    const DATA = await page.locator('input[type="date"]').inputValue();
+    await apiSeed(
+      `/rest/v1/frequencias?aluno_id=eq.${ALUNO_ID}&data_aula=eq.${DATA}&tipo_registro=eq.chamada_aula`,
+      { method: 'DELETE' },
+    );
+
+    // Recarrega para refletir o estado limpo (aluno Presente)
+    await page.reload();
+    await page.waitForSelector('.card-body .card');
+    // Aguarda o handshake do canal Realtime antes de inserir o evento
+    await page.waitForTimeout(2500);
+    const btnAusenteJoao = page.getByRole('button', {
+      name: 'Marcar João Miguel da Silva como ausente',
+    });
+    await expect(btnAusenteJoao).toBeVisible();
+
+    try {
+      // Registro externo de ausência deve virar o cartão sem reload
+      const novoId = crypto.randomUUID();
+      await apiSeed('/rest/v1/frequencias?on_conflict=client_request_id', {
+        method: 'POST',
+        body: JSON.stringify({
+          id: novoId,
+          client_request_id: novoId,
+          aluno_id: ALUNO_ID,
+          professor_id: PROF_ID,
+          turma_id: TURMA_ID,
+          ano_letivo_id: ANO_ID,
+          data_aula: DATA,
+          periodo: 'Manhã',
+          tipo_registro: 'chamada_aula',
+          status: 'ausente',
+        }),
+      });
+
+      await expect(
+        page.getByRole('button', { name: 'Marcar João Miguel da Silva como presente' }),
+      ).toBeVisible({
+        timeout: 15000,
+      });
+    } finally {
+      await apiSeed(
+        `/rest/v1/frequencias?aluno_id=eq.${ALUNO_ID}&data_aula=eq.${DATA}&tipo_registro=eq.chamada_aula`,
+        { method: 'DELETE' },
+      );
+    }
   });
 });

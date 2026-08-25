@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useMonitoramento } from '@/composables/useMonitoramento';
 import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh';
@@ -8,7 +8,8 @@ import type { AlunoRisco } from '@/tipos/componentes';
 
 const router = useRouter();
 const { buscarRankingRisco, abrirConversaResponsavel, carregando } = useMonitoramento();
-const { ultimaAtualizacao, estaAtualizando, atualizar: refresh } = useRealtimeRefresh();
+const { ultimaAtualizacao, estaAtualizando, atualizar: refresh, inscrever, encerrar } =
+  useRealtimeRefresh();
 
 const ranking = ref<AlunoRisco[]>([]);
 const filtroRisco = ref<'todos' | 'alto' | 'medio' | 'baixo'>('todos');
@@ -63,6 +64,11 @@ async function atualizarManual() {
 
 onMounted(async () => {
   await carregarRanking();
+  await inscrever([{ tabela: 'frequencias' }, { tabela: 'ocorrencias' }], carregarRanking);
+});
+
+onUnmounted(() => {
+  encerrar();
 });
 </script>
 

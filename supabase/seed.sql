@@ -95,32 +95,39 @@ $$;
 -- 2. ATUALIZAR PERFIS (dados complementares criados pelo trigger)
 -- ============================================================================
 update public.perfis set
-  nome = 'Carlos Administrador', telefone = '(85) 99999-0001', cargo = 'Diretor Escolar', status = 'ativo'
-where id = 'a0000000-0000-0000-0000-000000000001' and nome = 'gestao';
+  nome = 'Carlos Administrador', telefone = '(85) 99999-0001', cargo = 'Diretor Escolar', status = 'ativo',
+  acesso_modulos = array['frequencia', 'ocorrencias']
+where id = 'a0000000-0000-0000-0000-000000000001';
 
 update public.perfis set
-  nome = 'Ana Professora', telefone = '(85) 99999-0002', cargo = 'Professora de Português', status = 'ativo'
-where id = 'a0000000-0000-0000-0000-000000000002' and nome = 'prof1';
+  nome = 'Ana Professora', telefone = '(85) 99999-0002', cargo = 'Professora de Português', status = 'ativo',
+  acesso_modulos = array['frequencia', 'ocorrencias']
+where id = 'a0000000-0000-0000-0000-000000000002';
 
 update public.perfis set
-  nome = 'Bruno Professor', telefone = '(85) 99999-0003', cargo = 'Professor de Matemática', status = 'ativo'
-where id = 'a0000000-0000-0000-0000-000000000003' and nome = 'prof2';
+  nome = 'Bruno Professor', telefone = '(85) 99999-0003', cargo = 'Professor de Matemática', status = 'ativo',
+  acesso_modulos = array['frequencia']
+where id = 'a0000000-0000-0000-0000-000000000003';
 
 update public.perfis set
-  nome = 'Carla Docente', telefone = '(85) 99999-0004', status = 'pendente'
-where id = 'a0000000-0000-0000-0000-000000000004' and nome = 'prof3';
+  nome = 'Carla Docente', telefone = '(85) 99999-0004', status = 'pendente',
+  acesso_modulos = array['frequencia', 'ocorrencias']
+where id = 'a0000000-0000-0000-0000-000000000004';
 
 update public.perfis set
-  nome = 'Maria Silva', telefone = '(85) 99999-0005', status = 'ativo'
-where id = 'a0000000-0000-0000-0000-000000000005' and nome = 'resp1';
+  nome = 'Maria Silva', telefone = '(85) 99999-0005', status = 'ativo',
+  acesso_modulos = array['frequencia', 'ocorrencias']
+where id = 'a0000000-0000-0000-0000-000000000005';
 
 update public.perfis set
-  nome = 'João Santos', telefone = '(85) 99999-0006', status = 'pendente'
-where id = 'a0000000-0000-0000-0000-000000000006' and nome = 'resp2';
+  nome = 'João Santos', telefone = '(85) 99999-0006', status = 'pendente',
+  acesso_modulos = array['frequencia', 'ocorrencias']
+where id = 'a0000000-0000-0000-0000-000000000006';
 
 update public.perfis set
-  nome = 'Lucia Oliveira', telefone = '(85) 99999-0007', status = 'ativo'
-where id = 'a0000000-0000-0000-0000-000000000007' and nome = 'resp3';
+  nome = 'Lucia Oliveira', telefone = '(85) 99999-0007', status = 'ativo',
+  acesso_modulos = array['frequencia', 'ocorrencias']
+where id = 'a0000000-0000-0000-0000-000000000007';
 -- ============================================================================
 -- 3. ANO LETIVO VIGENTE
 -- ============================================================================

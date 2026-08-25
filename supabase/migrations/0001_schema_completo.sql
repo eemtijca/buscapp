@@ -692,6 +692,23 @@ as $$
   limit 1;
 $$;
 
+-- Módulos de acesso habilitados para o usuário corrente (perfis.acesso_modulos).
+-- Lista vazia significa nenhum módulo (fail-closed): o seed e o formulário de
+-- usuários populam explicitamente os módulos permitidos.
+create or replace function public.get_user_acesso_modulos()
+returns text[]
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(acesso_modulos, '{}'::text[])
+  from public.perfis
+  where id = auth.uid()
+    and status = 'ativo'
+  limit 1;
+$$;
+
 create or replace function public.is_professor_da_turma(p_turma_id uuid)
 returns boolean
 language sql
@@ -1038,6 +1055,7 @@ create policy "Freq: professor le da sua turma"
   using (
     public.get_user_papel() = 'professor'
     and public.is_professor_da_turma(turma_id)
+    and 'frequencia' = any(public.get_user_acesso_modulos())
   );
 
 create policy "Freq: responsavel le do dependente"
@@ -1054,6 +1072,7 @@ create policy "Freq: professor insere"
   with check (
     public.get_user_papel() = 'professor'
     and professor_id = auth.uid()
+    and 'frequencia' = any(public.get_user_acesso_modulos())
   );
 
 create policy "Freq: gestao insere"
@@ -1148,6 +1167,7 @@ create policy "Ocorr: professor le da sua turma"
   using (
     public.get_user_papel() = 'professor'
     and public.is_professor_da_turma(turma_id)
+    and 'ocorrencias' = any(public.get_user_acesso_modulos())
   );
 
 create policy "Ocorr: responsavel le do dependente"
@@ -1164,6 +1184,7 @@ create policy "Ocorr: professor insere"
   with check (
     public.get_user_papel() = 'professor'
     and professor_id = auth.uid()
+    and 'ocorrencias' = any(public.get_user_acesso_modulos())
   );
 
 create policy "Ocorr: gestao insere"
@@ -1998,7 +2019,11 @@ grant execute on function public.fn_criar_usuario to authenticated;
 create policy "Freq: professor deleta proprias"
   on public.frequencias for delete
   to authenticated
-  using (professor_id = auth.uid() and public.get_user_papel() = 'professor');
+  using (
+    professor_id = auth.uid()
+    and public.get_user_papel() = 'professor'
+    and 'frequencia' = any(public.get_user_acesso_modulos())
+  );
 
 create policy "Freq: gestao deleta"
   on public.frequencias for delete

@@ -1,39 +1,10 @@
--- ============================================================================
--- BUSCAPP — SCHEMA COMPLETO DO BANCO DE DADOS (migration única)
--- Projeto: BuscApp — EEMTI | Prevenção à evasão escolar
--- ============================================================================
--- Este arquivo é a ÚNICA migration do projeto: contém todo o schema versionado
--- (tabelas, enums, funções, RLS, views, índices, integridade e dados canônicos),
--- resultado do squash das migrations 0001–0005.
---
--- Requisitos cobertos: RF01–RF29 e RD01–RD04 (ver README.md).
---
--- Execução:
---   Local/dev ..... npx supabase db reset           (aplica esta migration + seed)
---   CI ............ supabase db reset --linked --no-seed --yes
---   Produção ...... workflow "Reset Database" ou npx supabase db push
---
--- Convenções deste arquivo:
---   * Numeração hierárquica estável de seções (N e N.M); as tabelas e funções
---     de redefinição de senha estão nas seções 23 e 28 por coesão temática;
---   * Comentários explicam o PORQUÊ das decisões, não o que o SQL faz;
---   * Segurança sempre explícita: security definer/invoker, search_path vazio,
---     policies RLS com USING/WITH CHECK e grants por papel;
---   * Dados canônicos tornam o sistema operacional out-of-the-box, inclusive em
---     ambientes sem seed (CI/produção). Dados de PESSOAS nunca são pré-
---     preenchidos aqui — ficam restritos ao seed de desenvolvimento;
---   * Tudo é editável pela gestão pela aplicação após a instalação.
--- ============================================================================
+-- Migration unica do schema BuscApp (EEMTI): cobre RF01 a RF29 e RD01 a RD04; convenções e detalhes no README.
 
--- ============================================================================
 -- 1. EXTENSÕES
--- ============================================================================
 create extension if not exists pgcrypto;
 create extension if not exists pg_trgm;
 
--- ============================================================================
 -- 2. TIPOS ENUMERADOS
--- ============================================================================
 create type public.papel_perfil as enum ('professor', 'gestao', 'responsavel');
 create type public.status_perfil as enum ('ativo', 'pendente', 'inativo');
 create type public.status_aluno as enum ('ativo', 'egresso', 'transferido', 'inativo');
@@ -49,9 +20,7 @@ create type public.tipo_notificacao as enum ('ausencia_portao', 'ausencia_aula',
 create type public.status_importacao as enum ('processando', 'concluido', 'parcial', 'falhou');
 create type public.status_exportacao as enum ('agendada', 'processando', 'concluida', 'falhou');
 
--- ============================================================================
 -- 3. FUNÇÕES AUXILIARES DE INFRAESTRUTURA (antes das tabelas que as referenciam)
--- ============================================================================
 
 create or replace function public.fn_set_updated_at()
 returns trigger
@@ -63,9 +32,7 @@ begin
 end;
 $$;
 
--- ============================================================================
--- 4. TABELAS — CAMADA DE DOMÍNIO E CONFIGURAÇÃO
--- ============================================================================
+-- 4. TABELAS: CAMADA DE DOMÍNIO E CONFIGURAÇÃO
 
 -- 4.1 anos_letivos
 create table public.anos_letivos (
@@ -135,9 +102,7 @@ create table public.disciplinas (
 
 comment on table public.disciplinas is 'RD04: Catálogo de disciplinas com código SIGE para compatibilidade SEDUC.';
 
--- ============================================================================
--- 5. TABELAS — ENTIDADES PRINCIPAIS
--- ============================================================================
+-- 5. TABELAS: ENTIDADES PRINCIPAIS
 
 -- 5.1 perfis
 create table public.perfis (
@@ -264,9 +229,7 @@ create table public.atribuicoes_professores (
 
 comment on table public.atribuicoes_professores is 'RF21: Professor titular ou substituto com janela temporal.';
 
--- ============================================================================
--- 6. TABELAS — CATÁLOGOS (TAGS E OPÇÕES CONFIGURÁVEIS)
--- ============================================================================
+-- 6. TABELAS: CATÁLOGOS (TAGS E OPÇÕES CONFIGURÁVEIS)
 
 create table public.tags_comportamento (
   id              uuid          primary key default gen_random_uuid(),
@@ -283,9 +246,7 @@ create table public.tags_comportamento (
 
 comment on table public.tags_comportamento is 'RF16: Catálogo de chips/tags de comportamento. peso_pontuacao usado na gamificação (RF28).';
 
--- ============================================================================
 -- 6.1 opcoes_configuracao (catálogo genérico editável pela gestão)
--- ============================================================================
 
 create table public.opcoes_configuracao (
   id          uuid        primary key default gen_random_uuid(),
@@ -302,9 +263,7 @@ create table public.opcoes_configuracao (
 
 comment on table public.opcoes_configuracao is 'Catálogo genérico de opções configuráveis pela gestão (módulos, permissões, documentos, períodos, motivos, vínculos, séries, letras, etc.).';
 
--- ============================================================================
--- 7. TABELAS — OPERACIONAIS (FREQUÊNCIA, COMPORTAMENTO, OCORRÊNCIAS)
--- ============================================================================
+-- 7. TABELAS: OPERACIONAIS (FREQUÊNCIA, COMPORTAMENTO, OCORRÊNCIAS)
 
 -- 7.1 frequencias
 create table public.frequencias (
@@ -383,9 +342,7 @@ create table public.ocorrencias (
 
 comment on table public.ocorrencias is 'Ocorrências graves e suspensões com bloqueio de retorno e workflow de status.';
 
--- ============================================================================
--- 9. TABELAS — ANEXOS (dedicadas, com integridade referencial)
--- ============================================================================
+-- 9. TABELAS: ANEXOS (dedicadas, com integridade referencial)
 
 create table public.anexos (
   id              uuid          primary key default gen_random_uuid(),
@@ -413,9 +370,7 @@ create table public.ocorrencia_anexos (
 
 comment on table public.ocorrencia_anexos is 'Join dedicado: ocorrências → anexos com integridade referencial.';
 
--- ============================================================================
--- 10. TABELAS — JUSTIFICATIVAS
--- ============================================================================
+-- 10. TABELAS: JUSTIFICATIVAS
 
 create table public.justificativas_faltas (
   id              uuid                primary key default gen_random_uuid(),
@@ -444,9 +399,7 @@ create table public.justificativa_anexos (
 
 comment on table public.justificativa_anexos is 'Join dedicado: justificativas → anexos com integridade referencial.';
 
--- ============================================================================
--- 11. TABELAS — COMUNICAÇÃO (CHAT)
--- ============================================================================
+-- 11. TABELAS: COMUNICAÇÃO (CHAT)
 
 create table public.conversas (
   id                    uuid        primary key default gen_random_uuid(),
@@ -483,9 +436,7 @@ create table public.mensagens (
 
 comment on table public.mensagens is 'RF26/RF27: Mensagens textuais. client_request_id para idempotência offline. Bloqueio anti-burnout via trigger.';
 
--- ============================================================================
--- 12. TABELAS — MONITORAMENTO E GAMIFICAÇÃO
--- ============================================================================
+-- 12. TABELAS: MONITORAMENTO E GAMIFICAÇÃO
 
 create table public.monitoramento_acoes (
   id               uuid                 primary key default gen_random_uuid(),
@@ -518,9 +469,7 @@ create table public.pontuacao_turmas (
 
 comment on table public.pontuacao_turmas is 'RF28: Snapshots mensais de pontuação para gamificação interturmas.';
 
--- ============================================================================
--- 13. TABELAS — NOTIFICAÇÕES
--- ============================================================================
+-- 13. TABELAS: NOTIFICAÇÕES
 
 create table public.notificacoes (
   id              uuid             primary key default gen_random_uuid(),
@@ -536,9 +485,7 @@ create table public.notificacoes (
 
 comment on table public.notificacoes is 'Fila de notificações push/in-app para todos os perfis.';
 
--- ============================================================================
--- 14. TABELAS — IMPORTAÇÃO, EXPORTAÇÃO E AUDITORIA
--- ============================================================================
+-- 14. TABELAS: IMPORTAÇÃO, EXPORTAÇÃO E AUDITORIA
 
 create table public.importacoes_log (
   id                  uuid              primary key default gen_random_uuid(),
@@ -595,9 +542,7 @@ create table public.auditoria (
 
 comment on table public.auditoria is 'RD01: Trilha de auditoria LGPD (Art. 14). Rastreia alterações em dados de menores.';
 
--- ============================================================================
--- 15. TABELA — CONVITES
--- ============================================================================
+-- 15. TABELA: CONVITES
 
 create table public.convites (
   id             uuid        primary key default gen_random_uuid(),
@@ -615,9 +560,7 @@ create table public.convites (
 
 comment on table public.convites is 'RF02/RF03: Registro de convites para onboarding via Supabase Admin API.';
 
--- ============================================================================
--- 16. TRIGGERS — UPDATED_AT (gerados dinamicamente)
--- ============================================================================
+-- 16. TRIGGERS: UPDATED_AT (gerados dinamicamente)
 
 do $$
 declare
@@ -642,9 +585,7 @@ begin
 end;
 $$;
 
--- ============================================================================
--- 17. TRIGGER — CRIAÇÃO AUTOMÁTICA DE PERFIL (signup)
--- ============================================================================
+-- 17. TRIGGER: CRIAÇÃO AUTOMÁTICA DE PERFIL (signup)
 
 create or replace function public.fn_handle_new_user()
 returns trigger
@@ -672,11 +613,8 @@ create trigger trg_on_auth_user_created
 
 comment on function public.fn_handle_new_user is 'Cria perfil automaticamente ao registrar em auth.users. Usa raw_user_meta_data apenas no signup inicial (único momento confiável).';
 
--- ============================================================================
 -- 18. ROW LEVEL SECURITY
--- ============================================================================
--- 18.0 Funções auxiliares usadas pelas políticas (security definer para leitura
--- de perfis sem depender de grants do chamador).
+-- Funções auxiliares das políticas com security definer para leitura de perfis sem grants do chamador.
 
 create or replace function public.get_user_papel()
 returns text
@@ -692,9 +630,7 @@ as $$
   limit 1;
 $$;
 
--- Módulos de acesso habilitados para o usuário corrente (perfis.acesso_modulos).
--- Lista vazia significa nenhum módulo (fail-closed): o seed e o formulário de
--- usuários populam explicitamente os módulos permitidos.
+-- Módulos de acesso com fail-closed: lista vazia nega tudo; seed e formulário populam os módulos permitidos.
 create or replace function public.get_user_acesso_modulos()
 returns text[]
 language sql
@@ -802,9 +738,7 @@ alter table public.exportacoes                 enable row level security;
 alter table public.auditoria                   enable row level security;
 alter table public.convites                    enable row level security;
 
--- ============================================================================
 -- 18.1 PERFIS
--- ============================================================================
 
 create policy "Perfis: leitura propria"
   on public.perfis for select
@@ -838,9 +772,7 @@ create policy "Perfis: gestao insere"
   to authenticated
   with check (public.get_user_papel() = 'gestao');
 
--- ============================================================================
 -- 18.2 ANOS LETIVOS
--- ============================================================================
 
 create policy "Anos: leitura autenticados"
   on public.anos_letivos for select
@@ -858,9 +790,7 @@ create policy "Anos: gestao atualiza"
   using (public.get_user_papel() = 'gestao')
   with check (public.get_user_papel() = 'gestao');
 
--- ============================================================================
 -- 18.3 CONFIGURAÇÕES DO SISTEMA
--- ============================================================================
 
 create policy "ConfigSis: leitura autenticados"
   on public.configuracoes_sistema for select
@@ -873,9 +803,7 @@ create policy "ConfigSis: gestao gerencia"
   using (public.get_user_papel() = 'gestao')
   with check (public.get_user_papel() = 'gestao');
 
--- ============================================================================
 -- 18.4 HORÁRIOS LETIVOS
--- ============================================================================
 
 create policy "Horarios: leitura autenticados"
   on public.horarios_letivos for select
@@ -888,9 +816,7 @@ create policy "Horarios: gestao gerencia"
   using (public.get_user_papel() = 'gestao')
   with check (public.get_user_papel() = 'gestao');
 
--- ============================================================================
 -- 18.4.1 OPÇÕES DE CONFIGURAÇÃO
--- ============================================================================
 
 alter table public.opcoes_configuracao enable row level security;
 
@@ -905,9 +831,7 @@ create policy "OpcoesConfig: gestao gerencia"
   using (public.get_user_papel() = 'gestao')
   with check (public.get_user_papel() = 'gestao');
 
--- ============================================================================
 -- 18.5 DISCIPLINAS
--- ============================================================================
 
 create policy "Disciplinas: leitura autenticados"
   on public.disciplinas for select
@@ -920,9 +844,7 @@ create policy "Disciplinas: gestao gerencia"
   using (public.get_user_papel() = 'gestao')
   with check (public.get_user_papel() = 'gestao');
 
--- ============================================================================
 -- 18.6 TURMAS
--- ============================================================================
 
 create policy "Turmas: leitura autenticados"
   on public.turmas for select
@@ -935,9 +857,7 @@ create policy "Turmas: gestao gerencia"
   using (public.get_user_papel() = 'gestao')
   with check (public.get_user_papel() = 'gestao');
 
--- ============================================================================
 -- 18.7 ALUNOS
--- ============================================================================
 
 create policy "Alunos: gestao tudo"
   on public.alunos for all
@@ -969,9 +889,7 @@ create policy "Alunos: responsavel le vinculados"
     and public.is_responsavel_do_aluno(id)
   );
 
--- ============================================================================
 -- 18.8 ENTURMAÇÕES
--- ============================================================================
 
 create policy "Enturm: gestao tudo"
   on public.enturmacoes for all
@@ -995,9 +913,7 @@ create policy "Enturm: responsavel le do dependente"
     and public.is_responsavel_do_aluno(aluno_id)
   );
 
--- ============================================================================
 -- 18.9 VÍNCULOS RESPONSÁVEIS
--- ============================================================================
 
 create policy "Vinculos: responsavel le proprios"
   on public.vinculos_responsaveis for select
@@ -1010,9 +926,7 @@ create policy "Vinculos: gestao tudo"
   using (public.get_user_papel() = 'gestao')
   with check (public.get_user_papel() = 'gestao');
 
--- ============================================================================
 -- 18.10 ATRIBUIÇÕES PROFESSORES
--- ============================================================================
 
 create policy "Atrib: leitura autenticados"
   on public.atribuicoes_professores for select
@@ -1025,9 +939,7 @@ create policy "Atrib: gestao gerencia"
   using (public.get_user_papel() = 'gestao')
   with check (public.get_user_papel() = 'gestao');
 
--- ============================================================================
 -- 18.11 TAGS COMPORTAMENTO
--- ============================================================================
 
 create policy "Tags: leitura autenticados"
   on public.tags_comportamento for select
@@ -1040,9 +952,7 @@ create policy "Tags: gestao gerencia"
   using (public.get_user_papel() = 'gestao')
   with check (public.get_user_papel() = 'gestao');
 
--- ============================================================================
 -- 18.12 FREQUÊNCIAS
--- ============================================================================
 
 create policy "Freq: gestao le todas"
   on public.frequencias for select
@@ -1088,9 +998,7 @@ create policy "Freq: gestao atualiza"
   using (public.get_user_papel() = 'gestao')
   with check (public.get_user_papel() = 'gestao');
 
--- ============================================================================
 -- 18.13 REGISTROS COMPORTAMENTO
--- ============================================================================
 
 create policy "Comport: gestao le todos"
   on public.registros_comportamento for select
@@ -1121,9 +1029,7 @@ create policy "Comport: professor insere"
     and professor_id = auth.uid()
   );
 
--- ============================================================================
 -- 18.14 REGISTRO COMPORTAMENTO TAGS
--- ============================================================================
 
 create policy "CompTags: gestao le todos"
   on public.registro_comportamento_tags for select
@@ -1152,9 +1058,7 @@ create policy "CompTags: professor insere"
     )
   );
 
--- ============================================================================
 -- 18.15 OCORRÊNCIAS
--- ============================================================================
 
 create policy "Ocorr: gestao le todas"
   on public.ocorrencias for select
@@ -1200,9 +1104,7 @@ create policy "Ocorr: gestao atualiza"
   using (public.get_user_papel() = 'gestao')
   with check (public.get_user_papel() = 'gestao');
 
--- ============================================================================
 -- 18.16 ANEXOS
--- ============================================================================
 
 create policy "Anexos: gestao tudo"
   on public.anexos for all
@@ -1220,9 +1122,7 @@ create policy "Anexos: cria proprio"
   to authenticated
   with check (criado_por = auth.uid());
 
--- ============================================================================
 -- 18.17 OCORRENCIA ANEXOS
--- ============================================================================
 
 create policy "OcorrAnexos: gestao tudo"
   on public.ocorrencia_anexos for all
@@ -1246,9 +1146,7 @@ create policy "OcorrAnexos: le quem ve ocorrencia"
     )
   );
 
--- ============================================================================
 -- 18.18 JUSTIFICATIVAS FALTAS
--- ============================================================================
 
 create policy "JustFaltas: responsavel ve proprias"
   on public.justificativas_faltas for select
@@ -1286,9 +1184,7 @@ create policy "JustFaltas: gestao avalia"
   using (public.get_user_papel() = 'gestao')
   with check (public.get_user_papel() = 'gestao');
 
--- ============================================================================
 -- 18.19 JUSTIFICATIVA ANEXOS
--- ============================================================================
 
 create policy "JustAnexos: gestao tudo"
   on public.justificativa_anexos for all
@@ -1313,9 +1209,7 @@ create policy "JustAnexos: gestao le"
   to authenticated
   using (public.get_user_papel() = 'gestao');
 
--- ============================================================================
 -- 18.20 CONVERSAS
--- ============================================================================
 
 create policy "Conv: participante le"
   on public.conversas for select
@@ -1345,9 +1239,7 @@ create policy "Conv: gestao oculta"
   using (public.get_user_papel() = 'gestao')
   with check (public.get_user_papel() = 'gestao' and ativa = false);
 
--- ============================================================================
 -- 18.21 MENSAGENS
--- ============================================================================
 
 create policy "Msg: participante le"
   on public.mensagens for select
@@ -1390,9 +1282,7 @@ create policy "Msg: gestao marca lida"
   using (public.get_user_papel() = 'gestao')
   with check (lida_em is not null);
 
--- ============================================================================
 -- 18.22 MONITORAMENTO AÇÕES
--- ============================================================================
 
 create policy "Monitoramento: gestao tudo"
   on public.monitoramento_acoes for all
@@ -1405,9 +1295,7 @@ create policy "Monitoramento: leitura ampla"
   to authenticated
   using (true);
 
--- ============================================================================
 -- 18.23 PONTUAÇÃO TURMAS
--- ============================================================================
 
 create policy "Pontuacao: leitura autenticados"
   on public.pontuacao_turmas for select
@@ -1420,9 +1308,7 @@ create policy "Pontuacao: gestao gerencia"
   using (public.get_user_papel() = 'gestao')
   with check (public.get_user_papel() = 'gestao');
 
--- ============================================================================
 -- 18.24 NOTIFICAÇÕES
--- ============================================================================
 
 create policy "Notif: destinatario le proprias"
   on public.notificacoes for select
@@ -1434,9 +1320,7 @@ create policy "Notif: sistema cria"
   to authenticated
   with check (public.get_user_papel() in ('gestao', 'professor') or destinatario_id <> auth.uid());
 
--- ============================================================================
 -- 18.25 IMPORTAÇÕES LOG
--- ============================================================================
 
 create policy "Import: gestao tudo"
   on public.importacoes_log for all
@@ -1444,9 +1328,7 @@ create policy "Import: gestao tudo"
   using (public.get_user_papel() = 'gestao')
   with check (public.get_user_papel() = 'gestao');
 
--- ============================================================================
 -- 18.26 EXPORTAÇÕES
--- ============================================================================
 
 create policy "Export: gestao tudo"
   on public.exportacoes for all
@@ -1454,18 +1336,14 @@ create policy "Export: gestao tudo"
   using (public.get_user_papel() = 'gestao')
   with check (public.get_user_papel() = 'gestao');
 
--- ============================================================================
 -- 18.27 AUDITORIA
--- ============================================================================
 
 create policy "Auditoria: gestao le"
   on public.auditoria for select
   to authenticated
   using (public.get_user_papel() = 'gestao');
 
--- ============================================================================
 -- 18.28 CONVITES
--- ============================================================================
 
 create policy "Convites: gestao tudo"
   on public.convites for all
@@ -1473,9 +1351,7 @@ create policy "Convites: gestao tudo"
   using (public.get_user_papel() = 'gestao')
   with check (public.get_user_papel() = 'gestao');
 
--- ============================================================================
 -- 19. VIEWS (security_invoker = true para não bypassar RLS)
--- ============================================================================
 
 -- 19.1 Ranking de Monitoramento (RF12)
 create or replace view public.v_ranking_monitoramento
@@ -1657,9 +1533,7 @@ group by t.id, t.nome_completo, f.data_aula;
 comment on view public.v_gamificacao_ranking is 'RF28: Leaderboard interturmas baseado na pontuação mensal acumulada.';
 comment on view public.v_pontuacao_diaria_turmas is 'RF28: Base para cálculo dos snapshots mensais de gamificação.';
 
--- ============================================================================
 -- 20. ÍNDICES DE PERFORMANCE
--- ============================================================================
 
 -- Frequências
 create index idx_frequencias_aluno_data on public.frequencias (aluno_id, data_aula);
@@ -1744,9 +1618,7 @@ create index idx_auditoria_usuario on public.auditoria (usuario_id, created_at d
 -- Convites
 create index idx_convites_status on public.convites (status, expira_em);
 
--- ============================================================================
--- 21. GRANTS — DATA API (Supabase)
--- ============================================================================
+-- 21. GRANTS: DATA API (Supabase)
 
 -- Leitura para autenticados em todas as tabelas (RLS filtra por linha)
 grant select on all tables in schema public to authenticated;
@@ -1783,9 +1655,7 @@ grant insert on public.pontuacao_turmas to authenticated;
 -- Uso de sequências (se houver)
 grant usage on all sequences in schema public to authenticated;
 
--- ============================================================================
 -- 22. CUSTOM ACCESS TOKEN HOOK
--- ============================================================================
 
 create or replace function public.custom_access_token_hook(event jsonb)
 returns jsonb
@@ -1821,9 +1691,7 @@ grant usage on schema public to supabase_auth_admin;
 grant execute on function public.custom_access_token_hook to supabase_auth_admin;
 revoke execute on function public.custom_access_token_hook from authenticated, anon, public;
 
--- ============================================================================
 -- 22.1 PRE-REQUEST HOOK (JWT enforcement)
--- ============================================================================
 
 create or replace function public.requisicao_exige_jwt()
 returns void
@@ -1859,12 +1727,7 @@ revoke execute on function public.get_user_papel from anon;
 revoke execute on function public.is_professor_da_turma from anon;
 revoke execute on function public.is_responsavel_do_aluno from anon;
 revoke execute on function public.get_turma_do_aluno from anon;
--- ============================================================================
--- ============================================================================
--- 23. REDEFINIÇÃO DE SENHA — CÓDIGOS GERADOS PELA GESTÃO (RF04)
--- ============================================================================
--- Fluxo sem dependência de e-mail: gestão gera código de 6 dígitos, usuário
--- redefine com ele. Funções finais na seção 28; políticas em 23.x abaixo.
+-- Fluxo sem dependência de email: gestão gera código de 6 dígitos; funções finais na seção 28, políticas em 23.x.
 
 -- 23.1 Tabela e índices
 
@@ -1888,9 +1751,7 @@ create index idx_codigos_redefinicao_email on public.codigos_redefinicao(email);
 create index idx_codigos_redefinicao_email_codigo on public.codigos_redefinicao(email, codigo);
 
 
--- ============================================================================
 -- 23.2 Criar usuário (gestão; perfil nasce pendente)
--- ============================================================================
 
 create or replace function public.fn_criar_usuario(
   p_nome      text,
@@ -1948,9 +1809,7 @@ $$;
 comment on function public.fn_criar_usuario is
   'Cria usuário em auth.users com perfil pendente. Apenas gestão. O trigger fn_handle_new_user cria o perfil automaticamente.';
 
--- ============================================================================
 -- 23.3 Políticas RLS
--- ============================================================================
 
 alter table public.codigos_redefinicao enable row level security;
 
@@ -1971,17 +1830,13 @@ create policy "Codigos: usuario ve seus proprios registros"
     )
   );
 
--- ============================================================================
 -- 23.4 Trigger updated_at
--- ============================================================================
 create trigger trg_set_updated_at
   before update on public.codigos_redefinicao
   for each row
   execute function public.fn_set_updated_at();
 
--- ============================================================================
 -- 23.5 Grants
--- ============================================================================
 
 grant select, insert, update on public.codigos_redefinicao to authenticated, service_role;
 
@@ -2000,9 +1855,7 @@ grant select, insert, update, delete on public.conversas to service_role;
 grant select, insert, update, delete on public.mensagens to service_role;
 grant select, insert, update, delete on public.notificacoes to service_role;
 
--- Permissões para o service_role nas tabelas usadas pelas Edge Functions
--- (criar-usuario, redefinir-senha-codigo, processar-anexo, limpar-anexos)
--- e pelo setup de testes via REST API.
+-- Permissões service_role para as Edge Functions (criar-usuario, redefinir-senha-codigo, processar-anexo, limpar-anexos) e setup REST de testes.
 grant select, insert, update, delete on public.perfis to service_role;
 grant select, insert, update, delete on public.anexos to service_role;
 grant select, insert, update, delete on public.ocorrencias to service_role;
@@ -2046,10 +1899,7 @@ create policy "Notif: destinatario deleta proprias"
   to authenticated
   using (destinatario_id = auth.uid());
 
--- ============================================================================
--- ============================================================================
 -- 24. REALTIME PUBLICATION
--- ============================================================================
 -- Tabelas publicadas para assinaturas postgres_changes no frontend.
 
 alter publication supabase_realtime add table public.notificacoes;
@@ -2061,10 +1911,7 @@ alter publication supabase_realtime add table public.justificativas_faltas;
 alter publication supabase_realtime add table public.frequencias;
 alter publication supabase_realtime add table public.conversas;
 alter publication supabase_realtime add table public.mensagens;
--- ============================================================================
--- ============================================================================
--- 25. STORAGE — BUCKET JUSTIFICATIVAS (RF23/RNF04)
--- ============================================================================
+-- 25. STORAGE: BUCKET JUSTIFICATIVAS (RF23/RNF04)
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values (
@@ -2106,9 +1953,7 @@ create policy "JustBucket: gestao update"
   using (bucket_id = 'justificativas' and public.get_user_papel() = 'gestao')
   with check (bucket_id = 'justificativas' and public.get_user_papel() = 'gestao');
 
--- ============================================================================
 -- RLS: Acesso de leitura de anexos pelo responsável
--- ============================================================================
 
 create policy "JustAnexos: responsavel le proprio"
   on public.justificativa_anexos for select
@@ -2130,10 +1975,7 @@ create policy "Anexos: responsavel le proprio"
     and criado_por = auth.uid()
   );
 
--- ============================================================================
--- ============================================================================
 -- 26. TRIGGERS DE DOMÍNIO
--- ============================================================================
 -- 26.1 Auto-justificar frequências ao aceitar a justificativa
 
 create or replace function public.fn_auto_justificar_frequencias()
@@ -2161,7 +2003,6 @@ create trigger trg_auto_justificar_frequencias
   when (new.status = 'aceita' and old.status = 'pendente')
   execute function public.fn_auto_justificar_frequencias();
 
--- ============================================================================
 -- 26.2 Notificar nova mensagem de chat
 
 create or replace function public.fn_notificar_nova_mensagem()
@@ -2212,13 +2053,9 @@ create trigger trg_notificar_nova_mensagem
   for each row
   execute function public.fn_notificar_nova_mensagem();
 
--- ============================================================================
--- 27. INTEGRIDADE — PREVENÇÃO DE DADOS ÓRFÃOS
--- ============================================================================
+-- 27. INTEGRIDADE: PREVENÇÃO DE DADOS ÓRFÃOS
 
--- 27.1 Funções auxiliares de validação de catálogo (usadas nas CHECKs).
--- SECURITY DEFINER: as CHECKs são avaliadas com a role que grava (incluindo
--- service_role nas Edge Functions), que pode não ter SELECT no catálogo.
+-- Validação de catálogo com security definer: as CHECKs avaliam com a role que grava, que pode não ter SELECT no catálogo.
 create or replace function public.fn_chave_catalogo_valida(p_tipo text, p_chave text)
 returns boolean
 language sql
@@ -2303,12 +2140,7 @@ alter table public.ocorrencias
   add constraint chk_ocorrencias_tags_validas
   check (public.fn_tags_validas(tags_comportamento));
 
--- 27.3 Expurgo de anexos e objetos de storage órfãos.
--- O Supabase não permite deletar storage.objects via SQL; o expurgo é feito pela
--- Edge Function "limpar-anexos" (usa a Storage API). O relatório de órfãos abaixo
--- (fn_relatorio_orfas) permite monitorar/auditar as pendências.
--- Agendamento sugerido: cron diário no Dashboard do Supabase chamando
--- /functions/v1/limpar-anexos (com header cron-secret).
+-- Expurgo pela Edge Function limpar-anexos (storage não é removível por SQL); fn_relatorio_orfas audita pendências; agendar cron diário no Dashboard.
 
 -- 27.4 Relatório de referências órfãs (monitoramento).
 create or replace function public.fn_relatorio_orfas()
@@ -2393,12 +2225,7 @@ $$;
 
 grant execute on function public.fn_relatorio_orfas to authenticated;
 
--- ============================================================================
--- 28. HARDENING DOS CÓDIGOS DE REDEFINIÇÃO
--- ============================================================================
--- Endurece o ciclo de vida dos códigos: bloqueio por tentativas por e-mail,
--- validade configurável, revogação com auditoria e limpeza programada.
--- As funções desta seção são as VERSÕES FINAIS vigentes.
+-- Endurece o ciclo dos códigos: bloqueio por tentativas, validade configurável, revogação auditada e limpeza programada; versões finais vigentes.
 
 create table if not exists public.codigos_redefinicao_tentativas (
   email         text        primary key,
@@ -2422,9 +2249,7 @@ create policy "CodTentativas: gestao le"
 grant select on public.codigos_redefinicao_tentativas to authenticated;
 grant select, insert, update, delete on public.codigos_redefinicao_tentativas to service_role;
 
--- ============================================================================
 -- 28.1 Solicitar código (público via Edge Function; suprime só se houver pendência não lida)
--- ============================================================================
 
 create or replace function public.fn_solicitar_codigo_redefinicao(p_email text)
 returns void
@@ -2477,9 +2302,7 @@ $$;
 comment on function public.fn_solicitar_codigo_redefinicao is
   'Cria notificações para os usuários de gestão quando alguém solicita redefinição de senha. Aceita perfis ativo ou pendente. Nova solicitação é suprimida somente se já existir solicitação pendente (não lida) para o perfil.';
 
--- ============================================================================
 -- 28.2 Gerar código (gestão; sempre emite NOVO código, revogando o ativo anterior)
--- ============================================================================
 
 create or replace function public.fn_gerar_codigo_redefinicao(
   p_perfil_id uuid,
@@ -2557,9 +2380,7 @@ $$;
 comment on function public.fn_gerar_codigo_redefinicao is
   'Gera um código NOVO de 6 dígitos, revogando qualquer código ativo anterior do perfil. Aceita perfis ativo ou pendente, marca as solicitações pendentes como atendidas e audita a geração/revogação. Apenas gestão.';
 
--- ============================================================================
 -- 28.3 Revogar código (gestão; registra revogado_em)
--- ============================================================================
 
 create or replace function public.fn_revogar_codigo(p_codigo_id uuid)
 returns void
@@ -2593,9 +2414,7 @@ $$;
 comment on function public.fn_revogar_codigo is
   'Revogação manual de código ativo com auditoria. Define expira_em = now() e registra revogado_em. Lança erro se já usado ou expirado.';
 
--- ============================================================================
 -- 28.4 Anti força bruta (tentativas por e-mail)
--- ============================================================================
 
 create or replace function public.fn_codigo_email_bloqueado(p_email text)
 returns boolean
@@ -2683,9 +2502,7 @@ comment on function public.fn_registrar_tentativa_email is
 comment on function public.fn_limpar_tentativas_email is
   'Limpa o contador de tentativas falhas de um e-mail após uma redefinição bem-sucedida.';
 
--- ============================================================================
 -- 28.5 Grants
--- ============================================================================
 
 grant execute on function public.fn_solicitar_codigo_redefinicao to anon;
 grant execute on function public.fn_gerar_codigo_redefinicao to authenticated;
@@ -2698,13 +2515,7 @@ grant execute on function public.fn_limpar_tentativas_email to authenticated;
 -- mas a tabela nunca teve GRANT de UPDATE para `authenticated` (apenas SELECT).
 grant insert, update on public.configuracoes_sistema to authenticated;
 
--- ============================================================================
--- 28.6 Limpar códigos não ativos (gestão; preserva os ativos)
--- Descrição: Remove permanentemente todos os códigos que não estão mais ativos
---            (usados, expirados ou revogados), preservando os ativos. Retorna a
---            quantidade removida e audita a operação. O histórico permanece na
---            tabela de auditoria (GERAR/REVOGAR/USAR_CODIGO).
--- ============================================================================
+-- Remove permanentemente códigos não ativos, retorna a quantidade removida e audita a operação (GERAR/REVOGAR/USAR_CODIGO).
 
 create or replace function public.fn_limpar_codigos_nao_ativos()
 returns integer
@@ -2743,14 +2554,7 @@ comment on function public.fn_limpar_codigos_nao_ativos is
   'Remove permanentemente códigos não ativos (usados, expirados ou revogados), preservando os ativos. Audita a operação e retorna a quantidade removida. Apenas gestão.';
 
 grant execute on function public.fn_limpar_codigos_nao_ativos to authenticated;
--- ============================================================================
--- 29. DADOS CANÔNICOS OUT-OF-THE-BOX
--- ============================================================================
--- Popula catálogos e configurações para o sistema funcionar imediatamente,
--- inclusive em ambientes sem seed (CI/produção). Tudo é editável pela gestão
--- depois. Nenhum dado de pessoa é pré-preenchido (ver seed.sql).
---
--- Deve permanecer APÓS as constraints de catálogo (seção 27).
+-- Popula catálogos para operação imediata sem seed, editável pela gestão, sem dados de pessoas; permanecer após as constraints da seção 27.
 
 
 insert into public.opcoes_configuracao (tipo, chave, rotulo, icone, ordem, ativo) values
@@ -2807,7 +2611,7 @@ insert into public.opcoes_configuracao (tipo, chave, rotulo, icone, ordem, ativo
   ('letra_turma', 'D', 'D', null, 4, true)
 on conflict (tipo, chave) do nothing;
 
--- 29.1 Horários letivos padrão (RF27 — horário protegido do chat)
+-- 29.1 Horários letivos padrão (RF27: horário protegido do chat)
 -- Segunda a sexta, 07:00–17:00. Ajustável pela gestão em Configurações › Horários.
 insert into public.horarios_letivos (dia_semana, hora_inicio, hora_fim) values
   (1, '07:00', '17:00'),
@@ -2817,7 +2621,7 @@ insert into public.horarios_letivos (dia_semana, hora_inicio, hora_fim) values
   (5, '07:00', '17:00')
 on conflict (dia_semana, hora_inicio, hora_fim) do nothing;
 
--- 29.2 Tags de comportamento (RF16) — base inicial editável pela gestão
+-- 29.2 Tags de comportamento (RF16): base inicial editável pela gestão
 insert into public.tags_comportamento (nome, categoria, icone, descricao, peso_pontuacao) values
   ('Participativo',     'positivo', 'hand-thumbs-up', 'Aluno participou ativamente da aula', 10),
   ('Colaborativo',      'positivo', 'people',         'Trabalhou bem em grupo',             10),
@@ -2833,7 +2637,7 @@ insert into public.tags_comportamento (nome, categoria, icone, descricao, peso_p
   ('Distração com eletrônicos', 'atencao', 'headphones', 'Distração com fones ou outros dispositivos', 0)
 on conflict (nome) do nothing;
 
--- 29.3 Disciplinas (RD04) — matriz curricular base do Ensino Médio (BNCC),
+-- 29.3 Disciplinas (RD04): matriz curricular base do Ensino Médio (BNCC),
 -- com IDs determinísticos e códigos SIGE. Editável pela gestão.
 insert into public.disciplinas (id, nome, codigo_sige, carga_horaria) values
   ('c0000000-0000-0000-0000-000000000001', 'Língua Portuguesa', 'PORT', 160),
@@ -2871,13 +2675,7 @@ where ano = extract(year from current_date)::int
     select 1 from public.anos_letivos where status = 'ativo' and ativo = true
   );
 
--- ============================================================================
--- 30. VIRADA DE ANO LETIVO (RF13/RF25)
--- ============================================================================
--- Ativa um ano planejado arquivando atomicamente o ano ativo vigente,
--- mantendo status e flag consistentes e registrando auditoria.
--- SECURITY DEFINER pois grava em public.auditoria (sem INSERT público para
--- authenticated); EXECUTE revogado de anon/public e concedido a authenticated.
+-- Ativa ano planejado arquivando o vigente com consistência e auditoria; security definer pois grava em public.auditoria.
 
 create or replace function public.ativar_ano_letivo(p_ano_id uuid)
 returns void

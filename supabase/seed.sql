@@ -1,21 +1,7 @@
--- ============================================================
--- Seed: Dados de desenvolvimento para testes
--- ============================================================
---
--- USUÁRIOS PARA TESTE (login com email e senha):
---   gestao@escola.edu.br  |  Carlos Administrador  |  Admin123!
---   prof1@escola.edu.br   |  Ana Professora        |  Prof123!
---   prof2@escola.edu.br   |  Bruno Professor       |  Prof123!
---   prof3@escola.edu.br   |  Carla Docente         |  Prof123!
---   resp1@email.com       |  Maria Silva           |  Resp123!
---   resp2@email.com       |  João Santos           |  Resp123!
---   resp3@email.com       |  Lucia Oliveira        |  Resp123!
--- ============================================================
+-- Dados de desenvolvimento. Usuarios de teste: gestao@escola.edu.br (Admin123!), prof1@escola.edu.br (Prof123!), prof2@escola.edu.br (Prof123!), prof3@escola.edu.br (Prof123!), resp1@email.com (Resp123!), resp2@email.com (Resp123!), resp3@email.com (Resp123!)
 
--- ============================================================================
 -- 1. USUÁRIOS (auth.users)
 -- O trigger fn_handle_new_user cria automaticamente o registro em public.perfis
--- ============================================================================
 do $$
 begin
   if not exists (select 1 from auth.users where email = 'gestao@escola.edu.br') then
@@ -55,9 +41,7 @@ begin
 end;
 $$;
 
--- ============================================================================
 -- 1B. IDENTIDADES (necessário para que o GoTrue reconheça os usuários)
--- ============================================================================
 do $$
 begin
   if not exists (select 1 from auth.identities where user_id = 'a0000000-0000-0000-0000-000000000001') then
@@ -91,9 +75,7 @@ begin
 end;
 $$;
 
--- ============================================================================
 -- 2. ATUALIZAR PERFIS (dados complementares criados pelo trigger)
--- ============================================================================
 update public.perfis set
   nome = 'Carlos Administrador', telefone = '(85) 99999-0001', cargo = 'Diretor Escolar', status = 'ativo',
   acesso_modulos = array['frequencia', 'ocorrencias']
@@ -128,9 +110,7 @@ update public.perfis set
   nome = 'Lucia Oliveira', telefone = '(85) 99999-0007', status = 'ativo',
   acesso_modulos = array['frequencia', 'ocorrencias']
 where id = 'a0000000-0000-0000-0000-000000000007';
--- ============================================================================
 -- 3. ANO LETIVO VIGENTE
--- ============================================================================
 insert into public.anos_letivos (id, ano, status, data_inicio, data_fim, ativo)
 values (
   'b0000000-0000-0000-0000-000000000001',
@@ -141,23 +121,16 @@ values (
   true
 )
 on conflict (ano) do nothing;
--- Configurações, catálogos, horários letivos, tags de comportamento,
--- disciplinas e o ano letivo vigente NÃO são populados aqui: fazem parte dos
--- dados canônicos da migration única (supabase/migrations/0001_schema_completo.sql).
--- Este seed contém EXCLUSIVAMENTE dados de pessoas e atividade para desenvolvimento.
+-- Catalogos e configuracoes ficam nos dados canonicos da migration unica; aqui há apenas pessoas e atividade.
 
--- ============================================================================
 -- 4. TURMAS
--- ============================================================================
 insert into public.turmas (id, ano_letivo_id, serie, letra, capacidade) values
   ('d0000000-0000-0000-0000-000000000001', 'b0000000-0000-0000-0000-000000000001', '1ª', 'A', 40),
   ('d0000000-0000-0000-0000-000000000002', 'b0000000-0000-0000-0000-000000000001', '2ª', 'B', 40),
   ('d0000000-0000-0000-0000-000000000003', 'b0000000-0000-0000-0000-000000000001', '3ª', 'C', 40)
 on conflict (ano_letivo_id, serie, letra) do nothing;
 
--- ============================================================================
 -- 5. ALUNOS
--- ============================================================================
 insert into public.alunos (id, nome, matricula, codigo_inep, status, data_nascimento, data_matricula, observacoes) values
   ('e0000000-0000-0000-0000-000000000001', 'João Miguel da Silva',    'MAT2026001', '23123456', 'ativo',       '2012-03-15', make_date(extract(year from current_date)::int, 2, 1), null),
   ('e0000000-0000-0000-0000-000000000002', 'Maria Clara Santos',      'MAT2026002', '23123457', 'ativo',       '2012-07-22', make_date(extract(year from current_date)::int, 2, 1), null),
@@ -170,9 +143,7 @@ insert into public.alunos (id, nome, matricula, codigo_inep, status, data_nascim
   ('e0000000-0000-0000-0000-000000000009', 'Thiago Vinicius Barbosa', 'MAT2026009', '23123464', 'ativo',       '2010-06-08', make_date(extract(year from current_date)::int, 2, 1), 'Aluno com acompanhamento pedagógico')
 on conflict (matricula) do nothing;
 
--- ============================================================================
 -- 6. ENTURMAÇÕES
--- ============================================================================
 insert into public.enturmacoes (aluno_id, turma_id, ano_letivo_id, status, data_matricula, data_encerramento) values
   ('e0000000-0000-0000-0000-000000000001', 'd0000000-0000-0000-0000-000000000001', 'b0000000-0000-0000-0000-000000000001', 'matriculado',  make_date(extract(year from current_date)::int, 2, 1), null),
   ('e0000000-0000-0000-0000-000000000002', 'd0000000-0000-0000-0000-000000000001', 'b0000000-0000-0000-0000-000000000001', 'matriculado',  make_date(extract(year from current_date)::int, 2, 1), null),
@@ -185,9 +156,7 @@ insert into public.enturmacoes (aluno_id, turma_id, ano_letivo_id, status, data_
   ('e0000000-0000-0000-0000-000000000009', 'd0000000-0000-0000-0000-000000000003', 'b0000000-0000-0000-0000-000000000001', 'matriculado',  make_date(extract(year from current_date)::int, 2, 1), null)
 on conflict (aluno_id, ano_letivo_id) do nothing;
 
--- ============================================================================
 -- 7. ATRIBUIÇÕES PROFESSORES
--- ============================================================================
 insert into public.atribuicoes_professores (professor_id, turma_id, disciplina_id, papel) values
   ('a0000000-0000-0000-0000-000000000002', 'd0000000-0000-0000-0000-000000000001', null, 'titular'),
   ('a0000000-0000-0000-0000-000000000002', 'd0000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000001', 'titular'),
@@ -198,9 +167,7 @@ insert into public.atribuicoes_professores (professor_id, turma_id, disciplina_i
   ('a0000000-0000-0000-0000-000000000003', 'd0000000-0000-0000-0000-000000000002', 'c0000000-0000-0000-0000-000000000002', 'titular'),
   ('a0000000-0000-0000-0000-000000000003', 'd0000000-0000-0000-0000-000000000003', 'c0000000-0000-0000-0000-000000000002', 'titular');
 
--- ============================================================================
 -- 8. VÍNCULOS RESPONSÁVEIS
--- ============================================================================
 insert into public.vinculos_responsaveis (responsavel_id, aluno_id, tipo_relacao, contato_prioritario) values
   ('a0000000-0000-0000-0000-000000000005', 'e0000000-0000-0000-0000-000000000001', 'mae',  true),
   ('a0000000-0000-0000-0000-000000000005', 'e0000000-0000-0000-0000-000000000002', 'mae',  false),
@@ -208,11 +175,7 @@ insert into public.vinculos_responsaveis (responsavel_id, aluno_id, tipo_relacao
   ('a0000000-0000-0000-0000-000000000007', 'e0000000-0000-0000-0000-000000000007', 'mae',  true)
 on conflict (responsavel_id, aluno_id) do nothing;
 
--- ============================================================================
--- 9. FREQUÊNCIAS
--- Gera 5 dias de aula (02 a 06 de março) para alunos ativos,
--- com diferentes padrões de ausência para testar ranking de risco.
--- ============================================================================
+-- Frequencias: cinco dias de aula em marco com padroes variados de ausencia para testar o ranking.
 do $$
 declare
   v_ano_letivo_id uuid := 'b0000000-0000-0000-0000-000000000001';
@@ -297,9 +260,7 @@ begin
 end;
 $$;
 
--- ============================================================================
 -- 10. OCORRÊNCIAS
--- ============================================================================
 insert into public.ocorrencias (aluno_id, professor_id, turma_id, ano_letivo_id, titulo, descricao, tipo, status, data_ocorrencia) values
   (
     'e0000000-0000-0000-0000-000000000003',
@@ -324,9 +285,7 @@ insert into public.ocorrencias (aluno_id, professor_id, turma_id, ano_letivo_id,
     '2026-03-18 15:00:00-03'
   );
 
--- ============================================================================
 -- 11. NOTIFICAÇÕES
--- ============================================================================
 insert into public.notificacoes (destinatario_id, tipo, titulo, corpo, metadados) values
   (
     'a0000000-0000-0000-0000-000000000001',
@@ -364,9 +323,7 @@ insert into public.notificacoes (destinatario_id, tipo, titulo, corpo, metadados
     null
   );
 
--- ============================================================================
 -- 12. CÓDIGOS DE REDEFINIÇÃO
--- ============================================================================
 insert into public.codigos_redefinicao (email, perfil_id, codigo, criado_por, usado_em, expira_em) values
   (
     'resp1@email.com',
@@ -393,9 +350,7 @@ insert into public.codigos_redefinicao (email, perfil_id, codigo, criado_por, us
     now() + interval '2 hours'
   );
 
--- ============================================================================
 -- 13. MONITORAMENTO AÇÕES
--- ============================================================================
 insert into public.monitoramento_acoes (aluno_id, responsavel_id, tipo_contato, status, realizado_por, observacao, agendado_para, realizado_em) values
   (
     'e0000000-0000-0000-0000-000000000003',

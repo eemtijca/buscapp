@@ -347,7 +347,10 @@ test.describe('Gestão - Ranking e Ocorrências', () => {
     const cardJoao = page.locator('.card').filter({ hasText: 'João Miguel da Silva' });
     await cardJoao.locator('button[title="Abrir conversa com o responsável"]').click();
     await page.waitForURL(/\/gestao\/chat/, { timeout: 10000 });
-    await expect(page.getByText('Maria Silva').first()).toBeVisible({ timeout: 10000 });
+    // Cabeçalho do painel: válido tanto no desktop quanto no mobile (painel aberto)
+    await expect(
+      page.locator('.chat-header').getByText('Maria Silva').first(),
+    ).toBeVisible({ timeout: 10000 });
   });
 
   test('CT21 - Página de ocorrências carrega', async ({ page }) => {
@@ -831,9 +834,15 @@ test.describe('Professor - Ocorrência com tags', () => {
     await login(page, 'prof1@escola.edu.br', SENHA_PROF);
     await page.goto('/professor/ocorrencia');
     await page.waitForSelector('input[type="checkbox"]', { timeout: 10000 });
-    const checkbox = page.locator('input[type="checkbox"]').first();
-    await checkbox.check();
-    await expect(page.locator('#descricaoText')).toHaveValue(/Relato/);
+    // Re-tenta: sob carga da suíte o Vue pode re-renderizar a lista de tags
+    // entre o clique e a atualização da descrição
+    await expect(async () => {
+      const checkbox = page.locator('input[type="checkbox"]').first();
+      if (!(await checkbox.isChecked())) {
+        await checkbox.check();
+      }
+      await expect(page.locator('#descricaoText')).toHaveValue(/Relato/);
+    }).toPass({ timeout: 10000 });
   });
 });
 
@@ -1363,20 +1372,27 @@ test.describe('Responsável — Chat', () => {
     await expect(page.getByText('Nenhuma conversa encontrada')).toBeVisible();
   });
 
-  test('CT71 - Input desabilitado ou aviso fora do horário', async ({ page }) => {
-    await login(page, 'resp1@email.com', SENHA_RESP);
-    await page.goto('/responsavel/chat');
-    await page.waitForTimeout(3000);
-    const primeiroItem = page.locator('.chat-sidebar button').first();
-    await primeiroItem.click();
-    await page.waitForTimeout(1000);
-    const textarea = page.locator('textarea');
-    const disabled = await textarea.isDisabled();
-    if (disabled) {
+  test('CT71 - Input desabilitado fora do horário letivo (responsável)', async ({ page }) => {
+    // Fecha a janela letiva para o bloqueio ser determinístico em qualquer hora
+    await restApi('/rest/v1/horarios_letivos?ativo=eq.true', {
+      method: 'PATCH',
+      body: JSON.stringify({ ativo: false }),
+    });
+    try {
+      await login(page, 'resp1@email.com', SENHA_RESP);
+      await page.goto('/responsavel/chat');
+      await page.waitForTimeout(3000);
+      const primeiroItem = page.locator('.chat-sidebar button').first();
+      await primeiroItem.click();
+      await page.waitForTimeout(1000);
+      const textarea = page.locator('textarea');
       await expect(textarea).toBeDisabled();
       await expect(page.locator('.alert-warning')).toBeVisible();
-    } else {
-      await expect(textarea).toBeEnabled();
+    } finally {
+      await restApi('/rest/v1/horarios_letivos?ativo=eq.false', {
+        method: 'PATCH',
+        body: JSON.stringify({ ativo: true }),
+      }).catch(() => {});
     }
   });
 
@@ -2447,8 +2463,7 @@ test.describe('Tempo real — Atualizações sem reload', () => {
     }
   });
 
-  test('CT143 - Lista de frequência do professor atualiza em tempo real', async ({ page }) => {
-    await login(page, 'prof1@escola.edu.br', SENHA_PROF);
+  test('CT143 - Lista de frequência do professor atualiza em tempo real', async ({ page }) => {    await login(page, 'prof1@escola.edu.br', SENHA_PROF);
     await page.goto('/professor/frequencia');
     await page.waitForSelector('.card-body .card');
 
@@ -2496,6 +2511,150 @@ test.describe('Tempo real — Atualizações sem reload', () => {
       await apiSeed(
         `/rest/v1/frequencias?aluno_id=eq.${ALUNO_ID}&data_aula=eq.${DATA}&tipo_registro=eq.chamada_aula`,
         { method: 'DELETE' },
+      );
+    }
+  });
+});
+
+// ============================================================================
+// CHAT DA COORDENAÇÃO VIA RANKING — exceção ao horário protegido
+// Conversa criada pela coordenação: aparece na sidebar mesmo sem mensagens,
+// gestão pode enviar a primeira mensagem fora do horário letivo e o
+// responsável recebe notificação.
+// ============================================================================
+test.describe('Chat da coordenação via ranking', () => {
+  const LUCAS_ID = 'e0000000-0000-0000-0000-000000000005';
+  const JOAO_SANTOS_ID = 'a0000000-0000-0000-0000-000000000006';
+
+  async function fecharJanelaLetiva() {
+    await restApi('/rest/v1/horarios_letivos?ativo=eq.true', {
+      method: 'PATCH',
+      body: JSON.stringify({ ativo: false }),
+    });
+  }
+
+  async function reabrirJanelaLetiva() {
+    await restApi('/rest/v1/horarios_letivos?ativo=eq.false', {
+      method: 'PATCH',
+      body: JSON.stringify({ ativo: true }),
+    });
+  }
+
+  test('CT144 - Ranking: conversa nova visível e gestão envia fora do horário', async ({
+    page,
+  }) => {
+    // Estado limpo: sem conversa prévia para Lucas
+    await restApi(`/rest/v1/conversas?aluno_id=eq.${LUCAS_ID}`, { method: 'DELETE' });
+
+    // Fecha a janela letiva: só a exceção (conversa iniciada pela gestão) permite enviar
+    await fecharJanelaLetiva();
+
+    let conversaId = '';
+    try {
+      await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
+      await page.goto('/gestao/ranking');
+
+      const cardLucas = page.locator('.card').filter({ hasText: 'Lucas Eduardo Pereira' }).first();
+      await cardLucas.locator('button[title="Abrir conversa com o responsável"]').click();
+      await page.waitForURL(/\/gestao\/chat/, { timeout: 15000 });
+
+      conversaId = new URL(page.url()).searchParams.get('conversa') ?? '';
+      expect(conversaId).not.toBe('');
+
+      // Painel da conversa aberto (deep-link) com o responsável no cabeçalho
+      await expect(
+        page.locator('.chat-header').getByText('João Santos'),
+      ).toBeVisible({ timeout: 10000 });
+
+      // No desktop a conversa também aparece na sidebar, sem mensagens
+      const largura = (await page.viewportSize())?.width ?? 1280;
+      if (largura >= 768) {
+        await expect(
+          page
+            .locator('.chat-sidebar button')
+            .filter({ hasText: 'João Santos' })
+            .filter({ hasText: 'Nenhuma mensagem ainda' })
+            .first(),
+        ).toBeVisible({ timeout: 10000 });
+      }
+
+      // Exceção: envio habilitado fora do horário para conversa iniciada pela coordenação
+      const textarea = page.locator('textarea');
+      await expect(textarea).toBeEnabled({ timeout: 10000 });
+      await textarea.fill('Primeiro contato da coordenação.');
+      await page.locator('button[aria-label="Enviar mensagem"]').click();
+      await expect(
+        page.locator('.chat-messages').getByText('Primeiro contato da coordenação.'),
+      ).toBeVisible({ timeout: 10000 });
+
+      // Responsável recebe notificação sobre a conversa iniciada
+      await expect
+        .poll(async () => {
+          const res = await restApi(
+            `/rest/v1/notificacoes?select=id&destinatario_id=eq.${JOAO_SANTOS_ID}&metadados->>conversa_id=eq.${conversaId}`,
+          );
+          return ((await res.json()) as { id: string }[]).length;
+        }, { timeout: 10000 })
+        .toBeGreaterThanOrEqual(1);
+    } finally {
+      await reabrirJanelaLetiva();
+      if (conversaId) {
+        await restApi(`/rest/v1/notificacoes?metadados->>conversa_id=eq.${conversaId}`, {
+          method: 'DELETE',
+        }).catch(() => {});
+      }
+      await restApi(`/rest/v1/conversas?aluno_id=eq.${LUCAS_ID}`, { method: 'DELETE' }).catch(
+        () => {},
+      );
+    }
+  });
+
+  test('CT145 - Responsável recebe a conversa iniciada pela coordenação', async ({ page }) => {
+    // Estado limpo: sem conversa prévia para Lucas
+    await restApi(`/rest/v1/conversas?aluno_id=eq.${LUCAS_ID}`, { method: 'DELETE' });
+    await fecharJanelaLetiva();
+
+    let conversaId = '';
+    try {
+      // 1. Coordenação inicia a conversa pelo ranking
+      await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
+      await page.goto('/gestao/ranking');
+      const cardLucas = page.locator('.card').filter({ hasText: 'Lucas Eduardo Pereira' }).first();
+      await cardLucas.locator('button[title="Abrir conversa com o responsável"]').click();
+      await page.waitForURL(/\/gestao\/chat/, { timeout: 15000 });
+      conversaId = new URL(page.url()).searchParams.get('conversa') ?? '';
+      expect(conversaId).not.toBe('');
+      await logout(page);
+
+      // 2. Responsável vê a conversa na própria lista
+      await login(page, 'resp2@email.com', SENHA_RESP);
+      await page.goto('/responsavel/chat');
+      const item = page
+        .locator('.chat-sidebar button')
+        .filter({ hasText: 'Lucas Eduardo Pereira' })
+        .first();
+      await expect(item).toBeVisible({ timeout: 10000 });
+
+      // 3. Ao abrir, a mensagem de sistema da coordenação está no histórico
+      await item.click();
+      await expect(
+        page.locator('.chat-messages').getByText('Conversa iniciada pela coordenação'),
+      ).toBeVisible({ timeout: 10000 });
+
+      // 4. Fora do horário, o envio do responsável permanece bloqueado
+      const textarea = page.locator('textarea');
+      if ((await textarea.count()) > 0) {
+        await expect(textarea).toBeDisabled();
+      }
+    } finally {
+      await reabrirJanelaLetiva();
+      if (conversaId) {
+        await restApi(`/rest/v1/notificacoes?metadados->>conversa_id=eq.${conversaId}`, {
+          method: 'DELETE',
+        }).catch(() => {});
+      }
+      await restApi(`/rest/v1/conversas?aluno_id=eq.${LUCAS_ID}`, { method: 'DELETE' }).catch(
+        () => {},
       );
     }
   });

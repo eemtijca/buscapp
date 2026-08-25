@@ -449,19 +449,21 @@ comment on table public.justificativa_anexos is 'Join dedicado: justificativas �
 -- ============================================================================
 
 create table public.conversas (
-  id                 uuid        primary key default gen_random_uuid(),
-  turma_id           uuid        not null references public.turmas(id) on delete restrict,
-  responsavel_id     uuid        not null references public.perfis(id) on delete cascade,
-  aluno_id           uuid        not null references public.alunos(id) on delete cascade,
-  assunto            text,
-  ativa              boolean     not null default true,
-  ultima_mensagem_em timestamptz,
-  created_at         timestamptz not null default now(),
-  updated_at         timestamptz not null default now(),
+  id                    uuid        primary key default gen_random_uuid(),
+  turma_id              uuid        not null references public.turmas(id) on delete restrict,
+  responsavel_id        uuid        not null references public.perfis(id) on delete cascade,
+  aluno_id              uuid        not null references public.alunos(id) on delete cascade,
+  assunto               text,
+  ativa                 boolean     not null default true,
+  iniciada_pela_gestao  boolean     not null default false,
+  ultima_mensagem_em    timestamptz,
+  created_at            timestamptz not null default now(),
+  updated_at            timestamptz not null default now(),
   constraint uq_conversa_responsavel_aluno unique (responsavel_id, aluno_id)
 );
 
 comment on table public.conversas is 'RF26: Conversas de chat entre responsável e staff (professor/gestão). Única ativa por par.';
+comment on column public.conversas.iniciada_pela_gestao is 'True quando a conversa foi aberta pela coordenação via ranking de risco: permite à gestão enviar fora do horário protegido.';
 
 create table public.mensagens (
   id                   uuid        primary key default gen_random_uuid(),

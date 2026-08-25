@@ -11,7 +11,7 @@ const props = withDefaults(
     enviando?: boolean;
     tituloChat?: string;
     subtituloChat?: string;
-    meuPapel?: string;
+    podeEnviar?: boolean;
     mostrarBotaoVoltar?: boolean;
     mostrarBotaoFechar?: boolean;
   }>(),
@@ -20,7 +20,7 @@ const props = withDefaults(
     enviando: false,
     tituloChat: 'Coordenação escolar',
     subtituloChat: '',
-    meuPapel: 'responsavel',
+    podeEnviar: true,
     mostrarBotaoVoltar: false,
     mostrarBotaoFechar: false,
   },
@@ -47,7 +47,7 @@ function autoResize() {
 }
 
 function submeter() {
-  if (!texto.value.trim() || props.enviando) return;
+  if (!texto.value.trim() || props.enviando || !props.podeEnviar) return;
   emit('enviar-mensagem', texto.value.trim());
   texto.value = '';
   nextTick(() => autoResize());
@@ -186,7 +186,7 @@ watch(
     </div>
 
     <div
-      v-if="!horarioAtivo && mensagemForaHorario"
+      v-if="!podeEnviar && mensagemForaHorario"
       class="alert alert-warning rounded-0 mb-0 py-2 small flex-shrink-0"
       role="status"
     >
@@ -204,8 +204,11 @@ watch(
             v-model="texto"
             class="form-control form-control-sm"
             rows="1"
-            placeholder="Digite sua mensagem..."
-            :disabled="enviando"
+            :placeholder="
+              podeEnviar ? 'Digite sua mensagem...' : 'Envio bloqueado fora do horário escolar'
+            "
+            :disabled="!podeEnviar || enviando"
+            :aria-disabled="!podeEnviar"
             @input="autoResize"
             @keydown.enter.prevent="submeter"
             style="
@@ -218,8 +221,8 @@ watch(
           <button
             type="submit"
             class="btn btn-primary btn-sm chat-submit-btn flex-shrink-0 d-flex align-items-center gap-1"
-            :disabled="enviando || !texto.trim()"
-            aria-label="Enviar mensagem"
+            :disabled="!podeEnviar || enviando || !texto.trim()"
+            :aria-label="podeEnviar ? 'Enviar mensagem' : 'Envio bloqueado'"
           >
             <span
               v-if="enviando"

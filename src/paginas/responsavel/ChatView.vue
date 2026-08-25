@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, onMounted, onUnmounted } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAutenticacao } from '@/composables/useAutenticacao';
 import { useMonitoramento } from '@/composables/useMonitoramento';
@@ -32,6 +32,8 @@ const erro = ref<string | null>(null);
 let canalMensagens: ReturnType<typeof supabaseClient.channel> | null = null;
 let canalContatos: ReturnType<typeof supabaseClient.channel> | null = null;
 let intervaloRelogio: number | null = null;
+
+const podeEnviar = computed(() => horarioAtivo.value);
 
 async function carregarContatos() {
   if (!usuario.value) return;
@@ -218,6 +220,7 @@ onUnmounted(() => {
       :horario-ativo="horarioAtivo"
       :mensagem-fora-horario="horarioConfig?.mensagemForaHorario ?? ''"
       :enviando="enviando"
+      :pode-enviar="podeEnviar"
       :carregando-contatos="carregandoContatos"
       :papel-usuario="usuario?.papel ?? 'responsavel'"
       :titulo-chat="contatoAtivo?.nomeContato ?? 'Coordenação escolar'"

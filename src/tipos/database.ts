@@ -300,6 +300,7 @@ export interface Conversa {
   aluno_id: string;
   assunto: string | null;
   ativa: boolean;
+  iniciada_pela_gestao: boolean;
   ultima_mensagem_em: string | null;
   created_at: string;
   updated_at: string;

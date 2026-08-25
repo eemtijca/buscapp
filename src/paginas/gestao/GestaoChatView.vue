@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, onMounted, onUnmounted } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAutenticacao } from '@/composables/useAutenticacao';
 import { useMonitoramento } from '@/composables/useMonitoramento';
@@ -38,6 +38,12 @@ const horarioConfig = ref({
 const statusMsg = ref<string | null>(null);
 const confirmandoExcluir = ref(false);
 const ocultarConvId = ref<string | null>(null);
+
+const podeEnviar = computed(() => {
+  if (horarioAtivo.value) return true;
+  if ((usuario.value?.papel ?? '') !== 'gestao') return false;
+  return contatoAtivo.value?.iniciadaPelaGestao === true;
+});
 
 let timeoutStatus: ReturnType<typeof setTimeout> | null = null;
 let canalMensagens: ReturnType<typeof supabaseClient.channel> | null = null;
@@ -285,12 +291,14 @@ onUnmounted(() => {
       :horario-ativo="horarioAtivo"
       :mensagem-fora-horario="horarioConfig.mensagemForaHorario"
       :enviando="enviando"
+      :pode-enviar="podeEnviar"
       :carregando-contatos="carregandoContatos"
       :papel-usuario="usuario?.papel ?? 'gestao'"
       :titulo-chat="contatoAtivo?.nomeContato ?? ''"
       :subtitulo-chat="contatoAtivo?.subtitulo ?? ''"
       :mostrar-botao-fechar="false"
       :contato-selecionado="contatoAtivo"
+      :mostrar-chat-inicialmente="!!route.query.conversa"
       @selecionar-conversa="selecionarConversa"
       @enviar-mensagem="handleEnviarMensagem"
       @voltar="handleVoltar"

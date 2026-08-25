@@ -251,6 +251,7 @@ export interface ContatoChat {
   ultimaData: string;
   naoLidas: number;
   ativa: boolean;
+  iniciadaPelaGestao?: boolean;
   alunoId?: string;
   turmaId?: string;
 }

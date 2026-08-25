@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
+import { useAutenticacao } from '@/composables/useAutenticacao';
 import { useMonitoramento } from '@/composables/useMonitoramento';
 import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh';
 import CartaoAlunoRisco from '@/componentes/CartaoAlunoRisco.vue';
 import type { AlunoRisco } from '@/tipos/componentes';
 
 const router = useRouter();
+const { usuario } = useAutenticacao();
 const { buscarRankingRisco, abrirConversaResponsavel, carregando } = useMonitoramento();
 const { ultimaAtualizacao, estaAtualizando, atualizar: refresh, inscrever, encerrar } =
   useRealtimeRefresh();
@@ -46,7 +48,7 @@ const totalRiscoMedio = computed(() => ranking.value.filter((r) => r.nivel === '
 const totalRiscoBaixo = computed(() => ranking.value.filter((r) => r.nivel === 'baixo').length);
 
 async function abrirChat(alunoId: string) {
-  const conversaId = await abrirConversaResponsavel(alunoId);
+  const conversaId = await abrirConversaResponsavel(alunoId, usuario.value?.id);
   if (!conversaId) {
     mostrarInfo('Não foi possível abrir o chat: aluno sem responsável ou turma vinculados.');
     return;

@@ -803,8 +803,9 @@ export function useMonitoramento() {
       const nivel = calcularNivelRisco(totalAusencias, totalOcorrencias);
       const mensagens: Record<NivelRisco, string> = {
         baixo: 'Continue acompanhando a vida escolar do seu filho.',
-        medio: 'Algumas faltas foram registradas. Entre em contato com a escola.',
-        alto: 'Acúmulo importante de ausências. Procure a coordenação imediatamente.',
+        medio: 'Há registros de faltas e/ou ocorrências. Entre em contato com a escola.',
+        alto:
+          'Acúmulo importante de faltas e/ou ocorrências. Procure a coordenação imediatamente.',
       };
 
       return {

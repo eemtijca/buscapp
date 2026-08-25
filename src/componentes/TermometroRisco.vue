@@ -15,21 +15,21 @@ const configNivel: Record<
     corTexto: 'text-success-emphasis',
     icone: 'check-circle',
     rotulo: 'Tudo certo',
-    descricao: 'Seu filho está com frequência regular.',
+    descricao: 'Seu filho está sem alertas de frequência ou comportamento.',
   },
   medio: {
     cor: 'bg-warning',
     corTexto: 'text-warning-emphasis',
     icone: 'exclamation-triangle',
     rotulo: 'Atenção',
-    descricao: 'Algumas faltas foram registradas. Acompanhe de perto.',
+    descricao: 'Há registros de faltas e/ou ocorrências. Acompanhe de perto.',
   },
   alto: {
     cor: 'bg-danger',
     corTexto: 'text-danger-emphasis',
     icone: 'exclamation-octagon',
     rotulo: 'Risco alto',
-    descricao: 'Acúmulo importante de ausências. Contate a escola.',
+    descricao: 'Acúmulo importante de faltas e/ou ocorrências. Contate a escola.',
   },
 };
 
@@ -59,12 +59,6 @@ const porcentagem = computed(() => {
     class="card shadow-sm border-0 overflow-hidden"
     :aria-label="'Termômetro de atenção do aluno ' + termometro.alunoNome"
   >
-    <div class="card-header bg-body-tertiary border-bottom-0">
-      <h2 class="h6 mb-0 d-flex align-items-center gap-2">
-        <i class="bi bi-thermometer-half text-primary" aria-hidden="true"></i>
-        Termômetro de Atenção
-      </h2>
-    </div>
     <div class="card-body">
       <div class="d-flex align-items-center gap-3 mb-3">
         <span

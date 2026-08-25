@@ -1,10 +1,6 @@
 import { onBeforeUnmount, onMounted, ref, watch, type Ref } from 'vue';
 
-/**
- * Mede a maior altura entre os filhos do contêiner e a expõe para que os cartões
- * possam ficar com altura uniforme (via variável CSS `--altura-cartao`).
- * Recalcula quando o contêiner monta ou muda de tamanho (ex.: abertura do modal).
- */
+/** Expõe na variável CSS --altura-cartao a maior altura entre os filhos do contêiner. */
 export function useAlturaUniformeCards(
   containerRef: Ref<HTMLElement | null>,
   seletor = '.cartao-selecao',

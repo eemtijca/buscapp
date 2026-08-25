@@ -5,10 +5,7 @@ import type { Perfil, PapelUsuario } from '@/tipos/database';
 const usuario: Ref<Perfil | null> = ref(null);
 const carregando: Ref<boolean> = ref(true);
 
-/**
- * Recurso alternativo para tokens emitidos antes do Custom Access Token Hook.
- * Em operação normal as claims do JWT já contêm nome e papel.
- */
+/** Fallback para tokens sem claims de nome e papel emitidos antes do Custom Access Token Hook. */
 async function carregarPerfil() {
   const {
     data: { session },
@@ -30,17 +27,33 @@ async function carregarPerfil() {
   }
 }
 
-/**
- * Ouvinte global registrado UMA vez no escopo de módulo.
- * Reage a INITIAL_SESSION, SIGNED_IN, TOKEN_REFRESHED e SIGNED_OUT
- * sem necessidade de onMounted ou verificação periódica.
- */
+/** Carrega acesso_modulos do perfil no banco e mescla no usuário montado pelas claims do JWT. */
+async function carregarModulosDoPerfil(id: string) {
+  try {
+    const { data } = await supabaseClient
+      .from('perfis')
+      .select('acesso_modulos')
+      .eq('id', id)
+      .single();
+    const modulos = (data as { acesso_modulos?: string[] } | null)?.acesso_modulos;
+    if (usuario.value && usuario.value.id === id) {
+      usuario.value = { ...usuario.value, acesso_modulos: modulos ?? [] };
+    }
+  } catch {
+    /* mantém a lista vazia em caso de falha */
+  }
+}
+
+/** Ouvinte global único para INITIAL_SESSION, SIGNED_IN, TOKEN_REFRESHED e SIGNED_OUT. */
 supabaseClient.auth.onAuthStateChange((event, session) => {
   if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
     if (session?.access_token) {
       const claims = decodificarToken(session.access_token);
 
       if (claims?.papel && claims?.nome) {
+        // Preserva módulos já carregados do banco em refreshes do token
+        const modulosConhecidos =
+          usuario.value?.id === claims.sub ? usuario.value.acesso_modulos : [];
         usuario.value = {
           id: claims.sub,
           nome: claims.nome,
@@ -49,13 +62,14 @@ supabaseClient.auth.onAuthStateChange((event, session) => {
           telefone: null,
           cargo: null,
           notificacoes_ativas: true,
-          acesso_modulos: ['frequencia'],
+          acesso_modulos: modulosConhecidos,
           permissoes: [],
           status: 'ativo',
           ultimo_acesso_em: null,
           created_at: '',
           updated_at: '',
         };
+        void carregarModulosDoPerfil(claims.sub);
       } else {
         carregarPerfil();
       }
@@ -65,6 +79,8 @@ supabaseClient.auth.onAuthStateChange((event, session) => {
     if (session?.access_token) {
       const claims = decodificarToken(session.access_token);
       if (claims?.papel && claims?.nome) {
+        const modulosConhecidos =
+          usuario.value?.id === claims.sub ? usuario.value.acesso_modulos : [];
         usuario.value = {
           id: claims.sub,
           nome: claims.nome,
@@ -73,13 +89,14 @@ supabaseClient.auth.onAuthStateChange((event, session) => {
           telefone: null,
           cargo: null,
           notificacoes_ativas: true,
-          acesso_modulos: ['frequencia'],
+          acesso_modulos: modulosConhecidos,
           permissoes: [],
           status: 'ativo',
           ultimo_acesso_em: null,
           created_at: '',
           updated_at: '',
         };
+        void carregarModulosDoPerfil(claims.sub);
       }
     }
     carregando.value = false;
@@ -91,10 +108,7 @@ supabaseClient.auth.onAuthStateChange((event, session) => {
 });
 
 export function useAutenticacao() {
-  /**
-   * Autentica com email/senha. O ouvinte onAuthStateChange
-   * preenche usuario.value automaticamente via JWT.
-   */
+  /** Autentica com email e senha; o ouvinte onAuthStateChange preenche o usuário via claims do JWT. */
   async function login(email: string, senha: string) {
     const { data, error } = await supabaseClient.auth.signInWithPassword({
       email,
@@ -110,7 +124,7 @@ export function useAutenticacao() {
     return data;
   }
 
-  /** Encerra a sessão atual (scope: 'local' = não afeta outras abas). */
+  /** Encerra a sessão local sem afetar outras abas. */
   async function logout() {
     supabaseClient.removeAllChannels();
     await supabaseClient.auth.signOut({ scope: 'local' });

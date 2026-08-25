@@ -201,12 +201,13 @@ test.describe('Gestão - Home', () => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await expect(page.locator('h3.card-nav-title').first()).toHaveText('Ranking de risco');
     await expect(page.locator('h3.card-nav-title').nth(1)).toHaveText('Ocorrências graves');
-    await expect(page.locator('h3.card-nav-title').nth(2)).toHaveText('Justificativas');
-    await expect(page.locator('h3.card-nav-title').nth(3)).toHaveText('Usuários');
-    await expect(page.locator('h3.card-nav-title').nth(4)).toHaveText('Alunos');
-    await expect(page.locator('h3.card-nav-title').nth(5)).toHaveText('Códigos');
-    await expect(page.locator('h3.card-nav-title').nth(7)).toHaveText('Anos letivos');
-    await expect(page.locator('h3.card-nav-title').nth(11)).toHaveText('Configurações');
+    await expect(page.locator('h3.card-nav-title').nth(2)).toHaveText('Infrequências');
+    await expect(page.locator('h3.card-nav-title').nth(3)).toHaveText('Justificativas');
+    await expect(page.locator('h3.card-nav-title').nth(4)).toHaveText('Usuários');
+    await expect(page.locator('h3.card-nav-title').nth(5)).toHaveText('Alunos');
+    await expect(page.locator('h3.card-nav-title').nth(6)).toHaveText('Códigos');
+    await expect(page.locator('h3.card-nav-title').nth(8)).toHaveText('Anos letivos');
+    await expect(page.locator('h3.card-nav-title').nth(12)).toHaveText('Configurações');
   });
 
   test('CT07 - Notificação de código aparece no header', async ({ page }) => {
@@ -347,7 +348,10 @@ test.describe('Gestão - Ranking e Ocorrências', () => {
     const cardJoao = page.locator('.card').filter({ hasText: 'João Miguel da Silva' });
     await cardJoao.locator('button[title="Abrir conversa com o responsável"]').click();
     await page.waitForURL(/\/gestao\/chat/, { timeout: 10000 });
-    await expect(page.getByText('Maria Silva').first()).toBeVisible({ timeout: 10000 });
+    // Cabeçalho do painel: válido tanto no desktop quanto no mobile (painel aberto)
+    await expect(
+      page.locator('.chat-header').getByText('Maria Silva').first(),
+    ).toBeVisible({ timeout: 10000 });
   });
 
   test('CT21 - Página de ocorrências carrega', async ({ page }) => {
@@ -363,9 +367,7 @@ test.describe('Gestão - Ranking e Ocorrências', () => {
   });
 });
 
-// ============================================================================
-// VISUALIZADOR DE ANEXO (BLOB) — gestão justificativas + responsável alertas
-// ============================================================================
+// Visualizador de anexos em blob
 test.describe('Gestão/Responsável — Visualizador de anexo (blob)', () => {
   const JUST_ID = '10000000-0000-0000-0000-000000000001';
   const ANEXO_ID = '20000000-0000-0000-0000-000000000001';
@@ -570,7 +572,7 @@ test.describe('Professor - Frequência', () => {
     }
     await page.click('button:has-text("Salvar frequência")');
     await expect(page.locator('.alert-success').first()).toBeVisible({ timeout: 10000 });
-    // Sai e volta — verifica se a página carrega
+    // Sai e volta para verificar o recarregamento da página
     await page.goto('/professor');
     await page.goto('/professor/frequencia');
     await expect(page.getByText('Registrar frequência')).toBeVisible();
@@ -606,6 +608,8 @@ test.describe('Gestão - Usuários - Código no cadastro', () => {
   test('CT29 - Criar usuário valida campos obrigatórios', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/usuarios/novo');
+    // Aguarda o formulário renderizar para o novalidate ser injetado antes do envio.
+    await page.waitForSelector('form');
     await page.evaluate(() => {
       const form = document.querySelector('form');
       if (form) form.setAttribute('novalidate', '');
@@ -828,9 +832,14 @@ test.describe('Professor - Ocorrência com tags', () => {
     await login(page, 'prof1@escola.edu.br', SENHA_PROF);
     await page.goto('/professor/ocorrencia');
     await page.waitForSelector('input[type="checkbox"]', { timeout: 10000 });
-    const checkbox = page.locator('input[type="checkbox"]').first();
-    await checkbox.check();
-    await expect(page.locator('#descricaoText')).toHaveValue(/Relato/);
+    // Re-tenta porque o Vue pode re-renderizar a lista de tags sob carga.
+    await expect(async () => {
+      const checkbox = page.locator('input[type="checkbox"]').first();
+      if (!(await checkbox.isChecked())) {
+        await checkbox.check();
+      }
+      await expect(page.locator('#descricaoText')).toHaveValue(/Relato/);
+    }).toPass({ timeout: 10000 });
   });
 });
 
@@ -1082,13 +1091,10 @@ test.describe('Gestão - Configuração', () => {
   });
 });
 
-// ============================================================================
-// INTEGRIDADE DE CATÁLOGO — bloqueio de exclusão/renomeação e enturmação
-// ============================================================================
+// Integridade de catálogo e enturmação
 test.describe('Gestão - Integridade de catálogo', () => {
   test.beforeAll(async () => {
-    // Referencia a tag de seed "Desatenção" em uma ocorrência para testar o
-    // bloqueio de exclusão/renomeação.
+    // Referencia a tag de seed "Desatenção" para testar bloqueio de exclusão e renomeação.
     const headers = {
       'Content-Type': 'application/json',
       apikey: SERVICE_KEY,
@@ -1165,25 +1171,22 @@ test.describe('Gestão - Integridade de catálogo', () => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/alunos/e0000000-0000-0000-0000-000000000001');
     const card = page.locator('.card').filter({ hasText: 'Enturmação atual' });
-    // Aguarda os dados assíncronos do onMounted terminarem de renderizar
-    // (o parágrafo só existe após carregarEnturmacao) antes de interagir,
-    // evitando cliques perdidos durante re-renderização do Vue.
+    // Aguarda os dados assíncronos renderizarem para evitar cliques perdidos.
     await expect(card.getByText(/Matrícula em:/)).toBeVisible();
-    // Re-clica caso o clique original seja engolido por um patch de DOM
-    // entre o hit-test e o dispatch do evento.
+    // Re-clica caso o primeiro clique seja perdido durante re-renderização do DOM.
     await expect(async () => {
       if ((await card.locator('#campoNovaTurma').count()) === 0) {
         await card.getByRole('button', { name: 'Alterar enturmação' }).click();
       }
       await expect(card.locator('#campoNovaTurma')).toBeVisible({ timeout: 3000 });
     }).toPass();
-    await card.locator('#campoNovaTurma').selectOption({ label: '3º C' });
+    await card.locator('#campoNovaTurma').selectOption({ label: '3ª C' });
     await card.locator('#campoNovaDataMat').fill('2026-08-01');
     await card.getByRole('button', { name: 'Salvar' }).click();
     await expect(card.getByRole('button', { name: 'Alterar enturmação' })).toBeVisible({
       timeout: 15000,
     });
-    await expect(card).toContainText('3º C');
+    await expect(card).toContainText('3ª C');
 
     const query =
       `${URL_SUPABASE}/rest/v1/enturmacoes?select=turma_id,status,ano_letivo_id` +
@@ -1206,15 +1209,10 @@ test.describe('Gestão - Integridade de catálogo', () => {
   });
 });
 
-// ============================================================================
-// CHAT — Setup de dados de teste
-// ============================================================================
+// Setup de dados de chat
 test.beforeAll(async () => {
-  // Cria conversas e mensagens de teste via API com service role.
-  // Usa upsert (merge-duplicates) para que seja seguro sob execução paralela
-  // de vários workers: cada beforeAll converge para o mesmo estado. As conversas
-  // são reutilizadas (sem reescrever o id), evitando violação de FK de mensagens
-  // quando existem conversas órfãs de execuções anteriores.
+  // Cria conversas e mensagens via API com service role usando upsert idempotente.
+  // As conversas são reutilizadas entre execuções para evitar violação de FK.
   const headers = {
     'Content-Type': 'application/json',
     apikey: SERVICE_KEY,
@@ -1312,9 +1310,7 @@ test.beforeAll(async () => {
   });
 });
 
-// ============================================================================
-// CT67–CT72: CHAT — Responsável
-// ============================================================================
+// Chat do responsável
 test.describe('Responsável — Chat', () => {
   test('CT67 - Pagina de chat carrega com lista de contatos', async ({ page }) => {
     await login(page, 'resp1@email.com', SENHA_RESP);
@@ -1360,20 +1356,27 @@ test.describe('Responsável — Chat', () => {
     await expect(page.getByText('Nenhuma conversa encontrada')).toBeVisible();
   });
 
-  test('CT71 - Input desabilitado ou aviso fora do horário', async ({ page }) => {
-    await login(page, 'resp1@email.com', SENHA_RESP);
-    await page.goto('/responsavel/chat');
-    await page.waitForTimeout(3000);
-    const primeiroItem = page.locator('.chat-sidebar button').first();
-    await primeiroItem.click();
-    await page.waitForTimeout(1000);
-    const textarea = page.locator('textarea');
-    const disabled = await textarea.isDisabled();
-    if (disabled) {
+  test('CT71 - Input desabilitado fora do horário letivo (responsável)', async ({ page }) => {
+    // Fecha a janela letiva para o bloqueio ser determinístico em qualquer hora
+    await restApi('/rest/v1/horarios_letivos?ativo=eq.true', {
+      method: 'PATCH',
+      body: JSON.stringify({ ativo: false }),
+    });
+    try {
+      await login(page, 'resp1@email.com', SENHA_RESP);
+      await page.goto('/responsavel/chat');
+      await page.waitForTimeout(3000);
+      const primeiroItem = page.locator('.chat-sidebar button').first();
+      await primeiroItem.click();
+      await page.waitForTimeout(1000);
+      const textarea = page.locator('textarea');
       await expect(textarea).toBeDisabled();
       await expect(page.locator('.alert-warning')).toBeVisible();
-    } else {
-      await expect(textarea).toBeEnabled();
+    } finally {
+      await restApi('/rest/v1/horarios_letivos?ativo=eq.false', {
+        method: 'PATCH',
+        body: JSON.stringify({ ativo: true }),
+      }).catch(() => {});
     }
   });
 
@@ -1392,9 +1395,7 @@ test.describe('Responsável — Chat', () => {
   });
 });
 
-// ============================================================================
-// CT73–CT79: CHAT — Gestão
-// ============================================================================
+// Chat da gestão
 test.describe('Gestão — Chat', () => {
   test('CT73 - Página de chat carrega com sidebar e placeholder', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 720 });
@@ -1424,8 +1425,10 @@ test.describe('Gestão — Chat', () => {
     const items = page.locator('.chat-sidebar button');
     if ((await items.count()) > 0) {
       await items.first().click();
-      await page.waitForTimeout(1000);
-      await expect(page.locator('i.bi-check2-all, i.bi-check2').first()).toBeVisible();
+      // O histórico deve exibir ao menos uma mensagem da conversa selecionada.
+      await expect(
+        page.locator('.chat-messages .rounded-3').first(),
+      ).toBeVisible({ timeout: 10000 });
     }
   });
 
@@ -1448,9 +1451,7 @@ test.describe('Gestão — Chat', () => {
   });
 });
 
-// ============================================================================
-// CT84–CT88: NOTIFICAÇÕES
-// ============================================================================
+// Notificações
 test.describe('Notificações — Popover', () => {
   test('CT84 - Sino visível para gestão', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
@@ -1498,9 +1499,7 @@ test.describe('Notificações — Popover', () => {
   });
 });
 
-// ============================================================================
-// CT89–CT91: MOBILE / RESPONSIVIDADE
-// ============================================================================
+// Mobile e responsividade
 test.describe('Chat — Mobile', () => {
   test('CT89 - Mobile: lista ocupa tela cheia inicialmente', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 });
@@ -1535,9 +1534,7 @@ test.describe('Chat — Mobile', () => {
   });
 });
 
-// ============================================================================
-// CT92–CT94: EDGE CASES — CHAT
-// ============================================================================
+// Casos extremos do chat
 test.describe('Chat — Casos Extremos', () => {
   test('CT92 - Rota /gestao/chat exige autenticação', async ({ page }) => {
     await page.goto('/gestao/chat');
@@ -1550,9 +1547,7 @@ test.describe('Chat — Casos Extremos', () => {
   });
 });
 
-// ============================================================================
-// CT95–CT98: RESILIÊNCIA
-// ============================================================================
+// Resiliência
 test.describe('Chat — Resiliência', () => {
   test('CT95 - Sidebar contatos visível na gestão', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
@@ -1589,9 +1584,7 @@ test.describe('Chat — Resiliência', () => {
   });
 });
 
-// ============================================================================
-// CT99–CT103: INPUT EDGE CASES
-// ============================================================================
+// Casos extremos de entrada
 test.describe('Chat — Input', () => {
   test('CT99 - Botão enviar desabilitado com input vazio', async ({ page }) => {
     await login(page, 'resp1@email.com', SENHA_RESP);
@@ -1644,7 +1637,7 @@ test.describe('Chat — Input', () => {
     if ((await items.count()) > 0) {
       await items.first().click();
       await page.waitForTimeout(1000);
-      // Mensagens de sistema aparecem centralizadas - apenas verifica se não há erros de JS
+      // Renderização centralizada de mensagens de sistema sem erros de JavaScript
       const pageErrors: string[] = [];
       page.on('pageerror', (err) => pageErrors.push(err.message));
       await page.waitForTimeout(500);
@@ -1653,9 +1646,7 @@ test.describe('Chat — Input', () => {
   });
 });
 
-// ============================================================================
-// CT103–CT106: NOTIFICAÇÕES — CASOS EXTREMOS
-// ============================================================================
+// Casos extremos das notificações
 test.describe('Notificações — Casos Extremos', () => {
   test('CT103 - Popover fecha e reabre sem erros', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
@@ -1715,11 +1706,7 @@ test.describe('Notificações — Casos Extremos', () => {
   });
 });
 
-// ============================================================================
-// CT121–CT125: CÓDIGOS — WORKFLOW COMPLETO E ENDURECIMENTO
-// Cobre a regressão do código pendente (0002), dedupe, bloqueio por
-// tentativas, auto-limpeza de solicitações, auditoria, revogação e configurações.
-// ============================================================================
+// Workflow completo dos códigos de redefinição
 test.describe('Códigos — Workflow completo (regressão pendente)', () => {
   test('CT121 - Pendente: código expirado → solicitação aparece → gera → redefinir senha', async ({
     page,
@@ -1965,7 +1952,7 @@ test.describe('Códigos — Revogação e nova solicitação (regressão)', () =
       await page.locator('.modal button:has-text("Concluído")').click();
 
       // 3. Código inicial exibido como revogado (badge vermelho)
-      // (o código fica mascarado na tabela; filtra por e-mail + status)
+      // O código fica mascarado na tabela; o filtro usa email e status.
       await page.goto('/gestao/codigos');
       await page.locator('button:has-text("Códigos")').click();
       const linhasEmail = page.locator('tr').filter({ hasText: email });
@@ -2097,6 +2084,9 @@ test.describe('Códigos — Limpar não ativos', () => {
 });
 
 test.describe('Códigos — Copiar ao clicar', () => {
+  // grantPermissions de clipboard só é suportado pelo Chromium no Playwright
+  test.skip(({ browserName }) => browserName !== 'chromium', 'Clipboard API apenas no Chromium');
+
   test('CT127 - Clique no código do modal copia e dá feedback', async ({ page, context }) => {
     await context.grantPermissions(['clipboard-read', 'clipboard-write'], {
       origin: 'http://localhost:5173',
@@ -2170,9 +2160,7 @@ test.describe('Códigos — Copiar ao clicar', () => {
   });
 });
 
-// ============================================================================
-// ANOS LETIVOS — gestão, virada de ano (RF13/RF25)
-// ============================================================================
+// Anos letivos e virada de ano
 test.describe('Gestão - Anos Letivos', () => {
   // Ano planejado usado nos testes da virada (não colide com o seed)
   const ANO_CORRENTE = new Date().getFullYear();
@@ -2292,5 +2280,336 @@ test.describe('Gestão - Anos Letivos', () => {
       .filter({ hasText: String(new Date().getFullYear()) });
     await expect(linhaCorrente.locator('.badge')).toHaveText(/Ativo/i);
     await expect(linhaCorrente.locator('button[title="Ativar (virada de ano)"]')).toBeDisabled();
+  });
+});
+
+// Atualizações em tempo real via Supabase Realtime
+test.describe('Tempo real — Atualizações sem reload', () => {
+  const GESTAO_ID = 'a0000000-0000-0000-0000-000000000001';
+  const ALUNO_ID = 'e0000000-0000-0000-0000-000000000001';
+  const TURMA_ID = 'd0000000-0000-0000-0000-000000000001';
+  const PROF_ID = 'a0000000-0000-0000-0000-000000000002';
+  const ANO_ID = 'b0000000-0000-0000-0000-000000000001';
+
+  async function apiSeed(url: string, options: RequestInit = {}) {
+    const res = await fetch(`${URL_SUPABASE}${url}`, {
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: SERVICE_KEY,
+        Authorization: `Bearer ${SERVICE_KEY}`,
+        Prefer: 'resolution=merge-duplicates,return=representation',
+      },
+      ...options,
+    });
+    if (!res.ok) throw new Error(`Setup ${options.method ?? 'GET'} ${url}: ${res.status}`);
+    return res;
+  }
+
+  test('CT140 - Alertas do responsável aparecem em tempo real', async ({ page }) => {
+    const DATA = '2026-12-05';
+    const FREQ_ID = '30000000-0000-0000-0000-000000001401';
+
+    // Estado limpo para a data do teste
+    await apiSeed(
+      `/rest/v1/frequencias?aluno_id=eq.${ALUNO_ID}&data_aula=eq.${DATA}`,
+      { method: 'DELETE' },
+    );
+
+    await login(page, 'resp1@email.com', SENHA_RESP);
+    await page.goto('/responsavel/alertas');
+    await expect(page.getByRole('heading', { name: 'Alertas' })).toBeVisible();
+    // Aguarda o handshake do canal Realtime antes de inserir o evento
+    await page.waitForTimeout(2500);
+    await expect(page.locator('.card').filter({ hasText: '05/12/2026' })).toHaveCount(0);
+
+    // Simula registro externo de ausência (professor/gestão)
+    try {
+      await apiSeed('/rest/v1/frequencias?on_conflict=client_request_id', {
+        method: 'POST',
+        body: JSON.stringify({
+          id: FREQ_ID,
+          client_request_id: FREQ_ID,
+          aluno_id: ALUNO_ID,
+          professor_id: PROF_ID,
+          turma_id: TURMA_ID,
+          ano_letivo_id: ANO_ID,
+          data_aula: DATA,
+          periodo: 'Manhã',
+          tipo_registro: 'chamada_aula',
+          status: 'ausente',
+        }),
+      });
+
+      // O card deve surgir sem reload via assinatura postgres_changes.
+      await expect(page.locator('.card').filter({ hasText: '05/12/2026' })).toBeVisible({
+        timeout: 15000,
+      });
+    } finally {
+      await apiSeed(
+        `/rest/v1/frequencias?id=eq.${FREQ_ID}&aluno_id=eq.${ALUNO_ID}&data_aula=eq.${DATA}`,
+        { method: 'DELETE' },
+      );
+    }
+  });
+
+  test('CT141 - Notificações chegam em tempo real no sino', async ({ page }) => {
+    const TITULO = `E2E Realtime ${Date.now()}`;
+
+    await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
+    await page.goto('/gestao');
+    await expect(page.getByText('Ranking de risco')).toBeVisible();
+    // Aguarda o handshake do canal Realtime antes de inserir o evento
+    await page.waitForTimeout(2500);
+
+    // Abre o popover ANTES de inserir: o item deve chegar com o canal aberto
+    await page.locator('button[aria-label="Notificações"]').click();
+    const notifMenu = page.locator('.notif-menu');
+    await expect(notifMenu).toBeVisible();
+
+    try {
+      await apiSeed('/rest/v1/notificacoes', {
+        method: 'POST',
+        body: JSON.stringify({
+          destinatario_id: GESTAO_ID,
+          tipo: 'sistema',
+          titulo: TITULO,
+          corpo: 'Teste de chegada em tempo real.',
+        }),
+      });
+
+      await expect(notifMenu.getByText(TITULO)).toBeVisible({ timeout: 15000 });
+    } finally {
+      await apiSeed(`/rest/v1/notificacoes?titulo=eq.${encodeURIComponent(TITULO)}`, {
+        method: 'DELETE',
+      }).catch(() => {});
+    }
+  });
+
+  test('CT142 - Ocorrências da gestão atualizam em tempo real', async ({ page }) => {
+    const TITULO = 'E2E Realtime';
+    const DESCRICAO = `Fluxo em tempo real ${Date.now()}`;
+
+    // Limpa artefatos de execuções anteriores
+    await apiSeed(`/rest/v1/ocorrencias?titulo=eq.${TITULO}`, { method: 'DELETE' });
+
+    await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
+    await page.goto('/gestao/ocorrencias');
+    await expect(page.getByText('Ocorrências graves e suspensões')).toBeVisible();
+    // Aguarda o handshake do canal Realtime antes de inserir o evento
+    await page.waitForTimeout(2500);
+    await expect(page.locator('article').filter({ hasText: DESCRICAO })).toHaveCount(0);
+
+    try {
+      await apiSeed('/rest/v1/ocorrencias', {
+        method: 'POST',
+        body: JSON.stringify({
+          aluno_id: ALUNO_ID,
+          professor_id: PROF_ID,
+          turma_id: TURMA_ID,
+          ano_letivo_id: ANO_ID,
+          titulo: TITULO,
+          descricao: DESCRICAO,
+          tipo: ['grave'],
+          tags_comportamento: [],
+        }),
+      });
+
+      await expect(page.locator('article').filter({ hasText: DESCRICAO })).toBeVisible({
+        timeout: 15000,
+      });
+    } finally {
+      await apiSeed(`/rest/v1/ocorrencias?titulo=eq.${TITULO}`, { method: 'DELETE' });
+    }
+  });
+
+  test('CT143 - Lista de frequência do professor atualiza em tempo real', async ({ page }) => {    await login(page, 'prof1@escola.edu.br', SENHA_PROF);
+    await page.goto('/professor/frequencia');
+    await page.waitForSelector('.card-body .card');
+
+    const DATA = await page.locator('input[type="date"]').inputValue();
+    await apiSeed(
+      `/rest/v1/frequencias?aluno_id=eq.${ALUNO_ID}&data_aula=eq.${DATA}&tipo_registro=eq.chamada_aula`,
+      { method: 'DELETE' },
+    );
+
+    // Recarrega para refletir o estado limpo (aluno Presente)
+    await page.reload();
+    await page.waitForSelector('.card-body .card');
+    // Aguarda o handshake do canal Realtime antes de inserir o evento
+    await page.waitForTimeout(2500);
+    const btnAusenteJoao = page.getByRole('button', {
+      name: 'Marcar João Miguel da Silva como ausente',
+    });
+    await expect(btnAusenteJoao).toBeVisible();
+
+    try {
+      // Registro externo de ausência deve virar o cartão sem reload
+      const novoId = crypto.randomUUID();
+      await apiSeed('/rest/v1/frequencias?on_conflict=client_request_id', {
+        method: 'POST',
+        body: JSON.stringify({
+          id: novoId,
+          client_request_id: novoId,
+          aluno_id: ALUNO_ID,
+          professor_id: PROF_ID,
+          turma_id: TURMA_ID,
+          ano_letivo_id: ANO_ID,
+          data_aula: DATA,
+          periodo: 'Manhã',
+          tipo_registro: 'chamada_aula',
+          status: 'ausente',
+        }),
+      });
+
+      await expect(
+        page.getByRole('button', { name: 'Marcar João Miguel da Silva como presente' }),
+      ).toBeVisible({
+        timeout: 15000,
+      });
+    } finally {
+      await apiSeed(
+        `/rest/v1/frequencias?aluno_id=eq.${ALUNO_ID}&data_aula=eq.${DATA}&tipo_registro=eq.chamada_aula`,
+        { method: 'DELETE' },
+      );
+    }
+  });
+});
+
+// Chat da coordenação iniciado pelo ranking
+test.describe('Chat da coordenação via ranking', () => {
+  const LUCAS_ID = 'e0000000-0000-0000-0000-000000000005';
+  const JOAO_SANTOS_ID = 'a0000000-0000-0000-0000-000000000006';
+
+  async function fecharJanelaLetiva() {
+    await restApi('/rest/v1/horarios_letivos?ativo=eq.true', {
+      method: 'PATCH',
+      body: JSON.stringify({ ativo: false }),
+    });
+  }
+
+  async function reabrirJanelaLetiva() {
+    await restApi('/rest/v1/horarios_letivos?ativo=eq.false', {
+      method: 'PATCH',
+      body: JSON.stringify({ ativo: true }),
+    });
+  }
+
+  test('CT144 - Ranking: conversa nova visível e gestão envia fora do horário', async ({
+    page,
+  }) => {
+    // Estado limpo: sem conversa prévia para Lucas
+    await restApi(`/rest/v1/conversas?aluno_id=eq.${LUCAS_ID}`, { method: 'DELETE' });
+
+    // Fecha a janela letiva; só a conversa iniciada pela gestão permite enviar.
+    await fecharJanelaLetiva();
+
+    let conversaId = '';
+    try {
+      await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
+      await page.goto('/gestao/ranking');
+
+      const cardLucas = page.locator('.card').filter({ hasText: 'Lucas Eduardo Pereira' }).first();
+      await cardLucas.locator('button[title="Abrir conversa com o responsável"]').click();
+      await page.waitForURL(/\/gestao\/chat/, { timeout: 15000 });
+
+      conversaId = new URL(page.url()).searchParams.get('conversa') ?? '';
+      expect(conversaId).not.toBe('');
+
+      // Painel da conversa aberto (deep-link) com o responsável no cabeçalho
+      await expect(
+        page.locator('.chat-header').getByText('João Santos'),
+      ).toBeVisible({ timeout: 10000 });
+
+      // No desktop a conversa também aparece na sidebar, sem mensagens
+      const largura = (await page.viewportSize())?.width ?? 1280;
+      if (largura >= 768) {
+        await expect(
+          page
+            .locator('.chat-sidebar button')
+            .filter({ hasText: 'João Santos' })
+            .filter({ hasText: 'Nenhuma mensagem ainda' })
+            .first(),
+        ).toBeVisible({ timeout: 10000 });
+      }
+
+      // Exceção: envio habilitado fora do horário para conversa iniciada pela coordenação
+      const textarea = page.locator('textarea');
+      await expect(textarea).toBeEnabled({ timeout: 10000 });
+      await textarea.fill('Primeiro contato da coordenação.');
+      await page.locator('button[aria-label="Enviar mensagem"]').click();
+      await expect(
+        page.locator('.chat-messages').getByText('Primeiro contato da coordenação.'),
+      ).toBeVisible({ timeout: 10000 });
+
+      // Responsável recebe notificação sobre a conversa iniciada
+      await expect
+        .poll(async () => {
+          const res = await restApi(
+            `/rest/v1/notificacoes?select=id&destinatario_id=eq.${JOAO_SANTOS_ID}&metadados->>conversa_id=eq.${conversaId}`,
+          );
+          return ((await res.json()) as { id: string }[]).length;
+        }, { timeout: 10000 })
+        .toBeGreaterThanOrEqual(1);
+    } finally {
+      await reabrirJanelaLetiva();
+      if (conversaId) {
+        await restApi(`/rest/v1/notificacoes?metadados->>conversa_id=eq.${conversaId}`, {
+          method: 'DELETE',
+        }).catch(() => {});
+      }
+      await restApi(`/rest/v1/conversas?aluno_id=eq.${LUCAS_ID}`, { method: 'DELETE' }).catch(
+        () => {},
+      );
+    }
+  });
+
+  test('CT145 - Responsável recebe a conversa iniciada pela coordenação', async ({ page }) => {
+    // Estado limpo: sem conversa prévia para Lucas
+    await restApi(`/rest/v1/conversas?aluno_id=eq.${LUCAS_ID}`, { method: 'DELETE' });
+    await fecharJanelaLetiva();
+
+    let conversaId = '';
+    try {
+      // 1. Coordenação inicia a conversa pelo ranking
+      await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
+      await page.goto('/gestao/ranking');
+      const cardLucas = page.locator('.card').filter({ hasText: 'Lucas Eduardo Pereira' }).first();
+      await cardLucas.locator('button[title="Abrir conversa com o responsável"]').click();
+      await page.waitForURL(/\/gestao\/chat/, { timeout: 15000 });
+      conversaId = new URL(page.url()).searchParams.get('conversa') ?? '';
+      expect(conversaId).not.toBe('');
+      await logout(page);
+
+      // 2. Responsável vê a conversa na própria lista
+      await login(page, 'resp2@email.com', SENHA_RESP);
+      await page.goto('/responsavel/chat');
+      const item = page
+        .locator('.chat-sidebar button')
+        .filter({ hasText: 'Lucas Eduardo Pereira' })
+        .first();
+      await expect(item).toBeVisible({ timeout: 10000 });
+
+      // 3. Ao abrir, a mensagem de sistema da coordenação está no histórico
+      await item.click();
+      await expect(
+        page.locator('.chat-messages').getByText('Conversa iniciada pela coordenação'),
+      ).toBeVisible({ timeout: 10000 });
+
+      // 4. Fora do horário, o envio do responsável permanece bloqueado
+      const textarea = page.locator('textarea');
+      if ((await textarea.count()) > 0) {
+        await expect(textarea).toBeDisabled();
+      }
+    } finally {
+      await reabrirJanelaLetiva();
+      if (conversaId) {
+        await restApi(`/rest/v1/notificacoes?metadados->>conversa_id=eq.${conversaId}`, {
+          method: 'DELETE',
+        }).catch(() => {});
+      }
+      await restApi(`/rest/v1/conversas?aluno_id=eq.${LUCAS_ID}`, { method: 'DELETE' }).catch(
+        () => {},
+      );
+    }
   });
 });

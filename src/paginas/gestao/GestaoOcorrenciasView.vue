@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { onMounted, onUnmounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useMonitoramento } from '@/composables/useMonitoramento';
 import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh';
@@ -8,7 +8,13 @@ import type { OcorrenciaGrave } from '@/tipos/componentes';
 
 const router = useRouter();
 const { buscarOcorrenciasGraves, alternarBloqueioRetorno } = useMonitoramento();
-const { ultimaAtualizacao, estaAtualizando, atualizar: refresh } = useRealtimeRefresh();
+const {
+  ultimaAtualizacao,
+  estaAtualizando,
+  atualizar: refresh,
+  inscrever,
+  encerrar,
+} = useRealtimeRefresh();
 
 const ocorrencias = ref<OcorrenciaGrave[]>([]);
 const mensagemSucesso = ref<string | null>(null);
@@ -52,6 +58,11 @@ async function atualizarManual() {
 
 onMounted(async () => {
   await carregarOcorrencias();
+  await inscrever([{ tabela: 'ocorrencias' }], carregarOcorrencias);
+});
+
+onUnmounted(() => {
+  encerrar();
 });
 </script>
 

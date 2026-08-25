@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted } from 'vue';
+import { onUnmounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAutenticacao } from '@/composables/useAutenticacao';
 import { useStatusConexao } from '@/composables/useStatusConexao';
@@ -13,11 +13,17 @@ const { usuario, logout } = useAutenticacao();
 const { status } = useStatusConexao();
 const { naoLidasMensagens, iniciar, parar } = useNotificacoes();
 
-onMounted(() => {
-  if (usuario.value) {
-    iniciar(usuario.value.id);
-  }
-});
+watch(
+  usuario,
+  (val) => {
+    if (val?.id) {
+      void iniciar(val.id);
+    } else {
+      parar();
+    }
+  },
+  { immediate: true },
+);
 
 onUnmounted(() => {
   parar();

@@ -51,7 +51,7 @@ export function traduzirErro(erroDesconhecido: unknown): ErroTraduzido {
     }
   }
 
-  // --- Erros legados (string direta) ---
+  // Erros legados (string direta)
 
   if (mensagemOriginal.includes('Invalid login credentials')) {
     return { mensagem: 'E-mail ou senha incorretos.' };

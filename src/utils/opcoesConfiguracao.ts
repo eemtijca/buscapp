@@ -1,8 +1,4 @@
-// ============================================================================
-// Catálogo de regras por tipo de opção de configuração.
-// Centraliza rótulo, placeholder, ícone, regra de entrada e verificação de uso
-// para a interface genérica de opções (GestaoConfiguracaoOpcoesView.vue).
-// ============================================================================
+// Regras por tipo de opção usadas pela interface genérica de configuração.
 
 export type TipoCampo = 'texto' | 'letra' | 'ordinal';
 

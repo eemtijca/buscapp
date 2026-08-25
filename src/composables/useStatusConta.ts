@@ -16,11 +16,7 @@ let ouvinteRegistrado: ((event: Event) => void) | null = null;
 let ultimaVerificacaoEm = 0;
 let emVerificacao = false;
 
-/**
- * Consulta o status do perfil do usuário autenticado
- * A política RLS "Perfis: leitura propria" permite ler a própria linha mesmo
- * quando o perfil está inativo, garantindo que a desativação seja detectável
- */
+/** Consulta o status do perfil autenticado; a leitura própria por RLS permite detectar desativação. */
 async function verificarStatus(): Promise<StatusPerfilConta | null> {
   const {
     data: { session },

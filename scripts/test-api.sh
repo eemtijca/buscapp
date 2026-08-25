@@ -507,7 +507,7 @@ HTTP=$(api_code POST "/rest/v1/alunos" "{\"id\":\"$AID4\",\"nome\":\"Sem Matricu
 echo "  📝 matrícula vazia aceita pelo PostgREST (HTTP $HTTP)"
 
 TID3=$(python3 -c "import uuid; print(uuid.uuid4())")
-HTTP=$(api_code POST "/rest/v1/turmas" "{\"id\":\"$TID3\",\"serie\":\"2º\",\"letra\":\"A\",\"nome_completo\":\"2º A\"}" "$TG")
+HTTP=$(api_code POST "/rest/v1/turmas" "{\"id\":\"$TID3\",\"serie\":\"2ª\",\"letra\":\"A\",\"nome_completo\":\"2ª A\"}" "$TG")
 assert "turma sem ano_letivo 400" "400" "$HTTP"
 
 echo ""; echo "=== 6. FREQUÊNCIA — IDEMPOTÊNCIA E PERSISTÊNCIA ==="
@@ -1341,7 +1341,7 @@ AID_INT=$(UUID)
 HTTP=$(api_code POST "/rest/v1/alunos" "{\"id\":\"$AID_INT\",\"nome\":\"Integridade\",\"matricula\":\"INT${UNIQ}\"}" "$TG")
 assert "26.1 criar aluno 201" "201" "$HTTP"
 TID_INT=$(UUID)
-HTTP=$(api_code POST "/rest/v1/turmas" "{\"id\":\"$TID_INT\",\"ano_letivo_id\":\"b0000000-0000-0000-0000-000000000001\",\"serie\":\"2º\",\"letra\":\"C\"}" "$TG")
+HTTP=$(api_code POST "/rest/v1/turmas" "{\"id\":\"$TID_INT\",\"ano_letivo_id\":\"b0000000-0000-0000-0000-000000000001\",\"serie\":\"2ª\",\"letra\":\"C\"}" "$TG")
 assert "26.2 criar turma 201" "201" "$HTTP"
 
 # 26.3 turmas.serie fora do catálogo
@@ -1394,7 +1394,7 @@ echo ""; echo "=== 27. CASCADE → RESTRICT (turmas) ==="
 
 # 27.1 turma com conversa: DELETE bloqueado por FK RESTRICT
 TID_CONV=$(UUID)
-HTTP=$(api_code POST "/rest/v1/turmas" "{\"id\":\"$TID_CONV\",\"ano_letivo_id\":\"b0000000-0000-0000-0000-000000000001\",\"serie\":\"3º\",\"letra\":\"D\"}" "$TG")
+HTTP=$(api_code POST "/rest/v1/turmas" "{\"id\":\"$TID_CONV\",\"ano_letivo_id\":\"b0000000-0000-0000-0000-000000000001\",\"serie\":\"3ª\",\"letra\":\"D\"}" "$TG")
 assert "27.1 criar turma 201" "201" "$HTTP"
 AID_CONV=$(UUID)
 HTTP=$(api_code POST "/rest/v1/alunos" "{\"id\":\"$AID_CONV\",\"nome\":\"Aluno Conversa\",\"matricula\":\"CONV${UNIQ}\"}" "$TG")
@@ -1413,7 +1413,7 @@ npx supabase db query "DELETE FROM public.turmas WHERE id='$TID_CONV';" 2>/dev/n
 
 # 27.2 turma com atribuição: DELETE bloqueado por FK RESTRICT
 TID_ATR=$(UUID)
-HTTP=$(api_code POST "/rest/v1/turmas" "{\"id\":\"$TID_ATR\",\"ano_letivo_id\":\"b0000000-0000-0000-0000-000000000001\",\"serie\":\"2º\",\"letra\":\"D\"}" "$TG")
+HTTP=$(api_code POST "/rest/v1/turmas" "{\"id\":\"$TID_ATR\",\"ano_letivo_id\":\"b0000000-0000-0000-0000-000000000001\",\"serie\":\"2ª\",\"letra\":\"D\"}" "$TG")
 assert "27.2 criar turma 201" "201" "$HTTP"
 ATR_CONV=$(UUID)
 HTTP=$(api_code POST "/rest/v1/atribuicoes_professores" "{\"id\":\"$ATR_CONV\",\"professor_id\":\"a0000000-0000-0000-0000-000000000002\",\"turma_id\":\"$TID_ATR\",\"disciplina_id\":\"c0000000-0000-0000-0000-000000000001\",\"papel\":\"titular\",\"data_inicio\":\"2026-01-01\"}" "$TG")
@@ -1425,7 +1425,7 @@ npx supabase db query "DELETE FROM public.turmas WHERE id='$TID_ATR';" 2>/dev/nu
 
 # 27.3 turma sem filhos: DELETE OK
 TID_LIVRE=$(UUID)
-HTTP=$(api_code POST "/rest/v1/turmas" "{\"id\":\"$TID_LIVRE\",\"ano_letivo_id\":\"b0000000-0000-0000-0000-000000000001\",\"serie\":\"3º\",\"letra\":\"A\"}" "$TG")
+HTTP=$(api_code POST "/rest/v1/turmas" "{\"id\":\"$TID_LIVRE\",\"ano_letivo_id\":\"b0000000-0000-0000-0000-000000000001\",\"serie\":\"3ª\",\"letra\":\"A\"}" "$TG")
 assert "27.3 criar turma 201" "201" "$HTTP"
 npx supabase db query "DELETE FROM public.turmas WHERE id='$TID_LIVRE';" 2>/dev/null
 HTTP=$(api_code GET "/rest/v1/turmas?select=id&id=eq.$TID_LIVRE" '' "$TG")
@@ -1535,6 +1535,29 @@ HTTP=$(curl -s -o /tmp/api_resp.txt -w "%{http_code}" \
 assert "29.6 download sem auth 400/401/403" 1 "$( [ "$HTTP" = "400" ] || [ "$HTTP" = "401" ] || [ "$HTTP" = "403" ] && echo 1 || echo 0 )"
 
 rm -f /tmp/blob_test.png /tmp/dl_resp.bin /tmp/dl_gestao.bin
+
+# ============================================================================
+# LIMPEZA FINAL — remove alunos de teste sem enturmação (mantém a invariante
+# I11 de integridade: todo aluno ativo tem enturmação matriculada), evitando
+# estado sujo para suítes executadas em seguida (ex.: test-db.sh).
+# ============================================================================
+npx supabase db query "
+  DELETE FROM public.vinculos_responsaveis WHERE aluno_id IN (
+    SELECT id FROM public.alunos WHERE status='ativo' AND matricula NOT LIKE 'MAT2026%'
+      AND NOT EXISTS (SELECT 1 FROM public.enturmacoes e WHERE e.aluno_id = alunos.id AND e.status='matriculado')
+  );
+" >/dev/null 2>&1 || true
+npx supabase db query "
+  DELETE FROM public.alunos WHERE status='ativo' AND matricula NOT LIKE 'MAT2026%'
+    AND NOT EXISTS (SELECT 1 FROM public.enturmacoes e WHERE e.aluno_id = alunos.id AND e.status='matriculado');
+" >/dev/null 2>&1 || true
+npx supabase db query "
+  DELETE FROM public.anexos WHERE NOT EXISTS (
+    SELECT 1 FROM public.justificativa_anexos ja WHERE ja.anexo_id = anexos.id
+  ) AND NOT EXISTS (
+    SELECT 1 FROM public.ocorrencia_anexos oa WHERE oa.anexo_id = anexos.id
+  );
+" >/dev/null 2>&1 || true
 
 echo ""; echo "=========================================="
 echo "  TOTAL: $((PASS+FAIL))  |  PASS: $PASS  |  FAIL: $FAIL"

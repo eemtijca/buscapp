@@ -4,7 +4,7 @@ import type { ContatoChat, MensagemChat } from '@/tipos/componentes';
 import ChatContatos from '@/componentes/ChatContatos.vue';
 import ChatHorarioProtegido from '@/componentes/ChatHorarioProtegido.vue';
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     contatos: ContatoChat[];
     mensagens: MensagemChat[];
@@ -12,19 +12,23 @@ withDefaults(
     horarioAtivo: boolean;
     mensagemForaHorario: string;
     enviando: boolean;
+    podeEnviar?: boolean;
     carregandoContatos?: boolean;
     papelUsuario: string;
     tituloChat?: string;
     subtituloChat?: string;
     mostrarBotaoFechar?: boolean;
     contatoSelecionado?: ContatoChat | null;
+    mostrarChatInicialmente?: boolean;
   }>(),
   {
+    podeEnviar: true,
     carregandoContatos: false,
     tituloChat: '',
     subtituloChat: '',
     mostrarBotaoFechar: false,
     contatoSelecionado: null,
+    mostrarChatInicialmente: false,
   },
 );
 
@@ -36,7 +40,7 @@ const emit = defineEmits<{
   ocultar: [conversaId: string];
 }>();
 
-const mobileMostraChat = ref(false);
+const mobileMostraChat = ref(props.mostrarChatInicialmente);
 
 function selecionar(id: string) {
   mobileMostraChat.value = true;
@@ -85,7 +89,7 @@ function handleVoltar() {
         :enviando="enviando"
         :titulo-chat="tituloChat"
         :subtitulo-chat="subtituloChat"
-        :meu-papel="papelUsuario"
+        :pode-enviar="podeEnviar"
         :mostrar-botao-voltar="mobileMostraChat"
         :mostrar-botao-fechar="mostrarBotaoFechar"
         @enviar-mensagem="emit('enviarMensagem', $event)"

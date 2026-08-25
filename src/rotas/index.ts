@@ -11,6 +11,7 @@ import ProfessorOcorrenciaView from '@/paginas/professor/OcorrenciaView.vue';
 import GestaoHomeView from '@/paginas/gestao/GestaoHomeView.vue';
 import GestaoRankingView from '@/paginas/gestao/GestaoRankingView.vue';
 import GestaoOcorrenciasView from '@/paginas/gestao/GestaoOcorrenciasView.vue';
+import GestaoInfrequenciasView from '@/paginas/gestao/GestaoInfrequenciasView.vue';
 import GestaoJustificativasView from '@/paginas/gestao/GestaoJustificativasView.vue';
 import GestaoUsuariosView from '@/paginas/gestao/UsuariosView.vue';
 import GestaoUsuarioFormView from '@/paginas/gestao/UsuarioFormView.vue';
@@ -41,6 +42,7 @@ declare module 'vue-router' {
   interface RouteMeta {
     requerAutenticacao?: boolean;
     papeisPermitidos?: string[];
+    moduloPermitido?: string;
   }
 }
 
@@ -84,19 +86,31 @@ const router = createRouter({
         {
           path: 'frequencia',
           name: 'professor-frequencia',
-          meta: { requerAutenticacao: true, papeisPermitidos: ['professor'] },
+          meta: {
+            requerAutenticacao: true,
+            papeisPermitidos: ['professor'],
+            moduloPermitido: 'frequencia',
+          },
           component: ProfessorFrequenciaView,
         },
         {
           path: 'ausencia',
           name: 'professor-ausencia',
-          meta: { requerAutenticacao: true, papeisPermitidos: ['professor'] },
+          meta: {
+            requerAutenticacao: true,
+            papeisPermitidos: ['professor'],
+            moduloPermitido: 'frequencia',
+          },
           component: ProfessorAusenciaView,
         },
         {
           path: 'ocorrencia',
           name: 'professor-ocorrencia',
-          meta: { requerAutenticacao: true, papeisPermitidos: ['professor'] },
+          meta: {
+            requerAutenticacao: true,
+            papeisPermitidos: ['professor'],
+            moduloPermitido: 'ocorrencias',
+          },
           component: ProfessorOcorrenciaView,
         },
       ],
@@ -122,6 +136,12 @@ const router = createRouter({
           name: 'gestao-ocorrencias',
           meta: { requerAutenticacao: true, papeisPermitidos: ['gestao'] },
           component: GestaoOcorrenciasView,
+        },
+        {
+          path: 'infrequencias',
+          name: 'gestao-infrequencias',
+          meta: { requerAutenticacao: true, papeisPermitidos: ['gestao'] },
+          component: GestaoInfrequenciasView,
         },
         {
           path: 'justificativas',
@@ -299,23 +319,24 @@ router.beforeEach(async (to, _from) => {
 
   let perfilPapel: string | null = null;
   let perfilStatus: string | null = null;
+  let perfilModulos: string[] = [];
 
   if (session) {
-    // Lê o papel DIRETAMENTE do JWT via jwt-decode
-    // sem consultar o banco de dados (Custom Access Token Hook)
+    // Lê o papel das claims do JWT emitidas pelo Custom Access Token Hook.
     const claims = decodificarToken(session.access_token);
     perfilPapel = (claims?.papel as string) ?? null;
 
-    // Consulta o status atual do perfil para detectar contas desativadas
+    // Consulta status e módulos do perfil para as validações da rota.
     const { data } = await supabaseClient
       .from('perfis')
-      .select('status')
+      .select('status, acesso_modulos')
       .eq('id', session.user.id)
       .single();
     perfilStatus = (data as { status?: string } | null)?.status ?? null;
+    perfilModulos = (data as { acesso_modulos?: string[] } | null)?.acesso_modulos ?? [];
   }
 
-  // Conta desativada só pode permanecer na tela de "conta desativada"
+  // Conta desativada permanece apenas na tela própria.
   if (session && perfilStatus === 'inativo' && to.name !== 'conta-desativada') {
     return { name: 'conta-desativada' };
   }
@@ -341,6 +362,17 @@ router.beforeEach(async (to, _from) => {
       }
       if (!papeisPermitidos.includes(perfilPapel)) {
         return { name: '403', query: { destino: homePorPapel[perfilPapel] ?? '/' } };
+      }
+    }
+
+    // Módulos de acesso com fail-closed: lista vazia nega rotas com moduloPermitido.
+    const moduloPermitido = to.meta?.moduloPermitido;
+    if (moduloPermitido && perfilPapel === 'professor') {
+      if (!perfilModulos.includes(moduloPermitido)) {
+        return {
+          name: 'professor',
+          query: { moduloNegado: moduloPermitido },
+        };
       }
     }
   }

@@ -1,9 +1,6 @@
-// ============================================================================
-// Tipos TypeScript — Schema Completo BuscApp
-// Gerado a partir de supabase/migrations/0001_schema_completo.sql
-// ============================================================================
+// Tipos TypeScript gerados a partir de supabase/migrations/0001_schema_completo.sql.
 
-// -------- Enums --------
+// Enums
 export type PapelPerfil = 'professor' | 'gestao' | 'responsavel';
 export type PapelUsuario = PapelPerfil;
 export type StatusPerfil = 'ativo' | 'pendente' | 'inativo';
@@ -38,7 +35,7 @@ export type StatusExportacao = 'agendada' | 'processando' | 'concluida' | 'falho
 export type PapelAtribuicao = string;
 export type TipoVinculo = string;
 
-// -------- Interfaces --------
+// Interfaces
 export interface AnoLetivo {
   id: string;
   ano: number;
@@ -300,6 +297,7 @@ export interface Conversa {
   aluno_id: string;
   assunto: string | null;
   ativa: boolean;
+  iniciada_pela_gestao: boolean;
   ultima_mensagem_em: string | null;
   created_at: string;
   updated_at: string;
@@ -433,7 +431,7 @@ export interface CodigoRedefinicaoTentativa {
   updated_at: string;
 }
 
-// -------- Mapa de Tipos do Banco de Dados Supabase --------
+// Mapa de tipos do banco de dados
 export interface Database {
   public: {
     Tables: {

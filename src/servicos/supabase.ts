@@ -13,6 +13,12 @@ if (!supabaseUrl || !supabasePublishableKey) {
 
 export const supabaseClient: SupabaseClient = createClient(supabaseUrl, supabasePublishableKey, {
   auth: { storage: armazenamento },
+  realtime: {
+    worker: true,
+    heartbeatCallback(status) {
+      if (status === 'disconnected') void supabaseClient.realtime.connect();
+    },
+  },
 });
 
 /** Claims injetadas no JWT via Custom Access Token Hook. */
@@ -24,10 +30,7 @@ interface TokenClaims {
   [key: string]: unknown;
 }
 
-/**
- * Decodifica o JWT sem latência de rede (diferente de getSession()).
- * Usado pelo router guard para ler 'papel' da claim do token.
- */
+/** Decodifica o JWT localmente, sem latência de rede; usado pelo router guard. */
 export { armazenamento };
 
 export function decodificarToken(accessToken: string): TokenClaims | null {

@@ -803,8 +803,8 @@ export function useMonitoramento() {
       const nivel = calcularNivelRisco(totalAusencias, totalOcorrencias);
       const mensagens: Record<NivelRisco, string> = {
         baixo: 'Continue acompanhando a vida escolar do seu filho.',
-        medio: 'Algumas faltas foram registradas. Entre em contato com a escola.',
-        alto: 'Acúmulo importante de ausências. Procure a coordenação imediatamente.',
+        medio: 'Há registros de faltas e/ou ocorrências. Entre em contato com a escola.',
+        alto: 'Acúmulo importante de faltas e/ou ocorrências. Procure a coordenação imediatamente.',
       };
 
       return {
@@ -1059,8 +1059,7 @@ export function useMonitoramento() {
         anexo_id: anexoId,
       });
       if (vinculoError) {
-        // Compensação: remove o objeto do armazenamento e tenta remover a linha de anexo
-        // (se a permissão permitir). Linhas remanescentes são limpas pelo job de expurgo.
+        // Remove o anexo como compensação; linhas remanescentes são limpas pelo job de expurgo.
         try {
           await supabaseClient.from('anexos').delete().eq('id', anexoId);
         } catch {
@@ -1086,7 +1085,11 @@ export function useMonitoramento() {
     responsavelId: string,
     alunoId: string,
     turmaId: string,
-    comMensagemSistema = true,
+    opcoes: {
+      mensagemSistemaDe?: string | null;
+      textoSistema?: string;
+      iniciadaPelaGestao?: boolean;
+    } = {},
   ): Promise<string | null> {
     try {
       const { data: existing } = await supabaseClient
@@ -1107,6 +1110,7 @@ export function useMonitoramento() {
           aluno_id: alunoId,
           turma_id: turmaId,
           ativa: true,
+          iniciada_pela_gestao: opcoes.iniciadaPelaGestao ?? false,
         })
         .select('id')
         .single();
@@ -1114,12 +1118,12 @@ export function useMonitoramento() {
       if (error) throw error;
       const convId = (data as unknown as { id: string }).id;
 
-      if (comMensagemSistema) {
+      if (opcoes.mensagemSistemaDe) {
         const agora = new Date().toISOString();
         await supabaseClient.from('mensagens').insert({
           conversa_id: convId,
-          remetente_id: responsavelId,
-          conteudo: 'Conversa iniciada para acompanhamento escolar.',
+          remetente_id: opcoes.mensagemSistemaDe,
+          conteudo: opcoes.textoSistema ?? 'Conversa iniciada para acompanhamento escolar.',
           is_system_message: true,
           created_at: agora,
         });
@@ -1128,6 +1132,16 @@ export function useMonitoramento() {
           .from('conversas')
           .update({ ultima_mensagem_em: agora })
           .eq('id', convId);
+
+        if (opcoes.iniciadaPelaGestao) {
+          await supabaseClient.from('notificacoes').insert({
+            destinatario_id: responsavelId,
+            tipo: 'mensagem',
+            titulo: 'Coordenação iniciou uma conversa',
+            corpo: 'A coordenação escolar abriu um canal de diálogo para acompanhamento.',
+            metadados: { conversa_id: convId },
+          });
+        }
       }
 
       return convId;
@@ -1139,7 +1153,10 @@ export function useMonitoramento() {
     }
   }
 
-  async function abrirConversaResponsavel(alunoId: string): Promise<string | null> {
+  async function abrirConversaResponsavel(
+    alunoId: string,
+    gestaoUserId?: string,
+  ): Promise<string | null> {
     try {
       const { data: vinculos } = await supabaseClient
         .from('vinculos_responsaveis')
@@ -1164,7 +1181,11 @@ export function useMonitoramento() {
       const turmaId = (enturmacoes?.[0] as { turma_id: string } | undefined)?.turma_id;
       if (!turmaId) return null;
 
-      return await criarOuObterConversa(responsavelId, alunoId, turmaId, false);
+      return await criarOuObterConversa(responsavelId, alunoId, turmaId, {
+        mensagemSistemaDe: gestaoUserId ?? null,
+        textoSistema: 'Conversa iniciada pela coordenação para acompanhamento escolar.',
+        iniciadaPelaGestao: !!gestaoUserId,
+      });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       console.error('[useMonitoramento] Erro ao abrir conversa com responsável:', msg);
@@ -1187,7 +1208,7 @@ export function useMonitoramento() {
       const { data: convData } = await supabaseClient
         .from('conversas')
         .select(
-          '*, responsavel:perfis!conversas_responsavel_id_fkey(nome), aluno:alunos!conversas_aluno_id_fkey(nome), turma:turmas!conversas_turma_id_fkey(nome_completo)',
+          '*, iniciada_pela_gestao, responsavel:perfis!conversas_responsavel_id_fkey(nome), aluno:alunos!conversas_aluno_id_fkey(nome), turma:turmas!conversas_turma_id_fkey(nome_completo)',
         )
         .eq('id', conversaId)
         .single();
@@ -1196,6 +1217,7 @@ export function useMonitoramento() {
 
       const conv = convData as unknown as {
         id: string;
+        iniciada_pela_gestao: boolean | null;
         responsavel: { nome: string };
         aluno: { nome: string };
         turma: { nome_completo: string };
@@ -1229,40 +1251,38 @@ export function useMonitoramento() {
         ]),
       );
 
-      const mensagens: MensagemChat[] = (msgsData ?? [])
-        .filter((m: unknown) => !(m as { is_system_message: boolean }).is_system_message)
-        .map((m: unknown) => {
-          const msg = m as {
-            id: string;
-            conversa_id: string;
-            remetente_id: string;
-            conteudo: string;
-            is_system_message: boolean;
-            lida_em: string | null;
-            created_at: string;
-          };
-          const autor = autores.get(msg.remetente_id);
-          const raw = msg.created_at;
-          const d = safeDate(raw);
-          return {
-            id: msg.id,
-            conversaId: msg.conversa_id,
-            remetenteId: msg.remetente_id,
-            autor: autor?.tipo ?? 'gestao',
-            nomeAutor: autor?.nome ?? (msg.is_system_message ? 'Sistema' : 'Equipe escolar'),
-            texto: msg.conteudo,
-            horario: d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-            data: d.toLocaleDateString('pt-BR', {
-              day: '2-digit',
-              month: '2-digit',
-              year: 'numeric',
-            }),
-            dataIso: raw,
-            isSistema: msg.is_system_message,
-            minha: msg.remetente_id === userId,
-            lida: msg.lida_em !== null,
-          };
-        });
+      const mensagens: MensagemChat[] = (msgsData ?? []).map((m: unknown) => {
+        const msg = m as {
+          id: string;
+          conversa_id: string;
+          remetente_id: string;
+          conteudo: string;
+          is_system_message: boolean;
+          lida_em: string | null;
+          created_at: string;
+        };
+        const autor = autores.get(msg.remetente_id);
+        const raw = msg.created_at;
+        const d = safeDate(raw);
+        return {
+          id: msg.id,
+          conversaId: msg.conversa_id,
+          remetenteId: msg.remetente_id,
+          autor: autor?.tipo ?? 'gestao',
+          nomeAutor: autor?.nome ?? (msg.is_system_message ? 'Sistema' : 'Equipe escolar'),
+          texto: msg.conteudo,
+          horario: d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+          data: d.toLocaleDateString('pt-BR', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+          }),
+          dataIso: raw,
+          isSistema: msg.is_system_message,
+          minha: msg.remetente_id === userId,
+          lida: msg.lida_em !== null,
+        };
+      });
 
       return {
         contato: {
@@ -1277,6 +1297,7 @@ export function useMonitoramento() {
           ultimaData: '',
           naoLidas: 0,
           ativa: true,
+          iniciadaPelaGestao: conv.iniciada_pela_gestao ?? false,
         },
         mensagens,
       };
@@ -1324,7 +1345,9 @@ export function useMonitoramento() {
         const turmaId = turmaPorAluno.get(aluno.id);
         if (!turmaId) continue;
 
-        const convId = await criarOuObterConversa(userId, aluno.id, turmaId);
+        const convId = await criarOuObterConversa(userId, aluno.id, turmaId, {
+          mensagemSistemaDe: userId,
+        });
         if (!convId) continue;
 
         const { data: ultima } = await supabaseClient
@@ -1394,7 +1417,7 @@ export function useMonitoramento() {
       let query = supabaseClient
         .from('conversas')
         .select(
-          'id, responsavel_id, aluno_id, turma_id, ativa, ultima_mensagem_em, responsavel:perfis!conversas_responsavel_id_fkey(nome), aluno:alunos!conversas_aluno_id_fkey(nome), turma:turmas!conversas_turma_id_fkey(nome_completo)',
+          'id, responsavel_id, aluno_id, turma_id, ativa, iniciada_pela_gestao, ultima_mensagem_em, responsavel:perfis!conversas_responsavel_id_fkey(nome), aluno:alunos!conversas_aluno_id_fkey(nome), turma:turmas!conversas_turma_id_fkey(nome_completo)',
         );
 
       if (apenasSuasTurmas) {
@@ -1422,6 +1445,7 @@ export function useMonitoramento() {
         aluno_id: string;
         turma_id: string;
         ativa: boolean;
+        iniciada_pela_gestao: boolean | null;
         responsavel: { nome: string };
         aluno: { nome: string };
         turma: { nome_completo: string };
@@ -1471,10 +1495,11 @@ export function useMonitoramento() {
             : '',
           naoLidas: naoLidas ?? 0,
           ativa: conv.ativa,
+          iniciadaPelaGestao: conv.iniciada_pela_gestao ?? false,
         });
       }
 
-      return contatos.filter((c) => c.ultimaMensagem !== 'Nenhuma mensagem ainda');
+      return contatos;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       console.error('[useMonitoramento] Erro ao buscar contatos da equipe:', msg);

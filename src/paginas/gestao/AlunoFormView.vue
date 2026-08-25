@@ -195,8 +195,7 @@ async function salvarAlterarEnturmacao() {
     const anoLetivoId = anoLetivo.id;
 
     if (enturmacaoAtual.value && enturmacaoAtual.value.ano_letivo_id === anoLetivoId) {
-      // Mesmo ano letivo: reutiliza a linha existente (evita violar a unicidade
-      // (aluno_id, ano_letivo_id) e garante que o aluno nunca fique sem enturmação ativa).
+      // Reaproveita a linha existente para respeitar a unicidade de aluno e ano letivo.
       const { error } = await supabaseClient
         .from('enturmacoes')
         .update({

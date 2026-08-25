@@ -35,15 +35,14 @@ async function handleLogin(): Promise<void> {
   try {
     await login(email.value.trim(), senha.value);
 
-    // Após login bem-sucedido, o perfil do usuário foi carregado
-    // em usuario.value (vide carregarPerfil dentro do composable).
+    // Após o login o perfil já está carregado em usuario.value pelo composable.
     const papel = usuario.value?.papel;
 
     if (papel && homePorPapel[papel]) {
-      // Redirecionamento EXPLÍCITO baseado no papel do usuário
+      // Redireciona com base no papel do usuário
       await router.push(homePorPapel[papel]);
     } else {
-      // Caso o perfil não tenha papel definido (recurso de segurança alternativo)
+      // Perfil sem papel definido cai na mensagem de erro
       erro.value = 'Perfil não identificado. Contate a gestão escolar.';
     }
   } catch (erroDesconhecido: unknown) {

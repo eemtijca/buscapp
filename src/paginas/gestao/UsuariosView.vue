@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useGestaoUsuarios } from '@/composables/useGestaoUsuarios';
 import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh';
+import ModalConfirmacao from '@/componentes/ModalConfirmacao.vue';
 import type { UsuarioItem } from '@/tipos/componentes';
 
 const router = useRouter();
@@ -15,6 +16,22 @@ const filtroPapel = ref<'todos' | 'professor' | 'responsavel'>('todos');
 const filtroStatus = ref<'todos' | 'ativo' | 'pendente' | 'inativo'>('todos');
 const mensagemSucesso = ref<string | null>(null);
 const mensagemErro = ref<string | null>(null);
+const confirmacaoPendente = ref<{ usuario: UsuarioItem; acao: 'ativar' | 'desativar' } | null>(
+  null,
+);
+
+const tituloConfirmacao = computed(() =>
+  confirmacaoPendente.value?.acao === 'desativar'
+    ? 'Desativar usuário'
+    : 'Ativar usuário',
+);
+const mensagemConfirmacao = computed(() => {
+  const pendente = confirmacaoPendente.value;
+  if (!pendente) return '';
+  return pendente.acao === 'desativar'
+    ? `Deseja realmente desativar ${pendente.usuario.nome}? O acesso ao sistema será bloqueado imediatamente.`
+    : `Deseja realmente ativar ${pendente.usuario.nome}? O usuário voltará a ter acesso ao sistema.`;
+});
 
 function mostrarSucesso(msg: string) {
   mensagemSucesso.value = msg;
@@ -70,10 +87,21 @@ const statusBadge = (status: string) => {
   return map[status] ?? 'secondary';
 };
 
-async function toggleAtivacao(usuario: UsuarioItem) {
+function toggleAtivacao(usuario: UsuarioItem) {
   // Perfis de gestão não podem ser desativados pela interface (evita travar o sistema)
   if (usuario.papel === 'gestao') return;
-  if (usuario.status === 'ativo') {
+  confirmacaoPendente.value = {
+    usuario,
+    acao: usuario.status === 'ativo' ? 'desativar' : 'ativar',
+  };
+}
+
+async function executarToggleAtivacao() {
+  const pendente = confirmacaoPendente.value;
+  if (!pendente) return;
+  const { usuario, acao } = pendente;
+  confirmacaoPendente.value = null;
+  if (acao === 'desativar') {
     const ok = await desativarUsuario(usuario.id);
     if (ok) {
       usuario.status = 'inativo';
@@ -81,7 +109,7 @@ async function toggleAtivacao(usuario: UsuarioItem) {
     } else {
       mostrarErro('Falha ao desativar usuário.');
     }
-  } else if (usuario.status === 'inativo') {
+  } else {
     const ok = await ativarUsuario(usuario.id);
     if (ok) {
       usuario.status = 'ativo';
@@ -359,5 +387,18 @@ onMounted(async () => {
         </table>
       </div>
     </div>
+
+    <ModalConfirmacao
+      :visivel="!!confirmacaoPendente"
+      :titulo="tituloConfirmacao"
+      :mensagem="mensagemConfirmacao"
+      :rotulo-confirmar="confirmacaoPendente?.acao === 'desativar' ? 'Desativar' : 'Ativar'"
+      :icone="
+        confirmacaoPendente?.acao === 'desativar' ? 'pause-circle' : 'play-circle'
+      "
+      :variante="confirmacaoPendente?.acao === 'desativar' ? 'danger' : 'success'"
+      @confirmar="executarToggleAtivacao"
+      @cancelar="confirmacaoPendente = null"
+    />
   </div>
 </template>

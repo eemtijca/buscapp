@@ -42,6 +42,7 @@ __screenshots__/
 
 examples/
 agent-resources/
+.opencode
 
 # Playwright
 /test-results/

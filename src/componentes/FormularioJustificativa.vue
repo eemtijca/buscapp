@@ -57,20 +57,42 @@ const tamanhoArquivo = computed(() => {
   return (kb / 1024).toFixed(1) + ' MB';
 });
 
+// Arraste em andamento para destacar a área de soltar.
+const arrastando = ref(false);
+
+/** Valida e aceita o arquivo vindo do seletor ou do arraste; retorna true quando aceito. */
+function aceitarArquivo(file: File | null | undefined): boolean {
+  if (!file) return false;
+  if (!file.type.startsWith('image/') && file.type !== 'application/pdf') {
+    erroValidacao.value = 'Formato não aceito. Envie uma imagem ou um PDF.';
+    arquivo.value = null;
+    return false;
+  }
+  if (file.size > 10 * 1024 * 1024) {
+    erroValidacao.value = 'O arquivo é maior que 10 MB. Envie um arquivo menor.';
+    arquivo.value = null;
+    return false;
+  }
+  arquivo.value = file;
+  erroValidacao.value = null;
+  return true;
+}
+
 function aoSelecionarArquivo(event: Event) {
   const alvo = event.target as HTMLInputElement;
-  if (alvo.files && alvo.files.length > 0) {
-    const file = alvo.files[0];
-    if (!file) return;
-    if (file.size > 10 * 1024 * 1024) {
-      erroValidacao.value = 'O arquivo é maior que 10 MB. Envie um arquivo menor.';
-      arquivo.value = null;
-      alvo.value = '';
-      return;
-    }
-    arquivo.value = file;
-    erroValidacao.value = null;
-  }
+  const file = alvo.files?.[0];
+  // Rejeitado: limpa o input para permitir escolher o mesmo arquivo de novo depois.
+  if (!aceitarArquivo(file)) alvo.value = '';
+}
+
+function aoArrastarEntrar() {
+  if (!props.enviando) arrastando.value = true;
+}
+
+function aoSoltarArquivo(event: DragEvent) {
+  arrastando.value = false;
+  if (props.enviando) return;
+  aceitarArquivo(event.dataTransfer?.files?.[0] ?? null);
 }
 
 function limparArquivo() {
@@ -181,9 +203,20 @@ function submeter() {
       <div
         v-if="!arquivo"
         class="border border-2 border-dashed rounded-3 p-3 text-center text-body-secondary"
+        :class="{ 'border-success bg-success-subtle': arrastando }"
+        @dragenter.prevent="aoArrastarEntrar"
+        @dragover.prevent="aoArrastarEntrar"
+        @dragleave.self.prevent="arrastando = false"
+        @drop.prevent="aoSoltarArquivo"
       >
         <i class="bi bi-cloud-arrow-up fs-4 d-block mb-2" aria-hidden="true"></i>
-        <p class="mb-2 small">Toque para escolher uma foto ou documento do celular.</p>
+        <p class="mb-2 small">
+          {{
+            arrastando
+              ? 'Solte o arquivo aqui.'
+              : 'Escolha uma imagem ou PDF do seu dispositivo, ou arraste o arquivo até aqui.'
+          }}
+        </p>
         <label
           for="inputArquivoJustificativa"
           class="btn btn-success btn-sm"

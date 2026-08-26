@@ -28,8 +28,12 @@ export default defineConfig({
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',
 
-    /* Headless mode is set to true by default. Set it to false if you want to see the browser UI. */
     headless: true,
+  },
+
+  /* Workers paralelos competem por um único Postgres local; timeouts maiores evitam falsas falhas. */
+  expect: {
+    timeout: 10_000,
   },
 
   /* Configure projects for major browsers */

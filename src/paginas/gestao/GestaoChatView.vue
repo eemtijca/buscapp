@@ -3,6 +3,7 @@ import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAutenticacao } from '@/composables/useAutenticacao';
 import { useMonitoramento } from '@/composables/useMonitoramento';
+import { useNotificacoes } from '@/composables/useNotificacoes';
 import { supabaseClient } from '@/servicos/supabase';
 import ChatPainelDuplo from '@/componentes/ChatPainelDuplo.vue';
 import type { ContatoChat, MensagemChat } from '@/tipos/componentes';
@@ -20,6 +21,7 @@ const {
   horarioProtegidoAtivo,
   obterHorarioProtegido,
 } = useMonitoramento();
+const { marcarNotificacoesConversaLidas } = useNotificacoes();
 
 const contatos = ref<ContatoChat[]>([]);
 const mensagens = ref<MensagemChat[]>([]);
@@ -85,6 +87,8 @@ async function selecionarConversa(conversaId: string) {
   confirmandoExcluir.value = false;
 
   await marcarMensagensComoLidas(conversaId, userId);
+  // Badge de mensagens novas zera na hora em que a conversa é aberta.
+  await marcarNotificacoesConversaLidas(conversaId);
 
   const det = await buscarConversaDetalhe(conversaId, userId);
   mensagens.value = det.mensagens;
@@ -174,7 +178,7 @@ function inscreverCanalMensagens(conversaId: string) {
 }
 
 function inscreverCanalContatos() {
-  if (!usuario.value) return;
+  if (!usuario.value || canalContatos) return;
   canalContatos = supabaseClient
     .channel('chat-contatos-gestao')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'mensagens' }, () =>

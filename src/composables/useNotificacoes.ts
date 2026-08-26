@@ -209,6 +209,19 @@ async function marcarLida(id: string) {
   await carregar();
 }
 
+/** Limpa as notificações de mensagem de uma conversa lida; o banco propaga o resto. */
+async function marcarNotificacoesConversaLidas(conversaId: string) {
+  if (!usuarioId) return;
+  await supabaseClient
+    .from('notificacoes')
+    .update({ lida: true, lida_em: new Date().toISOString() })
+    .eq('destinatario_id', usuarioId)
+    .eq('tipo', 'mensagem')
+    .eq('lida', false)
+    .eq('metadados->>conversa_id', conversaId);
+  await carregar();
+}
+
 export function useNotificacoes() {
   return {
     naoLidasMensagens,
@@ -221,6 +234,7 @@ export function useNotificacoes() {
     marcarTodasComoLidas,
     limparTodas,
     marcarLida,
+    marcarNotificacoesConversaLidas,
     ICONE_TIPO,
   };
 }

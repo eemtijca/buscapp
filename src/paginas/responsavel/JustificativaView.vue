@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { ref, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useAutenticacao } from '@/composables/useAutenticacao';
 import { useMonitoramento } from '@/composables/useMonitoramento';
@@ -54,7 +54,8 @@ async function handleEnviarJustificativa(payload: {
   enviando.value = false;
 }
 
-onMounted(async () => {
+// Inicializa quando usuario existir: garante carga mesmo após reload direto na rota.
+async function inicializar() {
   if (!usuario.value) return;
 
   const frequenciaId = route.query.frequenciaId as string | undefined;
@@ -80,7 +81,9 @@ onMounted(async () => {
   if (!filhoSelecionado.value) {
     filhoSelecionado.value = filhos.value[0] || null;
   }
-});
+}
+
+watch(usuario, () => void inicializar(), { immediate: true });
 </script>
 
 <template>

@@ -91,7 +91,8 @@ async function carregarAlunos() {
 onMounted(async () => {
   opcoesPeriodos.value = await buscarOpcoes('periodo');
   await carregarAlunos();
-  await inscrever([{ tabela: 'frequencias' }], carregarAlunos);
+  // Enturmacoes na inscrição: matrícula nova aparece na lista sem recarregar.
+  await inscrever([{ tabela: 'frequencias' }, { tabela: 'enturmacoes' }], carregarAlunos);
 });
 
 onUnmounted(() => {

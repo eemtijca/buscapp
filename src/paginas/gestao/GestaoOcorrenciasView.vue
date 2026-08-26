@@ -1,13 +1,24 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue';
+import { nextTick, onUnmounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
+import { useAutenticacao } from '@/composables/useAutenticacao';
 import { useMonitoramento } from '@/composables/useMonitoramento';
 import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh';
+import { useOpcoesConfiguracao } from '@/composables/useOpcoesConfiguracao';
 import ListaOcorrencias from '@/componentes/ListaOcorrencias.vue';
-import type { OcorrenciaGrave } from '@/tipos/componentes';
+import CampoFormulario from '@/componentes/CampoFormulario.vue';
+import GrupoCheckbox from '@/componentes/GrupoCheckbox.vue';
+import type { AlunoFrequencia, OcorrenciaGrave, OpcaoCheckbox } from '@/tipos/componentes';
+import { supabaseClient } from '@/servicos/supabase';
 
 const router = useRouter();
-const { buscarOcorrenciasGraves, alternarBloqueioRetorno } = useMonitoramento();
+const { usuario } = useAutenticacao();
+const {
+  buscarOcorrenciasGraves,
+  alternarBloqueioRetorno,
+  buscarAlunosParaFrequencia,
+  registrarOcorrenciaGrave,
+} = useMonitoramento();
 const {
   ultimaAtualizacao,
   estaAtualizando,
@@ -15,10 +26,25 @@ const {
   inscrever,
   encerrar,
 } = useRealtimeRefresh();
+const { buscarOpcoes } = useOpcoesConfiguracao();
 
 const ocorrencias = ref<OcorrenciaGrave[]>([]);
 const mensagemSucesso = ref<string | null>(null);
 const mensagemErro = ref<string | null>(null);
+
+// Registro de ocorrência pela gestão (mesmo fluxo do professor).
+const mostrarFormulario = ref(false);
+const salvando = ref(false);
+const alunos = ref<AlunoFrequencia[]>([]);
+const opcoesTipo = ref<OpcaoCheckbox[]>([]);
+const opcoesTags = ref<OpcaoCheckbox[]>([]);
+const alunoId = ref('');
+const tipos = ref<string[]>(['grave']);
+const tags = ref<string[]>([]);
+const descricao = ref('');
+const exigePresenca = ref(false);
+const notificarCoordenacao = ref(true);
+const notificarResponsavel = ref(false);
 
 function mostrarSucesso(msg: string) {
   mensagemSucesso.value = msg;
@@ -56,10 +82,76 @@ async function atualizarManual() {
   await refresh(carregarOcorrencias);
 }
 
-onMounted(async () => {
+async function alternarFormulario() {
+  mostrarFormulario.value = !mostrarFormulario.value;
+  if (mostrarFormulario.value && !alunos.value.length) {
+    opcoesTipo.value = await buscarOpcoes('tipo_ocorrencia');
+    const { data: tagsData } = await supabaseClient
+      .from('tags_comportamento')
+      .select('nome, icone, descricao')
+      .eq('ativo', true)
+      .order('nome');
+    opcoesTags.value = (tagsData ?? []).map(
+      (t: { nome: string; icone: string | null; descricao: string | null }) => ({
+        valor: t.nome,
+        rotulo: t.descricao ?? t.nome,
+        icone: t.icone ?? undefined,
+      }),
+    );
+    alunos.value = await buscarAlunosParaFrequencia();
+  }
+}
+
+async function registrarOcorrencia() {
+  if (!usuario.value || !alunoId.value || !tipos.value.length) return;
+  salvando.value = true;
+  try {
+    const ok = await registrarOcorrenciaGrave(
+      alunoId.value,
+      usuario.value.id,
+      descricao.value.trim(),
+      tipos.value,
+      exigePresenca.value,
+      tags.value,
+      notificarCoordenacao.value,
+      notificarResponsavel.value,
+    );
+    if (ok) {
+      mostrarSucesso('Ocorrência registrada com sucesso!');
+      alunoId.value = '';
+      tipos.value = ['grave'];
+      tags.value = [];
+      descricao.value = '';
+      exigePresenca.value = false;
+      notificarCoordenacao.value = true;
+      notificarResponsavel.value = false;
+      mostrarFormulario.value = false;
+      await carregarOcorrencias();
+      await nextTick();
+      requestAnimationFrame(() => {
+        document
+          .querySelector('.alert-success')
+          ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    } else {
+      mostrarErro('Falha ao registrar ocorrência. Tente novamente.');
+    }
+  } finally {
+    salvando.value = false;
+  }
+}
+
+let inicializado = false;
+
+// Inicializa quando usuario existir: garante carga e inscrição realtime mesmo após reload direto.
+async function inicializar() {
+  if (!usuario.value || inicializado) return;
+  inicializado = true;
   await carregarOcorrencias();
   await inscrever([{ tabela: 'ocorrencias' }], carregarOcorrencias);
-});
+}
+
+watch(usuario, () => void inicializar(), { immediate: true });
 
 onUnmounted(() => {
   encerrar();
@@ -86,6 +178,19 @@ onUnmounted(() => {
         <span class="badge text-bg-secondary">{{ ocorrencias.length }} registro(s)</span>
         <button
           type="button"
+          class="btn btn-sm"
+          :class="mostrarFormulario ? 'btn-outline-secondary' : 'btn-success'"
+          @click="alternarFormulario"
+        >
+          <i
+            class="bi me-1"
+            :class="mostrarFormulario ? 'bi-x-lg' : 'bi-plus-lg'"
+            aria-hidden="true"
+          ></i>
+          {{ mostrarFormulario ? 'Cancelar' : 'Registrar ocorrência' }}
+        </button>
+        <button
+          type="button"
           class="btn btn-sm btn-outline-secondary"
           :disabled="estaAtualizando"
           @click="atualizarManual"
@@ -100,7 +205,6 @@ onUnmounted(() => {
           <i v-else class="bi bi-arrow-clockwise me-1" aria-hidden="true"></i>
           Atualizar
         </button>
-        <span class="rounded-circle d-inline-block" style="width: 8px; height: 8px"></span>
       </div>
     </div>
 
@@ -116,6 +220,107 @@ onUnmounted(() => {
     <div v-if="mensagemErro" class="alert alert-danger py-2 small mb-3" role="alert">
       <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>
       {{ mensagemErro }}
+    </div>
+
+    <div v-if="mostrarFormulario" class="card border mb-3">
+      <div class="card-header bg-body-tertiary py-2">
+        <span class="fw-medium small">Nova ocorrência</span>
+      </div>
+      <div class="card-body">
+        <CampoFormulario id="ocoGestaoAluno" label="Aluno" :obrigatorio="true">
+          <select id="ocoGestaoAluno" v-model="alunoId" class="form-select form-select-sm">
+            <option value="" disabled>Selecione um aluno</option>
+            <option v-for="a in alunos" :key="a.id" :value="a.id">
+              {{ a.nome }}<span v-if="a.turma"> — {{ a.turma }}</span>
+            </option>
+          </select>
+        </CampoFormulario>
+
+        <CampoFormulario id="ocoGestaoTipo" label="Tipo de ocorrência" :obrigatorio="true">
+          <GrupoCheckbox
+            nome="tipoOcorrenciaGestao"
+            :opcoes="opcoesTipo"
+            :modelo="tipos"
+            :colunas="3"
+            @update:modelo="tipos = $event"
+          />
+        </CampoFormulario>
+
+        <CampoFormulario
+          id="ocoGestaoTags"
+          label="Tags de comportamento (opcional)"
+          dica="Componha a descrição automaticamente"
+        >
+          <GrupoCheckbox
+            nome="tagsOcorrenciaGestao"
+            :opcoes="opcoesTags"
+            :modelo="tags"
+            :colunas="3"
+            @update:modelo="tags = $event"
+          />
+        </CampoFormulario>
+
+        <CampoFormulario id="ocoGestaoDescricao" label="Descrição" :obrigatorio="true">
+          <textarea
+            id="ocoGestaoDescricao"
+            v-model="descricao"
+            class="form-control form-control-sm"
+            rows="3"
+            maxlength="500"
+            placeholder="Descreva o acontecido com ao menos 10 caracteres."
+          ></textarea>
+        </CampoFormulario>
+
+        <div class="d-flex flex-wrap gap-3 mb-3 small">
+          <div class="form-check">
+            <input
+              id="ocoGestaoPresenca"
+              v-model="exigePresenca"
+              type="checkbox"
+              class="form-check-input"
+            />
+            <label class="form-check-label" for="ocoGestaoPresenca"
+              >Exigir presença do responsável</label
+            >
+          </div>
+          <div class="form-check">
+            <input
+              id="ocoGestaoCoord"
+              v-model="notificarCoordenacao"
+              type="checkbox"
+              class="form-check-input"
+            />
+            <label class="form-check-label" for="ocoGestaoCoord">Notificar coordenação</label>
+          </div>
+          <div class="form-check">
+            <input
+              id="ocoGestaoResp"
+              v-model="notificarResponsavel"
+              type="checkbox"
+              class="form-check-input"
+            />
+            <label class="form-check-label" for="ocoGestaoResp">Notificar responsável</label>
+          </div>
+        </div>
+
+        <div class="d-flex gap-2 justify-content-end">
+          <button
+            type="button"
+            class="btn btn-sm btn-success"
+            :disabled="salvando || !alunoId || !tipos.length || descricao.trim().length < 10"
+            @click="registrarOcorrencia"
+          >
+            <span
+              v-if="salvando"
+              class="spinner-border spinner-border-sm me-1"
+              role="status"
+              aria-hidden="true"
+            ></span>
+            <i v-else class="bi bi-check-lg me-1" aria-hidden="true"></i>
+            Registrar ocorrência
+          </button>
+        </div>
+      </div>
     </div>
 
     <div class="card border">

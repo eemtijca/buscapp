@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import { supabaseClient, decodificarToken } from '@/servicos/supabase';
+import { useAutenticacao } from '@/composables/useAutenticacao';
 import LayoutPrincipal from '@/layouts/LayoutPrincipal.vue';
 import LoginView from '@/paginas/auth/LoginView.vue';
 import SolicitarCodigoView from '@/paginas/auth/SolicitarCodigoView.vue';
@@ -266,25 +267,41 @@ const router = createRouter({
         {
           path: 'alertas',
           name: 'responsavel-alertas',
-          meta: { requerAutenticacao: true, papeisPermitidos: ['responsavel'] },
+          meta: {
+            requerAutenticacao: true,
+            papeisPermitidos: ['responsavel'],
+            moduloPermitido: 'alertas',
+          },
           component: ResponsavelAlertasView,
         },
         {
           path: 'termometro',
           name: 'responsavel-termometro',
-          meta: { requerAutenticacao: true, papeisPermitidos: ['responsavel'] },
+          meta: {
+            requerAutenticacao: true,
+            papeisPermitidos: ['responsavel'],
+            moduloPermitido: 'termometro',
+          },
           component: ResponsavelTermometroView,
         },
         {
           path: 'justificativa',
           name: 'responsavel-justificativa',
-          meta: { requerAutenticacao: true, papeisPermitidos: ['responsavel'] },
+          meta: {
+            requerAutenticacao: true,
+            papeisPermitidos: ['responsavel'],
+            moduloPermitido: 'justificativa',
+          },
           component: ResponsavelJustificativaView,
         },
         {
           path: 'chat',
           name: 'responsavel-chat',
-          meta: { requerAutenticacao: true, papeisPermitidos: ['responsavel'] },
+          meta: {
+            requerAutenticacao: true,
+            papeisPermitidos: ['responsavel'],
+            moduloPermitido: 'chat',
+          },
           component: ResponsavelChatView,
         },
       ],
@@ -354,6 +371,10 @@ router.beforeEach(async (to, _from) => {
       return { name: 'login' };
     }
 
+    const { garantirUsuario } = useAutenticacao();
+    // Views montam com usuario já pronto; evita telas que não carregam nem inscrevem realtime.
+    await garantirUsuario();
+
     const papeisPermitidos = to.meta.papeisPermitidos;
 
     if (papeisPermitidos) {
@@ -367,10 +388,10 @@ router.beforeEach(async (to, _from) => {
 
     // Módulos de acesso com fail-closed: lista vazia nega rotas com moduloPermitido.
     const moduloPermitido = to.meta?.moduloPermitido;
-    if (moduloPermitido && perfilPapel === 'professor') {
+    if (moduloPermitido && perfilPapel) {
       if (!perfilModulos.includes(moduloPermitido)) {
         return {
-          name: 'professor',
+          path: homePorPapel[perfilPapel] ?? '/',
           query: { moduloNegado: moduloPermitido },
         };
       }

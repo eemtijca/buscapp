@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useGestaoUsuarios } from '@/composables/useGestaoUsuarios';
 import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh';
@@ -7,7 +7,13 @@ import type { AlunoItem } from '@/tipos/componentes';
 
 const router = useRouter();
 const { buscarAlunos, carregando } = useGestaoUsuarios();
-const { ultimaAtualizacao, estaAtualizando, atualizar: refresh } = useRealtimeRefresh();
+const {
+  ultimaAtualizacao,
+  estaAtualizando,
+  atualizar: refresh,
+  inscrever,
+  encerrar,
+} = useRealtimeRefresh();
 
 const alunos = ref<AlunoItem[]>([]);
 const busca = ref('');
@@ -47,6 +53,12 @@ async function atualizarManual() {
 
 onMounted(async () => {
   await carregarAlunos();
+  // Enturmacoes na inscrição: matrícula nova aparece na lista sem recarregar.
+  await inscrever([{ tabela: 'alunos' }, { tabela: 'enturmacoes' }], carregarAlunos);
+});
+
+onUnmounted(() => {
+  encerrar();
 });
 </script>
 

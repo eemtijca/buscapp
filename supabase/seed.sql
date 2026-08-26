@@ -98,17 +98,17 @@ where id = 'a0000000-0000-0000-0000-000000000004';
 
 update public.perfis set
   nome = 'Maria Silva', telefone = '(85) 99999-0005', status = 'ativo',
-  acesso_modulos = array['frequencia', 'ocorrencias']
+  acesso_modulos = array['alertas', 'termometro', 'justificativa', 'chat']
 where id = 'a0000000-0000-0000-0000-000000000005';
 
 update public.perfis set
-  nome = 'João Santos', telefone = '(85) 99999-0006', status = 'pendente',
-  acesso_modulos = array['frequencia', 'ocorrencias']
+  nome = 'João Santos', telefone = '(85) 99999-0006', status = 'ativo',
+  acesso_modulos = array['alertas', 'termometro', 'justificativa', 'chat']
 where id = 'a0000000-0000-0000-0000-000000000006';
 
 update public.perfis set
   nome = 'Lucia Oliveira', telefone = '(85) 99999-0007', status = 'ativo',
-  acesso_modulos = array['frequencia', 'ocorrencias']
+  acesso_modulos = array['alertas', 'termometro', 'justificativa', 'chat']
 where id = 'a0000000-0000-0000-0000-000000000007';
 -- 3. ANO LETIVO VIGENTE
 insert into public.anos_letivos (id, ano, status, data_inicio, data_fim, ativo)

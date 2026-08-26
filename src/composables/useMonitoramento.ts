@@ -31,6 +31,7 @@ let cacheConfigSistema: {
   preventivo: number;
   mensagemForaHorario: string;
 } | null = null;
+let cacheHorarios: HorarioProtegido | null = null;
 
 async function carregarConfigSistema(): Promise<void> {
   if (cacheConfigSistema) return;
@@ -60,6 +61,12 @@ function calcularNivelRisco(totalAusencias: number, totalOcorrencias: number): N
   if (totalAusencias >= l.critico || totalOcorrencias >= 1) return 'alto';
   if (totalAusencias >= l.preventivo) return 'medio';
   return 'baixo';
+}
+
+/** Limpa caches de configuração e horários para a próxima sessão não reutilizar dados da anterior. */
+function limparCachesGlobais(): void {
+  cacheConfigSistema = null;
+  cacheHorarios = null;
 }
 
 function formatarData(iso: string): string {
@@ -1563,8 +1570,6 @@ export function useMonitoramento() {
     }
   }
 
-  let cacheHorarios: HorarioProtegido | null = null;
-
   async function carregarHorarios(): Promise<HorarioProtegido> {
     if (cacheHorarios) return cacheHorarios;
     await carregarConfigSistema();
@@ -1573,10 +1578,10 @@ export function useMonitoramento() {
     try {
       const { data } = await supabaseClient
         .from('horarios_letivos')
-        .select('dia_semana, hora_inicio, hora_fim')
-        .eq('ativo', true)
+        .select('dia_semana, hora_inicio, hora_fim, ativo')
         .order('dia_semana');
       if (!data || data.length === 0) {
+        // Banco sem configuração alguma assume a janela escolar padrão.
         cacheHorarios = {
           inicio: '07:00',
           fim: '17:00',
@@ -1585,14 +1590,32 @@ export function useMonitoramento() {
         };
         return cacheHorarios;
       }
-      const dias = [...new Set(data.map((h: { dia_semana: number }) => h.dia_semana))].sort();
+      // Janelas cadastradas mas todas desativadas: gestão fechou o canal por completo.
+      const janelas = (
+        data as Array<{
+          dia_semana: number;
+          hora_inicio: string;
+          hora_fim: string;
+          ativo: boolean;
+        }>
+      ).filter((h) => h.ativo);
+      if (!janelas.length) {
+        cacheHorarios = {
+          inicio: '23:59',
+          fim: '23:59',
+          diasSemana: [],
+          mensagemForaHorario: msg,
+        };
+        return cacheHorarios;
+      }
+      const dias = [...new Set(janelas.map((h: { dia_semana: number }) => h.dia_semana))].sort();
       const horasInicio =
-        data
+        janelas
           .filter((h: { dia_semana: number }) => h.dia_semana === dias[0])
           .map((h: { hora_inicio: string }) => h.hora_inicio.slice(0, 5))
           .sort()[0] ?? '07:00';
       const horasFim =
-        data
+        janelas
           .filter((h: { dia_semana: number }) => h.dia_semana === dias[dias.length - 1])
           .map((h: { hora_fim: string }) => h.hora_fim.slice(0, 5))
           .sort()
@@ -1670,5 +1693,6 @@ export function useMonitoramento() {
     ocultarConversa,
     horarioProtegidoAtivo,
     obterHorarioProtegido,
+    limparCachesGlobais,
   };
 }

@@ -1,5 +1,6 @@
 import { ref, type Ref } from 'vue';
 import { supabaseClient, decodificarToken, armazenamento } from '@/servicos/supabase';
+import { useMonitoramento } from '@/composables/useMonitoramento';
 import type { Perfil, PapelUsuario } from '@/tipos/database';
 
 const usuario: Ref<Perfil | null> = ref(null);
@@ -97,6 +98,9 @@ supabaseClient.auth.onAuthStateChange((event, session) => {
           updated_at: '',
         };
         void carregarModulosDoPerfil(claims.sub);
+      } else {
+        // Tokens sem claims de papel/nome precisam do perfil do banco antes das telas montarem.
+        void carregarPerfil();
       }
     }
     carregando.value = false;
@@ -129,11 +133,18 @@ export function useAutenticacao() {
     supabaseClient.removeAllChannels();
     await supabaseClient.auth.signOut({ scope: 'local' });
     armazenamento.limparTudo();
+    useMonitoramento().limparCachesGlobais();
     usuario.value = null;
   }
 
   async function verificarSessao(): Promise<boolean> {
     return !!usuario.value;
+  }
+
+  /** Garante usuario populado para a sessão atual; evita views montando antes do onAuthStateChange. */
+  async function garantirUsuario(): Promise<void> {
+    if (usuario.value) return;
+    await carregarPerfil();
   }
 
   async function solicitarCodigoRedefinicao(email: string) {
@@ -178,6 +189,7 @@ export function useAutenticacao() {
     login,
     logout,
     verificarSessao,
+    garantirUsuario,
     carregarPerfil,
     solicitarCodigoRedefinicao,
     redefinirSenhaComCodigo,

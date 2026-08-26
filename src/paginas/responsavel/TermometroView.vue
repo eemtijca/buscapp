@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue';
+import { onUnmounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAutenticacao } from '@/composables/useAutenticacao';
 import { useMonitoramento } from '@/composables/useMonitoramento';
@@ -33,17 +33,22 @@ async function recarregarTermometro() {
   }
 }
 
-onMounted(async () => {
-  if (usuario.value) {
-    filhos.value = await buscarFilhosDoResponsavel(usuario.value.id);
-    const primeiro = filhos.value[0];
-    if (primeiro) {
-      await selecionarFilho(primeiro);
-    }
-    await inscrever([{ tabela: 'frequencias' }, { tabela: 'ocorrencias' }], recarregarTermometro);
+let inicializado = false;
+
+// Inicializa quando usuario existir: garante carga e inscrição realtime mesmo após reload direto.
+async function inicializar() {
+  if (!usuario.value || inicializado) return;
+  inicializado = true;
+  filhos.value = await buscarFilhosDoResponsavel(usuario.value.id);
+  const primeiro = filhos.value[0];
+  if (primeiro) {
+    await selecionarFilho(primeiro);
   }
+  await inscrever([{ tabela: 'frequencias' }, { tabela: 'ocorrencias' }], recarregarTermometro);
   carregando.value = false;
-});
+}
+
+watch(usuario, () => void inicializar(), { immediate: true });
 
 onUnmounted(() => {
   encerrar();

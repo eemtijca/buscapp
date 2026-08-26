@@ -243,30 +243,26 @@ watch(dataAula, () => {
       Registrar infrequências
     </h1>
 
-    <ul class="nav nav-pills mb-3 gap-2">
-      <li class="nav-item">
-        <button
-          type="button"
-          class="nav-link"
-          :class="{ active: abaAtiva === 'turma' }"
-          @click="abaAtiva = 'turma'"
-        >
-          <i class="bi bi-people me-1" aria-hidden="true"></i>
-          Chamada por turma
-        </button>
-      </li>
-      <li class="nav-item">
-        <button
-          type="button"
-          class="nav-link"
-          :class="{ active: abaAtiva === 'individual' }"
-          @click="abaAtiva = 'individual'"
-        >
-          <i class="bi bi-person-dash me-1" aria-hidden="true"></i>
-          Registro individual
-        </button>
-      </li>
-    </ul>
+    <div class="btn-group btn-group-sm mb-3" role="group" aria-label="Modo de registro">
+      <button
+        type="button"
+        class="btn"
+        :class="abaAtiva === 'turma' ? 'btn-success' : 'btn-outline-success'"
+        @click="abaAtiva = 'turma'"
+      >
+        <i class="bi bi-people me-1" aria-hidden="true"></i>
+        Chamada por turma
+      </button>
+      <button
+        type="button"
+        class="btn"
+        :class="abaAtiva === 'individual' ? 'btn-success' : 'btn-outline-success'"
+        @click="abaAtiva = 'individual'"
+      >
+        <i class="bi bi-person-dash me-1" aria-hidden="true"></i>
+        Registro individual
+      </button>
+    </div>
 
     <div v-if="mensagemSucesso" class="alert alert-success py-2 small mb-3" role="status">
       <i class="bi bi-check-circle me-1" aria-hidden="true"></i>

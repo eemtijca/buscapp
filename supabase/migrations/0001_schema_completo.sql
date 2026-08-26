@@ -631,6 +631,7 @@ as $$
 $$;
 
 -- Módulos de acesso com fail-closed: lista vazia nega tudo; seed e formulário populam os módulos permitidos.
+-- Pendente também resolve módulos: conta criada pela gestão já pode ser contatada antes do primeiro acesso.
 create or replace function public.get_user_acesso_modulos()
 returns text[]
 language sql
@@ -641,7 +642,7 @@ as $$
   select coalesce(acesso_modulos, '{}'::text[])
   from public.perfis
   where id = auth.uid()
-    and status = 'ativo'
+    and status in ('ativo', 'pendente')
   limit 1;
 $$;
 
@@ -974,6 +975,7 @@ create policy "Freq: responsavel le do dependente"
   using (
     public.get_user_papel() = 'responsavel'
     and public.is_responsavel_do_aluno(aluno_id)
+    and public.get_user_acesso_modulos() && array['alertas', 'termometro', 'justificativa']
   );
 
 create policy "Freq: professor insere"
@@ -1080,6 +1082,7 @@ create policy "Ocorr: responsavel le do dependente"
   using (
     public.get_user_papel() = 'responsavel'
     and public.is_responsavel_do_aluno(aluno_id)
+    and 'alertas' = any(public.get_user_acesso_modulos())
   );
 
 create policy "Ocorr: professor insere"
@@ -1151,7 +1154,10 @@ create policy "OcorrAnexos: le quem ve ocorrencia"
 create policy "JustFaltas: responsavel ve proprias"
   on public.justificativas_faltas for select
   to authenticated
-  using (responsavel_id = auth.uid());
+  using (
+    responsavel_id = auth.uid()
+    and public.get_user_acesso_modulos() && array['justificativa', 'alertas']
+  );
 
 create policy "JustFaltas: gestao ve todas"
   on public.justificativas_faltas for select
@@ -1176,6 +1182,7 @@ create policy "JustFaltas: responsavel insere"
   with check (
     public.get_user_papel() = 'responsavel'
     and responsavel_id = auth.uid()
+    and 'justificativa' = any(public.get_user_acesso_modulos())
   );
 
 create policy "JustFaltas: gestao avalia"
@@ -1214,9 +1221,13 @@ create policy "JustAnexos: gestao le"
 create policy "Conv: participante le"
   on public.conversas for select
   to authenticated
-  using (responsavel_id = auth.uid() or auth.uid() in (
-    select professor_id from public.atribuicoes_professores where turma_id = conversas.turma_id
-  ));
+  using (
+    (responsavel_id = auth.uid()
+      and 'chat' = any(public.get_user_acesso_modulos()))
+    or auth.uid() in (
+      select professor_id from public.atribuicoes_professores where turma_id = conversas.turma_id
+    )
+  );
 
 create policy "Conv: gestao le todas"
   on public.conversas for select
@@ -1226,7 +1237,10 @@ create policy "Conv: gestao le todas"
 create policy "Conv: participante cria"
   on public.conversas for insert
   to authenticated
-  with check (responsavel_id = auth.uid());
+  with check (
+    responsavel_id = auth.uid()
+    and 'chat' = any(public.get_user_acesso_modulos())
+  );
 
 create policy "Conv: gestao cria"
   on public.conversas for insert
@@ -1248,7 +1262,8 @@ create policy "Msg: participante le"
     exists (
       select 1 from public.conversas c
       where c.id = conversa_id
-        and (c.responsavel_id = auth.uid()
+        and ((c.responsavel_id = auth.uid()
+            and 'chat' = any(public.get_user_acesso_modulos()))
           or auth.uid() in (
             select professor_id from public.atribuicoes_professores where turma_id = c.turma_id
           )
@@ -1268,7 +1283,8 @@ create policy "Msg: marca lida"
     exists (
       select 1 from public.conversas c
       where c.id = conversa_id
-        and (c.responsavel_id = auth.uid()
+        and ((c.responsavel_id = auth.uid()
+            and 'chat' = any(public.get_user_acesso_modulos()))
           or auth.uid() in (
             select professor_id from public.atribuicoes_professores where turma_id = c.turma_id
           ))
@@ -1911,6 +1927,14 @@ alter publication supabase_realtime add table public.justificativas_faltas;
 alter publication supabase_realtime add table public.frequencias;
 alter publication supabase_realtime add table public.conversas;
 alter publication supabase_realtime add table public.mensagens;
+-- Enturmacoes na publicação: rematrículas atualizam as listas de alunos em tempo real.
+alter publication supabase_realtime add table public.enturmacoes;
+
+-- Replica identity completa: eventos UPDATE/DELETE do Realtime passam a carregar
+-- todas as colunas, permitindo filtros por aluno_id e a checagem de RLS em DELETE.
+alter table public.frequencias replica identity full;
+alter table public.ocorrencias replica identity full;
+alter table public.justificativas_faltas replica identity full;
 -- 25. STORAGE: BUCKET JUSTIFICATIVAS (RF23/RNF04)
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
@@ -2052,6 +2076,90 @@ create trigger trg_notificar_nova_mensagem
   after insert on public.mensagens
   for each row
   execute function public.fn_notificar_nova_mensagem();
+
+-- 26.3 Limpar notificação de mensagem nova quando a conversa é lida
+
+create or replace function public.fn_notificar_mensagem_lida()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_responsavel_id uuid;
+begin
+  if new.lida_em is null or old.lida_em is not null then
+    return new;
+  end if;
+
+  select c.responsavel_id into v_responsavel_id
+  from public.conversas c where c.id = new.conversa_id;
+
+  -- Limpa apenas o grupo destinatário correspondente a quem leu a conversa.
+  if auth.uid() = v_responsavel_id then
+    update public.notificacoes
+    set lida = true,
+        lida_em = coalesce(lida_em, now())
+    where tipo = 'mensagem'
+      and metadados->>'conversa_id' = new.conversa_id::text
+      and lida = false
+      and destinatario_id = v_responsavel_id;
+  elsif public.get_user_papel() = 'gestao' then
+    update public.notificacoes
+    set lida = true,
+        lida_em = coalesce(lida_em, now())
+    where tipo = 'mensagem'
+      and metadados->>'conversa_id' = new.conversa_id::text
+      and lida = false
+      and destinatario_id in (
+        select id from public.perfis where papel = 'gestao' and status = 'ativo'
+      );
+  end if;
+
+  return new;
+end;
+$$;
+
+create trigger trg_notificar_mensagem_lida
+  after update of lida_em on public.mensagens
+  for each row
+  execute function public.fn_notificar_mensagem_lida();
+
+-- 26.4 Notificar responsável de ocorrência quando marcada para notificação
+
+create or replace function public.fn_notificar_ocorrencia()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_responsaveis uuid[];
+begin
+  if not new.notificar_responsavel then
+    return new;
+  end if;
+
+  select coalesce(array_agg(responsavel_id), '{}') into v_responsaveis
+  from public.vinculos_responsaveis
+  where aluno_id = new.aluno_id and ativo = true;
+
+  insert into public.notificacoes (destinatario_id, tipo, titulo, corpo, metadados)
+  select r,
+         'ocorrencia',
+         'Nova ocorrência registrada',
+         left(new.descricao, 120),
+         jsonb_build_object('aluno_id', new.aluno_id)
+  from unnest(v_responsaveis) as r;
+
+  return new;
+end;
+$$;
+
+create trigger trg_notificar_ocorrencia
+  after insert on public.ocorrencias
+  for each row
+  execute function public.fn_notificar_ocorrencia();
 
 -- 27. INTEGRIDADE: PREVENÇÃO DE DADOS ÓRFÃOS
 
@@ -2561,6 +2669,11 @@ insert into public.opcoes_configuracao (tipo, chave, rotulo, icone, ordem, ativo
   -- modulo: módulos acessíveis ao professor (perfis.acesso_modulos)
   ('modulo', 'frequencia',            'Frequência',        'check2-square',        1, true),
   ('modulo', 'ocorrencias',           'Ocorrências',       'exclamation-triangle', 2, true),
+  -- modulo: módulos acessíveis ao responsável (perfis.acesso_modulos)
+  ('modulo', 'alertas',               'Alertas',           'bell',                 3, true),
+  ('modulo', 'termometro',            'Termômetro',        'thermometer-half',     4, true),
+  ('modulo', 'justificativa',         'Justificativa',     'paperclip',            5, true),
+  ('modulo', 'chat',                  'Chat',              'chat-dots',            6, true),
   -- documento: documentos recebidos do aluno (alunos.documentos_recebidos)
   ('documento', 'rg',                     'RG',                       'person-vcard',       1, true),
   ('documento', 'cpf',                    'CPF',                      'credit-card',        2, true),
@@ -2610,6 +2723,12 @@ insert into public.opcoes_configuracao (tipo, chave, rotulo, icone, ordem, ativo
   ('letra_turma', 'C', 'C', null, 3, true),
   ('letra_turma', 'D', 'D', null, 4, true)
 on conflict (tipo, chave) do nothing;
+
+-- 28.6 Responsáveis existentes recebem os módulos do seu papel (fail-closed exige chaves já catalogadas)
+update public.perfis
+set acesso_modulos = acesso_modulos || array['alertas', 'termometro', 'justificativa', 'chat']
+where papel = 'responsavel'
+  and not ('chat' = any(acesso_modulos));
 
 -- 29.1 Horários letivos padrão (RF27: horário protegido do chat)
 -- Segunda a sexta, 07:00–17:00. Ajustável pela gestão em Configurações › Horários.

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useGestaoUsuarios } from '@/composables/useGestaoUsuarios';
 import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh';
@@ -8,7 +8,13 @@ import type { UsuarioItem } from '@/tipos/componentes';
 
 const router = useRouter();
 const { buscarUsuarios, ativarUsuario, desativarUsuario, carregando } = useGestaoUsuarios();
-const { ultimaAtualizacao, estaAtualizando, atualizar: refresh } = useRealtimeRefresh();
+const {
+  ultimaAtualizacao,
+  estaAtualizando,
+  atualizar: refresh,
+  inscrever,
+  encerrar,
+} = useRealtimeRefresh();
 
 const usuarios = ref<UsuarioItem[]>([]);
 const busca = ref('');
@@ -128,6 +134,11 @@ async function atualizarManual() {
 
 onMounted(async () => {
   await carregarUsuarios();
+  await inscrever([{ tabela: 'perfis' }], carregarUsuarios);
+});
+
+onUnmounted(() => {
+  encerrar();
 });
 </script>
 

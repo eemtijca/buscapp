@@ -748,7 +748,7 @@ assert_contains "10.2 acesso_modulos contém frequencia" "$PERF_DATA" "frequenci
 assert_contains "10.2 permissoes contem exportar" "$PERF_DATA" "exportar"
 
 echo "  10.3 Módulo fora do catálogo rejeitado (CHECK chk_perfis_modulos_catalogo)"
-HTTP=$(api_code PATCH "/rest/v1/perfis?id=eq.a0000000-0000-0000-0000-000000000002" '{"acesso_modulos":["frequencia","chat"]}' "$TG")
+HTTP=$(api_code PATCH "/rest/v1/perfis?id=eq.a0000000-0000-0000-0000-000000000002" '{"acesso_modulos":["frequencia","modulo_inexistente"]}' "$TG")
 assert "10.3 módulo fora do catálogo rejeitado" 1 "$( [ "$HTTP" = "400" ] || [ "$HTTP" = "422" ] && echo 1 || echo 0 )"
 
 echo ""; echo "=== 11. NOVOS CAMPOS — ALUNOS ==="
@@ -774,6 +774,10 @@ assert "12.1 ocorrência arrays vazios 201" "201" "$HTTP"
 # 12.2 perfil com arrays vazios (UPDATE para limpar)
 HTTP=$(api_code PATCH "/rest/v1/perfis?id=eq.a0000000-0000-0000-0000-000000000002" '{"acesso_modulos":[],"permissoes":[]}' "$TG")
 assert "12.2 UPDATE perfil arrays vazios 204" "204" "$HTTP"
+
+# 12.2.1 Restaura módulos e permissões do prof1 (políticas fail-closed exigem o módulo nas seções seguintes)
+HTTP=$(api_code PATCH "/rest/v1/perfis?id=eq.a0000000-0000-0000-0000-000000000002" '{"acesso_modulos":["frequencia","ocorrencias"],"permissoes":["exportar","gerenciar_usuarios"]}' "$TG")
+assert "12.2.1 restaura acesso_modulos do professor 204" "204" "$HTTP"
 
 # 12.3 SELECT view v_feed_aluno com novos tipos
 HTTP=$(api_code GET "/rest/v1/rpc/v_feed_aluno?limit=1" '' "$TG" 2>/dev/null) || HTTP=$(api_code GET "/rest/v1/v_feed_aluno?limit=1" '' "$TG" 2>/dev/null)
@@ -1266,7 +1270,7 @@ echo ""; echo "=== 25. OPCÕES DE CONFIGURAÇÃO ==="
 HTTP=$(api_code GET "/rest/v1/opcoes_configuracao?tipo=eq.modulo&select=chave,rotulo,icone,ordem&order=ordem" '' "$TG")
 assert "25.1 gestão SELECT módulo 200" "200" "$HTTP"
 QTD_MOD=$(api_body | py "d=json.load(sys.stdin); print(len(d) if isinstance(d,list) else 0)" 2>/dev/null)
-assert "25.1 módulo tem 2 opções" "2" "$QTD_MOD"
+assert "25.1 módulo tem 6 opções" "6" "$QTD_MOD"
 
 # 25.2 Gestão INSERT nova opção
 CFG_ID=$(UUID)

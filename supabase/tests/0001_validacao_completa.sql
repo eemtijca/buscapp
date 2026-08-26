@@ -135,6 +135,9 @@ begin
   v_gestao_id := public.test_create_auth_user('gestao_teste@escola.edu.br', 'Coordenador Teste', 'gestao');
   v_professor_id := public.test_create_auth_user('professor_teste@escola.edu.br', 'Professor Teste', 'professor');
   v_responsavel_id := public.test_create_auth_user('responsavel_teste@email.com', 'Responsável Teste', 'responsavel');
+  -- Módulos do papel: políticas fail-closed exigem as chaves do catálogo.
+  update public.perfis set acesso_modulos = array['frequencia', 'ocorrencias'] where id = v_professor_id;
+  update public.perfis set acesso_modulos = array['alertas', 'termometro', 'justificativa', 'chat'] where id = v_responsavel_id;
   perform public.test_set('gestao_id', v_gestao_id::text);
   perform public.test_set('professor_id', v_professor_id::text);
   perform public.test_set('responsavel_id', v_responsavel_id::text);

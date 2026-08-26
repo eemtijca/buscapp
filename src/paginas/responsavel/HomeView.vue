@@ -1,9 +1,16 @@
 <script setup lang="ts">
+import { computed } from 'vue';
 import { useAutenticacao } from '@/composables/useAutenticacao';
 import CartaoNavegacao from '@/componentes/CartaoNavegacao.vue';
 
 const { usuario } = useAutenticacao();
 const nomeResponsavel = usuario.value?.nome || 'Responsável';
+const temModulo = (modulo: string) => (usuario.value?.acesso_modulos ?? []).includes(modulo);
+
+const podeAlertas = computed(() => temModulo('alertas'));
+const podeTermometro = computed(() => temModulo('termometro'));
+const podeJustificativa = computed(() => temModulo('justificativa'));
+const podeChat = computed(() => temModulo('chat'));
 </script>
 
 <template>
@@ -22,7 +29,7 @@ const nomeResponsavel = usuario.value?.nome || 'Responsável';
     </div>
 
     <div class="row g-3 justify-content-center">
-      <div class="col-12 col-md-6 col-lg-4">
+      <div v-if="podeAlertas" class="col-12 col-md-6 col-lg-4">
         <CartaoNavegacao
           icone="bell"
           titulo="Alertas"
@@ -31,7 +38,7 @@ const nomeResponsavel = usuario.value?.nome || 'Responsável';
           cor="success"
         />
       </div>
-      <div class="col-12 col-md-6 col-lg-4">
+      <div v-if="podeTermometro" class="col-12 col-md-6 col-lg-4">
         <CartaoNavegacao
           icone="thermometer-half"
           titulo="Termômetro"
@@ -40,7 +47,7 @@ const nomeResponsavel = usuario.value?.nome || 'Responsável';
           cor="success"
         />
       </div>
-      <div class="col-12 col-md-6 col-lg-4">
+      <div v-if="podeJustificativa" class="col-12 col-md-6 col-lg-4">
         <CartaoNavegacao
           icone="paperclip"
           titulo="Justificativa"
@@ -49,7 +56,7 @@ const nomeResponsavel = usuario.value?.nome || 'Responsável';
           cor="success"
         />
       </div>
-      <div class="col-12 col-md-6 col-lg-4">
+      <div v-if="podeChat" class="col-12 col-md-6 col-lg-4">
         <CartaoNavegacao
           icone="chat-dots"
           titulo="Falar com coordenação"

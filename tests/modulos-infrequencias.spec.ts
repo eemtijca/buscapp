@@ -147,7 +147,7 @@ test.describe('Gestão - Registro de infrequências', () => {
 
     await expect(page).toHaveURL(/\/gestao\/infrequencias\?aluno=/);
     const abaIndividual = page.getByRole('button', { name: 'Registro individual' });
-    await expect(abaIndividual).toHaveClass(/active/);
+    await expect(abaIndividual).toHaveClass(/btn-success/);
 
     await expect(page.locator('#alunoIndividual')).toHaveValue(/^[0-9a-f-]{36}$/);
     await logout(page);
@@ -216,8 +216,10 @@ test.describe('Módulos de acesso - formulário para todos os papéis', () => {
 
     await expect(page.locator('h1')).toContainText('Editar usuário');
     await expect(page.getByText('Módulos de acesso')).toBeVisible();
-    await expect(page.locator('#modulo-frequencia')).toBeChecked();
-    await expect(page.locator('#modulo-ocorrencias')).toBeChecked();
+    await expect(page.locator('#modulo-alertas')).toBeChecked();
+    await expect(page.locator('#modulo-termometro')).toBeChecked();
+    await expect(page.locator('#modulo-justificativa')).toBeChecked();
+    await expect(page.locator('#modulo-chat')).toBeChecked();
 
     await logout(page);
   });

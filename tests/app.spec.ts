@@ -1206,6 +1206,20 @@ test.describe('Gestão - Integridade de catálogo', () => {
         ano_letivo_id: 'b0000000-0000-0000-0000-000000000001',
       },
     ]);
+    // Restaura a enturmação original (1ª A no ano corrente) para não quebrar testes paralelos do professor.
+    await restApi(
+      `/rest/v1/enturmacoes?aluno_id=eq.e0000000-0000-0000-0000-000000000001&ano_letivo_id=eq.b0000000-0000-0000-0000-000000000001`,
+      { method: 'DELETE' },
+    );
+    await restApi('/rest/v1/enturmacoes', {
+      method: 'POST',
+      body: JSON.stringify({
+        aluno_id: 'e0000000-0000-0000-0000-000000000001',
+        turma_id: 'd0000000-0000-0000-0000-000000000001',
+        ano_letivo_id: 'b0000000-0000-0000-0000-000000000001',
+        status: 'matriculado',
+      }),
+    });
   });
 });
 
@@ -1419,16 +1433,67 @@ test.describe('Gestão — Chat', () => {
   });
 
   test('CT75 - Selecionar conversa exibe mensagens', async ({ page }) => {
-    await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
-    await page.goto('/gestao/chat');
-    await page.waitForTimeout(2000);
-    const items = page.locator('.chat-sidebar button');
-    if ((await items.count()) > 0) {
-      await items.first().click();
+    // Conversa dedicada com marcador único: imune a interferência de workers paralelos.
+    const marcador = `CT75-${Date.now()}`;
+    const FA = 'e0000000-0000-0000-0000-000000000001';
+    const FT = 'd0000000-0000-0000-0000-000000000001';
+    const FR = 'a0000000-0000-0000-0000-000000000005';
+    let mensagemId = '';
+    try {
+      // Reaproveita a conversa existente do par responsável-aluno ou cria uma nova (constraint única).
+      const busca = await fetch(
+        `${URL_SUPABASE}/rest/v1/conversas?responsavel_id=eq.${FR}&aluno_id=eq.${FA}&select=id`,
+        { headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` } },
+      );
+      const existentes = (await busca.json()) as Array<{ id: string }>;
+      let conversaId = existentes[0]?.id ?? '';
+      if (!conversaId) {
+        conversaId = crypto.randomUUID();
+        await restApi('/rest/v1/conversas', {
+          method: 'POST',
+          body: JSON.stringify({
+            id: conversaId,
+            responsavel_id: FR,
+            aluno_id: FA,
+            turma_id: FT,
+            ativa: true,
+          }),
+        });
+      }
+      const msgRes = await restApi('/rest/v1/mensagens?select=id', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          apikey: SERVICE_KEY,
+          Authorization: `Bearer ${SERVICE_KEY}`,
+          Prefer: 'return=representation',
+        },
+        body: JSON.stringify({
+          conversa_id: conversaId,
+          remetente_id: 'a0000000-0000-0000-0000-000000000001',
+          conteudo: `${marcador} mensagem de histórico.`,
+        }),
+      });
+      mensagemId = ((await msgRes.json()) as Array<{ id: string }>)[0]?.id ?? '';
+
+      await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
+      await page.goto('/gestao/chat');
+      const item = page.locator('.chat-sidebar button').filter({ hasText: marcador });
+      await expect(item).toBeVisible({ timeout: 10000 });
+      await item.first().click();
       // O histórico deve exibir ao menos uma mensagem da conversa selecionada.
-      await expect(
-        page.locator('.chat-messages .rounded-3').first(),
-      ).toBeVisible({ timeout: 10000 });
+      await expect(page.locator('.chat-messages').getByText(marcador)).toBeVisible({
+        timeout: 10000,
+      });
+    } finally {
+      if (mensagemId) {
+        await restApi(`/rest/v1/mensagens?id=eq.${mensagemId}`, { method: 'DELETE' }).catch(
+          () => {},
+        );
+      }
+      await restApi(`/rest/v1/notificacoes?corpo=ilike.*${marcador}*`, {
+        method: 'DELETE',
+      }).catch(() => {});
     }
   });
 
@@ -2477,10 +2542,13 @@ test.describe('Tempo real — Atualizações sem reload', () => {
 
 // Chat da coordenação iniciado pelo ranking
 test.describe('Chat da coordenação via ranking', () => {
+  // Serial: os testes compartilham a conversa de Lucas e a janela letiva.
+  test.describe.configure({ mode: 'serial' });
   const LUCAS_ID = 'e0000000-0000-0000-0000-000000000005';
   const JOAO_SANTOS_ID = 'a0000000-0000-0000-0000-000000000006';
 
   async function fecharJanelaLetiva() {
+    // Desativa todas as janelas: com o fallback corrigido, o canal fica sempre fora do horário.
     await restApi('/rest/v1/horarios_letivos?ativo=eq.true', {
       method: 'PATCH',
       body: JSON.stringify({ ativo: false }),
@@ -2488,6 +2556,7 @@ test.describe('Chat da coordenação via ranking', () => {
   }
 
   async function reabrirJanelaLetiva() {
+    // Reabre exatamente as janelas fechadas pelo teste.
     await restApi('/rest/v1/horarios_letivos?ativo=eq.false', {
       method: 'PATCH',
       body: JSON.stringify({ ativo: true }),
@@ -2611,5 +2680,44 @@ test.describe('Chat da coordenação via ranking', () => {
         () => {},
       );
     }
+  });
+});
+
+test.describe('Responsável — Anexo da justificativa por arrastar e soltar', () => {
+  /** Cria um DataTransfer com um arquivo sintético para simular o arraste no navegador. */
+  async function dataTransferComArquivo(page: Page, nome: string, tipo: string) {
+    return page.evaluateHandle(
+      ([nomeArg, tipoArg]) => {
+        const dt = new DataTransfer();
+        dt.items.add(new File(['conteudo de teste'], nomeArg, { type: tipoArg }));
+        return dt;
+      },
+      [nome, tipo],
+    );
+  }
+
+  test('CT146 - Anexo aceito por arrastar e soltar e tipo inválido rejeitado', async ({ page }) => {
+    await login(page, 'resp1@email.com', SENHA_RESP);
+    await page.goto('/responsavel/justificativa');
+
+    const zona = page.locator('.border-dashed');
+    await expect(zona).toBeVisible({ timeout: 10000 });
+
+    // PDF arrastado é aceito e exibido como selecionado.
+    const pdf = await dataTransferComArquivo(page, 'atestado.pdf', 'application/pdf');
+    await zona.dispatchEvent('drop', { dataTransfer: pdf });
+    await expect(page.locator('.alert-success').filter({ hasText: 'atestado.pdf' })).toBeVisible();
+
+    // Remove o arquivo antes do segundo cenário.
+    await page.getByRole('button', { name: 'Remover arquivo selecionado' }).click();
+    await expect(zona).toBeVisible();
+
+    // Arquivo de texto é rejeitado com mensagem de formato.
+    const txt = await dataTransferComArquivo(page, 'nota.txt', 'text/plain');
+    await zona.dispatchEvent('drop', { dataTransfer: txt });
+    await expect(page.getByText('Formato não aceito. Envie uma imagem ou um PDF.')).toBeVisible();
+    await expect(page.locator('.alert-success').filter({ hasText: 'nota.txt' })).toHaveCount(0);
+
+    await logout(page);
   });
 });

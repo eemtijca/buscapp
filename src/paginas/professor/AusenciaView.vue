@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, nextTick } from 'vue';
+import { computed, onMounted, onUnmounted, ref, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAutenticacao } from '@/composables/useAutenticacao';
 import { useMonitoramento } from '@/composables/useMonitoramento';
+import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh';
 import { useOpcoesConfiguracao } from '@/composables/useOpcoesConfiguracao';
 import CampoFormulario from '@/componentes/CampoFormulario.vue';
 import GrupoCheckbox from '@/componentes/GrupoCheckbox.vue';
@@ -11,6 +12,7 @@ import type { AlunoFrequencia, OpcaoCheckbox } from '@/tipos/componentes';
 const router = useRouter();
 const { usuario } = useAutenticacao();
 const { buscarAlunosParaFrequencia, registrarAusenciaEmPeriodo, carregando } = useMonitoramento();
+const { inscrever, encerrar } = useRealtimeRefresh();
 
 const alunos = ref<AlunoFrequencia[]>([]);
 const alunoId = ref('');
@@ -80,10 +82,20 @@ async function confirmar() {
   setTimeout(() => (mensagemSucesso.value = null), 4000);
 }
 
+async function carregarAlunos() {
+  alunos.value = await buscarAlunosParaFrequencia();
+}
+
 onMounted(async () => {
   opcoesPeriodos.value = await buscarOpcoes('periodo');
   opcoesMotivos.value = await buscarOpcoes('motivo_ausencia');
-  alunos.value = await buscarAlunosParaFrequencia();
+  await carregarAlunos();
+  // Enturmacoes na inscrição: matrícula nova aparece na lista sem recarregar.
+  await inscrever([{ tabela: 'frequencias' }, { tabela: 'enturmacoes' }], carregarAlunos);
+});
+
+onUnmounted(() => {
+  encerrar();
 });
 </script>
 

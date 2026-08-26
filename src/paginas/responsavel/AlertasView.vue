@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue';
+import { onUnmounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAutenticacao } from '@/composables/useAutenticacao';
 import { useMonitoramento } from '@/composables/useMonitoramento';
@@ -79,14 +79,21 @@ async function atualizarManual() {
   await refresh(carregarAlertas);
 }
 
-onMounted(async () => {
+let inicializado = false;
+
+// Inicializa quando usuario existir: garante carga e inscrição realtime mesmo após reload direto.
+async function inicializar() {
+  if (!usuario.value || inicializado) return;
+  inicializado = true;
   await carregarTags();
   await carregarAlertas();
   await inscrever(
     [{ tabela: 'frequencias' }, { tabela: 'ocorrencias' }, { tabela: 'justificativas_faltas' }],
     carregarAlertas,
   );
-});
+}
+
+watch(usuario, () => void inicializar(), { immediate: true });
 
 onUnmounted(() => {
   encerrar();

@@ -210,7 +210,12 @@ export interface TermometroAtencao {
   alunoNome: string;
   alunoTurma: string | null;
   totalAusencias: number;
+  totalAusenciasJustificadas: number;
   totalOcorrencias: number;
+  score: number;
+  limites: { preventivo: number; critico: number; medio: number; alto: number };
+  fatores: string[];
+  tendencia?: 'alta' | 'estavel' | 'queda';
   mensagem: string;
 }
 

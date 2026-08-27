@@ -64,12 +64,25 @@ create table public.configuracoes_sistema (
   max_tentativas_codigo    integer not null default 5,
   minutos_bloqueio_codigo  integer not null default 15,
   dias_retencao_codigos    integer not null default 30,
-  constraint chk_sistema_singleton check (id = 1)
+  peso_falta               numeric not null default 1.0 constraint chk_peso_falta check (peso_falta between 0.5 and 2.0),
+  peso_ocorrencia          numeric not null default 1.0 constraint chk_peso_ocorrencia check (peso_ocorrencia between 0.5 and 2.0),
+  peso_recencia            numeric not null default 1.0 constraint chk_peso_recencia check (peso_recencia between 0 and 2.0),
+  janela_recencia_dias     integer not null default 14 constraint chk_janela_recencia check (janela_recencia_dias between 7 and 30),
+  limite_score_medio       integer not null default 40 constraint chk_limite_medio check (limite_score_medio between 20 and 60),
+  limite_score_alto        integer not null default 75 constraint chk_limite_alto check (limite_score_alto between 60 and 90),
+  constraint chk_sistema_singleton check (id = 1),
+  constraint chk_limites_score_ordem check (limite_score_medio < limite_score_alto)
 );
 
 insert into public.configuracoes_sistema (id) values (1) on conflict do nothing;
 
 comment on table public.configuracoes_sistema is 'Parâmetros globais de sistema em linha única.';
+comment on column public.configuracoes_sistema.peso_falta is 'Multiplicador do componente de faltas no cálculo do termômetro (0.5–2.0).';
+comment on column public.configuracoes_sistema.peso_ocorrencia is 'Multiplicador do componente de ocorrências no cálculo do termômetro (0.5–2.0).';
+comment on column public.configuracoes_sistema.peso_recencia is 'Multiplicador do componente de recência/decay no cálculo do termômetro (0–2.0).';
+comment on column public.configuracoes_sistema.janela_recencia_dias is 'Janela em dias para contar faltas recentes no componente de recência (7–30).';
+comment on column public.configuracoes_sistema.limite_score_medio is 'Score mínimo para nível médio/amarelo (20–60).';
+comment on column public.configuracoes_sistema.limite_score_alto is 'Score mínimo para nível alto/vermelho (60–90).';
 
 -- 4.3 horarios_letivos
 create table public.horarios_letivos (

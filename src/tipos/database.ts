@@ -58,6 +58,12 @@ export interface ConfiguracaoSistema {
   max_tentativas_codigo: number;
   minutos_bloqueio_codigo: number;
   dias_retencao_codigos: number;
+  peso_falta: number;
+  peso_ocorrencia: number;
+  peso_recencia: number;
+  janela_recencia_dias: number;
+  limite_score_medio: number;
+  limite_score_alto: number;
   updated_at: string;
 }
 

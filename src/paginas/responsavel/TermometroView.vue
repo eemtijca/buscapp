@@ -7,6 +7,7 @@ import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh';
 import TermometroRisco from '@/componentes/TermometroRisco.vue';
 import type { Aluno } from '@/tipos/database';
 import type { TermometroAtencao } from '@/tipos/componentes';
+import { supabaseClient } from '@/servicos/supabase';
 
 const router = useRouter();
 const { usuario } = useAutenticacao();
@@ -18,17 +19,42 @@ const filhoSelecionado = ref<Aluno | null>(null);
 const termometro = ref<TermometroAtencao | null>(null);
 const carregando = ref(true);
 
+/** Busca o nome da turma do aluno para exibir no termômetro. */
+async function buscarTurmaAluno(alunoId: string): Promise<string | null> {
+  try {
+    const { data } = await supabaseClient
+      .from('enturmacoes')
+      .select('turma_id')
+      .eq('aluno_id', alunoId)
+      .eq('status', 'matriculado')
+      .limit(1)
+      .single();
+    const turmaId = (data as unknown as { turma_id: string } | null)?.turma_id;
+    if (!turmaId) return null;
+    const { data: turma } = await supabaseClient
+      .from('turmas')
+      .select('nome_completo')
+      .eq('id', turmaId)
+      .single();
+    return (turma as unknown as { nome_completo: string } | null)?.nome_completo ?? null;
+  } catch {
+    return null;
+  }
+}
+
 async function selecionarFilho(filho: Aluno) {
   filhoSelecionado.value = filho;
-  termometro.value = await buscarTermometroAluno(filho.id, filho.nome, '');
+  const turma = await buscarTurmaAluno(filho.id);
+  termometro.value = await buscarTermometroAluno(filho.id, filho.nome, turma);
 }
 
 async function recarregarTermometro() {
   if (filhoSelecionado.value) {
+    const turma = await buscarTurmaAluno(filhoSelecionado.value.id);
     termometro.value = await buscarTermometroAluno(
       filhoSelecionado.value.id,
       filhoSelecionado.value.nome,
-      '',
+      turma,
     );
   }
 }
@@ -44,7 +70,15 @@ async function inicializar() {
   if (primeiro) {
     await selecionarFilho(primeiro);
   }
-  await inscrever([{ tabela: 'frequencias' }, { tabela: 'ocorrencias' }], recarregarTermometro);
+  await inscrever(
+    [
+      { tabela: 'frequencias' },
+      { tabela: 'ocorrencias' },
+      { tabela: 'justificativas_faltas' },
+      { tabela: 'configuracoes_sistema' },
+    ],
+    recarregarTermometro,
+  );
   carregando.value = false;
 }
 

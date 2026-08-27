@@ -17,6 +17,12 @@ const minutosValidadeCodigo = ref(60);
 const maxTentativasCodigo = ref(5);
 const minutosBloqueioCodigo = ref(15);
 const diasRetencaoCodigos = ref(30);
+const pesoFalta = ref(1);
+const pesoOcorrencia = ref(1);
+const pesoRecencia = ref(1);
+const janelaRecenciaDias = ref(14);
+const limiteScoreMedio = ref(40);
+const limiteScoreAlto = ref(75);
 
 const erros = ref<Record<string, string | null>>({});
 
@@ -29,6 +35,13 @@ const podeSalvar = computed(() => {
   if (maxTentativasCodigo.value < 1) return false;
   if (minutosBloqueioCodigo.value < 1) return false;
   if (diasRetencaoCodigos.value < 1) return false;
+  if (pesoFalta.value < 0.5 || pesoFalta.value > 2) return false;
+  if (pesoOcorrencia.value < 0.5 || pesoOcorrencia.value > 2) return false;
+  if (pesoRecencia.value < 0 || pesoRecencia.value > 2) return false;
+  if (janelaRecenciaDias.value < 7 || janelaRecenciaDias.value > 30) return false;
+  if (limiteScoreMedio.value < 20 || limiteScoreMedio.value > 60) return false;
+  if (limiteScoreAlto.value < 60 || limiteScoreAlto.value > 90) return false;
+  if (limiteScoreMedio.value >= limiteScoreAlto.value) return false;
   return true;
 });
 
@@ -50,6 +63,23 @@ function validar() {
   if (maxTentativasCodigo.value < 1) err.maxTentativasCodigo = 'Deve ser um número positivo.';
   if (minutosBloqueioCodigo.value < 1) err.minutosBloqueioCodigo = 'Deve ser um número positivo.';
   if (diasRetencaoCodigos.value < 1) err.diasRetencaoCodigos = 'Deve ser pelo menos 1 dia.';
+  if (pesoFalta.value < 0.5 || pesoFalta.value > 2) err.pesoFalta = 'Entre 0,5 e 2,0.';
+  if (pesoOcorrencia.value < 0.5 || pesoOcorrencia.value > 2)
+    err.pesoOcorrencia = 'Entre 0,5 e 2,0.';
+  if (pesoRecencia.value < 0 || pesoRecencia.value > 2) err.pesoRecencia = 'Entre 0 e 2,0.';
+  if (janelaRecenciaDias.value < 7 || janelaRecenciaDias.value > 30)
+    err.janelaRecenciaDias = 'Entre 7 e 30 dias.';
+  if (limiteScoreMedio.value < 20 || limiteScoreMedio.value > 60)
+    err.limiteScoreMedio = 'Entre 20 e 60.';
+  if (limiteScoreAlto.value < 60 || limiteScoreAlto.value > 90)
+    err.limiteScoreAlto = 'Entre 60 e 90.';
+  if (
+    limiteScoreMedio.value >= limiteScoreAlto.value &&
+    limiteScoreMedio.value >= 20 &&
+    limiteScoreAlto.value >= 60
+  ) {
+    err.limiteScoreMedio = `Deve ser menor que o limite alto (${limiteScoreAlto.value}).`;
+  }
   erros.value = err;
   return Object.keys(err).length === 0;
 }
@@ -77,6 +107,15 @@ async function carregar() {
       maxTentativasCodigo.value = data.max_tentativas_codigo ?? 5;
       minutosBloqueioCodigo.value = data.minutos_bloqueio_codigo ?? 15;
       diasRetencaoCodigos.value = data.dias_retencao_codigos ?? 30;
+      pesoFalta.value = (data as unknown as { peso_falta?: number }).peso_falta ?? 1;
+      pesoOcorrencia.value = (data as unknown as { peso_ocorrencia?: number }).peso_ocorrencia ?? 1;
+      pesoRecencia.value = (data as unknown as { peso_recencia?: number }).peso_recencia ?? 1;
+      janelaRecenciaDias.value =
+        (data as unknown as { janela_recencia_dias?: number }).janela_recencia_dias ?? 14;
+      limiteScoreMedio.value =
+        (data as unknown as { limite_score_medio?: number }).limite_score_medio ?? 40;
+      limiteScoreAlto.value =
+        (data as unknown as { limite_score_alto?: number }).limite_score_alto ?? 75;
     }
   } catch {
     mostrarErro('Falha ao carregar.');
@@ -101,6 +140,12 @@ async function salvar() {
         max_tentativas_codigo: maxTentativasCodigo.value,
         minutos_bloqueio_codigo: minutosBloqueioCodigo.value,
         dias_retencao_codigos: diasRetencaoCodigos.value,
+        peso_falta: pesoFalta.value,
+        peso_ocorrencia: pesoOcorrencia.value,
+        peso_recencia: pesoRecencia.value,
+        janela_recencia_dias: janelaRecenciaDias.value,
+        limite_score_medio: limiteScoreMedio.value,
+        limite_score_alto: limiteScoreAlto.value,
       })
       .eq('id', 1);
     if (error) throw error;
@@ -242,6 +287,175 @@ onMounted(carregar);
             >{{ mensagemForaHorario.length }}/500</small
           >
         </CampoFormulario>
+
+        <h2 class="h6 fw-bold mt-4 mb-2">Termômetro de atenção — pesos e limites</h2>
+        <p class="small text-body-secondary">
+          Ajuste fino do cálculo inteligente. A barra é sempre verde/amarela/vermelha; o marcador é
+          o score 0–100.
+        </p>
+
+        <!-- Prévia da barra segmentada -->
+        <div class="card bg-body-tertiary border mb-3">
+          <div class="card-body py-3">
+            <div class="small fw-semibold mb-2">Prévia da barra</div>
+            <div class="progress position-relative" style="height: 14px">
+              <div class="progress-bar bg-success" :style="{ width: limiteScoreMedio + '%' }"></div>
+              <div
+                class="progress-bar bg-warning"
+                :style="{ width: limiteScoreAlto - limiteScoreMedio + '%' }"
+              ></div>
+              <div
+                class="progress-bar bg-danger"
+                :style="{ width: 100 - limiteScoreAlto + '%' }"
+              ></div>
+            </div>
+            <div class="d-flex justify-content-between small text-body-secondary mt-1">
+              <span>0</span><span>{{ limiteScoreMedio }}</span
+              ><span>{{ limiteScoreAlto }}</span
+              ><span>100</span>
+            </div>
+            <div class="small text-body-secondary mt-1">
+              Verde 0–{{ limiteScoreMedio - 1 }} · Amarelo {{ limiteScoreMedio }}–{{
+                limiteScoreAlto - 1
+              }}
+              · Vermelho ≥{{ limiteScoreAlto }}
+            </div>
+          </div>
+        </div>
+
+        <div class="row g-3">
+          <div class="col-md-4">
+            <CampoFormulario id="cfg-peso-falta" label="Peso das faltas" :erro="erros.pesoFalta">
+              <div class="input-group">
+                <input
+                  id="cfg-peso-falta"
+                  v-model.number="pesoFalta"
+                  type="number"
+                  class="form-control"
+                  :class="{ 'is-invalid': erros.pesoFalta }"
+                  :disabled="salvando"
+                  min="0.5"
+                  max="2"
+                  step="0.1"
+                  @input="validar"
+                />
+                <span class="input-group-text">×</span>
+              </div>
+            </CampoFormulario>
+          </div>
+          <div class="col-md-4">
+            <CampoFormulario
+              id="cfg-peso-oco"
+              label="Peso das ocorrências"
+              :erro="erros.pesoOcorrencia"
+            >
+              <div class="input-group">
+                <input
+                  id="cfg-peso-oco"
+                  v-model.number="pesoOcorrencia"
+                  type="number"
+                  class="form-control"
+                  :class="{ 'is-invalid': erros.pesoOcorrencia }"
+                  :disabled="salvando"
+                  min="0.5"
+                  max="2"
+                  step="0.1"
+                  @input="validar"
+                />
+                <span class="input-group-text">×</span>
+              </div>
+            </CampoFormulario>
+          </div>
+          <div class="col-md-4">
+            <CampoFormulario
+              id="cfg-peso-recencia"
+              label="Peso da recência"
+              :erro="erros.pesoRecencia"
+            >
+              <div class="input-group">
+                <input
+                  id="cfg-peso-recencia"
+                  v-model.number="pesoRecencia"
+                  type="number"
+                  class="form-control"
+                  :class="{ 'is-invalid': erros.pesoRecencia }"
+                  :disabled="salvando"
+                  min="0"
+                  max="2"
+                  step="0.1"
+                  @input="validar"
+                />
+                <span class="input-group-text">×</span>
+              </div>
+            </CampoFormulario>
+          </div>
+          <div class="col-md-4">
+            <CampoFormulario
+              id="cfg-janela"
+              label="Janela de recência"
+              :erro="erros.janelaRecenciaDias"
+            >
+              <div class="input-group">
+                <input
+                  id="cfg-janela"
+                  v-model.number="janelaRecenciaDias"
+                  type="number"
+                  class="form-control"
+                  :class="{ 'is-invalid': erros.janelaRecenciaDias }"
+                  :disabled="salvando"
+                  min="7"
+                  max="30"
+                  @input="validar"
+                />
+                <span class="input-group-text">dias</span>
+              </div>
+            </CampoFormulario>
+          </div>
+          <div class="col-md-4">
+            <CampoFormulario
+              id="cfg-limite-medio"
+              label="Score médio a partir de"
+              :erro="erros.limiteScoreMedio"
+            >
+              <div class="input-group">
+                <input
+                  id="cfg-limite-medio"
+                  v-model.number="limiteScoreMedio"
+                  type="number"
+                  class="form-control"
+                  :class="{ 'is-invalid': erros.limiteScoreMedio }"
+                  :disabled="salvando"
+                  min="20"
+                  max="60"
+                  @input="validar"
+                />
+                <span class="input-group-text">pts</span>
+              </div>
+            </CampoFormulario>
+          </div>
+          <div class="col-md-4">
+            <CampoFormulario
+              id="cfg-limite-alto"
+              label="Score alto a partir de"
+              :erro="erros.limiteScoreAlto"
+            >
+              <div class="input-group">
+                <input
+                  id="cfg-limite-alto"
+                  v-model.number="limiteScoreAlto"
+                  type="number"
+                  class="form-control"
+                  :class="{ 'is-invalid': erros.limiteScoreAlto }"
+                  :disabled="salvando"
+                  min="60"
+                  max="90"
+                  @input="validar"
+                />
+                <span class="input-group-text">pts</span>
+              </div>
+            </CampoFormulario>
+          </div>
+        </div>
 
         <h2 class="h6 fw-bold mt-4 mb-2">Códigos de acesso</h2>
 

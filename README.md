@@ -100,10 +100,10 @@ Privacidade e resiliência completam os princípios do projeto. Cada perfil enxe
 | CRUD de disciplinas | Cadastro e edição com código SIGE para integração com a SEDUC. |
 | Atribuições | Vínculo professor-turma-disciplina com titular/substituto e período de vigência. |
 | Gestão de códigos | Fila de solicitações, lista de códigos com status, revogação e expiração automática após 1 hora. Limpeza de códigos não ativos com auditoria. |
-| Notificações | Badge não lidas em tempo real. Notificações de mensagem são limpas automaticamente ao ler a conversa (trigger no banco + limpeza imediata no cliente). Responsáveis recebem aviso quando a gestão registra ocorrência com notificação habilitada. |
+| Notificações | Badge não lidas em tempo real. Clique leva ao destino correto por papel (responsável: alertas/justificativa/chat; gestão: ranking/ocorrências/justificativas; professor: frequência/ocorrência) com deep-link `?aluno=`/`?conversa=` e nunca 403. Mensagens são limpas ao ler a conversa (trigger + cliente). |
 | Catálogos genéricos | CRUD completo para módulos, documentos, períodos, motivos de ausência, tipos de ocorrência, vínculos, papéis de atribuição, séries e letras de turma sobre a tabela `opcoes_configuracao`. Chave interna gerada pelo nome, validações por tipo, bloqueio de duplicatas e exclusão de opções referenciadas. Reordenação por arrastar com modo protegido e seletor visual de ícones. |
 | Tags de comportamento | Catálogo com nome, categoria, ícone, descrição e peso de pontuação. Exclusão e renomeação de tags referenciadas em ocorrências são bloqueadas. |
-| Parâmetros do sistema | Limites crítico e preventivo de faltas, dias de expurgo de anexos e nome da escola. |
+| Parâmetros do sistema | Limites crítico/preventivo de faltas, pesos de faltas/ocorrências/recência, janela de recência, limites de score médio/alto, dias de expurgo e nome da escola. Barra do termômetro com prévia em tempo real. |
 | Horários letivos | Janelas de atendimento do chat por dia da semana e horário, com todas desativadas o canal permanece fechado. |
 
 ### Módulo Responsável
@@ -111,7 +111,7 @@ Privacidade e resiliência completam os princípios do projeto. Cada perfil enxe
 | Funcionalidade | Descrição |
 |----------------|-----------|
 | Alertas | Ausências (escola e aula) e ocorrências (grave e suspensão) com distinção visual e badge de urgência. Botão para enviar justificativa direto do alerta. Modal de detalhes com status da justificativa, motivo, anexo via blob e tags de comportamento. Indicadores "Aguardando validação", "Aceita" ou "Recusada". |
-| Termômetro de atenção | Barra de progresso colorida (verde/amarelo/vermelho) com o nível de risco acumulado, calculado de ausências e ocorrências. Suporte a múltiplos filhos com seletor. |
+| Termômetro de atenção | Barra segmentada fixa verde/amarelo/vermelho com marcador de score 0–100. Score ponderado por faltas injustificadas, peso de tags de ocorrências e recência (janela configurável), com faltas justificadas abatidas e tendência 30 dias. Fatores explicativos e limites configuráveis pela gestão. Suporte a múltiplos filhos com seletor. |
 | Justificativas | Envio com suporte a múltiplos dias. Anexo por seleção ou arrastar e soltar, com validação de tipo e tamanho, compressão automática via Canvas API (máximo 1600px, JPEG 0.6) e otimização serverless via Edge Function em segundo plano. Formulário permanece na tela após o envio. |
 | Aviso de presença obrigatória | Badge urgente quando uma ocorrência exige a presença física do responsável na escola para liberar o retorno do aluno. |
 | Chat com horário protegido | Conversa com a equipe da gestão escolar, com indicador online/offline baseado nos horários letivos cadastrados. Auto-scroll para novas mensagens e leitura de mensagens limpa as notificações correspondentes. |
@@ -202,7 +202,7 @@ buscapp/
 │   │   ├── useAutenticacao.ts           # Login, logout, sessão e redefinição de senha por código
 │   │   ├── useGestaoUsuarios.ts         # CRUD de usuários, alunos, turmas, disciplinas, atribuições, códigos
 │   │   ├── useMonitoramento.ts          # Frequência, comportamento, ocorrências, ranking, risco, termômetro, chat. Limites e horários lidos do banco com cache em memória
-│   │   ├── useNotificacoes.ts           # Leitura, marcação de lidas e limpeza de notificações
+│   │   ├── useNotificacoes.ts           # Notificações por papel com deep-link ?aluno/?conversa e roteamento sem 403
 │   │   ├── useOpcoesConfiguracao.ts     # Busca em cache de opções configuráveis por tipo
 │   │   ├── useRealtimeRefresh.ts        # Canal de conexão Realtime e auto-refresh
 │   │   ├── useStatusConexao.ts          # Health check periódico no Supabase Auth
@@ -256,6 +256,7 @@ buscapp/
 │   │   └── index.ts                     # Vue Router com guardas RBAC e módulos de acesso
 │   ├── servicos/
 │   │   ├── supabase.ts                  # Cliente Supabase, decodificação JWT, extração de claims
+│   │   ├── termometro.ts                # Cálculo puro do score/nivel/fatores do termômetro (pesos e recência)
 │   │   └── armazenamentoAdaptavel.ts    # Storage adaptativo (localStorage/sessionStorage)
 │   ├── tipos/
 │   │   ├── database.ts                  # Tipos do schema do banco de dados
@@ -290,8 +291,27 @@ buscapp/
 │   ├── test-api.sh                      # Testes de API com bash/curl
 │   └── test-db.sh                       # Executa testes SQL no container Docker do Supabase
 ├── tests/
-│   ├── app.spec.ts                      # Testes E2E Playwright (fluxos completos)
-│   ├── modulos-infrequencias.spec.ts    # Testes E2E de módulos, infrequências e termômetro
+│   ├── suporte/                         # Helpers compartilhados (dados, api, sessao, fixtures)
+│   │   ├── dados.ts
+│   │   ├── api.ts
+│   │   ├── sessao.ts
+│   │   └── fixtures.ts
+│   ├── autenticacao.spec.ts             # Auth e recuperação de senha
+│   ├── gestao-navegacao.spec.ts         # Home da gestão
+│   ├── gestao-usuarios.spec.ts          # Usuários, códigos no cadastro e módulos
+│   ├── gestao-alunos.spec.ts            # Alunos e documentos
+│   ├── gestao-codigos.spec.ts           # Códigos (workflow completo, dedup, bloqueio, copiar)
+│   ├── gestao-catalogo.spec.ts          # Catálogos e integridade
+│   ├── gestao-estrutura.spec.ts         # Turmas, disciplinas, atribuições e anos letivos
+│   ├── professor.spec.ts                # Professor (frequência, ausência, ocorrências, gating)
+│   ├── ranking-ocorrencias.spec.ts      # Ranking e registro de infrequências
+│   ├── anexos.spec.ts                   # Visualizador blob
+│   ├── chat.spec.ts                     # Chat responsável/gestão + notificações
+│   ├── chat-coordenacao.spec.ts         # Chat iniciado pela coordenação via ranking
+│   ├── tempo-real.spec.ts               # Realtime sem reload
+│   ├── responsavel-justificativa.spec.ts # Anexo por arrastar e soltar
+│   ├── termometro.spec.ts               # Termômetro (barra segmentada, limiares, justificativa, pesos) — CT-T1..T5
+│   ├── notificacoes.spec.ts             # Notificações por papel sem 403 com deep-link
 │   └── pwa.spec.ts                      # Testes do build PWA (config dedicada, roda contra preview)
 ├── .github/workflows/
 │   ├── codeql.yml                       # Análise de segurança CodeQL
@@ -431,7 +451,7 @@ O banco é gerenciado pelo Supabase (PostgreSQL 17) com 30 tabelas, 5 views anal
 
 | Tabela | Descrição |
 |--------|-----------|
-| `configuracoes_sistema` | Parâmetros globais (limites de ausência crítica e preventiva, dias de expurgo, nome da escola). |
+| `configuracoes_sistema` | Parâmetros globais (limites de faltas, pesos e janela de recência do termômetro, limites de score médio/alto, dias de expurgo, nome da escola e parâmetros de códigos). |
 | `opcoes_configuracao` | Catálogo genérico de opções configuráveis pela gestão (módulos, documentos, períodos, motivos de ausência, tipos de ocorrência, vínculos, papéis de atribuição, séries e letras de turma). Chaves validadas por restrições `CHECK` nas tabelas que as referenciam. |
 
 ### Views Analíticas
@@ -716,18 +736,19 @@ O projeto possui quatro camadas de teste independentes.
 
 ### E2E (Playwright)
 
-- **Arquivos:** `tests/app.spec.ts` e `tests/modulos-infrequencias.spec.ts`, totalizando 146 testes coletados por projeto.
+- **Arquivos:** `tests/*.spec.ts` organizados por domínio (16 arquivos + `tests/suporte/` com helpers), ~150 testes por projeto (2 skipped) + `tests/pwa.spec.ts` dedicado.
 - **Projetos:** Chromium, Firefox, WebKit, Mobile Chrome (Pixel 5) e Mobile Safari (iPhone 12).
 - **Cobertura:**
   - Login, logout e credenciais inválidas
   - Gestão: home, usuários com confirmação de ativação/desativação, módulos de acesso para todos os papéis, infrequências (chamada por turma e registro individual), alunos, códigos, turmas, anos letivos (virada e reversão), atribuições, ranking com botões de chat e falta
   - Professor: frequência, ausência e ocorrências
   - Responsável: chat, home com cartões por módulo, alertas, justificativas (incluindo anexo por arrastar e soltar)
+  - Termômetro inteligente: barra segmentada fixa, limiar 9/10 faltas, gatilho crítico, abatimento de justificativa e persistência de pesos (CT-T1..T5)
   - Tempo real: alertas, notificações, ocorrências, ranking e lista de frequência atualizam sem reload
   - Visualizador de anexo (modal blob, sem token na URL)
-  - Notificações (popover, marcar lidas, limpar todas)
-  - Chat completo (sidebar, mensagens, busca, header, horário protegido)
-  - Configurações do sistema (catálogos, tags, parâmetros, horários)
+  - Notificações por papel com deep-link `?aluno`/`?conversa` sem 403 (popover, marcar lidas, limpar todas)
+  - Chat completo (sidebar, mensagens, busca, header, horário protegido) e chat iniciado pela coordenação via ranking
+  - Configurações do sistema (catálogos, tags, parâmetros com pesos do termômetro, horários)
   - Integridade de catálogo e transferência de enturmação
   - Resiliência e casos extremos
 - **Execução:** `npm run test:e2e` (o dev server é iniciado automaticamente; requer Supabase local + seed).

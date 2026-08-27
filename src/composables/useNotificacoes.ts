@@ -3,6 +3,7 @@ import { supabaseClient } from '@/servicos/supabase';
 import { timestampRelativo } from '@/utils/chatUtils';
 import type { Notificacao } from '@/tipos/database';
 import type { NotificacaoItem } from '@/tipos/componentes';
+import { useAutenticacao } from '@/composables/useAutenticacao';
 
 const naoLidasMensagens: Ref<number> = ref(0);
 const naoLidasOutros: Ref<number> = ref(0);
@@ -30,18 +31,41 @@ const ICONE_TIPO: Record<string, string> = {
   codigo_redefinicao: 'key',
 };
 
-function rotaPorTipo(tipo: string, _metadados?: Record<string, unknown> | null): string {
-  const papel = (window as unknown as Record<string, unknown>).__papel__ as string | undefined;
+/** Obtém o papel do usuário logado para roteamento de notificações (Opção A). */
+function obterPapel(): string | undefined {
+  const usuario = useAutenticacao().usuario.value;
+  if (usuario?.papel) return usuario.papel;
+  return undefined;
+}
+
+function rotaPorTipo(tipo: string, metadados?: Record<string, unknown> | null): string {
+  const papel = obterPapel();
+  const alunoId = (metadados?.aluno_id as string | undefined) ?? null;
+  const conversaId = (metadados?.conversa_id as string | undefined) ?? null;
+  const qsAluno = alunoId ? `?aluno=${alunoId}` : '';
+  const qsConversa = conversaId ? `?conversa=${conversaId}` : '';
+
   if (tipo === 'mensagem') {
-    if (papel === 'responsavel') return '/responsavel/chat';
-    if (papel === 'gestao') return '/gestao/chat';
+    if (papel === 'responsavel') return `/responsavel/chat${qsConversa}`;
+    if (papel === 'gestao') return `/gestao/chat${qsConversa}`;
+    // Professor não tem chat; cai no home
+    return papel ? `/${papel}` : '/';
   }
-  if (tipo === 'ausencia_portao' || tipo === 'ausencia_aula') {
-    if (papel === 'responsavel') return '/responsavel/alertas';
-    return '/gestao/ranking';
+  if (tipo === 'ausencia_portao' || tipo === 'ausencia_aula' || tipo === 'monitoramento') {
+    if (papel === 'responsavel') return `/responsavel/alertas${qsAluno}`;
+    if (papel === 'professor') return `/professor/frequencia${qsAluno}`;
+    return `/gestao/ranking${qsAluno}`;
   }
-  if (tipo === 'ocorrencia') return '/gestao/ocorrencias';
-  if (tipo === 'justificativa') return '/gestao/justificativas';
+  if (tipo === 'ocorrencia') {
+    if (papel === 'responsavel') return `/responsavel/alertas${qsAluno}`;
+    if (papel === 'professor') return `/professor/ocorrencia${qsAluno}`;
+    return `/gestao/ocorrencias${qsAluno}`;
+  }
+  if (tipo === 'justificativa') {
+    if (papel === 'responsavel') return `/responsavel/justificativa${qsAluno}`;
+    if (papel === 'professor') return `/professor`;
+    return `/gestao/justificativas${qsAluno}`;
+  }
   if (tipo === 'codigo_redefinicao') return '/gestao/codigos';
   return papel ? `/${papel}` : '/';
 }

@@ -8,8 +8,8 @@ dotenv.config();
  */
 export default defineConfig({
   testDir: './tests',
-  /* Testes de PWA rodam contra o build de produção (vide playwright.pwa.config.ts) */
-  testIgnore: /pwa\.spec\.ts/,
+  /* PWA roda apenas no preview (playwright.pwa.config.ts); suporte não é spec */
+  testIgnore: [/pwa\.spec\.ts/, /suporte\//],
   /* Run tests in files in parallel */
   fullyParallel: true,
   /* Fail the build on CI if you accidentally left test.only in the source code. */

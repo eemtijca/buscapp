@@ -20,10 +20,15 @@ function handleClickOutside(e: MouseEvent) {
   }
 }
 
-function navegar(n: { id: string; rota: string; lida: boolean }) {
-  if (!n.lida) marcarLida(n.id);
+async function navegar(n: { id: string; rota: string; lida: boolean }) {
+  if (!n.lida) void marcarLida(n.id);
   aberto.value = false;
-  router.push(n.rota);
+  try {
+    await router.push(n.rota);
+  } catch {
+    // Fallback para home em caso de rota bloqueada
+    await router.push('/');
+  }
 }
 
 async function handleLimparTodas() {

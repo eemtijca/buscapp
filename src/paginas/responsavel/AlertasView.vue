@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { onUnmounted, ref, watch } from 'vue';
-import { useRouter } from 'vue-router';
+import { onUnmounted, ref, watch, nextTick } from 'vue';
+import { useRouter, useRoute } from 'vue-router';
 import { useAutenticacao } from '@/composables/useAutenticacao';
 import { useMonitoramento } from '@/composables/useMonitoramento';
 import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh';
@@ -10,6 +10,7 @@ import type { AlertaResponsavel } from '@/tipos/componentes';
 import { supabaseClient } from '@/servicos/supabase';
 
 const router = useRouter();
+const route = useRoute();
 const { usuario } = useAutenticacao();
 const { buscarAlertasResponsavel } = useMonitoramento();
 const {
@@ -72,12 +73,34 @@ function fecharModal() {
 async function carregarAlertas() {
   if (usuario.value) {
     alertas.value = await buscarAlertasResponsavel(usuario.value.id);
+    await nextTick();
+    destacarAlertaDeepLink();
+  }
+}
+
+/** Destaca os alertas via ?aluno= (deep-link da notificação). */
+function destacarAlertaDeepLink() {
+  const alunoId = route.query.aluno as string | undefined;
+  if (!alunoId || !alertas.value.length) return;
+  // Se houver filtro por aluno, destaca o primeiro card visível
+  const primeiro = document.querySelector('.row.g-3 .col-12');
+  if (primeiro) {
+    primeiro.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    primeiro.classList.add('ring', 'ring-primary');
+    setTimeout(() => primeiro.classList.remove('ring', 'ring-primary'), 2500);
   }
 }
 
 async function atualizarManual() {
   await refresh(carregarAlertas);
 }
+
+watch(
+  () => route.query.aluno,
+  () => {
+    void nextTick(() => destacarAlertaDeepLink());
+  },
+);
 
 let inicializado = false;
 

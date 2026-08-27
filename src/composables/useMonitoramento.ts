@@ -25,42 +25,107 @@ import type {
   TermometroAtencao,
   HorarioProtegido,
 } from '@/tipos/componentes';
+import {
+  calcularTermometro,
+  calcularNivel,
+  CONFIG_TERMOMETRO_PADRAO,
+  type ConfigTermometro,
+} from '@/servicos/termometro';
 
 let cacheConfigSistema: {
   critico: number;
   preventivo: number;
+  pesoFalta: number;
+  pesoOcorrencia: number;
+  pesoRecencia: number;
+  janelaRecenciaDias: number;
+  limiteScoreMedio: number;
+  limiteScoreAlto: number;
   mensagemForaHorario: string;
 } | null = null;
 let cacheHorarios: HorarioProtegido | null = null;
+
+/** Monta a configuração do termômetro a partir do cache. */
+function obterConfigTermometro(): ConfigTermometro {
+  const c = cacheConfigSistema;
+  if (!c) return { ...CONFIG_TERMOMETRO_PADRAO };
+  return {
+    preventivo: c.preventivo,
+    critico: c.critico,
+    pesoFalta: c.pesoFalta,
+    pesoOcorrencia: c.pesoOcorrencia,
+    pesoRecencia: c.pesoRecencia,
+    janelaRecenciaDias: c.janelaRecenciaDias,
+    limiteScoreMedio: c.limiteScoreMedio,
+    limiteScoreAlto: c.limiteScoreAlto,
+  };
+}
 
 async function carregarConfigSistema(): Promise<void> {
   if (cacheConfigSistema) return;
   try {
     const { data } = await supabaseClient
       .from('configuracoes_sistema')
-      .select('limite_critico_faltas, limite_preventivo_faltas, mensagem_fora_horario')
+      .select(
+        'limite_critico_faltas, limite_preventivo_faltas, mensagem_fora_horario, peso_falta, peso_ocorrencia, peso_recencia, janela_recencia_dias, limite_score_medio, limite_score_alto',
+      )
       .single();
+    const row = data as unknown as {
+      limite_critico_faltas?: number;
+      limite_preventivo_faltas?: number;
+      mensagem_fora_horario?: string;
+      peso_falta?: number;
+      peso_ocorrencia?: number;
+      peso_recencia?: number;
+      janela_recencia_dias?: number;
+      limite_score_medio?: number;
+      limite_score_alto?: number;
+    } | null;
     cacheConfigSistema = {
-      critico: data?.limite_critico_faltas ?? 25,
-      preventivo: data?.limite_preventivo_faltas ?? 10,
+      critico: row?.limite_critico_faltas ?? 25,
+      preventivo: row?.limite_preventivo_faltas ?? 10,
+      pesoFalta: row?.peso_falta ?? 1,
+      pesoOcorrencia: row?.peso_ocorrencia ?? 1,
+      pesoRecencia: row?.peso_recencia ?? 1,
+      janelaRecenciaDias: row?.janela_recencia_dias ?? 14,
+      limiteScoreMedio: row?.limite_score_medio ?? 40,
+      limiteScoreAlto: row?.limite_score_alto ?? 75,
       mensagemForaHorario:
-        data?.mensagem_fora_horario ??
+        row?.mensagem_fora_horario ??
         'O canal de diálogo está fora do horário escolar. Mensagens enviadas agora serão respondidas quando a coordenação estiver disponível.',
     };
   } catch {
     cacheConfigSistema = {
       critico: 25,
       preventivo: 10,
+      pesoFalta: 1,
+      pesoOcorrencia: 1,
+      pesoRecencia: 1,
+      janelaRecenciaDias: 14,
+      limiteScoreMedio: 40,
+      limiteScoreAlto: 75,
       mensagemForaHorario: 'O canal de diálogo está fora do horário escolar.',
     };
   }
 }
 
-function calcularNivelRisco(totalAusencias: number, totalOcorrencias: number): NivelRisco {
-  const l = cacheConfigSistema ?? { critico: 25, preventivo: 10, mensagemForaHorario: '' };
-  if (totalAusencias >= l.critico || totalOcorrencias >= 1) return 'alto';
-  if (totalAusencias >= l.preventivo) return 'medio';
-  return 'baixo';
+/** Mantido para compatibilidade: delega para o serviço de termômetro. */
+export function calcularNivelRisco(totalAusencias: number, totalOcorrencias: number): NivelRisco {
+  const cfg = obterConfigTermometro();
+  // Compatibilidade: quando só há contagens, mapeia cada ocorrência para peso padrão 10.
+  const ocorrencias = Array.from({ length: totalOcorrencias }, () => ({
+    peso: 10,
+    exigePresenca: false,
+    categoria: 'atencao',
+  }));
+  return calcularNivel(0, totalAusencias, ocorrencias, cfg);
+}
+
+/** Calcula dias entre duas datas ISO (YYYY-MM-DD). */
+function diasEntre(a: string, b: string): number {
+  const da = new Date(a + 'T00:00:00');
+  const db = new Date(b + 'T00:00:00');
+  return Math.round((db.getTime() - da.getTime()) / (1000 * 60 * 60 * 24));
 }
 
 /** Limpa caches de configuração e horários para a próxima sessão não reutilizar dados da anterior. */
@@ -373,6 +438,8 @@ export function useMonitoramento() {
     carregando.value = true;
     erro.value = null;
     try {
+      const cfg = obterConfigTermometro();
+
       const { data: alunosData, error: errAlunos } = await supabaseClient
         .from('alunos')
         .select('*')
@@ -383,44 +450,129 @@ export function useMonitoramento() {
 
       const { data: frequenciasData, error: errFreq } = await supabaseClient
         .from('frequencias')
-        .select('aluno_id, data_aula');
+        .select('aluno_id, data_aula, status')
+        .eq('status', 'ausente')
+        .is('deleted_at', null);
 
       if (errFreq) throw errFreq;
       const frequencias = (frequenciasData ?? []) as unknown as Pick<
         Frequencia,
-        'aluno_id' | 'data_aula'
+        'aluno_id' | 'data_aula' | 'status'
       >[];
+
+      // Justificativas aceitas para abater faltas do ranking.
+      const alunoIds = alunos.map((a) => a.id);
+      const { data: justsData } = await supabaseClient
+        .from('justificativas_faltas')
+        .select('aluno_id, data_falta, data_fim')
+        .in('aluno_id', alunoIds)
+        .eq('status', 'aceita');
+      const justificadas = new Set<string>();
+      for (const j of (justsData ?? []) as unknown as Array<{
+        aluno_id: string;
+        data_falta: string;
+        data_fim: string | null;
+      }>) {
+        const fim = j.data_fim ?? j.data_falta;
+        const inicio = new Date(j.data_falta + 'T00:00:00');
+        const fimD = new Date(fim + 'T00:00:00');
+        for (let d = new Date(inicio); d <= fimD; d.setDate(d.getDate() + 1)) {
+          justificadas.add(`${j.aluno_id}:${d.toISOString().slice(0, 10)}`);
+        }
+      }
 
       const { data: ocorrenciasData, error: errOco } = await supabaseClient
         .from('ocorrencias')
-        .select('aluno_id, exige_presenca_responsavel');
+        .select('aluno_id, exige_presenca_responsavel, tags_comportamento, created_at');
 
       if (errOco) throw errOco;
-      const ocorrencias = (ocorrenciasData ?? []) as unknown as Pick<
-        Ocorrencia,
-        'aluno_id' | 'exige_presenca_responsavel'
+      const ocorrenciasRaw = (ocorrenciasData ?? []) as unknown as Array<
+        Pick<
+          Ocorrencia,
+          'aluno_id' | 'exige_presenca_responsavel' | 'tags_comportamento' | 'created_at'
+        >
       >[];
 
+      // Mapa de peso por tag para cálculo ponderado.
+      const { data: tagsData } = await supabaseClient
+        .from('tags_comportamento')
+        .select('nome, peso_pontuacao, categoria');
+      const pesoPorTag = new Map<string, { peso: number; categoria: string }>();
+      for (const t of (tagsData ?? []) as unknown as Array<{
+        nome: string;
+        peso_pontuacao: number;
+        categoria: string;
+      }>) {
+        pesoPorTag.set(t.nome, { peso: t.peso_pontuacao, categoria: t.categoria });
+      }
+
+      const hojeIso = new Date().toISOString().slice(0, 10);
+      const janelaInicio = new Date();
+      janelaInicio.setDate(janelaInicio.getDate() - cfg.janelaRecenciaDias);
+      const janelaIso = janelaInicio.toISOString().slice(0, 10);
+
       const ranking: AlunoRisco[] = alunos.map((aluno) => {
-        const ausencias = frequencias.filter((f) => f.aluno_id === aluno.id);
-        const ocos = ocorrencias.filter((o) => o.aluno_id === aluno.id);
-        const totalAusencias = ausencias.length;
-        const totalOcorrencias = ocos.length;
-        const ultima = ausencias
+        const todasAusencias = frequencias.filter((f) => f.aluno_id === aluno.id);
+        const ausenciasInjust = todasAusencias.filter(
+          (f) => !justificadas.has(`${aluno.id}:${f.data_aula}`),
+        );
+        const ocos = (
+          ocorrenciasRaw as unknown as Array<{
+            aluno_id: string;
+            exige_presenca_responsavel: boolean;
+            tags_comportamento: string[];
+            created_at: string;
+          }>
+        ).filter((o) => o.aluno_id === aluno.id);
+
+        const faltasRecentes = ausenciasInjust.filter((f) => f.data_aula >= janelaIso).length;
+        const ultima = ausenciasInjust
           .map((f) => f.data_aula)
           .sort()
           .reverse()[0];
+        const diasDesdeUltima = ultima ? diasEntre(ultima, hojeIso) : null;
+
+        // Mapeia ocorrências para peso/categoria.
+        const ocorrenciasCalc = ocos.map((o) => {
+          let peso = 0;
+          let categoria = 'atencao';
+          for (const nome of (o.tags_comportamento ?? []) as string[]) {
+            const info = pesoPorTag.get(nome);
+            if (info) {
+              peso += Math.max(0, info.peso);
+              if (info.categoria === 'critico') categoria = 'critico';
+            } else {
+              peso += 10;
+            }
+          }
+          // Sem tags mas com registro já conta peso padrão leve.
+          if (peso === 0 && ((o.tags_comportamento ?? []) as string[]).length === 0) peso = 5;
+          return { peso, exigePresenca: o.exige_presenca_responsavel, categoria };
+        });
+
+        const { nivel } = calcularTermometro(
+          {
+            faltasInjustificadas: ausenciasInjust.length,
+            faltasRecentes,
+            diasDesdeUltimaFalta: diasDesdeUltima,
+            ocorrencias: ocorrenciasCalc,
+          },
+          cfg,
+        );
+
         return {
           id: aluno.id,
           nome: aluno.nome,
           matricula: aluno.matricula,
           turma: null,
           serie: null,
-          totalAusencias,
-          totalOcorrencias,
-          nivel: calcularNivelRisco(totalAusencias, totalOcorrencias),
+          totalAusencias: ausenciasInjust.length,
+          totalOcorrencias: ocos.length,
+          nivel,
           ultimaAusencia: ultima ? formatarData(ultima) : undefined,
-          exigePresencaResponsavel: ocos.some((o) => o.exige_presenca_responsavel),
+          exigePresencaResponsavel: (
+            ocos as unknown as Array<{ exige_presenca_responsavel: boolean }>
+          ).some((o) => o.exige_presenca_responsavel),
         };
       });
 
@@ -789,25 +941,118 @@ export function useMonitoramento() {
     alunoTurma: string | null,
   ): Promise<TermometroAtencao> {
     await carregarConfigSistema();
+    const cfg = obterConfigTermometro();
     try {
       const { data: freqs, error: errF } = await supabaseClient
         .from('frequencias')
         .select('id, data_aula')
         .eq('aluno_id', alunoId)
-        .eq('status', 'ausente');
+        .eq('status', 'ausente')
+        .is('deleted_at', null);
 
       if (errF) throw errF;
-      const totalAusencias = (freqs ?? []).length;
+      const todasFreqs = (freqs ?? []) as unknown as Array<{ id: string; data_aula: string }>;
+
+      // Faltas justificadas (aceitas) não contam para o score.
+      const { data: justs } = await supabaseClient
+        .from('justificativas_faltas')
+        .select('data_falta, data_fim')
+        .eq('aluno_id', alunoId)
+        .eq('status', 'aceita');
+      const datasJustificadas = new Set<string>();
+      for (const j of (justs ?? []) as unknown as Array<{
+        data_falta: string;
+        data_fim: string | null;
+      }>) {
+        const fim = j.data_fim ?? j.data_falta;
+        const ini = new Date(j.data_falta + 'T00:00:00');
+        const fimD = new Date(fim + 'T00:00:00');
+        for (let d = new Date(ini); d <= fimD; d.setDate(d.getDate() + 1)) {
+          datasJustificadas.add(d.toISOString().slice(0, 10));
+        }
+      }
+      const freqsInjust = todasFreqs.filter((f) => !datasJustificadas.has(f.data_aula));
+      const totalAusenciasJustificadas = todasFreqs.length - freqsInjust.length;
+      const totalAusencias = freqsInjust.length;
+
+      // Recência: faltas na janela e dias desde a última.
+      const hojeIso = new Date().toISOString().slice(0, 10);
+      const janelaInicio = new Date();
+      janelaInicio.setDate(janelaInicio.getDate() - cfg.janelaRecenciaDias);
+      const janelaIso = janelaInicio.toISOString().slice(0, 10);
+      const faltasRecentes = freqsInjust.filter((f) => f.data_aula >= janelaIso).length;
+      const ultimaFalta =
+        freqsInjust
+          .map((f) => f.data_aula)
+          .sort()
+          .reverse()[0] ?? null;
+      const diasDesdeUltimaFalta = ultimaFalta ? diasEntre(ultimaFalta, hojeIso) : null;
+
+      // Tendência 30d vs 30d anteriores.
+      const d30 = new Date();
+      d30.setDate(d30.getDate() - 30);
+      const d60 = new Date();
+      d60.setDate(d60.getDate() - 60);
+      const iso30 = d30.toISOString().slice(0, 10);
+      const iso60 = d60.toISOString().slice(0, 10);
+      const cnt30 = freqsInjust.filter((f) => f.data_aula >= iso30).length;
+      const cnt60 = freqsInjust.filter((f) => f.data_aula >= iso60 && f.data_aula < iso30).length;
+      let tendencia: TermometroAtencao['tendencia'] = 'estavel';
+      if (cnt30 > cnt60) tendencia = 'alta';
+      else if (cnt30 < cnt60) tendencia = 'queda';
 
       const { data: ocos, error: errO } = await supabaseClient
         .from('ocorrencias')
-        .select('id')
+        .select('id, tags_comportamento, exige_presenca_responsavel')
         .eq('aluno_id', alunoId);
 
       if (errO) throw errO;
-      const totalOcorrencias = (ocos ?? []).length;
+      const ocosRaw = (ocos ?? []) as unknown as Array<{
+        id: string;
+        tags_comportamento: string[];
+        exige_presenca_responsavel: boolean;
+      }>;
+      const totalOcorrencias = ocosRaw.length;
 
-      const nivel = calcularNivelRisco(totalAusencias, totalOcorrencias);
+      // Busca pesos das tags para cálculo ponderado.
+      const { data: tagsData } = await supabaseClient
+        .from('tags_comportamento')
+        .select('nome, peso_pontuacao, categoria');
+      const pesoPorTag = new Map<string, { peso: number; categoria: string }>();
+      for (const t of (tagsData ?? []) as unknown as Array<{
+        nome: string;
+        peso_pontuacao: number;
+        categoria: string;
+      }>) {
+        pesoPorTag.set(t.nome, { peso: t.peso_pontuacao, categoria: t.categoria });
+      }
+
+      const ocorrenciasCalc = ocosRaw.map((o) => {
+        let peso = 0;
+        let categoria = 'atencao';
+        for (const nome of o.tags_comportamento ?? []) {
+          const info = pesoPorTag.get(nome);
+          if (info) {
+            peso += Math.max(0, info.peso);
+            if (info.categoria === 'critico') categoria = 'critico';
+          } else {
+            peso += 10;
+          }
+        }
+        if (peso === 0 && (o.tags_comportamento ?? []).length === 0) peso = 5;
+        return { peso, exigePresenca: o.exige_presenca_responsavel, categoria };
+      });
+
+      const { score, nivel, fatores } = calcularTermometro(
+        {
+          faltasInjustificadas: totalAusencias,
+          faltasRecentes,
+          diasDesdeUltimaFalta,
+          ocorrencias: ocorrenciasCalc,
+        },
+        cfg,
+      );
+
       const mensagens: Record<NivelRisco, string> = {
         baixo: 'Continue acompanhando a vida escolar do seu filho.',
         medio: 'Há registros de faltas e/ou ocorrências. Entre em contato com a escola.',
@@ -819,7 +1064,17 @@ export function useMonitoramento() {
         alunoNome,
         alunoTurma,
         totalAusencias,
+        totalAusenciasJustificadas,
         totalOcorrencias,
+        score,
+        limites: {
+          preventivo: cfg.preventivo,
+          critico: cfg.critico,
+          medio: cfg.limiteScoreMedio,
+          alto: cfg.limiteScoreAlto,
+        },
+        fatores,
+        tendencia,
         mensagem: mensagens[nivel],
       };
     } catch (e) {
@@ -830,7 +1085,17 @@ export function useMonitoramento() {
         alunoNome,
         alunoTurma,
         totalAusencias: 0,
+        totalAusenciasJustificadas: 0,
         totalOcorrencias: 0,
+        score: 0,
+        limites: {
+          preventivo: cfg.preventivo,
+          critico: cfg.critico,
+          medio: cfg.limiteScoreMedio,
+          alto: cfg.limiteScoreAlto,
+        },
+        fatores: [],
+        tendencia: 'estavel',
         mensagem: 'Não foi possível carregar os dados de risco.',
       };
     }

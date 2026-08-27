@@ -50,7 +50,7 @@ export function calcularNivel(
   ocorrencias: EntradaTermometro['ocorrencias'],
   cfg: ConfigTermometro,
 ): NivelRisco {
-  // Presença obrigatória ou tag crítica força nível alto imediatamente.
+  // Presença obrigatória ou tag crítica determina nível alto imediatamente.
   const temGatilhoCritico = ocorrencias.some((o) => o.exigePresenca || o.categoria === 'critico');
   if (temGatilhoCritico) return 'alto';
 
@@ -58,7 +58,7 @@ export function calcularNivel(
   if (faltasInjustificadas >= cfg.critico) return 'alto';
   if (faltasInjustificadas >= cfg.preventivo) return 'medio';
 
-  // Caso contrário, usa os limiares de score configuráveis.
+  // Caso contrário, utiliza os limiares de score configuráveis.
   if (score >= cfg.limiteScoreAlto) return 'alto';
   if (score >= cfg.limiteScoreMedio) return 'medio';
   return 'baixo';
@@ -71,31 +71,27 @@ export function calcularTermometro(
 ): ResultadoTermometro {
   const fatores: string[] = [];
 
-  // Componente de faltas: até 70 pontos, proporcional ao limite crítico.
+  // Componente de faltas com até 70 pontos, proporcional ao limite crítico.
   const baseFaltas = Math.min(70, (entrada.faltasInjustificadas / Math.max(1, cfg.critico)) * 70);
   const scoreFaltas = Math.min(70, baseFaltas * cfg.pesoFalta);
   if (entrada.faltasInjustificadas > 0) {
     fatores.push(`${entrada.faltasInjustificadas} falta(s) injustificada(s)`);
   }
 
-  // Componente de ocorrências: soma dos pesos das tags, limitado a 30 pontos.
+  // Componente de ocorrências com soma dos pesos das tags, limitado a 30 pontos.
   const somaPesoOcorrencias = entrada.ocorrencias.reduce((acc, o) => acc + Math.max(0, o.peso), 0);
   const baseOcorrencias = Math.min(30, somaPesoOcorrencias);
   const scoreOcorrencias = Math.min(30, baseOcorrencias * cfg.pesoOcorrencia);
   if (entrada.ocorrencias.length > 0) {
-    // Se houver pesos configurados, exibe a soma; senão, contagem simples.
-    if (somaPesoOcorrencias > 0) {
-      fatores.push(`${entrada.ocorrencias.length} ocorrência(s) — peso ${somaPesoOcorrencias}`);
-    } else {
-      fatores.push(`${entrada.ocorrencias.length} ocorrência(s)`);
-    }
+    // Contagem simples para o responsável, mantendo vocabulário consistente com o restante do projeto.
+    fatores.push(`${entrada.ocorrencias.length} ocorrência(s)`);
   }
   const temExigePresenca = entrada.ocorrencias.some((o) => o.exigePresenca);
   if (temExigePresenca) {
     fatores.push('exige presença do responsável');
   }
 
-  // Componente de recência: faltas recentes + decaimento por dias sem falta.
+  // Componente de recência com faltas recentes e decaimento por dias sem falta.
   let scoreRecencia = 0;
   if (entrada.faltasRecentes > 0) {
     // Até 15 pontos por concentração recente.
@@ -116,7 +112,7 @@ export function calcularTermometro(
   return { score, nivel, fatores };
 }
 
-/** Mapeia nível para classes Bootstrap de cor. */
+/** Mapeia o nível para classes Bootstrap de cor, representando verde, amarelo ou vermelho. */
 export function corPorNivel(nivel: NivelRisco): string {
   switch (nivel) {
     case 'alto':
@@ -128,7 +124,7 @@ export function corPorNivel(nivel: NivelRisco): string {
   }
 }
 
-/** Retorna as porcentagens dos limiares para a barra segmentada. */
+/** Retorna as porcentagens dos limiares da barra móvel para as faixas média e alta. */
 export function pctLimiares(cfg: ConfigTermometro): { medio: number; alto: number } {
   return { medio: cfg.limiteScoreMedio, alto: cfg.limiteScoreAlto };
 }

@@ -935,6 +935,7 @@ export function useMonitoramento() {
     }
   }
 
+  /** Busca faltas e ocorrências do aluno e calcula o Termômetro de Atenção. Faltas justificadas são desconsideradas; a tendência compara os últimos 30 dias com os 30 dias anteriores. */
   async function buscarTermometroAluno(
     alunoId: string,
     alunoNome: string,
@@ -953,7 +954,7 @@ export function useMonitoramento() {
       if (errF) throw errF;
       const todasFreqs = (freqs ?? []) as unknown as Array<{ id: string; data_aula: string }>;
 
-      // Faltas justificadas (aceitas) não contam para o score.
+      // Faltas justificadas com status aceito não compõem o score e formam a base de ausências injustificadas.
       const { data: justs } = await supabaseClient
         .from('justificativas_faltas')
         .select('data_falta, data_fim')
@@ -975,7 +976,7 @@ export function useMonitoramento() {
       const totalAusenciasJustificadas = todasFreqs.length - freqsInjust.length;
       const totalAusencias = freqsInjust.length;
 
-      // Recência: faltas na janela e dias desde a última.
+      // Recência considera faltas dentro da janela configurada e dias desde a última ocorrência.
       const hojeIso = new Date().toISOString().slice(0, 10);
       const janelaInicio = new Date();
       janelaInicio.setDate(janelaInicio.getDate() - cfg.janelaRecenciaDias);
@@ -988,7 +989,7 @@ export function useMonitoramento() {
           .reverse()[0] ?? null;
       const diasDesdeUltimaFalta = ultimaFalta ? diasEntre(ultimaFalta, hojeIso) : null;
 
-      // Tendência 30d vs 30d anteriores.
+      // Tendência compara o volume dos últimos 30 dias com os 30 dias anteriores.
       const d30 = new Date();
       d30.setDate(d30.getDate() - 30);
       const d60 = new Date();
@@ -1014,7 +1015,7 @@ export function useMonitoramento() {
       }>;
       const totalOcorrencias = ocosRaw.length;
 
-      // Busca pesos das tags para cálculo ponderado.
+      // Consulta os pesos das tags para o cálculo ponderado das ocorrências.
       const { data: tagsData } = await supabaseClient
         .from('tags_comportamento')
         .select('nome, peso_pontuacao, categoria');

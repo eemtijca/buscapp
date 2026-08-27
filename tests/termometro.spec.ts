@@ -57,7 +57,7 @@ test.describe('Termômetro — Barra segmentada inteligente', () => {
     await limparTermometro();
   });
 
-  test('CT-T1 - Barra tem 3 segmentos verde/amarelo/vermelho e marcador de score', async ({ page }) => {
+  test('CT-T1 - Barra móvel única colorida por nível (verde/amarelo/vermelho) com score', async ({ page }) => {
     await criarFaltas(2, '2026-02-01');
     await login(page, 'resp1@email.com', SENHA_RESP);
     await page.goto('/responsavel/termometro');
@@ -65,14 +65,29 @@ test.describe('Termômetro — Barra segmentada inteligente', () => {
     await expect(card).toBeVisible();
     const progress = page.locator('.progress[role="progressbar"]');
     await expect(progress).toBeVisible();
-    await expect(progress.locator('.progress-bar.bg-success')).toBeVisible();
-    await expect(progress.locator('.progress-bar.bg-warning')).toBeVisible();
-    await expect(progress.locator('.progress-bar.bg-danger')).toBeVisible();
-    // Marcador de score
-    await expect(progress.locator('.position-absolute.bg-dark')).toBeVisible();
+    // Barra móvel: apenas 1 segmento visível, cor depende do nível
+    await expect(progress.locator('.progress-bar')).toHaveCount(1);
+    await expect(progress.locator('.progress-bar')).toBeVisible();
+    await expect(progress.locator('.progress-bar.bg-success, .progress-bar.bg-warning, .progress-bar.bg-danger')).toBeVisible();
+    // Largura reflete o score (aria-valuenow)
+    const score = await progress.getAttribute('aria-valuenow');
+    expect(score).toMatch(/^\d+$/);
+    await expect(progress.locator('.progress-bar')).toHaveAttribute('style', new RegExp(`${score}%`));
     await expect(progress).toHaveAttribute('aria-valuenow', /^\d+$/);
-    await expect(card.getByText(/Score \d+\/100/)).toBeVisible();
-    await expect(card.getByText(/Limites/)).toBeVisible();
+    await expect(progress).toHaveAttribute('aria-valuetext', /(Tudo certo|Atenção|Risco alto)/);
+    // Marcadores sutis de limiar
+    await expect(progress.locator('.termometro-marcador')).toHaveCount(2);
+    await expect(card.getByText(/\d+\/100/)).toBeVisible();
+    // Detalhe colapsável organizado em tabela
+    await expect(card.getByText('Como é calculado?')).toBeVisible();
+    const details = card.locator('details');
+    await expect(details).toContainText(/Atenção/);
+    await expect(details).toContainText(/Amarelo/);
+    await expect(details).toContainText(/A partir de/);
+    await details.locator('summary').click();
+    await expect(details).toHaveAttribute('open', '');
+    await expect(details.locator('table')).toBeVisible();
+    await expect(details.locator('table')).toContainText(/Limite configurado/);
   });
 
   test('CT-T2 - 9 faltas fica no verde e 10 faltas cruza para amarelo', async ({ page }) => {

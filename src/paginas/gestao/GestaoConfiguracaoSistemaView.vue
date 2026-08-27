@@ -290,24 +290,75 @@ onMounted(carregar);
 
         <h2 class="h6 fw-bold mt-4 mb-2">Termômetro de atenção — pesos e limites</h2>
         <p class="small text-body-secondary">
-          Ajuste fino do cálculo inteligente. A barra é sempre verde/amarela/vermelha; o marcador é
-          o score 0–100.
+          Ajuste fino do cálculo inteligente. A barra preenche até o score e muda de cor
+          (verde/amarelo/vermelho) conforme os limiares.
         </p>
 
-        <!-- Prévia da barra segmentada -->
+        <!-- Prévia da barra móvel -->
         <div class="card bg-body-tertiary border mb-3">
           <div class="card-body py-3">
             <div class="small fw-semibold mb-2">Prévia da barra</div>
-            <div class="progress position-relative" style="height: 14px">
-              <div class="progress-bar bg-success" :style="{ width: limiteScoreMedio + '%' }"></div>
+            <div class="d-flex gap-2 mb-2">
+              <button
+                v-for="ex in [20, 50, 85]"
+                :key="ex"
+                type="button"
+                class="btn btn-sm py-0 px-2"
+                :class="
+                  ex < limiteScoreMedio
+                    ? 'btn-success'
+                    : ex < limiteScoreAlto
+                      ? 'btn-warning'
+                      : 'btn-danger'
+                "
+                style="font-size: 0.75rem"
+                :aria-label="'Exemplo score ' + ex"
+              >
+                {{ ex }}
+              </button>
+              <span class="small text-body-secondary align-self-center ms-1"
+                >exemplos de score</span
+              >
+            </div>
+            <div class="d-flex flex-column gap-2">
               <div
-                class="progress-bar bg-warning"
-                :style="{ width: limiteScoreAlto - limiteScoreMedio + '%' }"
-              ></div>
-              <div
-                class="progress-bar bg-danger"
-                :style="{ width: 100 - limiteScoreAlto + '%' }"
-              ></div>
+                v-for="ex in [20, 50, 85]"
+                :key="'bar-' + ex"
+                class="progress position-relative bg-white rounded-pill overflow-hidden"
+                style="height: 14px"
+              >
+                <div
+                  class="progress-bar rounded-pill"
+                  :class="
+                    ex < limiteScoreMedio
+                      ? 'bg-success'
+                      : ex < limiteScoreAlto
+                        ? 'bg-warning'
+                        : 'bg-danger'
+                  "
+                  :style="{ width: ex + '%' }"
+                ></div>
+                <span
+                  class="position-absolute top-0 bottom-0"
+                  :style="{
+                    left: limiteScoreMedio + '%',
+                    width: '2px',
+                    background: 'rgba(0,0,0,0.15)',
+                    transform: 'translateX(-50%)',
+                  }"
+                  aria-hidden="true"
+                ></span>
+                <span
+                  class="position-absolute top-0 bottom-0"
+                  :style="{
+                    left: limiteScoreAlto + '%',
+                    width: '2px',
+                    background: 'rgba(0,0,0,0.15)',
+                    transform: 'translateX(-50%)',
+                  }"
+                  aria-hidden="true"
+                ></span>
+              </div>
             </div>
             <div class="d-flex justify-content-between small text-body-secondary mt-1">
               <span>0</span><span>{{ limiteScoreMedio }}</span
@@ -318,7 +369,7 @@ onMounted(carregar);
               Verde 0–{{ limiteScoreMedio - 1 }} · Amarelo {{ limiteScoreMedio }}–{{
                 limiteScoreAlto - 1
               }}
-              · Vermelho ≥{{ limiteScoreAlto }}
+              · Vermelho ≥{{ limiteScoreAlto }} — a barra assume a cor do nível.
             </div>
           </div>
         </div>

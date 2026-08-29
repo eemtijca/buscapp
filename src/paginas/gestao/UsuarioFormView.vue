@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { onMounted, ref, watch, nextTick } from 'vue';
+import { computed, onMounted, ref, watch, nextTick } from 'vue';
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router';
 import { useGestaoUsuarios } from '@/composables/useGestaoUsuarios';
 import { useOpcoesConfiguracao } from '@/composables/useOpcoesConfiguracao';
 import { supabaseClient } from '@/servicos/supabase';
 import CampoFormulario from '@/componentes/CampoFormulario.vue';
+import Combobox from '@/componentes/Combobox.vue';
+import type { OpcaoCombobox } from '@/componentes/Combobox.vue';
 import GrupoCheckbox from '@/componentes/GrupoCheckbox.vue';
 import type {
   PapelPerfil,
@@ -32,6 +34,19 @@ const notificacoesAtivas = ref(true);
 const acessoModulos = ref<string[]>([]);
 
 const opcoesModulos = ref<OpcaoCheckbox[]>([]);
+
+const papelOpcoes = computed<OpcaoCombobox[]>(() => [
+  { valor: 'professor', rotulo: 'Professor' },
+  { valor: 'responsavel', rotulo: 'Responsável' },
+]);
+const statusOpcoes = computed<OpcaoCombobox[]>(() => {
+  const base: OpcaoCombobox[] = [
+    { valor: 'ativo', rotulo: 'Ativo' },
+    { valor: 'pendente', rotulo: 'Pendente' },
+  ];
+  if (papel.value !== 'gestao') base.push({ valor: 'inativo', rotulo: 'Inativo' });
+  return base;
+});
 
 function chavesCatalogoModulo(): Set<string> {
   return new Set(opcoesModulos.value.map((o) => o.valor));
@@ -421,15 +436,14 @@ async function salvar() {
           </CampoFormulario>
 
           <CampoFormulario id="campoPapel" label="Papel" :obrigatorio="true">
-            <select
+            <Combobox
               id="campoPapel"
               v-model="papel"
-              class="form-select form-select-sm"
-              :disabled="modoEdicao"
-            >
-              <option value="professor">Professor</option>
-              <option value="responsavel">Responsável</option>
-            </select>
+              :opcoes="papelOpcoes"
+              placeholder="Selecione o papel"
+              tamanho="sm"
+              :desabilitado="modoEdicao"
+            />
           </CampoFormulario>
 
           <CampoFormulario id="campoTelefone" label="Telefone">
@@ -467,20 +481,16 @@ async function salvar() {
           </div>
 
           <div v-if="modoEdicao" class="mt-3 mb-0">
-            <label for="campoStatus" class="form-label small fw-medium">Status</label>
-            <select
-              id="campoStatus"
-              v-model="status"
-              class="form-select form-select-sm"
-              :disabled="papel === 'gestao'"
-              :title="
-                papel === 'gestao' ? 'Perfis de gestão não podem ser desativados.' : undefined
-              "
-            >
-              <option value="ativo">Ativo</option>
-              <option value="pendente">Pendente</option>
-              <option v-if="papel !== 'gestao'" value="inativo">Inativo</option>
-            </select>
+            <CampoFormulario id="campoStatus" label="Status">
+              <Combobox
+                id="campoStatus"
+                v-model="status"
+                :opcoes="statusOpcoes"
+                placeholder="Selecione o status"
+                tamanho="sm"
+                :desabilitado="papel === 'gestao'"
+              />
+            </CampoFormulario>
           </div>
         </div>
       </div>

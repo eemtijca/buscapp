@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { supabaseClient } from '@/servicos/supabase';
 import CampoFormulario from '@/componentes/CampoFormulario.vue';
+import Combobox from '@/componentes/Combobox.vue';
+import type { OpcaoCombobox } from '@/componentes/Combobox.vue';
 import type { HorarioLetivo } from '@/tipos/database';
 
 const diasSemana = [
@@ -27,6 +29,14 @@ const formDia = ref(1);
 const formInicio = ref('07:00');
 const formFim = ref('17:00');
 const formAtivo = ref(true);
+
+const diasOpcoes = computed<OpcaoCombobox[]>(() =>
+  diasSemana.map((d) => ({ valor: String(d.valor), rotulo: d.rotulo })),
+);
+const formDiaStr = computed({
+  get: () => String(formDia.value),
+  set: (v: string) => (formDia.value = Number(v)),
+});
 
 function mostrarSucesso(msg: string) {
   mensagemSucesso.value = msg;
@@ -233,14 +243,14 @@ onMounted(carregar);
             <button type="button" class="btn-close" @click="modalAberto = false"></button>
           </div>
           <div class="modal-body">
-            <div class="mb-3">
-              <label class="form-label">Dia da semana</label>
-              <select class="form-select" v-model="formDia">
-                <option v-for="d in diasSemana" :key="d.valor" :value="d.valor">
-                  {{ d.rotulo }}
-                </option>
-              </select>
-            </div>
+            <CampoFormulario id="hr-dia" label="Dia da semana">
+              <Combobox
+                id="hr-dia"
+                v-model="formDiaStr"
+                :opcoes="diasOpcoes"
+                placeholder="Selecione o dia"
+              />
+            </CampoFormulario>
             <CampoFormulario id="hr-inicio" label="Início">
               <input
                 id="hr-inicio"

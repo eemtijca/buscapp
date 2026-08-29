@@ -19,13 +19,19 @@ test.describe('Gestão - Turmas - Modal', () => {
     await page.goto('/gestao/turmas');
     await page.click('button:has-text("Nova turma")');
     await page.waitForSelector('#campoSerie');
-    const serieOptions = await page.locator('#campoSerie option').allTextContents();
-    expect(serieOptions.length).toBeGreaterThanOrEqual(3);
-    expect(serieOptions).toContain('1ª');
-    expect(serieOptions).toContain('2ª');
-    const letraOptions = await page.locator('#campoLetra option').allTextContents();
-    expect(letraOptions.length).toBeGreaterThanOrEqual(3);
-    expect(letraOptions).toContain('A');
+    // Abre o combobox de série e verifica as opções disponíveis
+    await page.click('#campoSerie');
+    await expect(page.getByRole('option', { name: '1ª' })).toBeVisible();
+    await expect(page.getByRole('option', { name: '2ª' })).toBeVisible();
+    const serieCount = await page.locator('#campoSerie-lista [role="option"]').count();
+    expect(serieCount).toBeGreaterThanOrEqual(3);
+    await page.keyboard.press('Escape');
+    // Abre o combobox de letra e verifica
+    await page.click('#campoLetra');
+    await expect(page.getByRole('option', { name: 'A', exact: true })).toBeVisible();
+    const letraCount = await page.locator('#campoLetra-lista [role="option"]').count();
+    expect(letraCount).toBeGreaterThanOrEqual(3);
+    await page.keyboard.press('Escape');
     await page.click('button:has-text("Cancelar")');
   });
 });

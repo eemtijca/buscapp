@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, onUnmounted, ref, watch } from 'vue';
+import { computed, nextTick, onUnmounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAutenticacao } from '@/composables/useAutenticacao';
 import { useMonitoramento } from '@/composables/useMonitoramento';
@@ -7,6 +7,8 @@ import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh';
 import { useOpcoesConfiguracao } from '@/composables/useOpcoesConfiguracao';
 import ListaOcorrencias from '@/componentes/ListaOcorrencias.vue';
 import CampoFormulario from '@/componentes/CampoFormulario.vue';
+import Combobox from '@/componentes/Combobox.vue';
+import type { OpcaoCombobox } from '@/componentes/Combobox.vue';
 import GrupoCheckbox from '@/componentes/GrupoCheckbox.vue';
 import type { AlunoFrequencia, OcorrenciaGrave, OpcaoCheckbox } from '@/tipos/componentes';
 import { supabaseClient } from '@/servicos/supabase';
@@ -40,6 +42,10 @@ const opcoesTipo = ref<OpcaoCheckbox[]>([]);
 const opcoesTags = ref<OpcaoCheckbox[]>([]);
 const alunoId = ref('');
 const tipos = ref<string[]>(['grave']);
+
+const alunoOpcoes = computed<OpcaoCombobox[]>(() =>
+  alunos.value.map((a) => ({ valor: a.id, rotulo: a.nome, descricao: a.turma ?? undefined })),
+);
 const tags = ref<string[]>([]);
 const descricao = ref('');
 const exigePresenca = ref(false);
@@ -228,12 +234,13 @@ onUnmounted(() => {
       </div>
       <div class="card-body">
         <CampoFormulario id="ocoGestaoAluno" label="Aluno" :obrigatorio="true">
-          <select id="ocoGestaoAluno" v-model="alunoId" class="form-select form-select-sm">
-            <option value="" disabled>Selecione um aluno</option>
-            <option v-for="a in alunos" :key="a.id" :value="a.id">
-              {{ a.nome }}<span v-if="a.turma"> — {{ a.turma }}</span>
-            </option>
-          </select>
+          <Combobox
+            id="ocoGestaoAluno"
+            v-model="alunoId"
+            :opcoes="alunoOpcoes"
+            placeholder="Selecione um aluno"
+            tamanho="sm"
+          />
         </CampoFormulario>
 
         <CampoFormulario id="ocoGestaoTipo" label="Tipo de ocorrência" :obrigatorio="true">

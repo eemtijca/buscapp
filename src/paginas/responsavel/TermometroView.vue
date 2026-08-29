@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { onUnmounted, ref, watch } from 'vue';
+import { computed, onUnmounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAutenticacao } from '@/composables/useAutenticacao';
 import { useMonitoramento } from '@/composables/useMonitoramento';
 import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh';
 import TermometroRisco from '@/componentes/TermometroRisco.vue';
+import Combobox from '@/componentes/Combobox.vue';
+import type { OpcaoCombobox } from '@/componentes/Combobox.vue';
 import type { Aluno } from '@/tipos/database';
 import type { TermometroAtencao } from '@/tipos/componentes';
 import { supabaseClient } from '@/servicos/supabase';
@@ -18,6 +20,17 @@ const filhos = ref<Aluno[]>([]);
 const filhoSelecionado = ref<Aluno | null>(null);
 const termometro = ref<TermometroAtencao | null>(null);
 const carregando = ref(true);
+
+const filhoOpcoes = computed<OpcaoCombobox[]>(() =>
+  filhos.value.map((f) => ({ valor: f.id, rotulo: f.nome, descricao: f.matricula ?? undefined })),
+);
+const filhoSelecionadoId = computed({
+  get: () => filhoSelecionado.value?.id ?? '',
+  set: (id: string) => {
+    const filho = filhos.value.find((f) => f.id === id);
+    if (filho) void selecionarFilho(filho);
+  },
+});
 
 /** Busca o nome da turma do aluno para exibir no termômetro. */
 async function buscarTurmaAluno(alunoId: string): Promise<string | null> {
@@ -109,22 +122,12 @@ onUnmounted(() => {
 
     <div v-if="filhos.length > 1" class="mb-3">
       <label for="seletorFilho" class="form-label fw-semibold small">Selecione o aluno</label>
-      <select
+      <Combobox
         id="seletorFilho"
-        class="form-select"
-        :value="filhoSelecionado?.id"
-        @change="
-          (e: Event) => {
-            const alvo = e.target as HTMLSelectElement;
-            const filho = filhos.find((f: Aluno) => f.id === alvo.value);
-            if (filho) selecionarFilho(filho);
-          }
-        "
-      >
-        <option v-for="f in filhos" :key="f.id" :value="f.id">
-          {{ f.nome }}<span v-if="f.matricula"> — {{ f.matricula }}</span>
-        </option>
-      </select>
+        v-model="filhoSelecionadoId"
+        :opcoes="filhoOpcoes"
+        placeholder="Selecione o aluno"
+      />
     </div>
 
     <div v-if="carregando" class="text-center py-5">

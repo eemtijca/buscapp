@@ -7,6 +7,7 @@ import { useOpcoesConfiguracao } from '@/composables/useOpcoesConfiguracao';
 import { useAlturaUniformeCards } from '@/composables/useAlturaUniformeCards';
 import { supabaseClient } from '@/servicos/supabase';
 import CampoFormulario from '@/componentes/CampoFormulario.vue';
+import Combobox from '@/componentes/Combobox.vue';
 import GrupoCheckbox from '@/componentes/GrupoCheckbox.vue';
 import CartaoSelecao from '@/componentes/CartaoSelecao.vue';
 import type { AlunoFrequencia, OpcaoCheckbox } from '@/tipos/componentes';
@@ -29,6 +30,10 @@ const mensagemErro = ref<string | null>(null);
 const { buscarOpcoes } = useOpcoesConfiguracao();
 const opcoesTipo = ref<OpcaoCheckbox[]>([]);
 const opcoesTags = ref<OpcaoCheckbox[]>([]);
+
+const alunoOpcoes = computed(() =>
+  alunos.value.map((a) => ({ valor: a.id, rotulo: a.nome, descricao: a.turma || 'Sem turma' })),
+);
 
 const tipoOcorrenciaRef = ref<HTMLElement | null>(null);
 const { altura: alturaCartaoTipo } = useAlturaUniformeCards(tipoOcorrenciaRef);
@@ -161,17 +166,14 @@ onMounted(async () => {
     <div class="card border">
       <div class="card-body">
         <CampoFormulario id="alunoSelect" label="Aluno" :obrigatorio="true">
-          <select
+          <Combobox
             id="alunoSelect"
             v-model="alunoId"
-            class="form-select form-select-sm"
-            :disabled="!alunos.length"
-          >
-            <option value="" disabled>Selecione um aluno</option>
-            <option v-for="a in alunos" :key="a.id" :value="a.id">
-              {{ a.nome }} — {{ a.turma || 'Sem turma' }}
-            </option>
-          </select>
+            :opcoes="alunoOpcoes"
+            placeholder="Selecione um aluno"
+            tamanho="sm"
+            :desabilitado="!alunos.length"
+          />
         </CampoFormulario>
 
         <CampoFormulario id="tipoOcorrencia" label="Tipo de ocorrência" :obrigatorio="true">

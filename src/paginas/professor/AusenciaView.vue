@@ -6,6 +6,7 @@ import { useMonitoramento } from '@/composables/useMonitoramento';
 import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh';
 import { useOpcoesConfiguracao } from '@/composables/useOpcoesConfiguracao';
 import CampoFormulario from '@/componentes/CampoFormulario.vue';
+import Combobox from '@/componentes/Combobox.vue';
 import GrupoCheckbox from '@/componentes/GrupoCheckbox.vue';
 import type { AlunoFrequencia, OpcaoCheckbox } from '@/tipos/componentes';
 
@@ -27,6 +28,10 @@ const opcoesMotivos = ref<OpcaoCheckbox[]>([]);
 
 const motivos = ref<string[]>([]);
 const dataAula = ref(new Date().toISOString().slice(0, 10));
+
+const alunoOpcoes = computed(() =>
+  alunos.value.map((a) => ({ valor: a.id, rotulo: a.nome, descricao: a.turma || 'Sem turma' })),
+);
 
 const justificativaSugerida = computed(() => {
   if (!motivos.value.length) return '';
@@ -142,12 +147,13 @@ onUnmounted(() => {
         </CampoFormulario>
 
         <CampoFormulario id="alunoSelect" label="Aluno" :obrigatorio="true">
-          <select id="alunoSelect" v-model="alunoId" class="form-select form-select-sm">
-            <option value="" disabled>Selecione um aluno</option>
-            <option v-for="a in alunos" :key="a.id" :value="a.id">
-              {{ a.nome }} — {{ a.turma || 'Sem turma' }}
-            </option>
-          </select>
+          <Combobox
+            id="alunoSelect"
+            v-model="alunoId"
+            :opcoes="alunoOpcoes"
+            placeholder="Selecione um aluno"
+            tamanho="sm"
+          />
         </CampoFormulario>
 
         <CampoFormulario

@@ -76,7 +76,10 @@ test.describe('Gestão - Registro de infrequências', () => {
     await expect(page).toHaveURL(/\/gestao\/infrequencias\?aluno=/);
     const abaIndividual = page.getByRole('button', { name: 'Registro individual' });
     await expect(abaIndividual).toHaveClass(/btn-success/);
-    await expect(page.locator('#alunoIndividual')).toHaveValue(/^[0-9a-f-]{36}$/);
+    // O combobox exibe o rótulo (nome — turma) em vez do UUID; basta garantir que há seleção.
+    await expect(page.locator('#alunoIndividual')).not.toHaveValue('');
+    const valor = await page.locator('#alunoIndividual').inputValue();
+    expect(valor.trim().length).toBeGreaterThan(3);
     await logout(page);
   });
 });

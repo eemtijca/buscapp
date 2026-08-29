@@ -1,7 +1,12 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
-import { useRouter } from 'vue-router';
+import { onMounted, ref, nextTick, watch } from 'vue';
+import { useRouter, onBeforeRouteLeave } from 'vue-router';
 import { supabaseClient } from '@/servicos/supabase';
+import { useFormSnapshot } from '@/composables/useFormSnapshot';
+import {
+  mensagemSucesso as criarMensagemSucesso,
+  mensagemErroExplicita,
+} from '@/utils/mensagemExplicita';
 import CampoFormulario from '@/componentes/CampoFormulario.vue';
 import type { AnoLetivo } from '@/tipos/database';
 
@@ -19,26 +24,56 @@ const editandoId = ref<string | null>(null);
 const formAno = ref<number>(new Date().getFullYear());
 const formDataInicio = ref(`${new Date().getFullYear()}-02-01`);
 const formDataFim = ref(`${new Date().getFullYear()}-12-20`);
-const formDirty = ref(false);
+// Snapshot para detecção de alterações.
+const {
+  isDirty: formDirty,
+  reset: resetSnapshot,
+  pausar: pausarSnapshot,
+  pausado: snapshotPausado,
+} = useFormSnapshot(() => ({
+  ano: String(formAno.value),
+  inicio: formDataInicio.value,
+  fim: formDataFim.value,
+}));
+let timerSucesso: ReturnType<typeof setTimeout> | null = null;
+let timerErro: ReturnType<typeof setTimeout> | null = null;
+
+onBeforeRouteLeave((_to, _from, next) => {
+  if (formDirty.value && modalAberto.value && !carregando.value) {
+    const confirmar = window.confirm('Há alterações não salvas. Deseja realmente sair?');
+    if (!confirmar) return next(false);
+  }
+  next();
+});
+
+watch([formAno, formDataInicio, formDataFim], () => {
+  if (snapshotPausado.value) return;
+});
 
 function mostrarSucesso(msg: string) {
+  if (timerSucesso) clearTimeout(timerSucesso);
   mensagemSucesso.value = msg;
-  setTimeout(() => (mensagemSucesso.value = null), 4000);
+  timerSucesso = setTimeout(() => (mensagemSucesso.value = null), 6000);
 }
 
 function mostrarErro(msg: string) {
+  if (timerErro) clearTimeout(timerErro);
   mensagemErro.value = msg;
-  setTimeout(() => (mensagemErro.value = null), 4000);
+  timerErro = setTimeout(() => (mensagemErro.value = null), 6000);
 }
 
 function resetForm() {
+  pausarSnapshot(true);
   const anoAtual = new Date().getFullYear();
   formAno.value = anoAtual;
   formDataInicio.value = `${anoAtual}-02-01`;
   formDataFim.value = `${anoAtual}-12-20`;
-  formDirty.value = false;
   editandoId.value = null;
   modoEdicao.value = false;
+  nextTick(() => {
+    resetSnapshot();
+    pausarSnapshot(false);
+  });
 }
 
 async function carregarAnos() {
@@ -58,28 +93,51 @@ async function carregarAnos() {
 }
 
 function abrirNovo() {
+  pausarSnapshot(true);
   resetForm();
   modalAberto.value = true;
+  nextTick(() => {
+    resetSnapshot();
+    pausarSnapshot(false);
+  });
 }
 
 function abrirEditar(ano: AnoLetivo) {
+  pausarSnapshot(true);
   modoEdicao.value = true;
   editandoId.value = ano.id;
   formAno.value = ano.ano;
   formDataInicio.value = ano.data_inicio;
   formDataFim.value = ano.data_fim;
-  formDirty.value = true;
   modalAberto.value = true;
+  nextTick(() => {
+    resetSnapshot();
+    pausarSnapshot(false);
+  });
 }
 
 async function salvar() {
   document.querySelector('.modal-body')?.scrollTo({ top: 0, behavior: 'smooth' });
   if (!formAno.value || !formDataInicio.value || !formDataFim.value) {
-    mostrarErro('Preencha o ano e as datas do período letivo.');
+    mostrarErro(
+      mensagemErroExplicita(
+        'Ano letivo',
+        String(formAno.value),
+        'salvar',
+        'Preencha o ano e as datas do período letivo.',
+      ),
+    );
     return;
   }
   if (formDataFim.value < formDataInicio.value) {
-    mostrarErro('A data de fim deve ser posterior à data de início.');
+    mostrarErro(
+      mensagemErroExplicita(
+        'Ano letivo',
+        String(formAno.value),
+        'salvar',
+        'A data de fim deve ser posterior à data de início.',
+      ),
+    );
     return;
   }
   carregando.value = true;
@@ -95,13 +153,22 @@ async function salvar() {
         .eq('id', editandoId.value);
       if (error) {
         if (error.code === '23505') {
-          mostrarErro('Já existe um ano letivo para este ano.');
+          mostrarErro(
+            mensagemErroExplicita(
+              'Ano letivo',
+              String(formAno.value),
+              'atualizar',
+              'Já existe um ano letivo para este ano.',
+            ),
+          );
         } else {
-          mostrarErro('Falha ao atualizar ano letivo.');
+          mostrarErro(
+            mensagemErroExplicita('Ano letivo', String(formAno.value), 'atualizar', error),
+          );
         }
         return;
       }
-      mostrarSucesso('Ano letivo atualizado.');
+      mostrarSucesso(criarMensagemSucesso('Ano letivo', String(formAno.value), 'atualizado'));
     } else {
       const { error } = await supabaseClient.from('anos_letivos').insert({
         ano: formAno.value,
@@ -112,13 +179,23 @@ async function salvar() {
       });
       if (error) {
         if (error.code === '23505') {
-          mostrarErro('Já existe um ano letivo para este ano.');
+          mostrarErro(
+            mensagemErroExplicita(
+              'Ano letivo',
+              String(formAno.value),
+              'criar',
+              'Já existe um ano letivo para este ano.',
+            ),
+          );
         } else {
-          mostrarErro('Falha ao criar ano letivo.');
+          mostrarErro(mensagemErroExplicita('Ano letivo', String(formAno.value), 'criar', error));
         }
         return;
       }
-      mostrarSucesso('Ano letivo criado como planejado. Use "Ativar" para realizar a virada.');
+      mostrarSucesso(
+        criarMensagemSucesso('Ano letivo', String(formAno.value), 'criado') +
+          ' Use "Ativar" para realizar a virada.',
+      );
     }
     modalAberto.value = false;
     resetForm();
@@ -160,7 +237,12 @@ onMounted(carregarAnos);
       <i class="bi bi-house me-1" aria-hidden="true"></i>
       Início
     </router-link>
-    <button type="button" class="btn btn-sm btn-outline-secondary mb-3" @click="router.back()">
+    <button
+      type="button"
+      class="btn btn-sm btn-outline-secondary mb-3"
+      :disabled="carregando"
+      @click="router.back()"
+    >
       <i class="bi bi-arrow-left me-1" aria-hidden="true"></i>
       Voltar
     </button>
@@ -170,19 +252,46 @@ onMounted(carregarAnos);
         <i class="bi bi-calendar3 text-success me-2" aria-hidden="true"></i>
         Anos letivos
       </h1>
-      <button type="button" class="btn btn-sm btn-success" @click="abrirNovo">
+      <button
+        type="button"
+        class="btn btn-sm btn-success"
+        :disabled="carregando"
+        @click="abrirNovo"
+      >
         <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>
         Novo ano letivo
       </button>
     </div>
 
-    <div v-if="mensagemSucesso" class="alert alert-success py-2 small mb-3" role="status">
+    <div
+      v-if="mensagemSucesso"
+      class="alert alert-success alert-dismissible fade show py-2 small mb-3 pe-5"
+      role="status"
+    >
       <i class="bi bi-check-circle me-1" aria-hidden="true"></i>
       {{ mensagemSucesso }}
+      <button
+        type="button"
+        class="btn-close position-absolute top-50 end-0 translate-middle-y me-2 p-2"
+        style="font-size: 0.7rem"
+        aria-label="Fechar"
+        @click="mensagemSucesso = null"
+      ></button>
     </div>
-    <div v-if="mensagemErro" class="alert alert-danger py-2 small mb-3" role="alert">
+    <div
+      v-if="mensagemErro"
+      class="alert alert-danger alert-dismissible fade show py-2 small mb-3 pe-5"
+      role="alert"
+    >
       <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>
       {{ mensagemErro }}
+      <button
+        type="button"
+        class="btn-close position-absolute top-50 end-0 translate-middle-y me-2 p-2"
+        style="font-size: 0.7rem"
+        aria-label="Fechar"
+        @click="mensagemErro = null"
+      ></button>
     </div>
 
     <div v-if="carregando && !anos.length" class="text-center py-5">
@@ -203,7 +312,12 @@ onMounted(carregarAnos);
       <p class="mb-3 small">
         Cadastre o ano corrente e ative-o para liberar turmas, matrículas e monitoramento.
       </p>
-      <button type="button" class="btn btn-sm btn-success" @click="abrirNovo">
+      <button
+        type="button"
+        class="btn btn-sm btn-success"
+        :disabled="carregando"
+        @click="abrirNovo"
+      >
         <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>
         Criar ano letivo
       </button>
@@ -271,7 +385,7 @@ onMounted(carregarAnos);
       tabindex="-1"
       style="background-color: rgba(0, 0, 0, 0.5)"
     >
-      <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-dialog modal-dialog-centered modal-fullscreen-sm-down">
         <div class="modal-content">
           <div class="modal-header">
             <h5 class="modal-title small fw-bold">

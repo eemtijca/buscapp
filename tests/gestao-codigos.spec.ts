@@ -344,7 +344,8 @@ test.describe('Gestão — Configuração de códigos', () => {
     const novoMax = 7;
     await page.fill('#cfg-max-tentativas', String(novoMax));
     await page.click('button:has-text("Salvar alterações")');
-    await expect(page.getByText('Configurações salvas.')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('.alert-success')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('.alert-success')).toContainText(/salva com sucesso/);
 
     await expect
       .poll(async () => {

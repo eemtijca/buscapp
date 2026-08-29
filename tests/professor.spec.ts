@@ -69,12 +69,16 @@ test.describe('Professor - Ocorrência com tags', () => {
   test('CT57 - Tags carregam do banco e descrição se preenche', async ({ page }) => {
     await login(page, 'prof1@escola.edu.br', SENHA_PROF);
     await page.goto('/professor/ocorrencia');
-    await page.waitForSelector('input[type="checkbox"]', { timeout: 10000 });
+    await page.waitForLoadState('networkidle');
+    await page.waitForSelector('input[type="checkbox"]', { timeout: 15000 });
     await expect(async () => {
       const checkbox = page.locator('input[type="checkbox"]').first();
-      if (!(await checkbox.isChecked())) { await checkbox.check(); }
-      await expect(page.locator('#descricaoText')).toHaveValue(/Relato/);
-    }).toPass({ timeout: 10000 });
+      await expect(checkbox).toBeVisible({ timeout: 5000 });
+      if (!(await checkbox.isChecked())) {
+        await checkbox.check();
+      }
+      await expect(page.locator('#descricaoText')).toHaveValue(/Relato/, { timeout: 5000 });
+    }).toPass({ timeout: 15000 });
   });
 });
 

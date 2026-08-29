@@ -1,9 +1,14 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch, nextTick } from 'vue';
 import { useRouter, onBeforeRouteLeave } from 'vue-router';
 import { supabaseClient } from '@/servicos/supabase';
 import { useOpcoesConfiguracao } from '@/composables/useOpcoesConfiguracao';
 import { useAnoLetivo } from '@/composables/useAnoLetivo';
+import { useFormSnapshot } from '@/composables/useFormSnapshot';
+import {
+  mensagemSucesso as criarMensagemSucesso,
+  mensagemErroExplicita,
+} from '@/utils/mensagemExplicita';
 import CampoFormulario from '@/componentes/CampoFormulario.vue';
 import Combobox from '@/componentes/Combobox.vue';
 import type { OpcaoCombobox } from '@/componentes/Combobox.vue';
@@ -30,7 +35,20 @@ const formSerie = ref('1ª');
 const formLetra = ref('A');
 const formCapacidade = ref<number | null>(null);
 const formAtivo = ref(true);
-const formDirty = ref(false);
+// Snapshot para detecção de alterações.
+const {
+  isDirty: formDirty,
+  reset: resetSnapshot,
+  pausar: pausarSnapshot,
+  pausado: snapshotPausado,
+} = useFormSnapshot(() => ({
+  serie: formSerie.value,
+  letra: formLetra.value,
+  capacidade: String(formCapacidade.value ?? ''),
+  ativo: String(formAtivo.value),
+}));
+let timerSucesso: ReturnType<typeof setTimeout> | null = null;
+let timerErro: ReturnType<typeof setTimeout> | null = null;
 
 const serieOpcoes = computed<OpcaoCombobox[]>(() =>
   opcoesSerie.value.map((o) => ({ valor: o.valor, rotulo: o.rotulo, icone: o.icone })),
@@ -48,27 +66,34 @@ onBeforeRouteLeave((_to, _from, next) => {
 });
 
 watch([formSerie, formLetra, formCapacidade, formAtivo], () => {
-  if (!formDirty.value && modalAberto.value) formDirty.value = true;
+  // snapshot cuida do dirty; watch apenas para compatibilidade futura
+  if (snapshotPausado.value) return;
 });
 
 function mostrarSucesso(msg: string) {
+  if (timerSucesso) clearTimeout(timerSucesso);
   mensagemSucesso.value = msg;
-  setTimeout(() => (mensagemSucesso.value = null), 4000);
+  timerSucesso = setTimeout(() => (mensagemSucesso.value = null), 6000);
 }
 
 function mostrarErro(msg: string) {
+  if (timerErro) clearTimeout(timerErro);
   mensagemErro.value = msg;
-  setTimeout(() => (mensagemErro.value = null), 4000);
+  timerErro = setTimeout(() => (mensagemErro.value = null), 6000);
 }
 
 function resetForm() {
+  pausarSnapshot(true);
   formSerie.value = '1ª';
   formLetra.value = 'A';
   formCapacidade.value = null;
   formAtivo.value = true;
-  formDirty.value = false;
   editandoId.value = null;
   modoEdicao.value = false;
+  nextTick(() => {
+    resetSnapshot();
+    pausarSnapshot(false);
+  });
 }
 
 async function carregarTurmas() {
@@ -86,6 +111,7 @@ async function carregarTurmas() {
 }
 
 async function abrirEditar(turma: Turma) {
+  pausarSnapshot(true);
   modoEdicao.value = true;
   editandoId.value = turma.id;
   formSerie.value = turma.serie;
@@ -93,11 +119,19 @@ async function abrirEditar(turma: Turma) {
   formCapacidade.value = turma.capacidade;
   formAtivo.value = turma.ativo;
   modalAberto.value = true;
+  await nextTick();
+  resetSnapshot();
+  pausarSnapshot(false);
 }
 
 function abrirNovo() {
+  pausarSnapshot(true);
   resetForm();
   modalAberto.value = true;
+  nextTick(() => {
+    resetSnapshot();
+    pausarSnapshot(false);
+  });
 }
 
 async function salvar() {
@@ -115,14 +149,30 @@ async function salvar() {
         })
         .eq('id', editandoId.value);
       if (error) {
-        mostrarErro('Falha ao atualizar turma.');
+        mostrarErro(
+          mensagemErroExplicita(
+            'Turma',
+            `${formSerie.value} ${formLetra.value}`,
+            'atualizar',
+            error,
+          ),
+        );
         return;
       }
-      mostrarSucesso('Turma atualizada.');
+      mostrarSucesso(
+        criarMensagemSucesso('Turma', `${formSerie.value} ${formLetra.value}`, 'atualizada'),
+      );
     } else {
       const anoLetivo = await buscarAnoLetivoAtivo();
       if (!anoLetivo) {
-        mostrarErro('Nenhum ano letivo ativo encontrado.');
+        mostrarErro(
+          mensagemErroExplicita(
+            'Turma',
+            `${formSerie.value} ${formLetra.value}`,
+            'criar',
+            'Nenhum ano letivo ativo encontrado.',
+          ),
+        );
         return;
       }
       const { error } = await supabaseClient.from('turmas').insert({
@@ -133,10 +183,14 @@ async function salvar() {
         ano_letivo_id: anoLetivo.id,
       });
       if (error) {
-        mostrarErro('Falha ao criar turma.');
+        mostrarErro(
+          mensagemErroExplicita('Turma', `${formSerie.value} ${formLetra.value}`, 'criar', error),
+        );
         return;
       }
-      mostrarSucesso('Turma criada.');
+      mostrarSucesso(
+        criarMensagemSucesso('Turma', `${formSerie.value} ${formLetra.value}`, 'criada'),
+      );
     }
     modalAberto.value = false;
     resetForm();
@@ -169,7 +223,12 @@ onMounted(carregarTurmas);
       <i class="bi bi-house me-1" aria-hidden="true"></i>
       Início
     </router-link>
-    <button type="button" class="btn btn-sm btn-outline-secondary mb-3" @click="router.back()">
+    <button
+      type="button"
+      class="btn btn-sm btn-outline-secondary mb-3"
+      :disabled="carregando"
+      @click="router.back()"
+    >
       <i class="bi bi-arrow-left me-1" aria-hidden="true"></i>
       Voltar
     </button>
@@ -179,19 +238,46 @@ onMounted(carregarTurmas);
         <i class="bi bi-book text-success me-2" aria-hidden="true"></i>
         Turmas
       </h1>
-      <button type="button" class="btn btn-sm btn-success" @click="abrirNovo">
+      <button
+        type="button"
+        class="btn btn-sm btn-success"
+        :disabled="carregando"
+        @click="abrirNovo"
+      >
         <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>
         Nova turma
       </button>
     </div>
 
-    <div v-if="mensagemSucesso" class="alert alert-success py-2 small mb-3" role="status">
+    <div
+      v-if="mensagemSucesso"
+      class="alert alert-success alert-dismissible fade show py-2 small mb-3 pe-5"
+      role="status"
+    >
       <i class="bi bi-check-circle me-1" aria-hidden="true"></i>
       {{ mensagemSucesso }}
+      <button
+        type="button"
+        class="btn-close position-absolute top-50 end-0 translate-middle-y me-2 p-2"
+        style="font-size: 0.7rem"
+        aria-label="Fechar"
+        @click="mensagemSucesso = null"
+      ></button>
     </div>
-    <div v-if="mensagemErro" class="alert alert-danger py-2 small mb-3" role="alert">
+    <div
+      v-if="mensagemErro"
+      class="alert alert-danger alert-dismissible fade show py-2 small mb-3 pe-5"
+      role="alert"
+    >
       <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>
       {{ mensagemErro }}
+      <button
+        type="button"
+        class="btn-close position-absolute top-50 end-0 translate-middle-y me-2 p-2"
+        style="font-size: 0.7rem"
+        aria-label="Fechar"
+        @click="mensagemErro = null"
+      ></button>
     </div>
 
     <div v-if="carregando && !turmas.length" class="text-center py-5">
@@ -240,6 +326,7 @@ onMounted(carregarTurmas);
                   <button
                     type="button"
                     class="btn btn-sm btn-outline-success"
+                    :disabled="carregando"
                     @click="abrirEditar(turma)"
                   >
                     <i class="bi bi-pencil" aria-hidden="true"></i>
@@ -248,6 +335,7 @@ onMounted(carregarTurmas);
                     type="button"
                     class="btn btn-sm"
                     :class="turma.ativo ? 'btn-outline-danger' : 'btn-outline-success'"
+                    :disabled="carregando"
                     :title="turma.ativo ? 'Desativar' : 'Ativar'"
                     @click="alternarAtivo(turma)"
                   >
@@ -270,7 +358,7 @@ onMounted(carregarTurmas);
       tabindex="-1"
       style="background-color: rgba(0, 0, 0, 0.5)"
     >
-      <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-dialog modal-dialog-centered modal-fullscreen-sm-down">
         <div class="modal-content">
           <div class="modal-header">
             <h5 class="modal-title small fw-bold">
@@ -330,6 +418,7 @@ onMounted(carregarTurmas);
               <button
                 type="button"
                 class="btn btn-sm btn-outline-secondary"
+                :disabled="carregando"
                 @click="modalAberto = false"
               >
                 Cancelar

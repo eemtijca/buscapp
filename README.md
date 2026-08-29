@@ -70,7 +70,11 @@ Privacidade e resiliência completam os princípios do projeto. Cada perfil enxe
 |----------------|-----------|
 | Atualização em tempo real | Todas as telas operacionais dos três papéis assinam canais do Supabase Realtime e se atualizam sem recarregar (detalhes na seção [Tempo Real](#tempo-real)). O guard de rotas garante o usuário carregado antes das views montarem, evitando telas sem carga ou sem inscrição após reload direto. |
 | Indicador de conexão | Indicador visual verde/amarelo/vermelho do status da conexão com o Supabase, atualizado a cada 30s. |
-| Tratamento de erros | Tradução dos erros do Supabase Auth (inclusive limite de tentativas, com contagem regressiva) para mensagens em português. |
+| Combobox pesquisável | `Combobox.vue` com `useDebounce` substitui `select`; busca com filtragem insensível a acentos, navegação por teclado e `aria`. |
+| Indicador de carregamento | Overlay global `TelaCarregamento` com título dinâmico da rota de destino e `lazy` de rotas via `meta.titulo`. |
+| Tratamento de erros | Tradução dos erros do Supabase Auth para mensagens explícitas com entidade e horário (ex.: `Usuário "Ana" atualizado com sucesso às 14:32` / `falhou ao salvar: ...`) e `auto-dismiss` em 6s com `btn-close` centralizado (`pe-5` + `top-50`). |
+| Proteção contra saída | Detecção de alterações por snapshot JSON (`useFormSnapshot`) com pausa na hidratação; `onBeforeRouteLeave` com `Há alterações não salvas` e limpeza de `draft` em `sessionStorage`. |
+| Bloqueio de ações | Botões desabilitados durante operações de BD (`carregando`/`salvando`) para evitar duplo envio. |
 | Páginas de erro | Páginas dedicadas para 403, 404 e 500, além de tela própria para conta desativada. |
 | Auditoria | Tabela `auditoria` no banco para rastreabilidade das operações administrativas. |
 | Modal de confirmação | Confirmação genérica para ações destrutivas (ativar/inativar usuário, salvar chamada, limpar notificações). |
@@ -178,6 +182,7 @@ buscapp/
 │   ├── componentes/                     # Componentes reutilizáveis
 │   │   ├── CabecalhoNavegacao.vue       # Cabeçalho de navegação com 6 variantes
 │   │   ├── CampoFormulario.vue          # Campo de formulário com label, erro e dica
+│   │   ├── Combobox.vue                 # Combobox pesquisável com debounce e aria
 │   │   ├── CartaoAlertaResponsavel.vue  # Cartão de alerta para o responsável
 │   │   ├── CartaoAlunoFrequencia.vue    # Cartão de aluno para registro de frequência
 │   │   ├── CartaoAlunoRisco.vue         # Cartão de aluno no ranking de risco (com botão de chat)
@@ -194,11 +199,15 @@ buscapp/
 │   │   ├── ModalConfirmacao.vue         # Modal genérico de confirmação
 │   │   ├── NotificacoesPopover.vue      # Popover de notificações (sino)
 │   │   ├── SeletorIcone.vue             # Seletor visual de ícones Bootstrap com busca e categorias
+│   │   ├── TelaCarregamento.vue         # Overlay global com título dinâmico
 │   │   ├── TermometroRisco.vue          # Termômetro visual de risco
 │   │   └── VisualizadorAnexo.vue        # Modal de anexos (imagem/PDF) via blob, sem tokens na URL
 │   ├── composables/                     # Lógica de apresentação reutilizável
 │   │   ├── useAlturaUniformeCards.ts    # Mede e uniformiza a altura de cartões de seleção (CSS var)
 │   │   ├── useAnoLetivo.ts              # Busca padronizada do ano letivo ativo (status + flag)
+│   │   ├── useDebounce.ts               # Debounce para busca em combobox
+│   │   ├── useFormSnapshot.ts           # Snapshot JSON para detecção de alterações
+│   │   ├── useNavegacao.ts              # Estado isNavigating/destinoTitulo para overlay
 │   │   ├── useAutenticacao.ts           # Login, logout, sessão e redefinição de senha por código
 │   │   ├── useGestaoUsuarios.ts         # CRUD de usuários, alunos, turmas, disciplinas, atribuições, códigos
 │   │   ├── useMonitoramento.ts          # Frequência, comportamento, ocorrências, ranking, risco, termômetro, chat. Limites e horários lidos do banco com cache em memória
@@ -266,6 +275,7 @@ buscapp/
 │   └── utils/
 │       ├── chatUtils.ts                 # Utilitários do chat (cor do avatar, horário protegido)
 │       ├── comprimirImagem.ts           # Compressão de imagens via Canvas API (1600px, JPEG q0.6)
+│       ├── mensagemExplicita.ts         # Mensagens de sucesso/erro com horário e contexto
 │       ├── opcoesConfiguracao.ts        # Regras por tipo de opção de configuração (label, placeholder, validação)
 │       └── traduzirErro.ts              # Tradução de erros do Supabase Auth para português
 ├── supabase/
@@ -303,6 +313,8 @@ buscapp/
 │   ├── gestao-codigos.spec.ts           # Códigos (workflow completo, dedup, bloqueio, copiar)
 │   ├── gestao-catalogo.spec.ts          # Catálogos e integridade
 │   ├── gestao-estrutura.spec.ts         # Turmas, disciplinas, atribuições e anos letivos
+│   ├── gestao-formularios-navegacao.spec.ts # Formulários com estado limpo e navegação
+│   ├── combobox.spec.ts                 # Combobox pesquisável com debounce e aria
 │   ├── professor.spec.ts                # Professor (frequência, ausência, ocorrências, gating)
 │   ├── ranking-ocorrencias.spec.ts      # Ranking e registro de infrequências
 │   ├── anexos.spec.ts                   # Visualizador blob
@@ -736,7 +748,7 @@ O projeto possui quatro camadas de teste independentes.
 
 ### E2E (Playwright)
 
-- **Arquivos:** `tests/*.spec.ts` organizados por domínio (16 arquivos + `tests/suporte/` com helpers), ~150 testes por projeto (2 skipped) + `tests/pwa.spec.ts` dedicado.
+- **Arquivos:** `tests/*.spec.ts` organizados por domínio (17 arquivos + `tests/suporte/` com helpers), ~160 testes por projeto (2 skipped) + `tests/pwa.spec.ts` dedicado.
 - **Projetos:** Chromium, Firefox, WebKit, Mobile Chrome (Pixel 5) e Mobile Safari (iPhone 12).
 - **Cobertura:**
   - Login, logout e credenciais inválidas

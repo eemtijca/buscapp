@@ -10,6 +10,7 @@ import CampoFormulario from '@/componentes/CampoFormulario.vue';
 import Combobox from '@/componentes/Combobox.vue';
 import type { OpcaoCombobox } from '@/componentes/Combobox.vue';
 import GrupoCheckbox from '@/componentes/GrupoCheckbox.vue';
+import ModalConfirmacao from '@/componentes/ModalConfirmacao.vue';
 import type { AlunoFrequencia, OcorrenciaGrave, OpcaoCheckbox } from '@/tipos/componentes';
 import { supabaseClient } from '@/servicos/supabase';
 
@@ -49,6 +50,13 @@ const alunoOpcoes = computed<OpcaoCombobox[]>(() =>
 const tags = ref<string[]>([]);
 const descricao = ref('');
 const exigePresenca = ref(false);
+const confirmarRegistro = ref(false);
+const confirmarCancelar = ref(false);
+
+/** Verifica se há dados preenchidos no formulário de ocorrência. */
+const temDadosOcorrencia = computed(
+  () => !!alunoId.value || !!descricao.value.trim() || tags.value.length > 0,
+);
 const notificarCoordenacao = ref(true);
 const notificarResponsavel = ref(false);
 
@@ -89,6 +97,10 @@ async function atualizarManual() {
 }
 
 async function alternarFormulario() {
+  if (mostrarFormulario.value && temDadosOcorrencia.value) {
+    confirmarCancelar.value = true;
+    return;
+  }
   mostrarFormulario.value = !mostrarFormulario.value;
   if (mostrarFormulario.value && !alunos.value.length) {
     opcoesTipo.value = await buscarOpcoes('tipo_ocorrencia');
@@ -108,7 +120,17 @@ async function alternarFormulario() {
   }
 }
 
+function solicitarRegistroOcorrencia() {
+  if (!usuario.value || !alunoId.value || !tipos.value.length) return;
+  if (descricao.value.trim().length < 10) {
+    mostrarErro('Descreva a ocorrência com pelo menos 10 caracteres.');
+    return;
+  }
+  confirmarRegistro.value = true;
+}
+
 async function registrarOcorrencia() {
+  confirmarRegistro.value = false;
   if (!usuario.value || !alunoId.value || !tipos.value.length) return;
   salvando.value = true;
   try {
@@ -313,9 +335,16 @@ onUnmounted(() => {
         <div class="d-flex gap-2 justify-content-end">
           <button
             type="button"
+            class="btn btn-sm btn-outline-secondary"
+            @click="temDadosOcorrencia ? (confirmarCancelar = true) : (mostrarFormulario = false)"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
             class="btn btn-sm btn-success"
             :disabled="salvando || !alunoId || !tipos.length || descricao.trim().length < 10"
-            @click="registrarOcorrencia"
+            @click="solicitarRegistroOcorrencia"
           >
             <span
               v-if="salvando"
@@ -339,5 +368,33 @@ onUnmounted(() => {
         />
       </div>
     </div>
+    <ModalConfirmacao
+      :visivel="confirmarRegistro"
+      titulo="Confirmar ocorrência"
+      mensagem="Deseja registrar esta ocorrência? Ela afetará o termômetro de atenção do aluno."
+      rotulo-confirmar="Registrar"
+      icone="shield-exclamation"
+      variante="danger"
+      @confirmar="registrarOcorrencia"
+      @cancelar="confirmarRegistro = false"
+    />
+    <ModalConfirmacao
+      :visivel="confirmarCancelar"
+      titulo="Descartar ocorrência?"
+      mensagem="Há dados preenchidos que serão perdidos. Deseja realmente cancelar?"
+      rotulo-confirmar="Descartar"
+      icone="exclamation-triangle"
+      variante="danger"
+      @confirmar="
+        () => {
+          confirmarCancelar = false;
+          mostrarFormulario = false;
+          alunoId = '';
+          descricao = '';
+          tags = [];
+        }
+      "
+      @cancelar="confirmarCancelar = false"
+    />
   </div>
 </template>

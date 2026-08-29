@@ -10,6 +10,7 @@ import CampoFormulario from '@/componentes/CampoFormulario.vue';
 import Combobox from '@/componentes/Combobox.vue';
 import GrupoCheckbox from '@/componentes/GrupoCheckbox.vue';
 import CartaoSelecao from '@/componentes/CartaoSelecao.vue';
+import ModalConfirmacao from '@/componentes/ModalConfirmacao.vue';
 import type { AlunoFrequencia, OpcaoCheckbox } from '@/tipos/componentes';
 
 const router = useRouter();
@@ -59,6 +60,14 @@ const descricaoSugerida = computed(() => {
 
 const contadorDescricao = computed(() => descricao.value.length);
 
+const confirmarEnvio = ref(false);
+const confirmarCancelar = ref(false);
+
+/** Verifica se há dados não salvos para confirmação ao cancelar. */
+const temDados = computed(
+  () => !!alunoId.value || !!descricao.value.trim() || tags.value.length > 0,
+);
+
 function aplicarTags() {
   if (!descricao.value.startsWith('Relato de')) {
     descricao.value = descricaoSugerida.value;
@@ -68,7 +77,7 @@ function aplicarTags() {
   }
 }
 
-async function confirmar() {
+async function solicitarConfirmacao() {
   if (!usuario.value || !alunoId.value) {
     mensagemErro.value = 'Selecione um aluno.';
     return;
@@ -81,6 +90,12 @@ async function confirmar() {
     mensagemErro.value = 'Descreva a ocorrência com pelo menos 10 caracteres.';
     return;
   }
+  confirmarEnvio.value = true;
+}
+
+async function confirmar() {
+  confirmarEnvio.value = false;
+  if (!usuario.value || !alunoId.value) return;
   const ok = await registrarOcorrenciaGrave(
     alunoId.value,
     usuario.value.id,
@@ -279,14 +294,18 @@ onMounted(async () => {
         </div>
 
         <div class="d-flex gap-2 justify-content-end">
-          <button type="button" class="btn btn-sm btn-outline-secondary" @click="router.back()">
+          <button
+            type="button"
+            class="btn btn-sm btn-outline-secondary"
+            @click="temDados ? (confirmarCancelar = true) : router.back()"
+          >
             Cancelar
           </button>
           <button
             type="button"
             class="btn btn-sm btn-success"
             :disabled="carregando || !alunoId"
-            @click="confirmar"
+            @click="solicitarConfirmacao"
           >
             <span
               v-if="carregando"
@@ -299,5 +318,30 @@ onMounted(async () => {
         </div>
       </div>
     </div>
+    <ModalConfirmacao
+      :visivel="confirmarEnvio"
+      titulo="Confirmar ocorrência"
+      mensagem="Deseja registrar esta ocorrência? Ela afetará o termômetro de atenção do aluno."
+      rotulo-confirmar="Registrar"
+      icone="exclamation-octagon"
+      variante="danger"
+      @confirmar="confirmar"
+      @cancelar="confirmarEnvio = false"
+    />
+    <ModalConfirmacao
+      :visivel="confirmarCancelar"
+      titulo="Descartar ocorrência?"
+      mensagem="Há dados preenchidos que serão perdidos. Deseja realmente cancelar?"
+      rotulo-confirmar="Descartar"
+      icone="exclamation-triangle"
+      variante="danger"
+      @confirmar="
+        () => {
+          confirmarCancelar = false;
+          router.back();
+        }
+      "
+      @cancelar="confirmarCancelar = false"
+    />
   </div>
 </template>

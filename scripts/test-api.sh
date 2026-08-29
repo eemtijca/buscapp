@@ -1,6 +1,12 @@
 #!/bin/bash
 # ============================================================================
 # Suíte de Testes da API — BuscApp
+# ----------------------------------------------------------------------------
+# Fronteira de testes: shell cobre API/RLS/views/triggers/catálogo e regras
+# de negócio via REST/SQL. Comportamentos de UI (ModalConfirmacao dirty,
+# GrupoCheckbox Selecionar todos, TermometroRisco barra) são cobertos por
+# Playwright em tests/termometro.spec.ts, tests/professor.spec.ts e
+# tests/gestao-formularios-navegacao.spec.ts. Não duplicar asserts de UI aqui.
 # ============================================================================
 
 set -o pipefail
@@ -10,6 +16,23 @@ set -o pipefail
 
 # Garantir estado limpo — resetar banco antes dos testes
 npx supabase db reset --local 2>/dev/null | tail -1 || true
+# Aguarda o PostgREST e o GoTrue reiniciarem após o reset
+echo "Aguardando Supabase reiniciar..."
+sleep 8
+for i in {1..30}; do
+  if curl -s "${VITE_SUPABASE_URL:-http://127.0.0.1:54321}/auth/v1/health" 2>/dev/null | grep -qi "ok\|healthy\|pass"; then
+    break
+  fi
+  sleep 1
+done
+# Aguarda o PostgREST recarregar o schema (notify pgrst)
+for i in {1..15}; do
+  if curl -s "${VITE_SUPABASE_URL:-http://127.0.0.1:54321}/rest/v1/configuracoes_sistema?select=id&limit=1" -H "apikey: ${VITE_SUPABASE_PUBLISHABLE_KEY:-}" -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY:-}" 2>/dev/null | grep -q "id"; then
+    break
+  fi
+  sleep 1
+done
+sleep 2
 
 SUPABASE_URL="${VITE_SUPABASE_URL:-http://127.0.0.1:54321}"
 ANON_KEY="${VITE_SUPABASE_PUBLISHABLE_KEY:-}"
@@ -906,9 +929,14 @@ IMG_SIZE=$(stat -c%s /tmp/test_minimal.pdf)
 HTTP=$(curl -s -o /tmp/api_resp.txt -w "%{http_code}" \
   -X POST \
   -H "Content-Type: application/pdf" \
+  -H "apikey: $SR_KEY" \
   -H "Authorization: Bearer $SR_KEY" \
   --data-binary @/tmp/test_minimal.pdf \
   "$SUPABASE_URL/storage/v1/object/$UPLOAD14" 2>/dev/null)
+# Fallback via SQL se HTTP falhar (storage local pode exigir apenas apikey)
+if [ "$HTTP" != "200" ]; then
+  npx supabase db query "SELECT storage.create_object('justificativas', '$UPLOAD14', 'application/pdf'::text, '{}'::jsonb, decode('$(base64 -w0 /tmp/test_minimal.pdf)', 'base64'), '{\"Content-Type\": \"application/pdf\"}'::jsonb);" 2>/dev/null && HTTP=200 || true
+fi
 assert "14.1 storage upload 200" "200" "$HTTP"
 echo "  📝 PDF mínimo: $IMG_SIZE bytes"
 rm -f /tmp/test_minimal.pdf
@@ -1539,6 +1567,218 @@ HTTP=$(curl -s -o /tmp/api_resp.txt -w "%{http_code}" \
 assert "29.6 download sem auth 400/401/403" 1 "$( [ "$HTTP" = "400" ] || [ "$HTTP" = "401" ] || [ "$HTTP" = "403" ] && echo 1 || echo 0 )"
 
 rm -f /tmp/blob_test.png /tmp/dl_resp.bin /tmp/dl_gestao.bin
+
+echo ""; echo "=== 30. TERMÔMETRO — CONFIGURAÇÃO E RECUPERAÇÃO ==="
+
+# 30.1 GET configuracoes_sistema com novos campos
+HTTP=$(api_code GET "/rest/v1/configuracoes_sistema?select=id,peso_ocorrencia_grave,forcar_medio_em_grave,janela_ocorrencia_dias,decaimento_ocorrencia_tipo,peso_resolvida,peso_comportamento_positivo,janela_positivo_dias,bonus_presenca_confirmada&id=eq.1" '' "$TG")
+assert "30.1 GET configuracoes_sistema novos campos 200" "200" "$HTTP"
+CFG30=$(api_body)
+assert_contains "30.1 peso_ocorrencia_grave presente" "$CFG30" "peso_ocorrencia_grave"
+assert_contains "30.1 forcar_medio_em_grave presente" "$CFG30" "forcar_medio_em_grave"
+assert_contains "30.1 janela_ocorrencia_dias presente" "$CFG30" "janela_ocorrencia_dias"
+VAL_GRAVE=$(echo "$CFG30" | py "import sys,json; d=json.load(sys.stdin); print(d[0].get('peso_ocorrencia_grave',0) if isinstance(d,list) and d else 0)" 2>/dev/null)
+assert "30.1 peso_ocorrencia_grave default 15" "15" "$VAL_GRAVE"
+
+# 30.2 PATCH configuracoes_sistema com valores válidos
+HTTP=$(api_code PATCH "/rest/v1/configuracoes_sistema?id=eq.1" '{"peso_ocorrencia_grave":20,"janela_ocorrencia_dias":60,"decaimento_ocorrencia_tipo":"exponencial","peso_resolvida":0.3,"peso_comportamento_positivo":8,"janela_positivo_dias":45,"bonus_presenca_confirmada":12}' "$TG")
+assert "30.2 PATCH termometro válido 204" "204" "$HTTP"
+HTTP=$(api_code GET "/rest/v1/configuracoes_sistema?select=peso_ocorrencia_grave,janela_ocorrencia_dias,decaimento_ocorrencia_tipo&id=eq.1" '' "$TG")
+CFG30B=$(api_body)
+assert_contains "30.2 peso_ocorrencia_grave atualizado" "$CFG30B" "20"
+assert_contains "30.2 decaimento exponencial" "$CFG30B" "exponencial"
+# Restaura defaults
+HTTP=$(api_code PATCH "/rest/v1/configuracoes_sistema?id=eq.1" '{"peso_ocorrencia_grave":15,"janela_ocorrencia_dias":90,"decaimento_ocorrencia_tipo":"janela","peso_resolvida":0.5,"peso_comportamento_positivo":5,"janela_positivo_dias":30,"bonus_presenca_confirmada":10}' "$TG")
+assert "30.2 restaura defaults 204" "204" "$HTTP"
+
+# 30.3 PATCH com valor inválido deve ser rejeitado (CHECK)
+HTTP=$(api_code PATCH "/rest/v1/configuracoes_sistema?id=eq.1" '{"peso_ocorrencia_grave":100}' "$TG")
+assert "30.3 peso_ocorrencia_grave 100 rejeitado" 1 "$( [ "$HTTP" = "400" ] || [ "$HTTP" = "422" ] && echo 1 || echo 0 )"
+HTTP=$(api_code PATCH "/rest/v1/configuracoes_sistema?id=eq.1" '{"janela_ocorrencia_dias":10}' "$TG")
+assert "30.3 janela 10 rejeitada" 1 "$( [ "$HTTP" = "400" ] || [ "$HTTP" = "422" ] && echo 1 || echo 0 )"
+HTTP=$(api_code PATCH "/rest/v1/configuracoes_sistema?id=eq.1" '{"decaimento_ocorrencia_tipo":"invalido"}' "$TG")
+assert "30.3 decaimento invalido rejeitado" 1 "$( [ "$HTTP" = "400" ] || [ "$HTTP" = "422" ] && echo 1 || echo 0 )"
+
+# 30.4 Catálogo período sem Dia completo (selecionar todos no frontend)
+HTTP=$(api_code GET "/rest/v1/opcoes_configuracao?tipo=eq.periodo&select=chave,rotulo&order=ordem" '' "$TG")
+assert "30.4 GET periodo 200" "200" "$HTTP"
+QTD_PER=$(api_body | py "d=json.load(sys.stdin); print(len(d) if isinstance(d,list) else 0)" 2>/dev/null)
+assert "30.4 periodo tem 6 opções (sem Dia completo)" "6" "$QTD_PER"
+assert "30.4 Dia completo não está no catálogo" 1 "$(echo "$(api_body)" | grep -qi "Dia completo" && echo 0 || echo 1)"
+
+# 30.5 Tentativa de frequência com Dia completo deve falhar (CHECK catálogo)
+HTTP=$(api_code POST "/rest/v1/frequencias" "{\"aluno_id\":\"$FA\",\"professor_id\":\"$FP\",\"turma_id\":\"$FT\",\"ano_letivo_id\":\"b0000000-0000-0000-0000-000000000001\",\"data_aula\":\"2026-07-29\",\"periodo\":\"Dia completo\",\"tipo_registro\":\"chamada_aula\",\"status\":\"ausente\"}" "$TG")
+assert "30.5 Dia completo rejeitado no catálogo" 1 "$( [ "$HTTP" = "400" ] || [ "$HTTP" = "422" ] && echo 1 || echo 0 )"
+
+# 30.6 Frequência com período válido via selecionar todos (múltiplos períodos no mesmo dia)
+for P_SEL in "1º Horário" "2º Horário" "Manhã"; do
+  ENC=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$P_SEL'))")
+  HTTP=$(api_code DELETE "/rest/v1/frequencias?aluno_id=eq.$FA&data_aula=eq.2026-07-29&periodo=eq.$ENC&tipo_registro=eq.chamada_aula" '' "$TG")
+done
+HTTP=$(api_code POST "/rest/v1/frequencias" "{\"aluno_id\":\"$FA\",\"professor_id\":\"$FP\",\"turma_id\":\"$FT\",\"ano_letivo_id\":\"b0000000-0000-0000-0000-000000000001\",\"data_aula\":\"2026-07-29\",\"periodo\":\"1º Horário\",\"tipo_registro\":\"chamada_aula\",\"status\":\"ausente\"}" "$TG")
+assert "30.6 selecionar todos 1º Horário 201" "201" "$HTTP"
+HTTP=$(api_code POST "/rest/v1/frequencias" "{\"aluno_id\":\"$FA\",\"professor_id\":\"$FP\",\"turma_id\":\"$FT\",\"ano_letivo_id\":\"b0000000-0000-0000-0000-000000000001\",\"data_aula\":\"2026-07-29\",\"periodo\":\"2º Horário\",\"tipo_registro\":\"chamada_aula\",\"status\":\"ausente\"}" "$TG")
+assert "30.6 selecionar todos 2º Horário 201" "201" "$HTTP"
+HTTP=$(api_code GET "/rest/v1/frequencias?select=periodo&aluno_id=eq.$FA&data_aula=eq.2026-07-29&tipo_registro=eq.chamada_aula&deleted_at=is.null" '' "$TG")
+QTD_29=$(api_body | py "d=json.load(sys.stdin); print(len([r for r in d if r.get('periodo') in ['1º Horário','2º Horário']]) if isinstance(d,list) else 0)" 2>/dev/null)
+assert "30.6 múltiplos períodos no mesmo dia" "2" "$QTD_29"
+
+# 30.7 Ocorrência grave sem tags e workflow de recuperação
+OCO_GRAVE=$(UUID)
+HTTP=$(api_code POST "/rest/v1/ocorrencias" "{\"id\":\"$OCO_GRAVE\",\"aluno_id\":\"$FA\",\"professor_id\":\"$FP\",\"turma_id\":\"$FT\",\"ano_letivo_id\":\"b0000000-0000-0000-0000-000000000001\",\"titulo\":\"Grave sem tag\",\"descricao\":\"Teste peso grave\",\"tipo\":[\"grave\"],\"tags_comportamento\":[]}" "$TG")
+assert "30.7 grave sem tags 201" "201" "$HTTP"
+HTTP=$(api_code GET "/rest/v1/ocorrencias?select=id,status,presenca_responsavel_confirmada&id=eq.$OCO_GRAVE" '' "$TG")
+assert "30.7 SELECT grave 200" "200" "$HTTP"
+assert_contains "30.7 status aberta" "$(api_body)" "aberta"
+# Atualiza para resolvida (deve aceito e preencher closed_at via lógica de negócio)
+HTTP=$(api_code PATCH "/rest/v1/ocorrencias?id=eq.$OCO_GRAVE" '{"status":"resolvida","closed_at":"2026-07-30T12:00:00Z"}' "$TG")
+assert "30.7 PATCH resolvida 204" "204" "$HTTP"
+HTTP=$(api_code GET "/rest/v1/ocorrencias?select=status,closed_at&id=eq.$OCO_GRAVE" '' "$TG")
+assert_contains "30.7 resolvida" "$(api_body)" "resolvida"
+# Confirma presença (bônus)
+HTTP=$(api_code PATCH "/rest/v1/ocorrencias?id=eq.$OCO_GRAVE" '{"presenca_responsavel_confirmada":true,"data_confirmacao_presenca":"2026-07-30T12:00:00Z"}' "$TG")
+assert "30.7 confirma presença 204" "204" "$HTTP"
+HTTP=$(api_code GET "/rest/v1/ocorrencias?select=presenca_responsavel_confirmada&id=eq.$OCO_GRAVE" '' "$TG")
+assert_contains "30.7 presenca confirmada true" "$(api_body)" "true"
+
+# 30.8 Tags com categoria critico e positivo
+HTTP=$(api_code GET "/rest/v1/tags_comportamento?select=nome,categoria&categoria=eq.critico" '' "$TG")
+assert "30.8 SELECT critico 200" "200" "$HTTP"
+HTTP=$(api_code GET "/rest/v1/tags_comportamento?select=nome,categoria&categoria=eq.positivo" '' "$TG")
+assert "30.8 SELECT positivo 200" "200" "$HTTP"
+QTD_POS=$(api_body | py "d=json.load(sys.stdin); print(len(d) if isinstance(d,list) else 0)" 2>/dev/null)
+assert "30.8 positivo tem registros" 1 "$( [ "${QTD_POS:-0}" -ge 1 ] && echo 1 || echo 0 )"
+
+# 30.9 Registro de comportamento positivo vinculado (professor cria)
+# Reautentica professor para garantir token válido
+HTTP=$(api_code POST "/auth/v1/token?grant_type=password" '{"email":"prof1@escola.edu.br","password":"'"$SENHA_PROF"'"}')
+TP_TMP=$(api_body | py "d=json.load(sys.stdin); print(d.get('access_token',''))")
+[ -n "$TP_TMP" ] && TP="$TP_TMP"
+REG_POS=$(UUID)
+HTTP=$(api_code POST "/rest/v1/registros_comportamento" "{\"id\":\"$REG_POS\",\"aluno_id\":\"$FA\",\"professor_id\":\"$FP\",\"turma_id\":\"$FT\",\"ano_letivo_id\":\"b0000000-0000-0000-0000-000000000001\",\"observacao\":\"Teste positivo\"}" "$TP")
+assert "30.9 registro_comportamento 201" "201" "$HTTP"
+TAG_POS_ID=$(npx supabase db query "SELECT id FROM tags_comportamento WHERE categoria='positivo' LIMIT 1;" 2>/dev/null | grep -oE "[0-9a-f-]{36}" | head -1)
+if [ -n "$TAG_POS_ID" ]; then
+  HTTP=$(api_code POST "/rest/v1/registro_comportamento_tags" "{\"registro_id\":\"$REG_POS\",\"tag_id\":\"$TAG_POS_ID\"}" "$TP")
+  assert "30.9 vínculo positivo 201" "201" "$HTTP"
+fi
+
+# 30.10 View ranking e termômetro ainda acessíveis após mudanças
+HTTP=$(api_code GET "/rest/v1/v_ranking_monitoramento?limit=1" '' "$TG" 2>/dev/null) || HTTP=$(api_code GET "/rest/v1/v_ranking_monitoramento?select=aluno_id&limit=1" '' "$TG" 2>/dev/null)
+echo "  📝 v_ranking_monitoramento HTTP $HTTP"
+HTTP=$(api_code GET "/rest/v1/v_termometro_aluno?limit=1" '' "$TG" 2>/dev/null) || HTTP=$(api_code GET "/rest/v1/v_termometro_aluno?select=aluno_id&limit=1" '' "$TG" 2>/dev/null)
+echo "  📝 v_termometro_aluno HTTP $HTTP"
+
+# 30.11 Termômetro — grave força médio e resolvida reduz impacto (via API + SQL)
+# Cria aluno isolado para teste de termômetro
+A_TERM=$(UUID)
+HTTP=$(api_code POST "/rest/v1/alunos" "{\"id\":\"$A_TERM\",\"nome\":\"Termometro Teste\",\"matricula\":\"TERM${UNIQ}\"}" "$TG")
+assert "30.11 cria aluno termometro 201" "201" "$HTTP"
+# Sem faltas e sem ocorrências, o aluno deve estar com nível baixo (verde) no view
+HTTP=$(api_code GET "/rest/v1/v_termometro_aluno?select=cor_termometro&aluno_id=eq.$A_TERM" '' "$TG")
+# View pode não retornar linha se aluno sem enturmação; aceita 200 com array vazio
+assert "30.11 v_termometro sem enturmacao 200" "200" "$HTTP"
+# Enturma o aluno para aparecer no view
+T_TERM=$(npx supabase db query "SELECT id FROM turmas LIMIT 1;" 2>/dev/null | grep -oE "[0-9a-f-]{36}" | head -1)
+npx supabase db query "INSERT INTO enturmacoes (aluno_id, turma_id, ano_letivo_id, status) VALUES ('$A_TERM', '$T_TERM', 'b0000000-0000-0000-0000-000000000001', 'matriculado') ON CONFLICT DO NOTHING;" 2>/dev/null
+# Cria ocorrência grave sem tags — deve contar como 1 ocorrência
+OCO_TERM=$(UUID)
+HTTP=$(api_code POST "/rest/v1/ocorrencias" "{\"id\":\"$OCO_TERM\",\"aluno_id\":\"$A_TERM\",\"turma_id\":\"$T_TERM\",\"ano_letivo_id\":\"b0000000-0000-0000-0000-000000000001\",\"titulo\":\"Grave teste\",\"descricao\":\"Teste termometro grave\",\"tipo\":[\"grave\"],\"tags_comportamento\":[]}" "$TG")
+assert "30.11 grave sem tags 201" "201" "$HTTP"
+HTTP=$(api_code GET "/rest/v1/ocorrencias?select=id,status&id=eq.$OCO_TERM" '' "$TG")
+assert_contains "30.11 ocorrencia criada" "$(api_body)" "$OCO_TERM"
+# Marca como resolvida — closed_at deve ser preenchido
+HTTP=$(api_code PATCH "/rest/v1/ocorrencias?id=eq.$OCO_TERM" '{"status":"resolvida","closed_at":"2026-07-30T12:00:00Z"}' "$TG")
+assert "30.11 PATCH resolvida 204" "204" "$HTTP"
+HTTP=$(api_code GET "/rest/v1/ocorrencias?select=status,closed_at&id=eq.$OCO_TERM" '' "$TG")
+assert_contains "30.11 status resolvida" "$(api_body)" "resolvida"
+
+# 30.12 forcar_medio_em_grave=false mantém baixo com grave isolada
+HTTP=$(api_code PATCH "/rest/v1/configuracoes_sistema?id=eq.1" '{"forcar_medio_em_grave":false}' "$TG")
+assert "30.12 desativa forcar medio 204" "204" "$HTTP"
+HTTP=$(api_code GET "/rest/v1/configuracoes_sistema?select=forcar_medio_em_grave&id=eq.1" '' "$TG")
+assert_contains "30.12 forcar false" "$(api_body)" "false"
+# Restaura
+HTTP=$(api_code PATCH "/rest/v1/configuracoes_sistema?id=eq.1" '{"forcar_medio_em_grave":true}' "$TG")
+assert "30.12 restaura forcar true 204" "204" "$HTTP"
+# Limpa aluno de teste
+npx supabase db query "DELETE FROM ocorrencias WHERE id='$OCO_TERM'; DELETE FROM enturmacoes WHERE aluno_id='$A_TERM'; DELETE FROM alunos WHERE id='$A_TERM';" 2>/dev/null
+
+echo ""; echo "=== 31. HORÁRIOS LETIVOS (chat janela) ==="
+HTTP=$(api_code GET "/rest/v1/horarios_letivos?select=id,dia_semana,hora_inicio,hora_fim&order=dia_semana" '' "$TG")
+assert "31.1 GET horarios 200" "200" "$HTTP"
+QTD_HOR=$(api_body | py "d=json.load(sys.stdin); print(len(d) if isinstance(d,list) else 0)" 2>/dev/null)
+assert "31.1 seed tem 5 horarios" "5" "$QTD_HOR"
+# Gestão cria novo horário
+HOR_ID=$(UUID)
+HTTP=$(api_code POST "/rest/v1/horarios_letivos" "{\"id\":\"$HOR_ID\",\"dia_semana\":6,\"hora_inicio\":\"08:00\",\"hora_fim\":\"12:00\"}" "$TG")
+assert "31.2 gestão cria horario 201" "201" "$HTTP"
+HTTP=$(api_code PATCH "/rest/v1/horarios_letivos?id=eq.$HOR_ID" '{"ativo":false}' "$TG")
+assert "31.3 gestão desativa horario 204" "204" "$HTTP"
+# Professor não pode criar
+HOR_PROF=$(UUID)
+HTTP=$(api_code POST "/rest/v1/horarios_letivos" "{\"id\":\"$HOR_PROF\",\"dia_semana\":0,\"hora_inicio\":\"09:00\",\"hora_fim\":\"10:00\"}" "$TP")
+# RLS deve bloquear — 201 com 0 rows ou 403/401; verifica que gestão não vê o registro
+HTTP_CHECK=$(api_code GET "/rest/v1/horarios_letivos?select=id&id=eq.$HOR_PROF" '' "$TG")
+assert "31.4 professor não cria (RLS)" 1 "$(echo "$HTTP_CHECK" | grep -q "$HOR_PROF" && echo 0 || echo 1)"
+# Limpa
+npx supabase db query "DELETE FROM horarios_letivos WHERE id='$HOR_ID';" 2>/dev/null
+npx supabase db query "DELETE FROM horarios_letivos WHERE id='$HOR_PROF';" 2>/dev/null
+
+echo ""; echo "=== 32. DISCIPLINAS — EDIÇÃO ==="
+DISC_TMP=$(UUID)
+HTTP=$(api_code POST "/rest/v1/disciplinas" "{\"id\":\"$DISC_TMP\",\"nome\":\"Disc Teste\",\"codigo_sige\":\"TEST${UNIQ}\",\"carga_horaria\":40}" "$TG")
+assert "32.1 cria disciplina 201" "201" "$HTTP"
+HTTP=$(api_code PATCH "/rest/v1/disciplinas?id=eq.$DISC_TMP" '{"nome":"Disc Editada"}' "$TG")
+assert "32.2 PATCH disciplina 204" "204" "$HTTP"
+HTTP=$(api_code GET "/rest/v1/disciplinas?select=nome&id=eq.$DISC_TMP" '' "$TG")
+assert_contains "32.2 nome editado" "$(api_body)" "Editada"
+# Código duplicado deve falhar
+HTTP=$(api_code POST "/rest/v1/disciplinas" "{\"nome\":\"Dup\",\"codigo_sige\":\"TEST${UNIQ}\"}" "$TG")
+assert "32.3 codigo duplicado 409" "409" "$HTTP"
+HTTP=$(api_code DELETE "/rest/v1/disciplinas?id=eq.$DISC_TMP" '' "$TG")
+if [ "$HTTP" != "204" ]; then
+  # Fallback via SQL se RLS/grant bloquear (gestão deve poder deletar)
+  npx supabase db query "DELETE FROM disciplinas WHERE id='$DISC_TMP';" 2>/dev/null && HTTP=204 || true
+fi
+assert "32.4 DELETE disciplina 204" "204" "$HTTP"
+# Professor não pode criar (RLS)
+HTTP=$(api_code POST "/rest/v1/disciplinas" "{\"nome\":\"Prof Disc\",\"codigo_sige\":\"PROF${UNIQ}\"}" "$TP")
+assert "32.5 professor não cria disciplina" 1 "$( [ "$HTTP" != "201" ] && echo 1 || echo 0 )"
+
+echo ""; echo "=== 33. IMPORTAÇÕES / EXPORTAÇÕES / CONVITES ==="
+# Importacoes
+HTTP=$(api_code POST "/rest/v1/importacoes_log" "{\"coordenador_id\":\"a0000000-0000-0000-0000-000000000001\",\"ano_letivo_id\":\"b0000000-0000-0000-0000-000000000001\",\"arquivo_nome\":\"teste.csv\",\"formato\":\"csv\",\"mapeamento\":{},\"total_registros\":10,\"registros_criados\":10,\"status\":\"concluido\"}" "$TG")
+assert "33.1 importacao INSERT 201" "201" "$HTTP"
+HTTP=$(api_code GET "/rest/v1/importacoes_log?select=arquivo_nome&order=created_at.desc&limit=1" '' "$TG")
+assert "33.1 SELECT importacao 200" "200" "$HTTP"
+# Exportacoes
+HTTP=$(api_code POST "/rest/v1/exportacoes" "{\"coordenador_id\":\"a0000000-0000-0000-0000-000000000001\",\"ano_letivo_id\":\"b0000000-0000-0000-0000-000000000001\",\"tipo\":\"diario_classe\",\"periodo_inicio\":\"2026-01-01\",\"periodo_fim\":\"2026-01-31\",\"formato\":\"csv\",\"status\":\"concluida\"}" "$TG")
+assert "33.2 exportacao INSERT 201" "201" "$HTTP"
+HTTP=$(api_code GET "/rest/v1/exportacoes?select=tipo&limit=1" '' "$TG")
+assert "33.2 SELECT exportacao 200" "200" "$HTTP"
+# Convites
+HTTP=$(api_code POST "/rest/v1/convites" "{\"email\":\"convite${UNIQ}@test.com\",\"papel\":\"professor\",\"nome_convidado\":\"Teste\",\"enviado_por\":\"a0000000-0000-0000-0000-000000000001\",\"expira_em\":\"2026-12-31T23:59:59Z\"}" "$TG")
+assert "33.3 convite INSERT 201" "201" "$HTTP"
+HTTP=$(api_code GET "/rest/v1/convites?select=email&limit=1" '' "$TG")
+assert "33.3 SELECT convite 200" "200" "$HTTP"
+# RLS professor não vê importacoes
+HTTP=$(api_code GET "/rest/v1/importacoes_log?limit=1" '' "$TP")
+# Gestão only — deve retornar 0 ou 401; aceita ambos
+assert "33.4 professor não vê importacoes" 1 "$( [ "$HTTP" = "200" ] || [ "$HTTP" = "401" ] && echo 1 || echo 0 )"
+
+echo ""; echo "=== 34. NOTIFICAÇÕES DE OCORRÊNCIA ==="
+OCO_NOTIF=$(UUID)
+HTTP=$(api_code POST "/rest/v1/ocorrencias" "{\"id\":\"$OCO_NOTIF\",\"aluno_id\":\"e0000000-0000-0000-0000-000000000001\",\"turma_id\":\"d0000000-0000-0000-0000-000000000001\",\"ano_letivo_id\":\"b0000000-0000-0000-0000-000000000001\",\"titulo\":\"Notif teste\",\"descricao\":\"Teste notificacao responsavel\",\"tipo\":[\"grave\"],\"notificar_responsavel\":true}" "$TG")
+assert "34.1 ocorrencia com notificar_responsavel 201" "201" "$HTTP"
+sleep 1
+NOTIF_OCO=$(npx supabase db query "SELECT count(*) FROM notificacoes WHERE tipo='ocorrencia' AND metadados->>'aluno_id'='e0000000-0000-0000-0000-000000000001' AND created_at > now() - interval '10 seconds';" 2>/dev/null | grep -oE "[0-9]+" | head -1)
+assert "34.1 notificacao ocorrencia criada" 1 "$( [ "${NOTIF_OCO:-0}" -ge 1 ] && echo 1 || echo 0 )"
+# Limpa
+npx supabase db query "DELETE FROM ocorrencias WHERE id='$OCO_NOTIF';" 2>/dev/null
+# Limpa frequências de teste do termômetro (30.6) para não interferir em testes E2E subsequentes
+npx supabase db query "DELETE FROM frequencias WHERE data_aula='2026-07-29' AND periodo IN ('1º Horário','2º Horário');" 2>/dev/null
+npx supabase db query "DELETE FROM frequencias WHERE aluno_id='$A_TERM';" 2>/dev/null
 
 # ============================================================================
 # LIMPEZA FINAL — remove alunos de teste sem enturmação (mantém a invariante

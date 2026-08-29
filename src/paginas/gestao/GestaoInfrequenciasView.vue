@@ -35,7 +35,7 @@ const { inscrever, encerrar } = useRealtimeRefresh();
 
 const turmaSelecionada = ref('');
 const buscaTurma = ref('');
-const periodosChamada = ref<string[]>(['Dia completo']);
+const periodosChamada = ref<string[]>([]);
 
 const turmaOpcoes = computed<OpcaoCombobox[]>(() =>
   turmasDisponiveis.value.map((t) => ({ valor: t.id, rotulo: t.nome })),
@@ -159,13 +159,12 @@ async function confirmarSalvarChamada() {
   try {
     const turmaNome =
       turmasDisponiveis.value.find((t) => t.id === turmaSelecionada.value)?.nome ?? 'turma';
+    const periodosEfetivos = periodosChamada.value.filter((p) => p !== 'Dia completo');
     const { registradas, erro: errMsg } = await registrarFrequenciaEmMassa(
       alunosDaTurma.value,
       usuario.value.id,
       dataAula.value,
-      periodosChamada.value.includes('Dia completo')
-        ? ['1º Horário', '2º Horário', '3º Horário', '4º Horário', 'Manhã', 'Tarde']
-        : periodosChamada.value,
+      periodosEfetivos,
     );
     if (errMsg) {
       mostrarErro(errMsg);
@@ -178,7 +177,16 @@ async function confirmarSalvarChamada() {
   }
 }
 
-async function registrarIndividual() {
+const confirmarIndividual = ref(false);
+
+const temDadosIndividual = computed(
+  () =>
+    !!alunoIdIndividual.value ||
+    periodosIndividuais.value.length > 0 ||
+    !!justificativaIndividual.value.trim(),
+);
+
+function solicitarRegistrarIndividual() {
   if (!usuario.value) return;
   if (!alunoIdIndividual.value) {
     mostrarErro('Selecione um aluno.');
@@ -188,6 +196,12 @@ async function registrarIndividual() {
     mostrarErro('Selecione pelo menos um período.');
     return;
   }
+  confirmarIndividual.value = true;
+}
+
+async function registrarIndividual() {
+  confirmarIndividual.value = false;
+  if (!usuario.value) return;
   for (const periodo of periodosIndividuais.value) {
     const ok = await registrarAusenciaEmPeriodo(
       alunoIdIndividual.value,
@@ -346,6 +360,7 @@ watch(dataAula, () => {
               :opcoes="opcoesPeriodos"
               :modelo="periodosChamada"
               :colunas="4"
+              mostrar-selecionar-todos
               @update:modelo="periodosChamada = $event"
             />
           </div>
@@ -455,6 +470,7 @@ watch(dataAula, () => {
               :opcoes="opcoesPeriodos"
               :modelo="periodosIndividuais"
               :colunas="3"
+              mostrar-selecionar-todos
               @update:modelo="periodosIndividuais = $event"
             />
           </CampoFormulario>
@@ -496,10 +512,25 @@ watch(dataAula, () => {
 
           <div class="d-flex gap-2 justify-content-end">
             <button
+              v-if="temDadosIndividual"
+              type="button"
+              class="btn btn-sm btn-outline-secondary"
+              @click="
+                temDadosIndividual
+                  ? ((alunoIdIndividual = ''),
+                    (periodosIndividuais = []),
+                    (justificativaIndividual = ''),
+                    (motivosIndividuais = []))
+                  : null
+              "
+            >
+              Cancelar
+            </button>
+            <button
               type="button"
               class="btn btn-sm btn-success"
               :disabled="carregando || !alunoIdIndividual || !periodosIndividuais.length"
-              @click="registrarIndividual"
+              @click="solicitarRegistrarIndividual"
             >
               <span
                 v-if="carregando"
@@ -526,9 +557,19 @@ watch(dataAula, () => {
       "
       rotulo-confirmar="Registrar faltas"
       icone="calendar-x"
-      variante="danger"
+      variante="warning"
       @confirmar="confirmarSalvarChamada"
       @cancelar="chamadaPendente = false"
+    />
+    <ModalConfirmacao
+      :visivel="confirmarIndividual"
+      titulo="Registrar ausência"
+      :mensagem="`Registrar ${periodosIndividuais.length} ausência(s) para o aluno selecionado em ${new Date(dataAula + 'T12:00:00').toLocaleDateString('pt-BR')}?`"
+      rotulo-confirmar="Registrar"
+      icone="person-dash"
+      variante="warning"
+      @confirmar="registrarIndividual"
+      @cancelar="confirmarIndividual = false"
     />
   </div>
 </template>

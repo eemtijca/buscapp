@@ -2,6 +2,10 @@
 # ============================================================================
 # Suíte de Testes do Banco de Dados — BuscApp
 # Executa os testes SQL via Docker (contorno para limitação do CLI)
+# ----------------------------------------------------------------------------
+# Fronteira: cobre constraints, triggers, RLS, views e catálogo via SQL com
+# ROLLBACK. Regras de cálculo do termômetro (pesos, janelas, Dia completo)
+# têm asserts em Fase 9; UI (barra, modais) é validada via Playwright.
 # ============================================================================
 
 set -o pipefail

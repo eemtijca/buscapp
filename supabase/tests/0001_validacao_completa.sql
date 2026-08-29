@@ -1286,6 +1286,104 @@ end;
 $p8$;
 
 -- ============================================================================
+-- Fase 9: Termômetro — configuração e recuperação (pesos, janelas, Dia completo)
+-- ============================================================================
+
+do $p9$
+declare
+  v_count int;
+  v_val numeric;
+  v_text text;
+begin
+  -- T1: colunas de termômetro existem em configuracoes_sistema
+  select count(*) into v_count
+  from information_schema.columns
+  where table_name = 'configuracoes_sistema'
+    and column_name in ('peso_ocorrencia_grave','forcar_medio_em_grave','janela_ocorrencia_dias','decaimento_ocorrencia_tipo','peso_resolvida','peso_comportamento_positivo','janela_positivo_dias','bonus_presenca_confirmada');
+  perform public.test_msg('T1: colunas termômetro existem', v_count = 8);
+
+  -- T2: defaults
+  select peso_ocorrencia_grave into v_val from public.configuracoes_sistema where id = 1;
+  perform public.test_msg('T2: peso_ocorrencia_grave default 15', v_val = 15);
+  select janela_ocorrencia_dias into v_count from public.configuracoes_sistema where id = 1;
+  perform public.test_msg('T2b: janela_ocorrencia_dias default 90', v_count = 90);
+  select decaimento_ocorrencia_tipo into v_text from public.configuracoes_sistema where id = 1;
+  perform public.test_msg('T2c: decaimento default janela', v_text = 'janela');
+
+  -- T3: CHECK constraint peso_ocorrencia_grave entre 5 e 30
+  begin
+    update public.configuracoes_sistema set peso_ocorrencia_grave = 100 where id = 1;
+    perform public.test_msg('T3: peso_ocorrencia_grave 100 rejeitado', false);
+  exception when check_violation then
+    perform public.test_msg('T3: peso_ocorrencia_grave 100 rejeitado', true);
+  end;
+
+  -- T4: CHECK janela_ocorrencia_dias entre 30 e 365
+  begin
+    update public.configuracoes_sistema set janela_ocorrencia_dias = 10 where id = 1;
+    perform public.test_msg('T4: janela 10 rejeitada', false);
+  exception when check_violation then
+    perform public.test_msg('T4: janela 10 rejeitada', true);
+  end;
+
+  -- T5: CHECK decaimento tipo
+  begin
+    update public.configuracoes_sistema set decaimento_ocorrencia_tipo = 'invalido' where id = 1;
+    perform public.test_msg('T5: decaimento invalido rejeitado', false);
+  exception when check_violation then
+    perform public.test_msg('T5: decaimento invalido rejeitado', true);
+  end;
+
+  -- T6: catálogo período tem 6 opções (sem Dia completo)
+  select count(*) into v_count from public.opcoes_configuracao where tipo = 'periodo';
+  perform public.test_msg('T6: periodo tem 6 opções', v_count = 6);
+  select count(*) into v_count from public.opcoes_configuracao where tipo = 'periodo' and chave = 'Dia completo';
+  perform public.test_msg('T6b: Dia completo não está no catálogo', v_count = 0);
+
+  -- T7: frequência com Dia completo rejeitada
+  begin
+    insert into public.frequencias (aluno_id, professor_id, turma_id, ano_letivo_id, data_aula, tipo_registro, periodo, status)
+    values ((public.test_get('aluno1_id'))::uuid, (public.test_get('professor_id'))::uuid, (select id from public.turmas limit 1), (public.test_get('ano_id'))::uuid, current_date, 'chamada_aula', 'Dia completo', 'ausente');
+    perform public.test_msg('T7: Dia completo rejeitado', false);
+  exception when check_violation then
+    perform public.test_msg('T7: Dia completo rejeitado', true);
+  end;
+
+  -- T8: múltiplos períodos no mesmo dia (selecionar todos)
+  begin
+    insert into public.frequencias (aluno_id, professor_id, turma_id, ano_letivo_id, data_aula, tipo_registro, periodo, status)
+    values ((public.test_get('aluno1_id'))::uuid, (public.test_get('professor_id'))::uuid, (select id from public.turmas limit 1), (public.test_get('ano_id'))::uuid, current_date + 10, 'chamada_aula', '1º Horário', 'ausente');
+    insert into public.frequencias (aluno_id, professor_id, turma_id, ano_letivo_id, data_aula, tipo_registro, periodo, status)
+    values ((public.test_get('aluno1_id'))::uuid, (public.test_get('professor_id'))::uuid, (select id from public.turmas limit 1), (public.test_get('ano_id'))::uuid, current_date + 10, 'chamada_aula', '2º Horário', 'ausente');
+    select count(*) into v_count from public.frequencias where aluno_id = (public.test_get('aluno1_id'))::uuid and data_aula = current_date + 10;
+    perform public.test_msg('T8: múltiplos períodos no mesmo dia', v_count >= 2);
+  exception when others then
+    perform public.test_msg('T8: múltiplos períodos no mesmo dia', false);
+  end;
+
+  -- T9: categoria critico pode ser inserida
+  begin
+    insert into public.tags_comportamento (nome, categoria, peso_pontuacao) values ('TesteCriticoTmp', 'critico', 20);
+    select count(*) into v_count from public.tags_comportamento where nome = 'TesteCriticoTmp' and categoria = 'critico';
+    perform public.test_msg('T9: categoria critico inserida', v_count = 1);
+    delete from public.tags_comportamento where nome = 'TesteCriticoTmp';
+  exception when others then
+    perform public.test_msg('T9: categoria critico inserida', false);
+  end;
+
+  -- T10: ocorrencia status resolvida com presenca confirmada
+  begin
+    update public.ocorrencias set status = 'resolvida', closed_at = now() where id = (select id from public.ocorrencias limit 1);
+    perform public.test_msg('T10: ocorrencia resolvida', true);
+  exception when others then
+    perform public.test_msg('T10: ocorrencia resolvida', false);
+  end;
+
+  raise notice '[OK] Fase 9: Termômetro concluída';
+end;
+$p9$;
+
+-- ============================================================================
 -- INTEGRIDADE — dados órfãos (catálogo, perfis, enturmações, anexos)
 -- ============================================================================
 

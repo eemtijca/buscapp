@@ -10,7 +10,7 @@ export type SerieTurma = string;
 export type LetraTurma = string;
 export type TipoRegistroFrequencia = 'entrada_portao' | 'chamada_aula' | 'saida';
 export type StatusFrequencia = 'presente' | 'ausente' | 'justificado';
-export type CategoriaTag = 'positivo' | 'atencao';
+export type CategoriaTag = 'positivo' | 'atencao' | 'critico';
 export type TipoOcorrencia = 'grave' | 'suspensao';
 export type StatusOcorrencia = 'aberta' | 'em_andamento' | 'resolvida' | 'arquivada';
 export type TipoContatoBusca = 'telefone' | 'whatsapp' | 'presencial' | 'carta' | 'outro';
@@ -64,6 +64,14 @@ export interface ConfiguracaoSistema {
   janela_recencia_dias: number;
   limite_score_medio: number;
   limite_score_alto: number;
+  peso_ocorrencia_grave: number;
+  forcar_medio_em_grave: boolean;
+  janela_ocorrencia_dias: number;
+  decaimento_ocorrencia_tipo: string;
+  peso_resolvida: number;
+  peso_comportamento_positivo: number;
+  janela_positivo_dias: number;
+  bonus_presenca_confirmada: number;
   updated_at: string;
 }
 

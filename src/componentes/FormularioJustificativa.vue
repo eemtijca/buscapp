@@ -2,6 +2,7 @@
 import { ref, computed, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import CampoFormulario from '@/componentes/CampoFormulario.vue';
+import ModalConfirmacao from '@/componentes/ModalConfirmacao.vue';
 
 const props = withDefaults(
   defineProps<{
@@ -60,6 +61,13 @@ const tamanhoArquivo = computed(() => {
 // Arraste em andamento para destacar a área de soltar.
 const arrastando = ref(false);
 
+/** Controle dos modais de confirmação para enviar e cancelar. */
+const confirmarEnvio = ref(false);
+const confirmarCancelar = ref(false);
+
+/** Verifica se há dados não salvos para exibir confirmação ao cancelar. */
+const temDados = computed(() => !!motivo.value.trim() || !!arquivo.value);
+
 /** Valida e aceita o arquivo vindo do seletor ou do arraste; retorna true quando aceito. */
 function aceitarArquivo(file: File | null | undefined): boolean {
   if (!file) return false;
@@ -114,12 +122,27 @@ function submeter() {
     dataFim.value = dataInicio.value;
   }
   erroValidacao.value = null;
+  confirmarEnvio.value = true;
+}
+
+/** Confirma o envio após validação no modal. */
+function confirmarSubmeter() {
+  confirmarEnvio.value = false;
   emit('enviar', {
     motivo: motivo.value.trim(),
     dataInicio: dataInicio.value,
     dataFim: dataFim.value,
     arquivo: arquivo.value,
   });
+}
+
+/** Solicita confirmação ao cancelar quando há dados preenchidos. */
+function aoCancelar() {
+  if (temDados.value) {
+    confirmarCancelar.value = true;
+  } else {
+    router.back();
+  }
 }
 </script>
 
@@ -259,7 +282,7 @@ function submeter() {
         type="button"
         class="btn btn-sm btn-outline-secondary"
         :disabled="enviando"
-        @click="router.back()"
+        @click="aoCancelar"
       >
         Cancelar
       </button>
@@ -268,6 +291,31 @@ function submeter() {
         Enviar
       </button>
     </div>
+    <ModalConfirmacao
+      :visivel="confirmarEnvio"
+      titulo="Confirmar envio"
+      mensagem="Deseja enviar esta justificativa? Verifique os dados antes de confirmar."
+      rotulo-confirmar="Enviar"
+      icone="send"
+      variante="success"
+      @confirmar="confirmarSubmeter"
+      @cancelar="confirmarEnvio = false"
+    />
+    <ModalConfirmacao
+      :visivel="confirmarCancelar"
+      titulo="Descartar justificativa?"
+      mensagem="Há dados preenchidos que serão perdidos. Deseja realmente cancelar?"
+      rotulo-confirmar="Descartar"
+      icone="exclamation-triangle"
+      variante="danger"
+      @confirmar="
+        () => {
+          confirmarCancelar = false;
+          router.back();
+        }
+      "
+      @cancelar="confirmarCancelar = false"
+    />
   </form>
 </template>
 

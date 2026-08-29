@@ -41,6 +41,14 @@ let cacheConfigSistema: {
   janelaRecenciaDias: number;
   limiteScoreMedio: number;
   limiteScoreAlto: number;
+  pesoOcorrenciaGrave: number;
+  forcarMedioEmGrave: boolean;
+  janelaOcorrenciaDias: number;
+  decaimentoOcorrenciaTipo: 'nenhum' | 'janela' | 'exponencial';
+  pesoResolvida: number;
+  pesoComportamentoPositivo: number;
+  janelaPositivoDias: number;
+  bonusPresencaConfirmada: number;
   mensagemForaHorario: string;
 } | null = null;
 let cacheHorarios: HorarioProtegido | null = null;
@@ -58,6 +66,14 @@ function obterConfigTermometro(): ConfigTermometro {
     janelaRecenciaDias: c.janelaRecenciaDias,
     limiteScoreMedio: c.limiteScoreMedio,
     limiteScoreAlto: c.limiteScoreAlto,
+    pesoOcorrenciaGrave: c.pesoOcorrenciaGrave,
+    forcarMedioEmGrave: c.forcarMedioEmGrave,
+    janelaOcorrenciaDias: c.janelaOcorrenciaDias,
+    decaimentoOcorrenciaTipo: c.decaimentoOcorrenciaTipo,
+    pesoResolvida: c.pesoResolvida,
+    pesoComportamentoPositivo: c.pesoComportamentoPositivo,
+    janelaPositivoDias: c.janelaPositivoDias,
+    bonusPresencaConfirmada: c.bonusPresencaConfirmada,
   };
 }
 
@@ -67,7 +83,7 @@ async function carregarConfigSistema(): Promise<void> {
     const { data } = await supabaseClient
       .from('configuracoes_sistema')
       .select(
-        'limite_critico_faltas, limite_preventivo_faltas, mensagem_fora_horario, peso_falta, peso_ocorrencia, peso_recencia, janela_recencia_dias, limite_score_medio, limite_score_alto',
+        'limite_critico_faltas, limite_preventivo_faltas, mensagem_fora_horario, peso_falta, peso_ocorrencia, peso_recencia, janela_recencia_dias, limite_score_medio, limite_score_alto, peso_ocorrencia_grave, forcar_medio_em_grave, janela_ocorrencia_dias, decaimento_ocorrencia_tipo, peso_resolvida, peso_comportamento_positivo, janela_positivo_dias, bonus_presenca_confirmada',
       )
       .single();
     const row = data as unknown as {
@@ -80,6 +96,14 @@ async function carregarConfigSistema(): Promise<void> {
       janela_recencia_dias?: number;
       limite_score_medio?: number;
       limite_score_alto?: number;
+      peso_ocorrencia_grave?: number;
+      forcar_medio_em_grave?: boolean;
+      janela_ocorrencia_dias?: number;
+      decaimento_ocorrencia_tipo?: string;
+      peso_resolvida?: number;
+      peso_comportamento_positivo?: number;
+      janela_positivo_dias?: number;
+      bonus_presenca_confirmada?: number;
     } | null;
     cacheConfigSistema = {
       critico: row?.limite_critico_faltas ?? 25,
@@ -90,6 +114,15 @@ async function carregarConfigSistema(): Promise<void> {
       janelaRecenciaDias: row?.janela_recencia_dias ?? 14,
       limiteScoreMedio: row?.limite_score_medio ?? 40,
       limiteScoreAlto: row?.limite_score_alto ?? 75,
+      pesoOcorrenciaGrave: row?.peso_ocorrencia_grave ?? 15,
+      forcarMedioEmGrave: row?.forcar_medio_em_grave ?? true,
+      janelaOcorrenciaDias: row?.janela_ocorrencia_dias ?? 90,
+      decaimentoOcorrenciaTipo:
+        (row?.decaimento_ocorrencia_tipo as 'nenhum' | 'janela' | 'exponencial') ?? 'janela',
+      pesoResolvida: row?.peso_resolvida ?? 0.5,
+      pesoComportamentoPositivo: row?.peso_comportamento_positivo ?? 5,
+      janelaPositivoDias: row?.janela_positivo_dias ?? 30,
+      bonusPresencaConfirmada: row?.bonus_presenca_confirmada ?? 10,
       mensagemForaHorario:
         row?.mensagem_fora_horario ??
         'O canal de diálogo está fora do horário escolar. Mensagens enviadas agora serão respondidas quando a coordenação estiver disponível.',
@@ -104,6 +137,14 @@ async function carregarConfigSistema(): Promise<void> {
       janelaRecenciaDias: 14,
       limiteScoreMedio: 40,
       limiteScoreAlto: 75,
+      pesoOcorrenciaGrave: 15,
+      forcarMedioEmGrave: true,
+      janelaOcorrenciaDias: 90,
+      decaimentoOcorrenciaTipo: 'janela',
+      pesoResolvida: 0.5,
+      pesoComportamentoPositivo: 5,
+      janelaPositivoDias: 30,
+      bonusPresencaConfirmada: 10,
       mensagemForaHorario: 'O canal de diálogo está fora do horário escolar.',
     };
   }
@@ -117,6 +158,7 @@ export function calcularNivelRisco(totalAusencias: number, totalOcorrencias: num
     peso: 10,
     exigePresenca: false,
     categoria: 'atencao',
+    tipo: ['grave'] as string[],
   }));
   return calcularNivel(0, totalAusencias, ocorrencias, cfg);
 }
@@ -483,13 +525,21 @@ export function useMonitoramento() {
 
       const { data: ocorrenciasData, error: errOco } = await supabaseClient
         .from('ocorrencias')
-        .select('aluno_id, exige_presenca_responsavel, tags_comportamento, created_at');
+        .select(
+          'aluno_id, tipo, status, presenca_responsavel_confirmada, exige_presenca_responsavel, tags_comportamento, created_at',
+        );
 
       if (errOco) throw errOco;
       const ocorrenciasRaw = (ocorrenciasData ?? []) as unknown as Array<
         Pick<
           Ocorrencia,
-          'aluno_id' | 'exige_presenca_responsavel' | 'tags_comportamento' | 'created_at'
+          | 'aluno_id'
+          | 'tipo'
+          | 'status'
+          | 'presenca_responsavel_confirmada'
+          | 'exige_presenca_responsavel'
+          | 'tags_comportamento'
+          | 'created_at'
         >
       >[];
 
@@ -519,6 +569,9 @@ export function useMonitoramento() {
         const ocos = (
           ocorrenciasRaw as unknown as Array<{
             aluno_id: string;
+            tipo: string[];
+            status: string;
+            presenca_responsavel_confirmada: boolean;
             exige_presenca_responsavel: boolean;
             tags_comportamento: string[];
             created_at: string;
@@ -532,7 +585,7 @@ export function useMonitoramento() {
           .reverse()[0];
         const diasDesdeUltima = ultima ? diasEntre(ultima, hojeIso) : null;
 
-        // Mapeia ocorrências para peso/categoria.
+        // Mapeia ocorrências para peso/categoria com suporte a decaimento e status.
         const ocorrenciasCalc = ocos.map((o) => {
           let peso = 0;
           let categoria = 'atencao';
@@ -547,8 +600,22 @@ export function useMonitoramento() {
           }
           // Sem tags mas com registro já conta peso padrão leve.
           if (peso === 0 && ((o.tags_comportamento ?? []) as string[]).length === 0) peso = 5;
-          return { peso, exigePresenca: o.exige_presenca_responsavel, categoria };
+          const diasDesdeCriacao = o.created_at
+            ? diasEntre(o.created_at.slice(0, 10), hojeIso)
+            : null;
+          return {
+            peso,
+            exigePresenca: o.exige_presenca_responsavel,
+            categoria,
+            tipo: (o.tipo ?? []) as string[],
+            status: o.status,
+            diasDesdeCriacao,
+            presencaConfirmada: o.presenca_responsavel_confirmada,
+          };
         });
+
+        // Conta comportamentos positivos recentes para desconto no score.
+        // Busca será feita no termômetro individual; no ranking usa 0 para performance.
 
         const { nivel } = calcularTermometro(
           {
@@ -556,6 +623,7 @@ export function useMonitoramento() {
             faltasRecentes,
             diasDesdeUltimaFalta: diasDesdeUltima,
             ocorrencias: ocorrenciasCalc,
+            comportamentosPositivos: 0,
           },
           cfg,
         );
@@ -662,6 +730,52 @@ export function useMonitoramento() {
       const msg = e instanceof Error ? e.message : String(e);
       console.error('[useMonitoramento] Erro ao alternar bloqueio de retorno:', msg);
       erro.value = 'Falha ao atualizar bloqueio de retorno.';
+      return false;
+    }
+  }
+
+  /** Atualiza o status da ocorrência para refletir a resolução pela gestão. */
+  async function resolverOcorrencia(
+    ocorrenciaId: string,
+    novoStatus: 'resolvida' | 'arquivada' | 'aberta' | 'em_andamento',
+  ): Promise<boolean> {
+    try {
+      const payload: Record<string, unknown> = { status: novoStatus };
+      if (novoStatus === 'resolvida' || novoStatus === 'arquivada') {
+        payload.closed_at = new Date().toISOString();
+      } else {
+        payload.closed_at = null;
+      }
+      const { error: err } = await supabaseClient
+        .from('ocorrencias')
+        .update(payload)
+        .eq('id', ocorrenciaId);
+      if (err) throw err;
+      return true;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error('[useMonitoramento] Erro ao resolver ocorrência:', msg);
+      erro.value = 'Falha ao atualizar status da ocorrência.';
+      return false;
+    }
+  }
+
+  /** Confirma a presença do responsável, reduzindo o peso no termômetro. */
+  async function confirmarPresencaResponsavel(ocorrenciaId: string): Promise<boolean> {
+    try {
+      const { error: err } = await supabaseClient
+        .from('ocorrencias')
+        .update({
+          presenca_responsavel_confirmada: true,
+          data_confirmacao_presenca: new Date().toISOString(),
+        })
+        .eq('id', ocorrenciaId);
+      if (err) throw err;
+      return true;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error('[useMonitoramento] Erro ao confirmar presença:', msg);
+      erro.value = 'Falha ao confirmar presença do responsável.';
       return false;
     }
   }
@@ -1004,14 +1118,20 @@ export function useMonitoramento() {
 
       const { data: ocos, error: errO } = await supabaseClient
         .from('ocorrencias')
-        .select('id, tags_comportamento, exige_presenca_responsavel')
+        .select(
+          'id, tipo, status, presenca_responsavel_confirmada, tags_comportamento, exige_presenca_responsavel, created_at',
+        )
         .eq('aluno_id', alunoId);
 
       if (errO) throw errO;
       const ocosRaw = (ocos ?? []) as unknown as Array<{
         id: string;
+        tipo: string[];
+        status: string;
+        presenca_responsavel_confirmada: boolean;
         tags_comportamento: string[];
         exige_presenca_responsavel: boolean;
+        created_at: string;
       }>;
       const totalOcorrencias = ocosRaw.length;
 
@@ -1041,8 +1161,54 @@ export function useMonitoramento() {
           }
         }
         if (peso === 0 && (o.tags_comportamento ?? []).length === 0) peso = 5;
-        return { peso, exigePresenca: o.exige_presenca_responsavel, categoria };
+        const diasDesdeCriacao = o.created_at
+          ? diasEntre(o.created_at.slice(0, 10), hojeIso)
+          : null;
+        return {
+          peso,
+          exigePresenca: o.exige_presenca_responsavel,
+          categoria,
+          tipo: (o.tipo ?? []) as string[],
+          status: o.status,
+          diasDesdeCriacao,
+          presencaConfirmada: o.presenca_responsavel_confirmada,
+        };
       });
+
+      // Conta comportamentos positivos recentes para desconto.
+      let comportamentosPositivos = 0;
+      try {
+        const janelaPos = new Date();
+        janelaPos.setDate(janelaPos.getDate() - cfg.janelaPositivoDias);
+        const janelaPosIso = janelaPos.toISOString().slice(0, 10);
+        const { data: regsPos } = await supabaseClient
+          .from('registros_comportamento')
+          .select('id, data_hora')
+          .eq('aluno_id', alunoId)
+          .gte('data_hora', janelaPosIso + 'T00:00:00');
+        const regIds = (regsPos ?? []).map((r) => (r as { id: string }).id);
+        if (regIds.length) {
+          const { data: tagIds } = await supabaseClient
+            .from('registro_comportamento_tags')
+            .select('tag_id, registro_id')
+            .in('registro_id', regIds);
+          const positivoIds = new Set(
+            ((tagsData ?? []) as unknown as Array<{ id: string; categoria: string }>)
+              .filter((t) => t.categoria === 'positivo')
+              .map((t) => t.id),
+          );
+          const regsComPositivo = new Set<string>();
+          for (const r of (tagIds ?? []) as unknown as Array<{
+            tag_id: string;
+            registro_id: string;
+          }>) {
+            if (positivoIds.has(r.tag_id)) regsComPositivo.add(r.registro_id);
+          }
+          comportamentosPositivos = regsComPositivo.size;
+        }
+      } catch {
+        comportamentosPositivos = 0;
+      }
 
       const { score, nivel, fatores } = calcularTermometro(
         {
@@ -1050,6 +1216,7 @@ export function useMonitoramento() {
           faltasRecentes,
           diasDesdeUltimaFalta,
           ocorrencias: ocorrenciasCalc,
+          comportamentosPositivos,
         },
         cfg,
       );
@@ -1940,6 +2107,8 @@ export function useMonitoramento() {
     buscarRankingRisco,
     buscarOcorrenciasGraves,
     alternarBloqueioRetorno,
+    resolverOcorrencia,
+    confirmarPresencaResponsavel,
     buscarJustificativasPendentes,
     validarJustificativa,
     calcularEstatisticasPainel,

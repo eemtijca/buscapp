@@ -8,6 +8,7 @@ import { useOpcoesConfiguracao } from '@/composables/useOpcoesConfiguracao';
 import CampoFormulario from '@/componentes/CampoFormulario.vue';
 import Combobox from '@/componentes/Combobox.vue';
 import GrupoCheckbox from '@/componentes/GrupoCheckbox.vue';
+import ModalConfirmacao from '@/componentes/ModalConfirmacao.vue';
 import type { AlunoFrequencia, OpcaoCheckbox } from '@/tipos/componentes';
 
 const router = useRouter();
@@ -28,6 +29,13 @@ const opcoesMotivos = ref<OpcaoCheckbox[]>([]);
 
 const motivos = ref<string[]>([]);
 const dataAula = ref(new Date().toISOString().slice(0, 10));
+const confirmarEnvio = ref(false);
+const confirmarCancelar = ref(false);
+
+/** Verifica se há dados preenchidos para confirmação ao cancelar. */
+const temDados = computed(
+  () => !!alunoId.value || periodos.value.length > 0 || !!justificativa.value.trim(),
+);
 
 const alunoOpcoes = computed(() =>
   alunos.value.map((a) => ({ valor: a.id, rotulo: a.nome, descricao: a.turma || 'Sem turma' })),
@@ -49,7 +57,7 @@ function aplicarMotivo() {
   }
 }
 
-async function confirmar() {
+function solicitarConfirmacao() {
   if (!usuario.value || !alunoId.value) {
     mensagemErro.value = 'Selecione um aluno.';
     return;
@@ -58,6 +66,12 @@ async function confirmar() {
     mensagemErro.value = 'Selecione pelo menos um período.';
     return;
   }
+  confirmarEnvio.value = true;
+}
+
+async function confirmar() {
+  confirmarEnvio.value = false;
+  if (!usuario.value || !alunoId.value) return;
   for (const periodo of periodos.value) {
     const ok = await registrarAusenciaEmPeriodo(
       alunoId.value,
@@ -167,6 +181,7 @@ onUnmounted(() => {
             :opcoes="opcoesPeriodos"
             :modelo="periodos"
             :colunas="3"
+            mostrar-selecionar-todos
             @update:modelo="periodos = $event"
           />
         </CampoFormulario>
@@ -207,14 +222,18 @@ onUnmounted(() => {
         </CampoFormulario>
 
         <div class="d-flex gap-2 justify-content-end">
-          <button type="button" class="btn btn-sm btn-outline-secondary" @click="router.back()">
+          <button
+            type="button"
+            class="btn btn-sm btn-outline-secondary"
+            @click="temDados ? (confirmarCancelar = true) : router.back()"
+          >
             Cancelar
           </button>
           <button
             type="button"
             class="btn btn-sm btn-success"
             :disabled="carregando || !alunoId || !periodos.length"
-            @click="confirmar"
+            @click="solicitarConfirmacao"
           >
             <span
               v-if="carregando"
@@ -227,5 +246,30 @@ onUnmounted(() => {
         </div>
       </div>
     </div>
+    <ModalConfirmacao
+      :visivel="confirmarEnvio"
+      titulo="Confirmar ausência"
+      :mensagem="`Registrar ${periodos.length} ausência(s) para o aluno selecionado em ${new Date(dataAula + 'T12:00:00').toLocaleDateString('pt-BR')}?`"
+      rotulo-confirmar="Registrar"
+      icone="clock-history"
+      variante="warning"
+      @confirmar="confirmar"
+      @cancelar="confirmarEnvio = false"
+    />
+    <ModalConfirmacao
+      :visivel="confirmarCancelar"
+      titulo="Descartar ausência?"
+      mensagem="Há dados preenchidos que serão perdidos. Deseja realmente cancelar?"
+      rotulo-confirmar="Descartar"
+      icone="exclamation-triangle"
+      variante="danger"
+      @confirmar="
+        () => {
+          confirmarCancelar = false;
+          router.back();
+        }
+      "
+      @cancelar="confirmarCancelar = false"
+    />
   </div>
 </template>

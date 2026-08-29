@@ -7,6 +7,7 @@ import { useOpcoesConfiguracao } from '@/composables/useOpcoesConfiguracao';
 import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh';
 import CartaoAlunoFrequencia from '@/componentes/CartaoAlunoFrequencia.vue';
 import GrupoCheckbox from '@/componentes/GrupoCheckbox.vue';
+import ModalConfirmacao from '@/componentes/ModalConfirmacao.vue';
 import type { AlunoFrequencia, OpcaoCheckbox } from '@/tipos/componentes';
 
 const router = useRouter();
@@ -16,7 +17,12 @@ const { buscarAlunosParaFrequencia, registrarFrequenciaEmMassa, carregando } = u
 const alunos = ref<AlunoFrequencia[]>([]);
 const buscaAluno = ref('');
 const dataAula = ref(new Date().toISOString().slice(0, 10));
-const periodosSelecionados = ref<string[]>(['Dia completo']);
+const periodosSelecionados = ref<string[]>([]);
+const confirmarSalvar = ref(false);
+const confirmarCancelar = ref(false);
+
+/** Verifica se há faltas marcadas para confirmação ao cancelar. */
+const temDados = computed(() => alunos.value.some((a) => a.ausente));
 const mensagemSucesso = ref<string | null>(null);
 const salvando = ref(false);
 
@@ -57,16 +63,35 @@ function alternarAusencia(alunoId: string) {
   }
 }
 
+function solicitarSalvarFrequencia() {
+  if (!usuario.value || salvando.value) return;
+  if (!temDados.value) {
+    mensagemSucesso.value = 'Todos os alunos estão presentes. Nenhuma ausência registrada.';
+    setTimeout(() => (mensagemSucesso.value = null), 4000);
+    return;
+  }
+  if (!periodosSelecionados.value.length) {
+    mensagemSucesso.value = 'Selecione pelo menos um período.';
+    setTimeout(() => (mensagemSucesso.value = null), 4000);
+    return;
+  }
+  confirmarSalvar.value = true;
+}
+
 async function salvarFrequencia() {
+  confirmarSalvar.value = false;
   if (!usuario.value || salvando.value) return;
   salvando.value = true;
+  const periodosEfetivos =
+    periodosSelecionados.value.length === opcoesPeriodos.value.length &&
+    opcoesPeriodos.value.length > 0
+      ? periodosSelecionados.value
+      : periodosSelecionados.value.filter((p) => p !== 'Dia completo');
   const { registradas, erro: errMsg } = await registrarFrequenciaEmMassa(
     alunos.value,
     usuario.value.id,
     dataAula.value,
-    periodosSelecionados.value.includes('Dia completo')
-      ? ['1º Horário', '2º Horário', '3º Horário', '4º Horário', 'Manhã', 'Tarde']
-      : periodosSelecionados.value,
+    periodosEfetivos,
   );
   salvando.value = false;
   if (errMsg) {
@@ -162,6 +187,7 @@ watch(dataAula, () => {
             :opcoes="opcoesPeriodos"
             :modelo="periodosSelecionados"
             :colunas="4"
+            mostrar-selecionar-todos
             @update:modelo="periodosSelecionados = $event"
           />
         </div>
@@ -238,14 +264,18 @@ watch(dataAula, () => {
       </div>
 
       <div class="card-footer bg-body-tertiary d-flex justify-content-end gap-2">
-        <button type="button" class="btn btn-outline-secondary btn-sm" @click="router.back()">
+        <button
+          type="button"
+          class="btn btn-outline-secondary btn-sm"
+          @click="temDados ? (confirmarCancelar = true) : router.back()"
+        >
           Cancelar
         </button>
         <button
           type="button"
           class="btn btn-success btn-sm"
           :disabled="carregando || !alunos.length"
-          @click="salvarFrequencia"
+          @click="solicitarSalvarFrequencia"
         >
           <span
             v-if="carregando"
@@ -257,5 +287,30 @@ watch(dataAula, () => {
         </button>
       </div>
     </div>
+    <ModalConfirmacao
+      :visivel="confirmarSalvar"
+      titulo="Salvar frequência"
+      :mensagem="`Registrar ${totalAusentesMarcados} ausência(s) em ${new Date(dataAula + 'T12:00:00').toLocaleDateString('pt-BR')}?`"
+      rotulo-confirmar="Registrar faltas"
+      icone="calendar-x"
+      variante="warning"
+      @confirmar="salvarFrequencia"
+      @cancelar="confirmarSalvar = false"
+    />
+    <ModalConfirmacao
+      :visivel="confirmarCancelar"
+      titulo="Descartar marcações?"
+      mensagem="Há faltas marcadas que serão perdidas. Deseja realmente cancelar?"
+      rotulo-confirmar="Descartar"
+      icone="exclamation-triangle"
+      variante="danger"
+      @confirmar="
+        () => {
+          confirmarCancelar = false;
+          router.back();
+        }
+      "
+      @cancelar="confirmarCancelar = false"
+    />
   </div>
 </template>

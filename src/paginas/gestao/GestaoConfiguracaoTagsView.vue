@@ -17,7 +17,7 @@ const modoEdicao = ref(false);
 const editandoId = ref<string | null>(null);
 
 const formNome = ref('');
-const formCategoria = ref<'positivo' | 'atencao'>('atencao');
+const formCategoria = ref<'positivo' | 'atencao' | 'critico'>('atencao');
 const formIcone = ref('');
 const formDescricao = ref('');
 const formPeso = ref(0);

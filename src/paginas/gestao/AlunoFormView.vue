@@ -14,6 +14,7 @@ import CampoFormulario from '@/componentes/CampoFormulario.vue';
 import Combobox from '@/componentes/Combobox.vue';
 import type { OpcaoCombobox } from '@/componentes/Combobox.vue';
 import GrupoCheckbox from '@/componentes/GrupoCheckbox.vue';
+import ModalConfirmacao from '@/componentes/ModalConfirmacao.vue';
 import type { Turma, Enturmacao, VinculoResponsavel } from '@/tipos/database';
 import type { OpcaoCheckbox } from '@/tipos/componentes';
 
@@ -96,7 +97,30 @@ function aoBuscarResponsavel(termo: string) {
 const salvando = ref(false);
 const mensagemSucesso = ref<string | null>(null);
 const mensagemErro = ref<string | null>(null);
+const confirmarSalvar = ref(false);
+const confirmarCancelar = ref(false);
+const rotaPendente = ref<((v?: boolean) => void) | null>(null);
 let timerSucesso: ReturnType<typeof setTimeout> | null = null;
+
+function confirmarDescarte() {
+  confirmarCancelar.value = false;
+  const next = rotaPendente.value;
+  if (next) {
+    rotaPendente.value = null;
+    next();
+  } else {
+    router.push('/gestao/alunos');
+  }
+}
+
+function cancelarDescarte() {
+  confirmarCancelar.value = false;
+  const next = rotaPendente.value;
+  if (next) {
+    rotaPendente.value = null;
+    next(false);
+  }
+}
 let timerErro: ReturnType<typeof setTimeout> | null = null;
 
 // Snapshot para detecção de alterações.
@@ -185,8 +209,9 @@ function limparDraft() {
 
 onBeforeRouteLeave((_to, _from, next) => {
   if (formDirty.value && !salvando.value) {
-    const confirmar = window.confirm('Há alterações não salvas. Deseja realmente sair?');
-    if (!confirmar) return next(false);
+    confirmarCancelar.value = true;
+    rotaPendente.value = next;
+    return;
   }
   next();
 });
@@ -464,7 +489,30 @@ onMounted(async () => {
   pausarSnapshot(false);
 });
 
+function solicitarSalvar() {
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  if (!nome.value.trim()) {
+    mostrarErro(
+      mensagemErroExplicita(
+        'Aluno',
+        nome.value || 'sem nome',
+        'salvar',
+        'O campo nome é obrigatório.',
+      ),
+    );
+    return;
+  }
+  if (!matricula.value.trim()) {
+    mostrarErro(
+      mensagemErroExplicita('Aluno', nome.value, 'salvar', 'O campo matrícula é obrigatório.'),
+    );
+    return;
+  }
+  confirmarSalvar.value = true;
+}
+
 async function salvar() {
+  confirmarSalvar.value = false;
   window.scrollTo({ top: 0, behavior: 'smooth' });
   if (!nome.value.trim()) {
     mostrarErro(
@@ -628,7 +676,7 @@ async function salvar() {
       ></button>
     </div>
 
-    <form @submit.prevent="salvar">
+    <form @submit.prevent="solicitarSalvar">
       <div class="card border mb-3">
         <div class="card-header bg-body-tertiary py-2">
           <span class="fw-medium small">Dados do aluno</span>
@@ -1107,7 +1155,7 @@ async function salvar() {
           type="button"
           class="btn btn-sm btn-outline-secondary"
           :disabled="salvando || carregando"
-          @click="router.push('/gestao/alunos')"
+          @click="formDirty ? (confirmarCancelar = true) : router.push('/gestao/alunos')"
         >
           Cancelar
         </button>
@@ -1123,5 +1171,25 @@ async function salvar() {
         </button>
       </div>
     </form>
+    <ModalConfirmacao
+      :visivel="confirmarSalvar"
+      titulo="Salvar aluno"
+      :mensagem="`Deseja salvar ${modoEdicao ? 'as alterações do' : 'o novo'} aluno?`"
+      rotulo-confirmar="Salvar"
+      icone="person-check"
+      variante="success"
+      @confirmar="salvar"
+      @cancelar="confirmarSalvar = false"
+    />
+    <ModalConfirmacao
+      :visivel="confirmarCancelar"
+      titulo="Descartar alterações?"
+      mensagem="Há alterações não salvas que serão perdidas. Deseja realmente sair?"
+      rotulo-confirmar="Descartar"
+      icone="exclamation-triangle"
+      variante="danger"
+      @confirmar="confirmarDescarte"
+      @cancelar="cancelarDescarte"
+    />
   </div>
 </template>

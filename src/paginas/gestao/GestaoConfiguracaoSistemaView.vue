@@ -3,6 +3,7 @@ import { onMounted, ref, computed } from 'vue';
 import { supabaseClient } from '@/servicos/supabase';
 import { mensagemSucesso as msgSucesso, mensagemErroExplicita } from '@/utils/mensagemExplicita';
 import CampoFormulario from '@/componentes/CampoFormulario.vue';
+import ModalConfirmacao from '@/componentes/ModalConfirmacao.vue';
 
 const carregando = ref(false);
 const salvando = ref(false);
@@ -24,6 +25,16 @@ const pesoRecencia = ref(1);
 const janelaRecenciaDias = ref(14);
 const limiteScoreMedio = ref(40);
 const limiteScoreAlto = ref(75);
+const pesoOcorrenciaGrave = ref(15);
+const forcarMedioEmGrave = ref(true);
+const janelaOcorrenciaDias = ref(90);
+const decaimentoOcorrenciaTipo = ref('janela');
+const pesoResolvida = ref(0.5);
+const pesoComportamentoPositivo = ref(5);
+const janelaPositivoDias = ref(30);
+const bonusPresencaConfirmada = ref(10);
+
+const confirmarSalvar = ref(false);
 
 const erros = ref<Record<string, string | null>>({});
 
@@ -43,6 +54,13 @@ const podeSalvar = computed(() => {
   if (limiteScoreMedio.value < 20 || limiteScoreMedio.value > 60) return false;
   if (limiteScoreAlto.value < 60 || limiteScoreAlto.value > 90) return false;
   if (limiteScoreMedio.value >= limiteScoreAlto.value) return false;
+  if (pesoOcorrenciaGrave.value < 5 || pesoOcorrenciaGrave.value > 30) return false;
+  if (janelaOcorrenciaDias.value < 30 || janelaOcorrenciaDias.value > 365) return false;
+  if (!['nenhum', 'janela', 'exponencial'].includes(decaimentoOcorrenciaTipo.value)) return false;
+  if (pesoResolvida.value < 0 || pesoResolvida.value > 1) return false;
+  if (pesoComportamentoPositivo.value < 0 || pesoComportamentoPositivo.value > 15) return false;
+  if (janelaPositivoDias.value < 7 || janelaPositivoDias.value > 90) return false;
+  if (bonusPresencaConfirmada.value < 0 || bonusPresencaConfirmada.value > 30) return false;
   return true;
 });
 
@@ -81,6 +99,17 @@ function validar() {
   ) {
     err.limiteScoreMedio = `Deve ser menor que o limite alto (${limiteScoreAlto.value}).`;
   }
+  if (pesoOcorrenciaGrave.value < 5 || pesoOcorrenciaGrave.value > 30)
+    err.pesoOcorrenciaGrave = 'Entre 5 e 30.';
+  if (janelaOcorrenciaDias.value < 30 || janelaOcorrenciaDias.value > 365)
+    err.janelaOcorrenciaDias = 'Entre 30 e 365 dias.';
+  if (pesoResolvida.value < 0 || pesoResolvida.value > 1) err.pesoResolvida = 'Entre 0 e 1.';
+  if (pesoComportamentoPositivo.value < 0 || pesoComportamentoPositivo.value > 15)
+    err.pesoComportamentoPositivo = 'Entre 0 e 15.';
+  if (janelaPositivoDias.value < 7 || janelaPositivoDias.value > 90)
+    err.janelaPositivoDias = 'Entre 7 e 90 dias.';
+  if (bonusPresencaConfirmada.value < 0 || bonusPresencaConfirmada.value > 30)
+    err.bonusPresencaConfirmada = 'Entre 0 e 30.';
   erros.value = err;
   return Object.keys(err).length === 0;
 }
@@ -122,6 +151,23 @@ async function carregar() {
         (data as unknown as { limite_score_medio?: number }).limite_score_medio ?? 40;
       limiteScoreAlto.value =
         (data as unknown as { limite_score_alto?: number }).limite_score_alto ?? 75;
+      pesoOcorrenciaGrave.value =
+        (data as unknown as { peso_ocorrencia_grave?: number }).peso_ocorrencia_grave ?? 15;
+      forcarMedioEmGrave.value =
+        (data as unknown as { forcar_medio_em_grave?: boolean }).forcar_medio_em_grave ?? true;
+      janelaOcorrenciaDias.value =
+        (data as unknown as { janela_ocorrencia_dias?: number }).janela_ocorrencia_dias ?? 90;
+      decaimentoOcorrenciaTipo.value =
+        (data as unknown as { decaimento_ocorrencia_tipo?: string }).decaimento_ocorrencia_tipo ??
+        'janela';
+      pesoResolvida.value = (data as unknown as { peso_resolvida?: number }).peso_resolvida ?? 0.5;
+      pesoComportamentoPositivo.value =
+        (data as unknown as { peso_comportamento_positivo?: number }).peso_comportamento_positivo ??
+        5;
+      janelaPositivoDias.value =
+        (data as unknown as { janela_positivo_dias?: number }).janela_positivo_dias ?? 30;
+      bonusPresencaConfirmada.value =
+        (data as unknown as { bonus_presenca_confirmada?: number }).bonus_presenca_confirmada ?? 10;
     }
   } catch {
     mostrarErro('Falha ao carregar.');
@@ -130,7 +176,13 @@ async function carregar() {
   }
 }
 
+function solicitarSalvar() {
+  if (!validar()) return;
+  confirmarSalvar.value = true;
+}
+
 async function salvar() {
+  confirmarSalvar.value = false;
   if (!validar()) return;
   salvando.value = true;
   try {
@@ -152,6 +204,14 @@ async function salvar() {
         janela_recencia_dias: janelaRecenciaDias.value,
         limite_score_medio: limiteScoreMedio.value,
         limite_score_alto: limiteScoreAlto.value,
+        peso_ocorrencia_grave: pesoOcorrenciaGrave.value,
+        forcar_medio_em_grave: forcarMedioEmGrave.value,
+        janela_ocorrencia_dias: janelaOcorrenciaDias.value,
+        decaimento_ocorrencia_tipo: decaimentoOcorrenciaTipo.value,
+        peso_resolvida: pesoResolvida.value,
+        peso_comportamento_positivo: pesoComportamentoPositivo.value,
+        janela_positivo_dias: janelaPositivoDias.value,
+        bonus_presenca_confirmada: bonusPresencaConfirmada.value,
       })
       .eq('id', 1);
     if (error) throw error;
@@ -195,7 +255,7 @@ onMounted(carregar);
       <div class="spinner-border text-success"></div>
     </div>
 
-    <form v-else @submit.prevent="salvar" class="card">
+    <form v-else @submit.prevent="solicitarSalvar" class="card">
       <div class="card-body">
         <CampoFormulario id="cfg-nome" label="Nome da escola" :erro="erros.escolaNome">
           <input
@@ -516,6 +576,179 @@ onMounted(carregar);
           </div>
         </div>
 
+        <h2 class="h6 fw-bold mt-4 mb-2">Ocorrências e recuperação</h2>
+        <p class="small text-body-secondary">
+          Configuração de como ocorrências elevam o termômetro e como o aluno pode melhorar.
+        </p>
+        <div class="row g-3">
+          <div class="col-md-4">
+            <CampoFormulario
+              id="cfg-peso-grave"
+              label="Peso de grave sem tag"
+              :erro="erros.pesoOcorrenciaGrave"
+              dica="Pontos de uma ocorrência grave sem tags críticas."
+            >
+              <div class="input-group">
+                <input
+                  id="cfg-peso-grave"
+                  v-model.number="pesoOcorrenciaGrave"
+                  type="number"
+                  class="form-control"
+                  :class="{ 'is-invalid': erros.pesoOcorrenciaGrave }"
+                  :disabled="salvando"
+                  min="5"
+                  max="30"
+                  step="1"
+                  @input="validar"
+                />
+                <span class="input-group-text">pts</span>
+              </div>
+            </CampoFormulario>
+          </div>
+          <div class="col-md-4 d-flex align-items-end pb-2">
+            <div class="form-check">
+              <input
+                id="cfg-forcar-medio"
+                v-model="forcarMedioEmGrave"
+                type="checkbox"
+                class="form-check-input"
+                :disabled="salvando"
+              />
+              <label for="cfg-forcar-medio" class="form-check-label small"
+                >Grave força no mínimo Atenção</label
+              >
+            </div>
+          </div>
+          <div class="col-md-4">
+            <CampoFormulario
+              id="cfg-janela-ocorrencia"
+              label="Janela de ocorrência"
+              :erro="erros.janelaOcorrenciaDias"
+            >
+              <div class="input-group">
+                <input
+                  id="cfg-janela-ocorrencia"
+                  v-model.number="janelaOcorrenciaDias"
+                  type="number"
+                  class="form-control"
+                  :class="{ 'is-invalid': erros.janelaOcorrenciaDias }"
+                  :disabled="salvando"
+                  min="30"
+                  max="365"
+                  @input="validar"
+                />
+                <span class="input-group-text">dias</span>
+              </div>
+            </CampoFormulario>
+          </div>
+          <div class="col-md-4">
+            <CampoFormulario id="cfg-decaimento" label="Decaimento de ocorrência">
+              <select
+                id="cfg-decaimento"
+                v-model="decaimentoOcorrenciaTipo"
+                class="form-select"
+                :disabled="salvando"
+              >
+                <option value="nenhum">Nenhum</option>
+                <option value="janela">Janela fixa</option>
+                <option value="exponencial">Exponencial</option>
+              </select>
+            </CampoFormulario>
+          </div>
+          <div class="col-md-4">
+            <CampoFormulario
+              id="cfg-peso-resolvida"
+              label="Peso de resolvida"
+              :erro="erros.pesoResolvida"
+              dica="Multiplicador quando resolvida/arquivada."
+            >
+              <div class="input-group">
+                <input
+                  id="cfg-peso-resolvida"
+                  v-model.number="pesoResolvida"
+                  type="number"
+                  class="form-control"
+                  :class="{ 'is-invalid': erros.pesoResolvida }"
+                  :disabled="salvando"
+                  min="0"
+                  max="1"
+                  step="0.1"
+                  @input="validar"
+                />
+                <span class="input-group-text">×</span>
+              </div>
+            </CampoFormulario>
+          </div>
+          <div class="col-md-4">
+            <CampoFormulario
+              id="cfg-bonus-presenca"
+              label="Bônus presença confirmada"
+              :erro="erros.bonusPresencaConfirmada"
+            >
+              <div class="input-group">
+                <input
+                  id="cfg-bonus-presenca"
+                  v-model.number="bonusPresencaConfirmada"
+                  type="number"
+                  class="form-control"
+                  :class="{ 'is-invalid': erros.bonusPresencaConfirmada }"
+                  :disabled="salvando"
+                  min="0"
+                  max="30"
+                  step="1"
+                  @input="validar"
+                />
+                <span class="input-group-text">pts</span>
+              </div>
+            </CampoFormulario>
+          </div>
+          <div class="col-md-4">
+            <CampoFormulario
+              id="cfg-peso-positivo"
+              label="Desconto positivo máx."
+              :erro="erros.pesoComportamentoPositivo"
+            >
+              <div class="input-group">
+                <input
+                  id="cfg-peso-positivo"
+                  v-model.number="pesoComportamentoPositivo"
+                  type="number"
+                  class="form-control"
+                  :class="{ 'is-invalid': erros.pesoComportamentoPositivo }"
+                  :disabled="salvando"
+                  min="0"
+                  max="15"
+                  step="1"
+                  @input="validar"
+                />
+                <span class="input-group-text">pts</span>
+              </div>
+            </CampoFormulario>
+          </div>
+          <div class="col-md-4">
+            <CampoFormulario
+              id="cfg-janela-positivo"
+              label="Janela positivo"
+              :erro="erros.janelaPositivoDias"
+            >
+              <div class="input-group">
+                <input
+                  id="cfg-janela-positivo"
+                  v-model.number="janelaPositivoDias"
+                  type="number"
+                  class="form-control"
+                  :class="{ 'is-invalid': erros.janelaPositivoDias }"
+                  :disabled="salvando"
+                  min="7"
+                  max="90"
+                  @input="validar"
+                />
+                <span class="input-group-text">dias</span>
+              </div>
+            </CampoFormulario>
+          </div>
+        </div>
+
         <h2 class="h6 fw-bold mt-4 mb-2">Códigos de acesso</h2>
 
         <div class="row g-3">
@@ -613,5 +846,15 @@ onMounted(carregar);
         </div>
       </div>
     </form>
+    <ModalConfirmacao
+      :visivel="confirmarSalvar"
+      titulo="Salvar configurações"
+      mensagem="Deseja salvar as alterações nas configurações do sistema? Isso afetará o cálculo do termômetro."
+      rotulo-confirmar="Salvar"
+      icone="gear"
+      variante="warning"
+      @confirmar="salvar"
+      @cancelar="confirmarSalvar = false"
+    />
   </div>
 </template>

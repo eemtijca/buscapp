@@ -88,7 +88,13 @@ onUnmounted(() => {
           <button
             type="button"
             class="btn btn-sm"
-            :class="variante === 'success' ? 'btn-success' : 'btn-danger'"
+            :class="
+              variante === 'success'
+                ? 'btn-success'
+                : variante === 'warning'
+                  ? 'btn-warning'
+                  : 'btn-danger'
+            "
             @click="emit('confirmar')"
           >
             {{ rotuloConfirmar }}

@@ -9,11 +9,15 @@ const props = withDefaults(
     colunas?: 1 | 2 | 3 | 4;
     desabilitado?: boolean;
     nome?: string;
+    mostrarSelecionarTodos?: boolean;
+    rotuloSelecionarTodos?: string;
   }>(),
   {
     colunas: 1,
     desabilitado: false,
     nome: '',
+    mostrarSelecionarTodos: false,
+    rotuloSelecionarTodos: 'Selecionar todos',
   },
 );
 
@@ -26,6 +30,19 @@ const classeColuna = computed(() => {
   return `col-12 col-md-${tamanho}`;
 });
 
+/** Verifica se todos os valores disponíveis estão selecionados. */
+const todosSelecionados = computed(() => {
+  const ativos = props.opcoes.filter((o) => !o.desabilitado).map((o) => o.valor);
+  return ativos.length > 0 && ativos.every((v) => props.modelo.includes(v));
+});
+
+/** Verifica se há seleção parcial para estado indeterminado. */
+const indeterminado = computed(() => {
+  const ativos = props.opcoes.filter((o) => !o.desabilitado).map((o) => o.valor);
+  const selecionados = ativos.filter((v) => props.modelo.includes(v)).length;
+  return selecionados > 0 && selecionados < ativos.length;
+});
+
 function alternar(valor: string) {
   const idx = props.modelo.indexOf(valor);
   if (idx === -1) {
@@ -36,9 +53,36 @@ function alternar(valor: string) {
     emit('update:modelo', novo);
   }
 }
+
+/** Alterna a seleção de todos os itens disponíveis. */
+function alternarTodosItens() {
+  const ativos = props.opcoes.filter((o) => !o.desabilitado).map((o) => o.valor);
+  if (todosSelecionados.value) {
+    emit('update:modelo', []);
+  } else {
+    emit('update:modelo', [...ativos]);
+  }
+}
 </script>
 
 <template>
+  <div
+    v-if="mostrarSelecionarTodos && opcoes.length > 1"
+    class="form-check mb-2 border-bottom pb-2"
+  >
+    <input
+      :id="`${nome || 'cb'}-todos`"
+      :checked="todosSelecionados"
+      :indeterminate="indeterminado"
+      type="checkbox"
+      class="form-check-input"
+      :disabled="desabilitado"
+      @change="alternarTodosItens"
+    />
+    <label :for="`${nome || 'cb'}-todos`" class="form-check-label small fw-semibold">
+      {{ rotuloSelecionarTodos }}
+    </label>
+  </div>
   <div class="row g-2">
     <div v-for="opcao in opcoes" :key="opcao.valor" :class="classeColuna">
       <div class="form-check">

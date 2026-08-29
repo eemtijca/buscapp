@@ -215,6 +215,31 @@ const tendenciaInfo = computed(() => {
           </table>
         </div>
       </details>
+
+      <details class="mt-3 termometro-detalhe">
+        <summary class="small text-body-secondary">Como melhorar?</summary>
+        <ul class="small text-body-secondary mt-2 mb-0 ps-3 termometro-fatores">
+          <li v-if="termometro.totalAusencias >= termometro.limites.preventivo">
+            Reduza faltas injustificadas para voltar ao verde (faltam
+            {{ termometro.totalAusencias - termometro.limites.preventivo + 1 }}).
+          </li>
+          <li v-else>
+            Faltam {{ termometro.limites.preventivo - termometro.totalAusencias }} falta(s) para
+            atingir o nível de atenção — mantenha a frequência.
+          </li>
+          <li v-if="termometro.totalOcorrencias > 0">
+            Ocorrências pendentes mantêm o score elevado — resolva ou confirme presença do
+            responsável quando aplicável.
+          </li>
+          <li v-if="termometro.tendencia === 'queda'">
+            Tendência em queda — continue assim para acelerar a redução da recência.
+          </li>
+          <li v-else-if="termometro.tendencia === 'alta'">
+            Tendência em alta — evite novas faltas nos próximos dias.
+          </li>
+          <li>Comportamentos positivos recentes reduzem o score; registre-os com a coordenação.</li>
+        </ul>
+      </details>
     </div>
   </section>
 </template>

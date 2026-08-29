@@ -70,6 +70,14 @@ create table public.configuracoes_sistema (
   janela_recencia_dias     integer not null default 14 constraint chk_janela_recencia check (janela_recencia_dias between 7 and 30),
   limite_score_medio       integer not null default 40 constraint chk_limite_medio check (limite_score_medio between 20 and 60),
   limite_score_alto        integer not null default 75 constraint chk_limite_alto check (limite_score_alto between 60 and 90),
+  peso_ocorrencia_grave    numeric not null default 15 constraint chk_peso_ocorrencia_grave check (peso_ocorrencia_grave between 5 and 30),
+  forcar_medio_em_grave    boolean not null default true,
+  janela_ocorrencia_dias   integer not null default 90 constraint chk_janela_ocorrencia check (janela_ocorrencia_dias between 30 and 365),
+  decaimento_ocorrencia_tipo text not null default 'janela' constraint chk_decaimento_tipo check (decaimento_ocorrencia_tipo in ('nenhum','janela','exponencial')),
+  peso_resolvida           numeric not null default 0.5 constraint chk_peso_resolvida check (peso_resolvida between 0 and 1),
+  peso_comportamento_positivo numeric not null default 5 constraint chk_peso_positivo check (peso_comportamento_positivo between 0 and 15),
+  janela_positivo_dias     integer not null default 30 constraint chk_janela_positivo check (janela_positivo_dias between 7 and 90),
+  bonus_presenca_confirmada numeric not null default 10 constraint chk_bonus_presenca check (bonus_presenca_confirmada between 0 and 30),
   constraint chk_sistema_singleton check (id = 1),
   constraint chk_limites_score_ordem check (limite_score_medio < limite_score_alto)
 );
@@ -83,6 +91,14 @@ comment on column public.configuracoes_sistema.peso_recencia is 'Multiplicador d
 comment on column public.configuracoes_sistema.janela_recencia_dias is 'Janela em dias para contar faltas recentes no componente de recência (7–30).';
 comment on column public.configuracoes_sistema.limite_score_medio is 'Score mínimo para nível médio/amarelo (20–60).';
 comment on column public.configuracoes_sistema.limite_score_alto is 'Score mínimo para nível alto/vermelho (60–90).';
+comment on column public.configuracoes_sistema.peso_ocorrencia_grave is 'Peso aplicado a ocorrência grave sem tags (5–30).';
+comment on column public.configuracoes_sistema.forcar_medio_em_grave is 'Se verdadeiro, ocorrência grave força no mínimo nível médio.';
+comment on column public.configuracoes_sistema.janela_ocorrencia_dias is 'Janela em dias para desconsiderar ocorrências antigas (30–365).';
+comment on column public.configuracoes_sistema.decaimento_ocorrencia_tipo is 'Tipo de decaimento de ocorrências: nenhum, janela ou exponencial.';
+comment on column public.configuracoes_sistema.peso_resolvida is 'Multiplicador aplicado ao peso de ocorrência resolvida/arquivada (0–1).';
+comment on column public.configuracoes_sistema.peso_comportamento_positivo is 'Desconto máximo de score por comportamentos positivos recentes (0–15).';
+comment on column public.configuracoes_sistema.janela_positivo_dias is 'Janela em dias para contar comportamentos positivos (7–90).';
+comment on column public.configuracoes_sistema.bonus_presenca_confirmada is 'Desconto de score quando presença do responsável é confirmada (0–30).';
 
 -- 4.3 horarios_letivos
 create table public.horarios_letivos (
@@ -2696,13 +2712,12 @@ insert into public.opcoes_configuracao (tipo, chave, rotulo, icone, ordem, ativo
   ('documento', 'nis',                    'NIS',                      'person-badge',       6, true),
   ('documento', 'historico_escolar',      'Histórico Escolar',        'journal-text',       7, true),
   -- periodo: períodos de frequência (frequencias.periodo)
-  ('periodo', 'Dia completo', 'Dia completo', 'calendar-check', 1, true),
-  ('periodo', '1º Horário',   '1º Horário',   null,             2, true),
-  ('periodo', '2º Horário',   '2º Horário',   null,             3, true),
-  ('periodo', '3º Horário',   '3º Horário',   null,             4, true),
-  ('periodo', '4º Horário',   '4º Horário',   null,             5, true),
-  ('periodo', 'Manhã',        'Manhã',        'sun',            6, true),
-  ('periodo', 'Tarde',        'Tarde',        'sunset',         7, true),
+  ('periodo', '1º Horário',   '1º Horário',   null,             1, true),
+  ('periodo', '2º Horário',   '2º Horário',   null,             2, true),
+  ('periodo', '3º Horário',   '3º Horário',   null,             3, true),
+  ('periodo', '4º Horário',   '4º Horário',   null,             4, true),
+  ('periodo', 'Manhã',        'Manhã',        'sun',            5, true),
+  ('periodo', 'Tarde',        'Tarde',        'sunset',         6, true),
   -- motivo_ausencia: motivos de ausência à escola (frequencias.motivos_ausencia)
   ('motivo_ausencia', 'enfermaria',              'Enfermaria',              'heart-pulse', 1, true),
   ('motivo_ausencia', 'orientacao',              'Orientação pedagógica',   'people',      2, true),

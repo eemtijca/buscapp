@@ -80,7 +80,8 @@ test.describe('Termômetro — Barra segmentada inteligente', () => {
     await expect(card.getByText(/\d+\/100/)).toBeVisible();
     // Detalhe colapsável organizado em tabela
     await expect(card.getByText('Como é calculado?')).toBeVisible();
-    const details = card.locator('details');
+    await expect(card.getByText('Como melhorar?')).toBeVisible();
+    const details = card.locator('details').first();
     await expect(details).toContainText(/Atenção/);
     await expect(details).toContainText(/Amarelo/);
     await expect(details).toContainText(/A partir de/);
@@ -115,7 +116,7 @@ test.describe('Termômetro — Barra segmentada inteligente', () => {
       body: JSON.stringify({ nome: 'TesteCriticoE2E', categoria: 'critico', peso_pontuacao: 20, ativo: true }),
     });
     await criarFaltas(1, '2026-04-01');
-    // ocorrência sem gatilho crítico -> não deve ser alto
+    // ocorrência grave sem gatilho crítico -> deve elevar para Atenção (barra aumenta) mas não para alto
     await restApi('/rest/v1/ocorrencias', {
       method: 'POST',
       body: JSON.stringify({
@@ -132,7 +133,9 @@ test.describe('Termômetro — Barra segmentada inteligente', () => {
     });
     await login(page, 'resp1@email.com', SENHA_RESP);
     await page.goto('/responsavel/termometro');
-    await expect(page.getByText('Tudo certo')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('Atenção')).toBeVisible({ timeout: 10000 });
+    // Verifica que a barra refletiu o peso da ocorrência grave
+    await expect(page.locator('.progress[role="progressbar"]')).toHaveAttribute('aria-valuetext', /Atenção/);
     await logout(page);
     await restApi(`/rest/v1/ocorrencias?aluno_id=eq.${ALUNO_TERM_ID}`, { method: 'DELETE' });
     // agora com tag crítica + exige presença -> alto
@@ -193,6 +196,9 @@ test.describe('Termômetro — Barra segmentada inteligente', () => {
     await page.fill('#cfg-limite-medio', '30');
     await page.fill('#cfg-limite-alto', '60');
     await page.click('button:has-text("Salvar alterações")');
+    // Confirma o modal de salvamento
+    await expect(page.getByRole('dialog')).toBeVisible({ timeout: 5000 });
+    await page.getByRole('dialog').getByRole('button', { name: 'Salvar' }).click();
     await expect(page.locator('.alert-success')).toBeVisible({ timeout: 10000 });
     await expect(page.locator('.alert-success')).toContainText(/salva com sucesso/);
     // verifica persistência

@@ -1,49 +1,56 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import { supabaseClient, decodificarToken } from '@/servicos/supabase';
 import { useAutenticacao } from '@/composables/useAutenticacao';
+import { iniciarNavegacao, finalizarNavegacao } from '@/composables/useNavegacao';
 import LayoutPrincipal from '@/layouts/LayoutPrincipal.vue';
 import LoginView from '@/paginas/auth/LoginView.vue';
-import SolicitarCodigoView from '@/paginas/auth/SolicitarCodigoView.vue';
-import RedefinirSenhaCodigoView from '@/paginas/auth/RedefinirSenhaCodigoView.vue';
-import ProfessorHomeView from '@/paginas/professor/HomeView.vue';
-import ProfessorFrequenciaView from '@/paginas/professor/FrequenciaView.vue';
-import ProfessorAusenciaView from '@/paginas/professor/AusenciaView.vue';
-import ProfessorOcorrenciaView from '@/paginas/professor/OcorrenciaView.vue';
-import GestaoHomeView from '@/paginas/gestao/GestaoHomeView.vue';
-import GestaoRankingView from '@/paginas/gestao/GestaoRankingView.vue';
-import GestaoOcorrenciasView from '@/paginas/gestao/GestaoOcorrenciasView.vue';
-import GestaoInfrequenciasView from '@/paginas/gestao/GestaoInfrequenciasView.vue';
-import GestaoJustificativasView from '@/paginas/gestao/GestaoJustificativasView.vue';
-import GestaoUsuariosView from '@/paginas/gestao/UsuariosView.vue';
-import GestaoUsuarioFormView from '@/paginas/gestao/UsuarioFormView.vue';
-import GestaoAlunosView from '@/paginas/gestao/AlunosView.vue';
-import GestaoAlunoFormView from '@/paginas/gestao/AlunoFormView.vue';
-import GestaoCodigosView from '@/paginas/gestao/CodigosView.vue';
-import GestaoTurmasView from '@/paginas/gestao/TurmasView.vue';
-import AnosLetivosView from '@/paginas/gestao/AnosLetivosView.vue';
-import GestaoDisciplinasView from '@/paginas/gestao/DisciplinasView.vue';
-import GestaoAtribuicoesView from '@/paginas/gestao/AtribuicoesView.vue';
-import GestaoChatView from '@/paginas/gestao/GestaoChatView.vue';
-import GestaoConfiguracaoView from '@/paginas/gestao/GestaoConfiguracaoView.vue';
-import GestaoConfiguracaoOpcoesView from '@/paginas/gestao/GestaoConfiguracaoOpcoesView.vue';
-import GestaoConfiguracaoTagsView from '@/paginas/gestao/GestaoConfiguracaoTagsView.vue';
-import GestaoConfiguracaoSistemaView from '@/paginas/gestao/GestaoConfiguracaoSistemaView.vue';
-import GestaoConfiguracaoHorariosView from '@/paginas/gestao/GestaoConfiguracaoHorariosView.vue';
-import ResponsavelHomeView from '@/paginas/responsavel/HomeView.vue';
-import ResponsavelAlertasView from '@/paginas/responsavel/AlertasView.vue';
-import ResponsavelTermometroView from '@/paginas/responsavel/TermometroView.vue';
-import ResponsavelJustificativaView from '@/paginas/responsavel/JustificativaView.vue';
-import ResponsavelChatView from '@/paginas/responsavel/ChatView.vue';
-import Status403View from '@/paginas/error/Status403View.vue';
-import Status404View from '@/paginas/error/Status404View.vue';
-import Status500View from '@/paginas/error/Status500View.vue';
-import StatusContaDesativadaView from '@/paginas/error/StatusContaDesativadaView.vue';
+
+// Lazy load de todas as rotas (exceto layout e login para LCP)
+const SolicitarCodigoView = () => import('@/paginas/auth/SolicitarCodigoView.vue');
+const RedefinirSenhaCodigoView = () => import('@/paginas/auth/RedefinirSenhaCodigoView.vue');
+const ProfessorHomeView = () => import('@/paginas/professor/HomeView.vue');
+const ProfessorFrequenciaView = () => import('@/paginas/professor/FrequenciaView.vue');
+const ProfessorAusenciaView = () => import('@/paginas/professor/AusenciaView.vue');
+const ProfessorOcorrenciaView = () => import('@/paginas/professor/OcorrenciaView.vue');
+const GestaoHomeView = () => import('@/paginas/gestao/GestaoHomeView.vue');
+const GestaoRankingView = () => import('@/paginas/gestao/GestaoRankingView.vue');
+const GestaoOcorrenciasView = () => import('@/paginas/gestao/GestaoOcorrenciasView.vue');
+const GestaoInfrequenciasView = () => import('@/paginas/gestao/GestaoInfrequenciasView.vue');
+const GestaoJustificativasView = () => import('@/paginas/gestao/GestaoJustificativasView.vue');
+const GestaoUsuariosView = () => import('@/paginas/gestao/UsuariosView.vue');
+const GestaoUsuarioFormView = () => import('@/paginas/gestao/UsuarioFormView.vue');
+const GestaoAlunosView = () => import('@/paginas/gestao/AlunosView.vue');
+const GestaoAlunoFormView = () => import('@/paginas/gestao/AlunoFormView.vue');
+const GestaoCodigosView = () => import('@/paginas/gestao/CodigosView.vue');
+const GestaoTurmasView = () => import('@/paginas/gestao/TurmasView.vue');
+const AnosLetivosView = () => import('@/paginas/gestao/AnosLetivosView.vue');
+const GestaoDisciplinasView = () => import('@/paginas/gestao/DisciplinasView.vue');
+const GestaoAtribuicoesView = () => import('@/paginas/gestao/AtribuicoesView.vue');
+const GestaoChatView = () => import('@/paginas/gestao/GestaoChatView.vue');
+const GestaoConfiguracaoView = () => import('@/paginas/gestao/GestaoConfiguracaoView.vue');
+const GestaoConfiguracaoOpcoesView = () =>
+  import('@/paginas/gestao/GestaoConfiguracaoOpcoesView.vue');
+const GestaoConfiguracaoTagsView = () => import('@/paginas/gestao/GestaoConfiguracaoTagsView.vue');
+const GestaoConfiguracaoSistemaView = () =>
+  import('@/paginas/gestao/GestaoConfiguracaoSistemaView.vue');
+const GestaoConfiguracaoHorariosView = () =>
+  import('@/paginas/gestao/GestaoConfiguracaoHorariosView.vue');
+const ResponsavelHomeView = () => import('@/paginas/responsavel/HomeView.vue');
+const ResponsavelAlertasView = () => import('@/paginas/responsavel/AlertasView.vue');
+const ResponsavelTermometroView = () => import('@/paginas/responsavel/TermometroView.vue');
+const ResponsavelJustificativaView = () => import('@/paginas/responsavel/JustificativaView.vue');
+const ResponsavelChatView = () => import('@/paginas/responsavel/ChatView.vue');
+const Status403View = () => import('@/paginas/error/Status403View.vue');
+const Status404View = () => import('@/paginas/error/Status404View.vue');
+const Status500View = () => import('@/paginas/error/Status500View.vue');
+const StatusContaDesativadaView = () => import('@/paginas/error/StatusContaDesativadaView.vue');
 
 declare module 'vue-router' {
   interface RouteMeta {
     requerAutenticacao?: boolean;
     papeisPermitidos?: string[];
     moduloPermitido?: string;
+    titulo?: string;
   }
 }
 
@@ -59,19 +66,19 @@ const router = createRouter({
     {
       path: '/',
       name: 'login',
-      meta: { requerAutenticacao: false },
+      meta: { requerAutenticacao: false, titulo: 'Login' },
       component: LoginView,
     },
     {
       path: '/solicitar-codigo',
       name: 'solicitar-codigo',
-      meta: { requerAutenticacao: false },
+      meta: { requerAutenticacao: false, titulo: 'Solicitar código' },
       component: SolicitarCodigoView,
     },
     {
       path: '/redefinir-senha-codigo',
       name: 'redefinir-senha-codigo',
-      meta: { requerAutenticacao: false },
+      meta: { requerAutenticacao: false, titulo: 'Redefinir senha' },
       component: RedefinirSenhaCodigoView,
     },
     {
@@ -81,7 +88,7 @@ const router = createRouter({
         {
           path: '',
           name: 'professor',
-          meta: { requerAutenticacao: true, papeisPermitidos: ['professor'] },
+          meta: { requerAutenticacao: true, papeisPermitidos: ['professor'], titulo: 'Professor' },
           component: ProfessorHomeView,
         },
         {
@@ -91,6 +98,7 @@ const router = createRouter({
             requerAutenticacao: true,
             papeisPermitidos: ['professor'],
             moduloPermitido: 'frequencia',
+            titulo: 'Frequência',
           },
           component: ProfessorFrequenciaView,
         },
@@ -101,6 +109,7 @@ const router = createRouter({
             requerAutenticacao: true,
             papeisPermitidos: ['professor'],
             moduloPermitido: 'frequencia',
+            titulo: 'Ausência',
           },
           component: ProfessorAusenciaView,
         },
@@ -111,6 +120,7 @@ const router = createRouter({
             requerAutenticacao: true,
             papeisPermitidos: ['professor'],
             moduloPermitido: 'ocorrencias',
+            titulo: 'Ocorrência',
           },
           component: ProfessorOcorrenciaView,
         },
@@ -123,133 +133,161 @@ const router = createRouter({
         {
           path: '',
           name: 'gestao',
-          meta: { requerAutenticacao: true, papeisPermitidos: ['gestao'] },
+          meta: { requerAutenticacao: true, papeisPermitidos: ['gestao'], titulo: 'Gestão' },
           component: GestaoHomeView,
         },
         {
           path: 'ranking',
           name: 'gestao-ranking',
-          meta: { requerAutenticacao: true, papeisPermitidos: ['gestao'] },
+          meta: { requerAutenticacao: true, papeisPermitidos: ['gestao'], titulo: 'Ranking' },
           component: GestaoRankingView,
         },
         {
           path: 'ocorrencias',
           name: 'gestao-ocorrencias',
-          meta: { requerAutenticacao: true, papeisPermitidos: ['gestao'] },
+          meta: { requerAutenticacao: true, papeisPermitidos: ['gestao'], titulo: 'Ocorrências' },
           component: GestaoOcorrenciasView,
         },
         {
           path: 'infrequencias',
           name: 'gestao-infrequencias',
-          meta: { requerAutenticacao: true, papeisPermitidos: ['gestao'] },
+          meta: { requerAutenticacao: true, papeisPermitidos: ['gestao'], titulo: 'Infrequências' },
           component: GestaoInfrequenciasView,
         },
         {
           path: 'justificativas',
           name: 'gestao-justificativas',
-          meta: { requerAutenticacao: true, papeisPermitidos: ['gestao'] },
+          meta: {
+            requerAutenticacao: true,
+            papeisPermitidos: ['gestao'],
+            titulo: 'Justificativas',
+          },
           component: GestaoJustificativasView,
         },
         {
           path: 'usuarios',
           name: 'gestao-usuarios',
-          meta: { requerAutenticacao: true, papeisPermitidos: ['gestao'] },
+          meta: { requerAutenticacao: true, papeisPermitidos: ['gestao'], titulo: 'Usuários' },
           component: GestaoUsuariosView,
         },
         {
           path: 'usuarios/novo',
           name: 'gestao-usuarios-novo',
-          meta: { requerAutenticacao: true, papeisPermitidos: ['gestao'] },
+          meta: { requerAutenticacao: true, papeisPermitidos: ['gestao'], titulo: 'Novo usuário' },
           component: GestaoUsuarioFormView,
         },
         {
           path: 'usuarios/:id',
           name: 'gestao-usuarios-editar',
-          meta: { requerAutenticacao: true, papeisPermitidos: ['gestao'] },
+          meta: {
+            requerAutenticacao: true,
+            papeisPermitidos: ['gestao'],
+            titulo: 'Editar usuário',
+          },
           component: GestaoUsuarioFormView,
         },
         {
           path: 'alunos',
           name: 'gestao-alunos',
-          meta: { requerAutenticacao: true, papeisPermitidos: ['gestao'] },
+          meta: { requerAutenticacao: true, papeisPermitidos: ['gestao'], titulo: 'Alunos' },
           component: GestaoAlunosView,
         },
         {
           path: 'alunos/novo',
           name: 'gestao-alunos-novo',
-          meta: { requerAutenticacao: true, papeisPermitidos: ['gestao'] },
+          meta: { requerAutenticacao: true, papeisPermitidos: ['gestao'], titulo: 'Novo aluno' },
           component: GestaoAlunoFormView,
         },
         {
           path: 'alunos/:id',
           name: 'gestao-alunos-editar',
-          meta: { requerAutenticacao: true, papeisPermitidos: ['gestao'] },
+          meta: { requerAutenticacao: true, papeisPermitidos: ['gestao'], titulo: 'Editar aluno' },
           component: GestaoAlunoFormView,
         },
         {
           path: 'codigos',
           name: 'gestao-codigos',
-          meta: { requerAutenticacao: true, papeisPermitidos: ['gestao'] },
+          meta: { requerAutenticacao: true, papeisPermitidos: ['gestao'], titulo: 'Códigos' },
           component: GestaoCodigosView,
         },
         {
           path: 'turmas',
           name: 'gestao-turmas',
-          meta: { requerAutenticacao: true, papeisPermitidos: ['gestao'] },
+          meta: { requerAutenticacao: true, papeisPermitidos: ['gestao'], titulo: 'Turmas' },
           component: GestaoTurmasView,
         },
         {
           path: 'anos-letivos',
           name: 'gestao-anos-letivos',
-          meta: { requerAutenticacao: true, papeisPermitidos: ['gestao'] },
+          meta: { requerAutenticacao: true, papeisPermitidos: ['gestao'], titulo: 'Anos letivos' },
           component: AnosLetivosView,
         },
         {
           path: 'disciplinas',
           name: 'gestao-disciplinas',
-          meta: { requerAutenticacao: true, papeisPermitidos: ['gestao'] },
+          meta: { requerAutenticacao: true, papeisPermitidos: ['gestao'], titulo: 'Disciplinas' },
           component: GestaoDisciplinasView,
         },
         {
           path: 'atribuicoes',
           name: 'gestao-atribuicoes',
-          meta: { requerAutenticacao: true, papeisPermitidos: ['gestao'] },
+          meta: { requerAutenticacao: true, papeisPermitidos: ['gestao'], titulo: 'Atribuições' },
           component: GestaoAtribuicoesView,
         },
         {
           path: 'chat',
           name: 'gestao-chat',
-          meta: { requerAutenticacao: true, papeisPermitidos: ['gestao'] },
+          meta: {
+            requerAutenticacao: true,
+            papeisPermitidos: ['gestao'],
+            titulo: 'Chat da gestão',
+          },
           component: GestaoChatView,
         },
         {
           path: 'configuracao',
           name: 'gestao-configuracao',
-          meta: { requerAutenticacao: true, papeisPermitidos: ['gestao'] },
+          meta: { requerAutenticacao: true, papeisPermitidos: ['gestao'], titulo: 'Configurações' },
           component: GestaoConfiguracaoView,
         },
         {
           path: 'configuracao/:tipo',
           name: 'gestao-configuracao-opcoes',
-          meta: { requerAutenticacao: true, papeisPermitidos: ['gestao'] },
+          meta: {
+            requerAutenticacao: true,
+            papeisPermitidos: ['gestao'],
+            titulo: 'Opções de configuração',
+          },
           component: GestaoConfiguracaoOpcoesView,
         },
         {
           path: 'configuracao/tags',
           name: 'gestao-configuracao-tags',
-          meta: { requerAutenticacao: true, papeisPermitidos: ['gestao'] },
+          meta: {
+            requerAutenticacao: true,
+            papeisPermitidos: ['gestao'],
+            titulo: 'Tags de comportamento',
+          },
           component: GestaoConfiguracaoTagsView,
         },
         {
           path: 'configuracao/sistema',
           name: 'gestao-configuracao-sistema',
-          meta: { requerAutenticacao: true, papeisPermitidos: ['gestao'] },
+          meta: {
+            requerAutenticacao: true,
+            papeisPermitidos: ['gestao'],
+            titulo: 'Configurações do sistema',
+          },
           component: GestaoConfiguracaoSistemaView,
         },
         {
           path: 'configuracao/horarios',
           name: 'gestao-configuracao-horarios',
-          meta: { requerAutenticacao: true, papeisPermitidos: ['gestao'] },
+          meta: {
+            requerAutenticacao: true,
+            papeisPermitidos: ['gestao'],
+            titulo: 'Horários letivos',
+          },
           component: GestaoConfiguracaoHorariosView,
         },
       ],
@@ -261,7 +299,11 @@ const router = createRouter({
         {
           path: '',
           name: 'responsavel',
-          meta: { requerAutenticacao: true, papeisPermitidos: ['responsavel'] },
+          meta: {
+            requerAutenticacao: true,
+            papeisPermitidos: ['responsavel'],
+            titulo: 'Responsável',
+          },
           component: ResponsavelHomeView,
         },
         {
@@ -271,6 +313,7 @@ const router = createRouter({
             requerAutenticacao: true,
             papeisPermitidos: ['responsavel'],
             moduloPermitido: 'alertas',
+            titulo: 'Alertas',
           },
           component: ResponsavelAlertasView,
         },
@@ -281,6 +324,7 @@ const router = createRouter({
             requerAutenticacao: true,
             papeisPermitidos: ['responsavel'],
             moduloPermitido: 'termometro',
+            titulo: 'Termômetro',
           },
           component: ResponsavelTermometroView,
         },
@@ -291,6 +335,7 @@ const router = createRouter({
             requerAutenticacao: true,
             papeisPermitidos: ['responsavel'],
             moduloPermitido: 'justificativa',
+            titulo: 'Justificativa',
           },
           component: ResponsavelJustificativaView,
         },
@@ -301,6 +346,7 @@ const router = createRouter({
             requerAutenticacao: true,
             papeisPermitidos: ['responsavel'],
             moduloPermitido: 'chat',
+            titulo: 'Chat',
           },
           component: ResponsavelChatView,
         },
@@ -309,27 +355,32 @@ const router = createRouter({
     {
       path: '/403',
       name: '403',
+      meta: { titulo: 'Acesso negado' },
       component: Status403View,
     },
     {
       path: '/conta-desativada',
       name: 'conta-desativada',
+      meta: { titulo: 'Conta desativada' },
       component: StatusContaDesativadaView,
     },
     {
       path: '/500',
       name: '500',
+      meta: { titulo: 'Erro interno' },
       component: Status500View,
     },
     {
       path: '/:pathMatch(.*)*',
       name: '404',
+      meta: { titulo: 'Página não encontrada' },
       component: Status404View,
     },
   ],
 });
 
 router.beforeEach(async (to, _from) => {
+  iniciarNavegacao(to);
   const {
     data: { session },
   } = await supabaseClient.auth.getSession();
@@ -397,6 +448,14 @@ router.beforeEach(async (to, _from) => {
       }
     }
   }
+});
+
+router.afterEach(() => {
+  finalizarNavegacao();
+});
+
+router.onError(() => {
+  finalizarNavegacao();
 });
 
 export default router;

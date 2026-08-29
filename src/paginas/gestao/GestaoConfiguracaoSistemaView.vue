@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref, computed } from 'vue';
 import { supabaseClient } from '@/servicos/supabase';
+import { mensagemSucesso as msgSucesso, mensagemErroExplicita } from '@/utils/mensagemExplicita';
 import CampoFormulario from '@/componentes/CampoFormulario.vue';
 
 const carregando = ref(false);
@@ -84,13 +85,18 @@ function validar() {
   return Object.keys(err).length === 0;
 }
 
+let timerSucesso: ReturnType<typeof setTimeout> | null = null;
+let timerErro: ReturnType<typeof setTimeout> | null = null;
+
 function mostrarSucesso(msg: string) {
+  if (timerSucesso) clearTimeout(timerSucesso);
   mensagemSucesso.value = msg;
-  setTimeout(() => (mensagemSucesso.value = null), 4000);
+  timerSucesso = setTimeout(() => (mensagemSucesso.value = null), 6000);
 }
 function mostrarErro(msg: string) {
+  if (timerErro) clearTimeout(timerErro);
   mensagemErro.value = msg;
-  setTimeout(() => (mensagemErro.value = null), 4000);
+  timerErro = setTimeout(() => (mensagemErro.value = null), 6000);
 }
 
 async function carregar() {
@@ -149,9 +155,11 @@ async function salvar() {
       })
       .eq('id', 1);
     if (error) throw error;
-    mostrarSucesso('Configurações salvas.');
+    mostrarSucesso(msgSucesso('Configurações do sistema', escolaNome.value || 'gerais', 'salva'));
   } catch (e) {
-    mostrarErro(e instanceof Error ? e.message : String(e));
+    mostrarErro(
+      mensagemErroExplicita('Configurações do sistema', escolaNome.value || 'gerais', 'salvar', e),
+    );
   } finally {
     salvando.value = false;
   }

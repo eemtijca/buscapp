@@ -193,7 +193,8 @@ test.describe('Termômetro — Barra segmentada inteligente', () => {
     await page.fill('#cfg-limite-medio', '30');
     await page.fill('#cfg-limite-alto', '60');
     await page.click('button:has-text("Salvar alterações")');
-    await expect(page.getByText('Configurações salvas.')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('.alert-success')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('.alert-success')).toContainText(/salva com sucesso/);
     // verifica persistência
     await expect.poll(async () => {
       const r = await restApi('/rest/v1/configuracoes_sistema?id=eq.1&select=peso_falta,limite_score_medio');

@@ -4,7 +4,12 @@ import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router';
 import { useGestaoUsuarios } from '@/composables/useGestaoUsuarios';
 import { useOpcoesConfiguracao } from '@/composables/useOpcoesConfiguracao';
 import { useAnoLetivo } from '@/composables/useAnoLetivo';
+import { useFormSnapshot } from '@/composables/useFormSnapshot';
 import { supabaseClient } from '@/servicos/supabase';
+import {
+  mensagemSucesso as criarMensagemSucesso,
+  mensagemErroExplicita,
+} from '@/utils/mensagemExplicita';
 import CampoFormulario from '@/componentes/CampoFormulario.vue';
 import Combobox from '@/componentes/Combobox.vue';
 import type { OpcaoCombobox } from '@/componentes/Combobox.vue';
@@ -88,10 +93,31 @@ function aoBuscarResponsavel(termo: string) {
   void buscarResponsaveis(termo);
 }
 
-const formDirty = ref(false);
 const salvando = ref(false);
 const mensagemSucesso = ref<string | null>(null);
 const mensagemErro = ref<string | null>(null);
+let timerSucesso: ReturnType<typeof setTimeout> | null = null;
+let timerErro: ReturnType<typeof setTimeout> | null = null;
+
+// Snapshot para detecção de alterações.
+const {
+  isDirty: formDirty,
+  reset: resetSnapshot,
+  pausado: snapshotPausado,
+  pausar: pausarSnapshot,
+} = useFormSnapshot(() => ({
+  nome: nome.value,
+  matricula: matricula.value,
+  codigoInep: codigoInep.value,
+  dataNascimento: dataNascimento.value,
+  dataMatricula: dataMatricula.value,
+  observacoes: observacoes.value,
+  transporteEscolar: String(transporteEscolar.value),
+  alimentacaoDiferenciada: String(alimentacaoDiferenciada.value),
+  necessidadesEspeciais: String(necessidadesEspeciais.value),
+  documentosRecebidos: [...documentosRecebidos.value].sort().join(','),
+  status: status.value,
+}));
 
 const enturmacaoAtual = ref<Enturmacao | null>(null);
 const turmaAtualNome = ref('');
@@ -148,6 +174,10 @@ function limparDraft() {
   try {
     sessionStorage.removeItem(chaveDraft());
     sessionStorage.removeItem('draft-aluno-novo');
+    if (timeoutDraft) {
+      clearTimeout(timeoutDraft);
+      timeoutDraft = null;
+    }
   } catch {
     /* ignorar */
   }
@@ -171,10 +201,10 @@ watch(
     transporteEscolar,
     alimentacaoDiferenciada,
     necessidadesEspeciais,
+    status,
   ],
   () => {
-    if (!formDirty.value) formDirty.value = true;
-    salvarDraft();
+    if (!snapshotPausado.value) salvarDraft();
   },
   { deep: true },
 );
@@ -184,8 +214,15 @@ function hoje() {
 }
 
 function mostrarErro(msg: string) {
+  if (timerErro) clearTimeout(timerErro);
   mensagemErro.value = msg;
-  setTimeout(() => (mensagemErro.value = null), 4000);
+  timerErro = setTimeout(() => (mensagemErro.value = null), 6000);
+}
+
+function mostrarSucesso(msg: string) {
+  if (timerSucesso) clearTimeout(timerSucesso);
+  mensagemSucesso.value = msg;
+  timerSucesso = setTimeout(() => (mensagemSucesso.value = null), 6000);
 }
 
 async function carregarEnturmacao() {
@@ -361,6 +398,7 @@ async function salvarNovoResponsavel() {
 }
 
 onMounted(async () => {
+  pausarSnapshot(true);
   turmas.value = await buscarTurmas();
   opcoesDocumentos.value = await buscarOpcoes('documento');
   opcoesTipoVinculo.value = await buscarOpcoes('tipo_vinculo');
@@ -421,16 +459,28 @@ onMounted(async () => {
   } catch {
     /* ignorar dados corrompidos */
   }
+  await nextTick();
+  resetSnapshot();
+  pausarSnapshot(false);
 });
 
 async function salvar() {
   window.scrollTo({ top: 0, behavior: 'smooth' });
   if (!nome.value.trim()) {
-    mostrarErro('O campo nome é obrigatório.');
+    mostrarErro(
+      mensagemErroExplicita(
+        'Aluno',
+        nome.value || 'sem nome',
+        'salvar',
+        'O campo nome é obrigatório.',
+      ),
+    );
     return;
   }
   if (!matricula.value.trim()) {
-    mostrarErro('O campo matrícula é obrigatório.');
+    mostrarErro(
+      mensagemErroExplicita('Aluno', nome.value, 'salvar', 'O campo matrícula é obrigatório.'),
+    );
     return;
   }
   salvando.value = true;
@@ -455,16 +505,24 @@ async function salvar() {
       } as Parameters<typeof atualizarAluno>[1] & typeof dadosExtras);
       if (ok) {
         limparDraft();
-        mensagemSucesso.value = 'Alterações salvas com sucesso.';
+        resetSnapshot();
+        pausarSnapshot(false);
+        mostrarSucesso(criarMensagemSucesso('Aluno', nome.value, 'atualizado'));
         await nextTick();
         requestAnimationFrame(() => {
           document
             .querySelector('.alert-success')
             ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         });
-        setTimeout(() => (mensagemSucesso.value = null), 4000);
       } else {
-        mostrarErro(erro.value || 'Falha ao atualizar aluno.');
+        mostrarErro(
+          mensagemErroExplicita(
+            'Aluno',
+            nome.value,
+            'atualizar',
+            erro.value || 'Falha ao atualizar aluno.',
+          ),
+        );
       }
     } else {
       const id = await criarAluno({
@@ -494,17 +552,24 @@ async function salvar() {
           await supabaseClient.from('alunos').update(updates).eq('id', id);
         }
         limparDraft();
-        const modo = modoEdicao.value ? 'Editado' : 'Criado';
-        mensagemSucesso.value = `${modo} com sucesso!`;
+        resetSnapshot();
+        pausarSnapshot(false);
+        mostrarSucesso(criarMensagemSucesso('Aluno', nome.value, 'criado'));
         await nextTick();
         requestAnimationFrame(() => {
           document
             .querySelector('.alert-success')
             ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         });
-        setTimeout(() => (mensagemSucesso.value = null), 4000);
       } else {
-        mostrarErro(erro.value || 'Falha ao criar aluno.');
+        mostrarErro(
+          mensagemErroExplicita(
+            'Aluno',
+            nome.value,
+            'criar',
+            erro.value || 'Falha ao criar aluno.',
+          ),
+        );
       }
     }
   } finally {
@@ -532,13 +597,35 @@ async function salvar() {
       {{ modoEdicao ? 'Editar aluno' : 'Novo aluno' }}
     </h1>
 
-    <div v-if="mensagemSucesso" class="alert alert-success py-2 small mb-3" role="status">
+    <div
+      v-if="mensagemSucesso"
+      class="alert alert-success alert-dismissible fade show py-2 small mb-3 pe-5"
+      role="status"
+    >
       <i class="bi bi-check-circle me-1" aria-hidden="true"></i>
       {{ mensagemSucesso }}
+      <button
+        type="button"
+        class="btn-close position-absolute top-50 end-0 translate-middle-y me-2 p-2"
+        style="font-size: 0.7rem"
+        aria-label="Fechar"
+        @click="mensagemSucesso = null"
+      ></button>
     </div>
-    <div v-if="mensagemErro" class="alert alert-danger py-2 small mb-3" role="alert">
+    <div
+      v-if="mensagemErro"
+      class="alert alert-danger alert-dismissible fade show py-2 small mb-3 pe-5"
+      role="alert"
+    >
       <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>
       {{ mensagemErro }}
+      <button
+        type="button"
+        class="btn-close position-absolute top-50 end-0 translate-middle-y me-2 p-2"
+        style="font-size: 0.7rem"
+        aria-label="Fechar"
+        @click="mensagemErro = null"
+      ></button>
     </div>
 
     <form @submit.prevent="salvar">
@@ -1016,9 +1103,14 @@ async function salvar() {
       </div>
 
       <div class="d-flex gap-2 justify-content-end">
-        <router-link to="/gestao/alunos" class="btn btn-sm btn-outline-secondary"
-          >Cancelar</router-link
+        <button
+          type="button"
+          class="btn btn-sm btn-outline-secondary"
+          :disabled="salvando || carregando"
+          @click="router.push('/gestao/alunos')"
         >
+          Cancelar
+        </button>
         <button type="submit" class="btn btn-sm btn-success" :disabled="salvando || carregando">
           <span
             v-if="salvando"

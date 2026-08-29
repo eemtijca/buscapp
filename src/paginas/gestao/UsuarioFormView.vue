@@ -3,7 +3,12 @@ import { computed, onMounted, ref, watch, nextTick } from 'vue';
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router';
 import { useGestaoUsuarios } from '@/composables/useGestaoUsuarios';
 import { useOpcoesConfiguracao } from '@/composables/useOpcoesConfiguracao';
+import { useFormSnapshot } from '@/composables/useFormSnapshot';
 import { supabaseClient } from '@/servicos/supabase';
+import {
+  mensagemSucesso as criarMensagemSucesso,
+  mensagemErroExplicita,
+} from '@/utils/mensagemExplicita';
 import CampoFormulario from '@/componentes/CampoFormulario.vue';
 import Combobox from '@/componentes/Combobox.vue';
 import type { OpcaoCombobox } from '@/componentes/Combobox.vue';
@@ -67,7 +72,6 @@ const atribuicoes = ref<(AtribuicaoProfessor & { turma_nome?: string })[]>([]);
 const vinculos = ref<(VinculoResponsavel & { aluno_nome?: string })[]>([]);
 
 const salvando = ref(false);
-const formDirty = ref(false);
 const mensagemSucesso = ref<string | null>(null);
 const mensagemErro = ref<string | null>(null);
 const mensagemToast = ref<string | null>(null);
@@ -75,8 +79,27 @@ const usuarioCriado = ref(false);
 const codigoCriado = ref<string | null>(null);
 const codigoCriadoCopiado = ref(false);
 let timerCodigoCopiado: ReturnType<typeof setTimeout> | null = null;
+let timerSucesso: ReturnType<typeof setTimeout> | null = null;
+let timerErro: ReturnType<typeof setTimeout> | null = null;
 
 let timeoutDraft: ReturnType<typeof setTimeout> | null = null;
+
+// Snapshot para detecção de alterações.
+const {
+  isDirty: formDirty,
+  reset: resetSnapshot,
+  pausar: pausarSnapshot,
+  pausado: snapshotPausado,
+} = useFormSnapshot(() => ({
+  nome: nome.value,
+  email: email.value,
+  papel: papel.value,
+  telefone: telefone.value,
+  cargo: cargo.value,
+  notificacoesAtivas: notificacoesAtivas.value,
+  acessoModulos: [...acessoModulos.value].sort(),
+  status: status.value,
+}));
 
 function chaveDraft() {
   return modoEdicao.value && usuarioId.value
@@ -111,13 +134,17 @@ function limparDraft() {
   try {
     sessionStorage.removeItem(chaveDraft());
     sessionStorage.removeItem('draft-usuario-novo');
+    if (timeoutDraft) {
+      clearTimeout(timeoutDraft);
+      timeoutDraft = null;
+    }
   } catch {
     /* ignorar */
   }
 }
 
 onBeforeRouteLeave((_to, _from, next) => {
-  if (formDirty.value && !salvando.value && !usuarioCriado.value) {
+  if (formDirty.value && !salvando.value) {
     const confirmar = window.confirm('Há alterações não salvas. Deseja realmente sair?');
     if (!confirmar) return next(false);
   }
@@ -125,17 +152,23 @@ onBeforeRouteLeave((_to, _from, next) => {
 });
 
 watch(
-  [nome, email, telefone, cargo, notificacoesAtivas, acessoModulos, papel],
+  [nome, email, telefone, cargo, notificacoesAtivas, acessoModulos, papel, status],
   () => {
-    if (!formDirty.value && !usuarioCriado.value) formDirty.value = true;
-    if (!usuarioCriado.value) salvarDraft();
+    if (!usuarioCriado.value && !snapshotPausado.value) salvarDraft();
   },
   { deep: true },
 );
 
 function mostrarErro(msg: string) {
+  if (timerErro) clearTimeout(timerErro);
   mensagemErro.value = msg;
-  setTimeout(() => (mensagemErro.value = null), 4000);
+  timerErro = setTimeout(() => (mensagemErro.value = null), 6000);
+}
+
+function mostrarSucesso(msg: string) {
+  if (timerSucesso) clearTimeout(timerSucesso);
+  mensagemSucesso.value = msg;
+  timerSucesso = setTimeout(() => (mensagemSucesso.value = null), 6000);
 }
 
 async function copiarCodigoCriado() {
@@ -158,6 +191,7 @@ async function copiarCodigoCriado() {
 }
 
 onMounted(async () => {
+  pausarSnapshot(true);
   opcoesModulos.value = await buscarOpcoes('modulo');
   const id = route.params.id as string | undefined;
   if (!id) {
@@ -176,7 +210,9 @@ onMounted(async () => {
       cargo.value = usuario.cargo ?? '';
       status.value = usuario.status;
     } else {
-      mostrarErro('Usuário não encontrado.');
+      mostrarErro(mensagemErroExplicita('Usuário', id, 'carregar', 'Usuário não encontrado.'));
+      pausarSnapshot(false);
+      resetSnapshot();
       return;
     }
     const { data: perfil } = await supabaseClient
@@ -235,16 +271,28 @@ onMounted(async () => {
   } catch {
     /* ignorar dados corrompidos */
   }
+  await nextTick();
+  resetSnapshot();
+  pausarSnapshot(false);
 });
 
 async function salvar() {
   window.scrollTo({ top: 0, behavior: 'smooth' });
   if (!nome.value.trim()) {
-    mostrarErro('O campo nome é obrigatório.');
+    mostrarErro(
+      mensagemErroExplicita(
+        'Usuário',
+        nome.value || 'sem nome',
+        'salvar',
+        'O campo nome é obrigatório.',
+      ),
+    );
     return;
   }
   if (!email.value.trim()) {
-    mostrarErro('O campo e-mail é obrigatório.');
+    mostrarErro(
+      mensagemErroExplicita('Usuário', nome.value, 'salvar', 'O campo e-mail é obrigatório.'),
+    );
     return;
   }
   salvando.value = true;
@@ -266,16 +314,24 @@ async function salvar() {
       } as Parameters<typeof atualizarUsuario>[1] & typeof dadosExtras);
       if (ok) {
         limparDraft();
-        mensagemSucesso.value = 'Alterações salvas com sucesso.';
+        resetSnapshot();
+        pausarSnapshot(false);
+        mostrarSucesso(criarMensagemSucesso('Usuário', nome.value, 'atualizado'));
         await nextTick();
         requestAnimationFrame(() => {
           document
             .querySelector('.alert-success')
             ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         });
-        setTimeout(() => (mensagemSucesso.value = null), 4000);
       } else {
-        mostrarErro(erro.value || 'Falha ao atualizar usuário.');
+        mostrarErro(
+          mensagemErroExplicita(
+            'Usuário',
+            nome.value,
+            'atualizar',
+            erro.value || 'Falha ao atualizar usuário.',
+          ),
+        );
       }
     } else {
       const { id, codigo } = await criarUsuario({
@@ -288,16 +344,30 @@ async function salvar() {
       if (id) {
         await supabaseClient.from('perfis').update(dadosExtras).eq('id', id);
         limparDraft();
+        resetSnapshot();
+        pausarSnapshot(false);
         usuarioCriado.value = true;
         codigoCriado.value = codigo;
         if (codigo) {
-          mensagemSucesso.value = 'Usuário criado com sucesso! Código gerado automaticamente.';
+          mostrarSucesso(
+            criarMensagemSucesso('Usuário', nome.value, 'criado') +
+              ' Código gerado automaticamente.',
+          );
         } else {
-          mensagemSucesso.value =
-            'Usuário criado com sucesso! A senha inicial deve ser redefinida via código.';
+          mostrarSucesso(
+            criarMensagemSucesso('Usuário', nome.value, 'criado') +
+              ' A senha inicial deve ser redefinida via código.',
+          );
         }
       } else {
-        mostrarErro(erro.value || 'Falha ao criar usuário.');
+        mostrarErro(
+          mensagemErroExplicita(
+            'Usuário',
+            nome.value,
+            'criar',
+            erro.value || 'Falha ao criar usuário.',
+          ),
+        );
       }
     }
   } finally {
@@ -325,13 +395,35 @@ async function salvar() {
       {{ modoEdicao ? 'Editar usuário' : 'Novo usuário' }}
     </h1>
 
-    <div v-if="mensagemSucesso" class="alert alert-success py-2 small mb-3" role="status">
+    <div
+      v-if="mensagemSucesso"
+      class="alert alert-success alert-dismissible fade show py-2 small mb-3 pe-5"
+      role="status"
+    >
       <i class="bi bi-check-circle me-1" aria-hidden="true"></i>
       {{ mensagemSucesso }}
+      <button
+        type="button"
+        class="btn-close position-absolute top-50 end-0 translate-middle-y me-2 p-2"
+        style="font-size: 0.7rem"
+        aria-label="Fechar"
+        @click="mensagemSucesso = null"
+      ></button>
     </div>
-    <div v-if="mensagemErro" class="alert alert-danger py-2 small mb-3" role="alert">
+    <div
+      v-if="mensagemErro"
+      class="alert alert-danger alert-dismissible fade show py-2 small mb-3 pe-5"
+      role="alert"
+    >
       <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>
       {{ mensagemErro }}
+      <button
+        type="button"
+        class="btn-close position-absolute top-50 end-0 translate-middle-y me-2 p-2"
+        style="font-size: 0.7rem"
+        aria-label="Fechar"
+        @click="mensagemErro = null"
+      ></button>
     </div>
 
     <div
@@ -566,9 +658,14 @@ async function salvar() {
       </div>
 
       <div class="d-flex gap-2 justify-content-end">
-        <router-link to="/gestao/usuarios" class="btn btn-sm btn-outline-secondary"
-          >Cancelar</router-link
+        <button
+          type="button"
+          class="btn btn-sm btn-outline-secondary"
+          :disabled="salvando || carregando"
+          @click="router.push('/gestao/usuarios')"
         >
+          Cancelar
+        </button>
         <button type="submit" class="btn btn-sm btn-success" :disabled="salvando || carregando">
           <span
             v-if="salvando"

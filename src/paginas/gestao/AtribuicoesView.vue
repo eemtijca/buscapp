@@ -1,8 +1,13 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch, nextTick } from 'vue';
 import { useRouter, onBeforeRouteLeave } from 'vue-router';
 import { supabaseClient } from '@/servicos/supabase';
 import { useOpcoesConfiguracao } from '@/composables/useOpcoesConfiguracao';
+import { useFormSnapshot } from '@/composables/useFormSnapshot';
+import {
+  mensagemSucesso as criarMensagemSucesso,
+  mensagemErroExplicita,
+} from '@/utils/mensagemExplicita';
 import CampoFormulario from '@/componentes/CampoFormulario.vue';
 import Combobox from '@/componentes/Combobox.vue';
 import type { OpcaoCombobox } from '@/componentes/Combobox.vue';
@@ -39,7 +44,23 @@ const formPapel = ref('titular');
 const formDataInicio = ref('');
 const formDataFim = ref('');
 const formAtivo = ref(true);
-const formDirty = ref(false);
+// Snapshot para detecção de alterações.
+const {
+  isDirty: formDirty,
+  reset: resetSnapshot,
+  pausar: pausarSnapshot,
+  pausado: snapshotPausado,
+} = useFormSnapshot(() => ({
+  professor: formProfessorId.value,
+  turma: formTurmaId.value,
+  disciplina: formDisciplinaId.value,
+  papel: formPapel.value,
+  inicio: formDataInicio.value,
+  fim: formDataFim.value,
+  ativo: String(formAtivo.value),
+}));
+let timerSucesso: ReturnType<typeof setTimeout> | null = null;
+let timerErro: ReturnType<typeof setTimeout> | null = null;
 
 const professorOpcoes = computed<OpcaoCombobox[]>(() =>
   professores.value.map((p) => ({ valor: p.id, rotulo: p.nome })),
@@ -73,21 +94,24 @@ watch(
     formAtivo,
   ],
   () => {
-    if (!formDirty.value && modalAberto.value) formDirty.value = true;
+    if (snapshotPausado.value) return;
   },
 );
 
 function mostrarSucesso(msg: string) {
+  if (timerSucesso) clearTimeout(timerSucesso);
   mensagemSucesso.value = msg;
-  setTimeout(() => (mensagemSucesso.value = null), 4000);
+  timerSucesso = setTimeout(() => (mensagemSucesso.value = null), 6000);
 }
 
 function mostrarErro(msg: string) {
+  if (timerErro) clearTimeout(timerErro);
   mensagemErro.value = msg;
-  setTimeout(() => (mensagemErro.value = null), 4000);
+  timerErro = setTimeout(() => (mensagemErro.value = null), 6000);
 }
 
 function resetForm() {
+  pausarSnapshot(true);
   formProfessorId.value = '';
   formTurmaId.value = '';
   formDisciplinaId.value = '';
@@ -95,9 +119,12 @@ function resetForm() {
   formDataInicio.value = '';
   formDataFim.value = '';
   formAtivo.value = true;
-  formDirty.value = false;
   editandoId.value = null;
   modoEdicao.value = false;
+  nextTick(() => {
+    resetSnapshot();
+    pausarSnapshot(false);
+  });
 }
 
 function formatarData(data: string | null) {
@@ -147,6 +174,7 @@ async function carregarDados() {
 }
 
 async function abrirEditar(atribuicao: AtribuicaoItem) {
+  pausarSnapshot(true);
   modoEdicao.value = true;
   editandoId.value = atribuicao.id;
   formProfessorId.value = atribuicao.professor_id;
@@ -157,17 +185,27 @@ async function abrirEditar(atribuicao: AtribuicaoItem) {
   formDataFim.value = atribuicao.data_fim ? atribuicao.data_fim.slice(0, 10) : '';
   formAtivo.value = atribuicao.ativo;
   modalAberto.value = true;
+  await nextTick();
+  resetSnapshot();
+  pausarSnapshot(false);
 }
 
 function abrirNovo() {
+  pausarSnapshot(true);
   resetForm();
   modalAberto.value = true;
+  nextTick(() => {
+    resetSnapshot();
+    pausarSnapshot(false);
+  });
 }
 
 async function salvar() {
   document.querySelector('.modal-body')?.scrollTo({ top: 0, behavior: 'smooth' });
   if (!formProfessorId.value || !formTurmaId.value || !formDataInicio.value) {
-    mostrarErro('Preencha os campos obrigatórios.');
+    mostrarErro(
+      mensagemErroExplicita('Atribuição', 'nova', 'salvar', 'Preencha os campos obrigatórios.'),
+    );
     return;
   }
   carregando.value = true;
@@ -188,17 +226,17 @@ async function salvar() {
         .update(payload)
         .eq('id', editandoId.value);
       if (error) {
-        mostrarErro('Falha ao atualizar atribuição.');
+        mostrarErro(mensagemErroExplicita('Atribuição', formPapel.value, 'atualizar', error));
         return;
       }
-      mostrarSucesso('Atribuição atualizada.');
+      mostrarSucesso(criarMensagemSucesso('Atribuição', formPapel.value, 'atualizada'));
     } else {
       const { error } = await supabaseClient.from('atribuicoes_professores').insert(payload);
       if (error) {
-        mostrarErro('Falha ao criar atribuição.');
+        mostrarErro(mensagemErroExplicita('Atribuição', formPapel.value, 'criar', error));
         return;
       }
-      mostrarSucesso('Atribuição criada.');
+      mostrarSucesso(criarMensagemSucesso('Atribuição', formPapel.value, 'criada'));
     }
     modalAberto.value = false;
     resetForm();
@@ -240,7 +278,12 @@ onMounted(async () => {
       <i class="bi bi-house me-1" aria-hidden="true"></i>
       Início
     </router-link>
-    <button type="button" class="btn btn-sm btn-outline-secondary mb-3" @click="router.back()">
+    <button
+      type="button"
+      class="btn btn-sm btn-outline-secondary mb-3"
+      :disabled="carregando"
+      @click="router.back()"
+    >
       <i class="bi bi-arrow-left me-1" aria-hidden="true"></i>
       Voltar
     </button>
@@ -250,19 +293,46 @@ onMounted(async () => {
         <i class="bi bi-people text-success me-2" aria-hidden="true"></i>
         Atribuições
       </h1>
-      <button type="button" class="btn btn-sm btn-success" @click="abrirNovo">
+      <button
+        type="button"
+        class="btn btn-sm btn-success"
+        :disabled="carregando"
+        @click="abrirNovo"
+      >
         <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>
         Nova atribuição
       </button>
     </div>
 
-    <div v-if="mensagemSucesso" class="alert alert-success py-2 small mb-3" role="status">
+    <div
+      v-if="mensagemSucesso"
+      class="alert alert-success alert-dismissible fade show py-2 small mb-3 pe-5"
+      role="status"
+    >
       <i class="bi bi-check-circle me-1" aria-hidden="true"></i>
       {{ mensagemSucesso }}
+      <button
+        type="button"
+        class="btn-close position-absolute top-50 end-0 translate-middle-y me-2 p-2"
+        style="font-size: 0.7rem"
+        aria-label="Fechar"
+        @click="mensagemSucesso = null"
+      ></button>
     </div>
-    <div v-if="mensagemErro" class="alert alert-danger py-2 small mb-3" role="alert">
+    <div
+      v-if="mensagemErro"
+      class="alert alert-danger alert-dismissible fade show py-2 small mb-3 pe-5"
+      role="alert"
+    >
       <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>
       {{ mensagemErro }}
+      <button
+        type="button"
+        class="btn-close position-absolute top-50 end-0 translate-middle-y me-2 p-2"
+        style="font-size: 0.7rem"
+        aria-label="Fechar"
+        @click="mensagemErro = null"
+      ></button>
     </div>
 
     <div v-if="carregando && !atribuicoes.length" class="text-center py-5">
@@ -319,6 +389,7 @@ onMounted(async () => {
                   <button
                     type="button"
                     class="btn btn-sm btn-outline-success"
+                    :disabled="carregando"
                     @click="abrirEditar(a)"
                   >
                     <i class="bi bi-pencil" aria-hidden="true"></i>
@@ -327,6 +398,7 @@ onMounted(async () => {
                     type="button"
                     class="btn btn-sm"
                     :class="a.ativo ? 'btn-outline-danger' : 'btn-outline-success'"
+                    :disabled="carregando"
                     :title="a.ativo ? 'Desativar' : 'Ativar'"
                     @click="alternarAtivo(a)"
                   >
@@ -349,7 +421,7 @@ onMounted(async () => {
       tabindex="-1"
       style="background-color: rgba(0, 0, 0, 0.5)"
     >
-      <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-dialog modal-dialog-centered modal-fullscreen-sm-down">
         <div class="modal-content">
           <div class="modal-header">
             <h5 class="modal-title small fw-bold">

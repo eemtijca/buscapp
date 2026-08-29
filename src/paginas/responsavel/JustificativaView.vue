@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useAutenticacao } from '@/composables/useAutenticacao';
 import { useMonitoramento } from '@/composables/useMonitoramento';
 import { supabaseClient } from '@/servicos/supabase';
 import FormularioJustificativa from '@/componentes/FormularioJustificativa.vue';
+import Combobox from '@/componentes/Combobox.vue';
+import type { OpcaoCombobox } from '@/componentes/Combobox.vue';
 import type { Aluno } from '@/tipos/database';
 
 const router = useRouter();
@@ -14,6 +16,17 @@ const { buscarFilhosDoResponsavel, enviarJustificativa, processarAnexoAsync } = 
 
 const filhos = ref<Aluno[]>([]);
 const filhoSelecionado = ref<Aluno | null>(null);
+
+const filhoOpcoes = computed<OpcaoCombobox[]>(() =>
+  filhos.value.map((f) => ({ valor: f.id, rotulo: f.nome, descricao: f.matricula ?? undefined })),
+);
+const filhoSelecionadoId = computed({
+  get: () => filhoSelecionado.value?.id ?? '',
+  set: (id: string) => {
+    const filho = filhos.value.find((f) => f.id === id);
+    if (filho) filhoSelecionado.value = filho;
+  },
+});
 const enviando = ref(false);
 const mensagemSucesso = ref<string | null>(null);
 const mensagemErro = ref<string | null>(null);
@@ -106,11 +119,12 @@ watch(usuario, () => void inicializar(), { immediate: true });
 
     <div v-if="filhos.length > 1" class="mb-3">
       <label for="filhoSelect" class="form-label fw-semibold small">Aluno</label>
-      <select id="filhoSelect" class="form-select" v-model="filhoSelecionado">
-        <option v-for="f in filhos" :key="f.id" :value="f">
-          {{ f.nome }}<span v-if="f.matricula"> — {{ f.matricula }}</span>
-        </option>
-      </select>
+      <Combobox
+        id="filhoSelect"
+        v-model="filhoSelecionadoId"
+        :opcoes="filhoOpcoes"
+        placeholder="Selecione o aluno"
+      />
     </div>
 
     <div v-if="mensagemSucesso" class="alert alert-success py-2 small mb-3" role="status">

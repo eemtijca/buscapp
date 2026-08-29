@@ -36,7 +36,7 @@ test.describe('Professor - Frequência', () => {
     await login(page, 'prof1@escola.edu.br', SENHA_PROF);
     await page.goto('/professor/ausencia');
     await expect(page.getByText('Registrar ausência em aula')).toBeVisible();
-    await expect(page.locator('select').first()).toBeVisible();
+    await expect(page.locator('#alunoSelect')).toBeVisible();
     await expect(page.getByText('Registrar ausência').first()).toBeVisible();
   });
 
@@ -61,7 +61,7 @@ test.describe('Professor - Ocorrência com tags', () => {
     await login(page, 'prof1@escola.edu.br', SENHA_PROF);
     await page.goto('/professor/ocorrencia');
     await expect(page.getByText('Registrar ocorrência grave')).toBeVisible();
-    await expect(page.locator('select').first()).toBeVisible();
+    await expect(page.locator('#alunoSelect')).toBeVisible();
     await page.waitForSelector('input[type="checkbox"]', { timeout: 10000 });
     await expect(page.getByText('Notificar coordenação')).toBeVisible();
   });

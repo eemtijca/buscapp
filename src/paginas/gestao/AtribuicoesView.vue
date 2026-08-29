@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useRouter, onBeforeRouteLeave } from 'vue-router';
 import { supabaseClient } from '@/servicos/supabase';
 import { useOpcoesConfiguracao } from '@/composables/useOpcoesConfiguracao';
 import CampoFormulario from '@/componentes/CampoFormulario.vue';
+import Combobox from '@/componentes/Combobox.vue';
+import type { OpcaoCombobox } from '@/componentes/Combobox.vue';
 import type { AtribuicaoProfessor, Perfil, Turma, Disciplina } from '@/tipos/database';
 import type { OpcaoCheckbox } from '@/tipos/componentes';
 
@@ -38,6 +40,19 @@ const formDataInicio = ref('');
 const formDataFim = ref('');
 const formAtivo = ref(true);
 const formDirty = ref(false);
+
+const professorOpcoes = computed<OpcaoCombobox[]>(() =>
+  professores.value.map((p) => ({ valor: p.id, rotulo: p.nome })),
+);
+const turmaOpcoes = computed<OpcaoCombobox[]>(() =>
+  turmas.value.map((t) => ({ valor: t.id, rotulo: t.nome_completo })),
+);
+const disciplinaOpcoes = computed<OpcaoCombobox[]>(() =>
+  disciplinas.value.map((d) => ({ valor: d.id, rotulo: d.nome })),
+);
+const papelOpcoes = computed<OpcaoCombobox[]>(() =>
+  opcoesPapel.value.map((o) => ({ valor: o.valor, rotulo: o.rotulo, icone: o.icone })),
+);
 
 onBeforeRouteLeave((_to, _from, next) => {
   if (formDirty.value && modalAberto.value && !carregando.value) {
@@ -351,45 +366,40 @@ onMounted(async () => {
           <form @submit.prevent="salvar">
             <div class="modal-body">
               <CampoFormulario id="campoProfessor" label="Professor" :obrigatorio="true">
-                <select
+                <Combobox
                   id="campoProfessor"
                   v-model="formProfessorId"
-                  class="form-select form-select-sm"
-                  required
-                >
-                  <option value="">Selecione um professor</option>
-                  <option v-for="p in professores" :key="p.id" :value="p.id">{{ p.nome }}</option>
-                </select>
+                  :opcoes="professorOpcoes"
+                  placeholder="Selecione um professor"
+                  tamanho="sm"
+                />
               </CampoFormulario>
               <CampoFormulario id="campoTurma" label="Turma" :obrigatorio="true">
-                <select
+                <Combobox
                   id="campoTurma"
                   v-model="formTurmaId"
-                  class="form-select form-select-sm"
-                  required
-                >
-                  <option value="">Selecione uma turma</option>
-                  <option v-for="t in turmas" :key="t.id" :value="t.id">
-                    {{ t.nome_completo }}
-                  </option>
-                </select>
+                  :opcoes="turmaOpcoes"
+                  placeholder="Selecione uma turma"
+                  tamanho="sm"
+                />
               </CampoFormulario>
               <CampoFormulario id="campoDisciplina" label="Disciplina">
-                <select
+                <Combobox
                   id="campoDisciplina"
                   v-model="formDisciplinaId"
-                  class="form-select form-select-sm"
-                >
-                  <option value="">Selecione uma disciplina</option>
-                  <option v-for="d in disciplinas" :key="d.id" :value="d.id">{{ d.nome }}</option>
-                </select>
+                  :opcoes="disciplinaOpcoes"
+                  placeholder="Selecione uma disciplina"
+                  tamanho="sm"
+                />
               </CampoFormulario>
               <CampoFormulario id="campoPapel" label="Papel" :obrigatorio="true">
-                <select id="campoPapel" v-model="formPapel" class="form-select form-select-sm">
-                  <option v-for="p in opcoesPapel" :key="p.valor" :value="p.valor">
-                    {{ p.rotulo }}
-                  </option>
-                </select>
+                <Combobox
+                  id="campoPapel"
+                  v-model="formPapel"
+                  :opcoes="papelOpcoes"
+                  placeholder="Selecione o papel"
+                  tamanho="sm"
+                />
               </CampoFormulario>
               <CampoFormulario id="campoDataInicio" label="Data início" :obrigatorio="true">
                 <input

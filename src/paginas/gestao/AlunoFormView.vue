@@ -6,13 +6,15 @@ import { useOpcoesConfiguracao } from '@/composables/useOpcoesConfiguracao';
 import { useAnoLetivo } from '@/composables/useAnoLetivo';
 import { supabaseClient } from '@/servicos/supabase';
 import CampoFormulario from '@/componentes/CampoFormulario.vue';
+import Combobox from '@/componentes/Combobox.vue';
+import type { OpcaoCombobox } from '@/componentes/Combobox.vue';
 import GrupoCheckbox from '@/componentes/GrupoCheckbox.vue';
 import type { Turma, Enturmacao, VinculoResponsavel } from '@/tipos/database';
 import type { OpcaoCheckbox } from '@/tipos/componentes';
 
 const route = useRoute();
 const router = useRouter();
-const { buscarAlunos, buscarTurmas, criarAluno, atualizarAluno, carregando, erro } =
+const { buscarAlunos, buscarTurmas, buscarUsuarios, criarAluno, atualizarAluno, carregando, erro } =
   useGestaoUsuarios();
 const { buscarOpcoes } = useOpcoesConfiguracao();
 const { buscarAnoLetivoAtivo } = useAnoLetivo();
@@ -43,6 +45,48 @@ const responsavelEmail = ref('');
 const responsavelNome = ref('');
 const responsavelTelefone = ref('');
 const tipoVinculo = ref('outro');
+
+const responsaveisOpcoes = ref<OpcaoCombobox[]>([]);
+const carregandoResponsaveis = ref(false);
+let debounceResp: ReturnType<typeof setTimeout> | null = null;
+
+const turmaOpcoes = computed<OpcaoCombobox[]>(() =>
+  turmas.value.map((t) => ({ valor: t.id, rotulo: t.nome_completo })),
+);
+const tipoVinculoOpcoes = computed<OpcaoCombobox[]>(() =>
+  opcoesTipoVinculo.value.map((o) => ({ valor: o.valor, rotulo: o.rotulo, icone: o.icone })),
+);
+const statusOpcoes = computed<OpcaoCombobox[]>(() => [
+  { valor: 'ativo', rotulo: 'Ativo' },
+  { valor: 'egresso', rotulo: 'Egresso' },
+  { valor: 'transferido', rotulo: 'Transferido' },
+  { valor: 'inativo', rotulo: 'Inativo' },
+]);
+
+async function buscarResponsaveis(termo: string) {
+  if (debounceResp) clearTimeout(debounceResp);
+  debounceResp = setTimeout(async () => {
+    carregandoResponsaveis.value = true;
+    try {
+      const usuarios = await buscarUsuarios({ papel: 'responsavel', busca: termo || undefined });
+      // Limita a 30 para não sobrecarregar o combobox
+      responsaveisOpcoes.value = usuarios
+        .slice(0, 30)
+        .map((u) => ({
+          valor: u.email ?? '',
+          rotulo: u.nome,
+          descricao: u.email ?? '',
+        }))
+        .filter((o) => o.valor);
+    } finally {
+      carregandoResponsaveis.value = false;
+    }
+  }, 300);
+}
+
+function aoBuscarResponsavel(termo: string) {
+  void buscarResponsaveis(termo);
+}
 
 const formDirty = ref(false);
 const salvando = ref(false);
@@ -320,6 +364,8 @@ onMounted(async () => {
   turmas.value = await buscarTurmas();
   opcoesDocumentos.value = await buscarOpcoes('documento');
   opcoesTipoVinculo.value = await buscarOpcoes('tipo_vinculo');
+  // Pré-carrega responsáveis para o combobox de seleção existente
+  void buscarResponsaveis('');
   const id = route.params.id as string | undefined;
   if (id) {
     modoEdicao.value = true;
@@ -644,10 +690,13 @@ async function salvar() {
         </div>
         <div class="card-body">
           <CampoFormulario id="campoTurma" label="Turma">
-            <select id="campoTurma" v-model="turmaId" class="form-select form-select-sm">
-              <option value="">Selecione uma turma</option>
-              <option v-for="t in turmas" :key="t.id" :value="t.id">{{ t.nome_completo }}</option>
-            </select>
+            <Combobox
+              id="campoTurma"
+              v-model="turmaId"
+              :opcoes="turmaOpcoes"
+              placeholder="Selecione uma turma"
+              tamanho="sm"
+            />
           </CampoFormulario>
         </div>
       </div>
@@ -685,7 +734,18 @@ async function salvar() {
           </div>
 
           <CampoFormulario id="campoRespEmail" label="E-mail do responsável">
+            <Combobox
+              v-if="vinculoTipo === 'existente'"
+              id="campoRespEmail"
+              v-model="responsavelEmail"
+              :opcoes="responsaveisOpcoes"
+              placeholder="Busque por nome ou e-mail"
+              :carregando="carregandoResponsaveis"
+              tamanho="sm"
+              @buscar="aoBuscarResponsavel"
+            />
             <input
+              v-else
               id="campoRespEmail"
               v-model="responsavelEmail"
               type="email"
@@ -714,15 +774,13 @@ async function salvar() {
               />
             </CampoFormulario>
             <CampoFormulario id="campoTipoVinculo" label="Tipo de vínculo">
-              <select
+              <Combobox
                 id="campoTipoVinculo"
                 v-model="tipoVinculo"
-                class="form-select form-select-sm"
-              >
-                <option v-for="v in opcoesTipoVinculo" :key="v.valor" :value="v.valor">
-                  {{ v.rotulo }}
-                </option>
-              </select>
+                :opcoes="tipoVinculoOpcoes"
+                placeholder="Selecione o vínculo"
+                tamanho="sm"
+              />
             </CampoFormulario>
           </template>
         </div>
@@ -734,12 +792,13 @@ async function salvar() {
         </div>
         <div class="card-body">
           <CampoFormulario id="campoStatusAluno" label="Status">
-            <select v-model="status" class="form-select form-select-sm">
-              <option value="ativo">Ativo</option>
-              <option value="egresso">Egresso</option>
-              <option value="transferido">Transferido</option>
-              <option value="inativo">Inativo</option>
-            </select>
+            <Combobox
+              id="campoStatusAluno"
+              v-model="status"
+              :opcoes="statusOpcoes"
+              placeholder="Selecione o status"
+              tamanho="sm"
+            />
           </CampoFormulario>
         </div>
       </div>
@@ -769,10 +828,13 @@ async function salvar() {
 
           <div v-if="alterarEnturmacao" class="border rounded p-3 mt-2 bg-body-tertiary">
             <CampoFormulario id="campoNovaTurma" label="Nova turma">
-              <select id="campoNovaTurma" v-model="novaTurmaId" class="form-select form-select-sm">
-                <option value="">Selecione uma turma</option>
-                <option v-for="t in turmas" :key="t.id" :value="t.id">{{ t.nome_completo }}</option>
-              </select>
+              <Combobox
+                id="campoNovaTurma"
+                v-model="novaTurmaId"
+                :opcoes="turmaOpcoes"
+                placeholder="Selecione uma turma"
+                tamanho="sm"
+              />
             </CampoFormulario>
             <CampoFormulario id="campoNovaDataMat" label="Data matrícula">
               <input
@@ -875,7 +937,18 @@ async function salvar() {
             </div>
 
             <CampoFormulario id="campoNovoRespEmail" label="E-mail do responsável">
+              <Combobox
+                v-if="novoRespTipo === 'existente'"
+                id="campoNovoRespEmail"
+                v-model="novoRespEmail"
+                :opcoes="responsaveisOpcoes"
+                placeholder="Busque por nome ou e-mail"
+                :carregando="carregandoResponsaveis"
+                tamanho="sm"
+                @buscar="aoBuscarResponsavel"
+              />
               <input
+                v-else
                 id="campoNovoRespEmail"
                 v-model="novoRespEmail"
                 type="email"
@@ -904,15 +977,13 @@ async function salvar() {
                 />
               </CampoFormulario>
               <CampoFormulario id="campoNovoTipoVinculo" label="Tipo de vínculo">
-                <select
+                <Combobox
                   id="campoNovoTipoVinculo"
                   v-model="novoTipoVinculo"
-                  class="form-select form-select-sm"
-                >
-                  <option v-for="v in opcoesTipoVinculo" :key="v.valor" :value="v.valor">
-                    {{ v.rotulo }}
-                  </option>
-                </select>
+                  :opcoes="tipoVinculoOpcoes"
+                  placeholder="Selecione o vínculo"
+                  tamanho="sm"
+                />
               </CampoFormulario>
             </template>
 

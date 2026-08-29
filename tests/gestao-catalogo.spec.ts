@@ -244,7 +244,8 @@ test.describe('Gestão - Integridade de catálogo', () => {
       }
       await expect(card.locator('#campoNovaTurma')).toBeVisible({ timeout: 3000 });
     }).toPass();
-    await card.locator('#campoNovaTurma').selectOption({ label: '3ª C' });
+    await card.locator('#campoNovaTurma').click();
+    await card.locator('#campoNovaTurma-lista [role="option"]', { hasText: '3ª C' }).click();
     await card.locator('#campoNovaDataMat').fill('2026-08-01');
     await card.getByRole('button', { name: 'Salvar' }).click();
     await expect(card.getByRole('button', { name: 'Alterar enturmação' })).toBeVisible({ timeout: 15000 });

@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { supabaseClient } from '@/servicos/supabase';
 import CampoFormulario from '@/componentes/CampoFormulario.vue';
+import Combobox from '@/componentes/Combobox.vue';
+import type { OpcaoCombobox } from '@/componentes/Combobox.vue';
 import SeletorIcone from '@/componentes/SeletorIcone.vue';
 import type { TagComportamento } from '@/tipos/database';
 
@@ -20,6 +22,12 @@ const formIcone = ref('');
 const formDescricao = ref('');
 const formPeso = ref(0);
 const formAtivo = ref(true);
+
+const categoriaOpcoes = computed<OpcaoCombobox[]>(() => [
+  { valor: 'positivo', rotulo: 'Positivo' },
+  { valor: 'atencao', rotulo: 'Atenção' },
+  { valor: 'critico', rotulo: 'Crítico' },
+]);
 
 function mostrarSucesso(msg: string) {
   mensagemSucesso.value = msg;
@@ -300,14 +308,14 @@ onMounted(carregar);
                 :disabled="carregando"
               />
             </CampoFormulario>
-            <div class="mb-3">
-              <label class="form-label">Categoria</label>
-              <select class="form-select" v-model="formCategoria">
-                <option value="positivo">Positivo</option>
-                <option value="atencao">Atenção</option>
-                <option value="critico">Crítico</option>
-              </select>
-            </div>
+            <CampoFormulario id="tag-categoria" label="Categoria">
+              <Combobox
+                id="tag-categoria"
+                v-model="formCategoria"
+                :opcoes="categoriaOpcoes"
+                placeholder="Selecione a categoria"
+              />
+            </CampoFormulario>
             <SeletorIcone v-model="formIcone" :desabilitado="carregando" />
             <CampoFormulario id="tag-descricao" label="Descrição">
               <input

@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useRouter, onBeforeRouteLeave } from 'vue-router';
 import { supabaseClient } from '@/servicos/supabase';
 import { useOpcoesConfiguracao } from '@/composables/useOpcoesConfiguracao';
 import { useAnoLetivo } from '@/composables/useAnoLetivo';
 import CampoFormulario from '@/componentes/CampoFormulario.vue';
+import Combobox from '@/componentes/Combobox.vue';
+import type { OpcaoCombobox } from '@/componentes/Combobox.vue';
 import type { Turma } from '@/tipos/database';
 import type { OpcaoCheckbox } from '@/tipos/componentes';
 
@@ -29,6 +31,13 @@ const formLetra = ref('A');
 const formCapacidade = ref<number | null>(null);
 const formAtivo = ref(true);
 const formDirty = ref(false);
+
+const serieOpcoes = computed<OpcaoCombobox[]>(() =>
+  opcoesSerie.value.map((o) => ({ valor: o.valor, rotulo: o.rotulo, icone: o.icone })),
+);
+const letraOpcoes = computed<OpcaoCombobox[]>(() =>
+  opcoesLetra.value.map((o) => ({ valor: o.valor, rotulo: o.rotulo, icone: o.icone })),
+);
 
 onBeforeRouteLeave((_to, _from, next) => {
   if (formDirty.value && modalAberto.value && !carregando.value) {
@@ -278,18 +287,22 @@ onMounted(carregarTurmas);
           <form @submit.prevent="salvar">
             <div class="modal-body">
               <CampoFormulario id="campoSerie" label="Série" :obrigatorio="true">
-                <select id="campoSerie" v-model="formSerie" class="form-select form-select-sm">
-                  <option v-for="s in opcoesSerie" :key="s.valor" :value="s.valor">
-                    {{ s.rotulo }}
-                  </option>
-                </select>
+                <Combobox
+                  id="campoSerie"
+                  v-model="formSerie"
+                  :opcoes="serieOpcoes"
+                  placeholder="Selecione a série"
+                  tamanho="sm"
+                />
               </CampoFormulario>
               <CampoFormulario id="campoLetra" label="Letra" :obrigatorio="true">
-                <select id="campoLetra" v-model="formLetra" class="form-select form-select-sm">
-                  <option v-for="l in opcoesLetra" :key="l.valor" :value="l.valor">
-                    {{ l.rotulo }}
-                  </option>
-                </select>
+                <Combobox
+                  id="campoLetra"
+                  v-model="formLetra"
+                  :opcoes="letraOpcoes"
+                  placeholder="Selecione a letra"
+                  tamanho="sm"
+                />
               </CampoFormulario>
               <CampoFormulario id="campoCapacidade" label="Capacidade">
                 <input

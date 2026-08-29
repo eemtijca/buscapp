@@ -7,6 +7,8 @@ import { useOpcoesConfiguracao } from '@/composables/useOpcoesConfiguracao';
 import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh';
 import CartaoAlunoFrequencia from '@/componentes/CartaoAlunoFrequencia.vue';
 import CampoFormulario from '@/componentes/CampoFormulario.vue';
+import Combobox from '@/componentes/Combobox.vue';
+import type { OpcaoCombobox } from '@/componentes/Combobox.vue';
 import GrupoCheckbox from '@/componentes/GrupoCheckbox.vue';
 import ModalConfirmacao from '@/componentes/ModalConfirmacao.vue';
 import type { AlunoFrequencia, OpcaoCheckbox } from '@/tipos/componentes';
@@ -34,6 +36,13 @@ const { inscrever, encerrar } = useRealtimeRefresh();
 const turmaSelecionada = ref('');
 const buscaTurma = ref('');
 const periodosChamada = ref<string[]>(['Dia completo']);
+
+const turmaOpcoes = computed<OpcaoCombobox[]>(() =>
+  turmasDisponiveis.value.map((t) => ({ valor: t.id, rotulo: t.nome })),
+);
+const alunoOpcoes = computed<OpcaoCombobox[]>(() =>
+  alunos.value.map((a) => ({ valor: a.id, rotulo: a.nome, descricao: a.turma ?? undefined })),
+);
 const chamadaPendente = ref(false);
 const salvandoChamada = ref(false);
 
@@ -311,14 +320,13 @@ watch(dataAula, () => {
               class="col-form-label col-form-label-sm text-body-secondary mb-0"
               >Turma</label
             >
-            <select
+            <Combobox
               id="seletorTurma"
               v-model="turmaSelecionada"
-              class="form-select form-select-sm"
-              style="width: auto"
-            >
-              <option v-for="t in turmasDisponiveis" :key="t.id" :value="t.id">{{ t.nome }}</option>
-            </select>
+              :opcoes="turmaOpcoes"
+              placeholder="Selecione a turma"
+              tamanho="sm"
+            />
           </div>
         </div>
 
@@ -427,16 +435,13 @@ watch(dataAula, () => {
           </p>
 
           <CampoFormulario id="alunoIndividual" label="Aluno" :obrigatorio="true">
-            <select
+            <Combobox
               id="alunoIndividual"
               v-model="alunoIdIndividual"
-              class="form-select form-select-sm"
-            >
-              <option value="" disabled>Selecione um aluno</option>
-              <option v-for="a in alunos" :key="a.id" :value="a.id">
-                {{ a.nome }}<span v-if="a.turma"> — {{ a.turma }}</span>
-              </option>
-            </select>
+              :opcoes="alunoOpcoes"
+              placeholder="Selecione um aluno"
+              tamanho="sm"
+            />
           </CampoFormulario>
 
           <CampoFormulario

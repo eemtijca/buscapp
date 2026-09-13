@@ -16,6 +16,7 @@
     "seed:prod": "node dist/prisma/seeds/dev.js"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1131.0",
     "@buscapp/contratos": "*",
     "@fastify/cookie": "^11.1.2",
     "@fastify/cors": "^11.3.0",

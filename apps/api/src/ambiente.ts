@@ -17,6 +17,13 @@ const esquema = z
     AUTH_PEPPER: z.string().min(16, 'AUTH_PEPPER deve ter ao menos 16 caracteres'),
     SESSAO_COOKIE: z.string().default('buscapp_sessao'),
     COOKIE_SAMESITE: z.enum(['lax', 'strict', 'none']).default('lax'),
+    STORAGE_DRIVER: z.enum(['disco', 's3']).default('disco'),
+    UPLOAD_DIR: z.string().default('uploads'),
+    S3_BUCKET: z.string().optional(),
+    S3_REGION: z.string().default('us-east-1'),
+    S3_ENDPOINT: z.string().optional(),
+    S3_ACCESS_KEY_ID: z.string().optional(),
+    S3_SECRET_ACCESS_KEY: z.string().optional(),
     COOKIE_SECURE: z
       .enum(['true', 'false'])
       .optional()

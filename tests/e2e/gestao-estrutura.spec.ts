@@ -1,6 +1,8 @@
 import { test, expect } from '@playwright/test';
 import { login } from '../suporte/sessao.js';
 import { SENHA_ADMIN } from '../suporte/dados.js';
+import { apiFetch, loginApi } from '../suporte/api.js';
+import { consultar, excluirLinhas } from '../suporte/banco.js';
 
 test.describe('Gestão - Turmas - Modal', () => {
   test('CT64 - Modal de criar turma abre e tem campos', async ({ page }) => {
@@ -66,30 +68,28 @@ test.describe('Gestão - Anos Letivos', () => {
   const ANO_CORRENTE = new Date().getFullYear();
   const ANO_TESTE = ANO_CORRENTE + 1;
   async function limparAnoTeste() {
-    const { restApi } = await import('../suporte/api.js');
-    await restApi(`/rest/v1/anos_letivos?ano=eq.${ANO_TESTE}`, { method: 'DELETE' });
+    await excluirLinhas('anos_letivos', 'ano = $1', [ANO_TESTE]);
   }
   test.beforeAll(async () => {
     await limparAnoTeste();
   });
   test.afterAll(async () => {
-    const { restApi } = await import('../suporte/api.js');
-    const { URL_SUPABASE, SERVICE_KEY } = await import('../suporte/dados.js');
-    const res = await restApi(`/rest/v1/anos_letivos?ano=eq.${ANO_TESTE}&select=id,status,ativo`);
-    const anos = (await res.json()) as { id: string; status: string; ativo: boolean }[];
+    const anos = await consultar<{ id: string; status: string; ativo: boolean }>(
+      'select id, status, ativo from public.anos_letivos where ano = $1',
+      [ANO_TESTE],
+    );
     const ano = anos[0];
     if (ano && ano.status === 'ativo' && ano.ativo) {
-      const resSeed = await restApi(`/rest/v1/anos_letivos?ano=eq.${ANO_CORRENTE}&select=id`);
-      const corrente = ((await resSeed.json()) as { id: string }[])[0];
+      const correntes = await consultar<{ id: string }>(
+        'select id from public.anos_letivos where ano = $1',
+        [ANO_CORRENTE],
+      );
+      const corrente = correntes[0];
       if (corrente) {
-        await fetch(`${URL_SUPABASE}/rest/v1/rpc/ativar_ano_letivo`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            apikey: SERVICE_KEY,
-            Authorization: `Bearer ${SERVICE_KEY}`,
-          },
-          body: JSON.stringify({ p_ano_id: corrente.id }),
+        const { cookie } = await loginApi('gestao@escola.edu.br', SENHA_ADMIN);
+        await apiFetch(`/api/anos-letivos/${corrente.id}/ativar`, {
+          metodo: 'POST',
+          cookie,
         });
       }
     }

@@ -661,12 +661,17 @@ describe('/api/anos-letivos', () => {
     });
     expect(repetido.statusCode).toBe(400);
 
-    const arquivado = await app.inject({
+    const retorno = await app.inject({
       method: 'POST',
       url: `/api/anos-letivos/${ANO_LETIVO_ID}/ativar`,
       cookies: { buscapp_sessao: cookieGestao },
     });
-    expect(arquivado.statusCode).toBe(400);
+    expect(retorno.statusCode).toBe(200);
+    expect(retorno.json().ano_letivo).toMatchObject({
+      id: ANO_LETIVO_ID,
+      status: 'ativo',
+      ativo: true,
+    });
 
     await prisma.anos_letivos.delete({ where: { id: anoLetivo.id } });
   });

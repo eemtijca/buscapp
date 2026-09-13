@@ -19,7 +19,11 @@ function statusDe(codigo: CodigoBruto, agora: Date): CodigoRedefinicao['status']
   return 'ativo';
 }
 
-export function paraCodigo(codigo: CodigoBruto, agora = new Date()): CodigoRedefinicao {
+export function paraCodigo(
+  codigo: CodigoBruto,
+  agora = new Date(),
+  bloqueado = false,
+): CodigoRedefinicao {
   return {
     id: codigo.id,
     email: codigo.email,
@@ -30,6 +34,7 @@ export function paraCodigo(codigo: CodigoBruto, agora = new Date()): CodigoRedef
     expira_em: codigo.expira_em.toISOString(),
     created_at: codigo.created_at.toISOString(),
     status: statusDe(codigo, agora),
+    bloqueado,
   };
 }
 

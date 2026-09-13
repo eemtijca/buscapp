@@ -1,5 +1,6 @@
 import type { CodigoRedefinicao } from '@buscapp/contratos';
 import { gerarCodigoRedefinicao } from '../../nucleo/autenticacao/codigos.js';
+import { prisma } from '../../nucleo/banco/cliente.js';
 import { erroNaoEncontrado } from '../../nucleo/http/erros.js';
 import {
   buscarCodigo,
@@ -11,9 +12,17 @@ import {
 } from './codigos.repositorio.js';
 
 export async function listar(): Promise<CodigoRedefinicao[]> {
-  const codigos = await listarCodigos();
   const agora = new Date();
-  return codigos.map((codigo) => paraCodigo(codigo, agora));
+  const [codigos, tentativas] = await Promise.all([
+    listarCodigos(),
+    prisma.codigos_redefinicao_tentativas.findMany({
+      where: { bloqueado_ate: { gt: agora } },
+      select: { email: true },
+    }),
+  ]);
+
+  const bloqueados = new Set(tentativas.map((tentativa) => tentativa.email));
+  return codigos.map((codigo) => paraCodigo(codigo, agora, bloqueados.has(codigo.email)));
 }
 
 export async function gerar(perfilId: string, criadoPor: string): Promise<string> {

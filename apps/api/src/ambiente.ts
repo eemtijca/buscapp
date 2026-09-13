@@ -44,3 +44,11 @@ export type Ambiente = z.infer<typeof esquema>;
 export const ambiente: Ambiente = esquema.parse(process.env);
 
 export const cookieSeguro = ambiente.COOKIE_SECURE ?? ambiente.NODE_ENV === 'production';
+
+/** Origens autorizadas a consumir a API com credenciais (CORS). */
+export const origensPermitidas = [
+  ambiente.APP_URL,
+  ...ambiente.APP_ORIGINS.split(',')
+    .map((origem) => origem.trim())
+    .filter(Boolean),
+];

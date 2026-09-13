@@ -63,6 +63,7 @@ interface CodigoDto {
   expira_em: string;
   created_at: string;
   status: CodigoGerado['status'];
+  bloqueado: boolean;
 }
 
 interface NotificacaoDto {
@@ -178,7 +179,7 @@ export function useGestaoUsuarios() {
           corpo: dadosCadastrais,
         });
       }
-      if (status) {
+      if (status && status !== 'pendente') {
         if (status !== 'ativo' && status !== 'inativo') {
           throw new Error('Apenas os status "ativo" e "inativo" podem ser definidos manualmente.');
         }
@@ -451,7 +452,7 @@ export function useGestaoUsuarios() {
         revogado_em: c.revogado_em,
         expira_em: c.expira_em,
         criado_em: c.created_at,
-        status: c.status,
+        status: c.bloqueado && c.status === 'ativo' ? 'bloqueado' : c.status,
       }));
     } catch (e) {
       const msg = mensagemDeErro(e, 'Não foi possível carregar os códigos.');

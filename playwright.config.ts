@@ -64,10 +64,18 @@ export default defineConfig({
     },
   ],
 
-  /* Run your local dev server before starting the tests */
-  webServer: {
-    command: 'npm run dev:web',
-    url: 'http://localhost:5173',
-    reuseExistingServer: !process.env.CI,
-  },
+  /* Sobe API e web antes dos testes; Playwright aceita uma lista de webServers. */
+  webServer: [
+    {
+      command: 'npm run dev:api',
+      url: 'http://localhost:3001/api/saude',
+      reuseExistingServer: !process.env.CI,
+      timeout: 120_000,
+    },
+    {
+      command: 'VITE_API_URL=http://localhost:3001 npm run dev:web',
+      url: 'http://localhost:5173',
+      reuseExistingServer: !process.env.CI,
+    },
+  ],
 });

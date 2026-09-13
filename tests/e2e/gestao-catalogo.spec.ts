@@ -1,8 +1,14 @@
 import { test, expect } from '@playwright/test';
 import { login } from '../suporte/sessao.js';
-import { SENHA_ADMIN } from '../suporte/dados.js';
-import { restApi } from '../suporte/api.js';
-import { URL_SUPABASE, SERVICE_KEY } from '../suporte/dados.js';
+import {
+  ALUNO_JOAO_ID,
+  ANO_LETIVO_ID,
+  PROF1_ID,
+  SENHA_ADMIN,
+  TURMA_1A_ID,
+} from '../suporte/dados.js';
+import { apiFetch, loginApi } from '../suporte/api.js';
+import { consultar, executar, excluirLinhas, inserirLinhas } from '../suporte/banco.js';
 
 test.describe('Gestão - Configuração', () => {
   test('CT110 - Pagina hub carrega com categorias', async ({ page }) => {
@@ -149,45 +155,37 @@ test.describe('Gestão - Configuração', () => {
     await page.click('.modal button:has-text("Salvar")');
     await expect(page.locator('.alert-success')).toBeVisible({ timeout: 10000 });
     await expect(page.locator('.alert-success')).toContainText(/salva com sucesso/);
+    const { cookie } = await loginApi('gestao@escola.edu.br', SENHA_ADMIN);
     await expect
       .poll(async () => {
-        const res = await restApi(
-          '/rest/v1/configuracoes_sistema?id=eq.1&select=max_tentativas_codigo',
-        );
-        const data = (await res.json()) as { max_tentativas_codigo: number }[];
-        return data[0]?.max_tentativas_codigo;
+        const res = await apiFetch('/api/configuracoes', { cookie });
+        const data = (await res.json()) as { configuracao: { max_tentativas_codigo: number } };
+        return data.configuracao.max_tentativas_codigo;
       })
       .toBe(novoMax);
-    await restApi('/rest/v1/configuracoes_sistema?id=eq.1', {
-      method: 'PATCH',
-      body: JSON.stringify({ max_tentativas_codigo: 5 }),
+    await apiFetch('/api/configuracoes', {
+      metodo: 'PUT',
+      cookie,
+      corpo: { max_tentativas_codigo: 5 },
     }).catch(() => {});
   });
 });
 
 test.describe('Gestão - Integridade de catálogo', () => {
   test.beforeAll(async () => {
-    const headers = {
-      'Content-Type': 'application/json',
-      apikey: SERVICE_KEY,
-      Authorization: `Bearer ${SERVICE_KEY}`,
-      Prefer: 'return=representation',
-    };
-    const res = await fetch(`${URL_SUPABASE}/rest/v1/ocorrencias`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        aluno_id: 'e0000000-0000-0000-0000-000000000001',
-        professor_id: 'a0000000-0000-0000-0000-000000000002',
-        turma_id: 'd0000000-0000-0000-0000-000000000001',
-        ano_letivo_id: 'b0000000-0000-0000-0000-000000000001',
+    await excluirLinhas('ocorrencias', 'titulo = $1', ['Integridade tag referenciada']);
+    await inserirLinhas('ocorrencias', [
+      {
+        aluno_id: ALUNO_JOAO_ID,
+        professor_id: PROF1_ID,
+        turma_id: TURMA_1A_ID,
+        ano_letivo_id: ANO_LETIVO_ID,
         titulo: 'Integridade tag referenciada',
         descricao: 'Setup de teste de integridade',
         tipo: ['grave'],
         tags_comportamento: ['Desatenção'],
-      }),
-    });
-    if (!res.ok) throw new Error(`Setup ocorrencia falhou: ${res.status}`);
+      },
+    ]);
   });
 
   test('CT116 - Excluir opção de catálogo referenciada é bloqueado', async ({ page }) => {
@@ -258,36 +256,21 @@ test.describe('Gestão - Integridade de catálogo', () => {
       timeout: 15000,
     });
     await expect(card).toContainText('3ª C');
-    const query = `${URL_SUPABASE}/rest/v1/enturmacoes?select=turma_id,status,ano_letivo_id&aluno_id=eq.e0000000-0000-0000-0000-000000000001&status=eq.matriculado`;
-    const fetchEnturmacoes = async () => {
-      const res = await fetch(query, {
-        headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` },
-      });
-      if (!res.ok) return null;
-      const data = (await res.json()) as { turma_id: string }[] | null;
-      return Array.isArray(data) ? data : null;
-    };
-    await expect
-      .poll(fetchEnturmacoes, { timeout: 10000 })
-      .toEqual([
-        {
-          turma_id: 'd0000000-0000-0000-0000-000000000003',
-          status: 'matriculado',
-          ano_letivo_id: 'b0000000-0000-0000-0000-000000000001',
-        },
-      ]);
-    await restApi(
-      `/rest/v1/enturmacoes?aluno_id=eq.e0000000-0000-0000-0000-000000000001&ano_letivo_id=eq.b0000000-0000-0000-0000-000000000001`,
-      { method: 'DELETE' },
-    );
-    await restApi('/rest/v1/enturmacoes', {
-      method: 'POST',
-      body: JSON.stringify({
-        aluno_id: 'e0000000-0000-0000-0000-000000000001',
-        turma_id: 'd0000000-0000-0000-0000-000000000001',
-        ano_letivo_id: 'b0000000-0000-0000-0000-000000000001',
+    const fetchEnturmacoes = () =>
+      consultar<{ turma_id: string; status: string; ano_letivo_id: string }>(
+        'select turma_id, status, ano_letivo_id from public.enturmacoes where aluno_id = $1 and status = $2',
+        [ALUNO_JOAO_ID, 'matriculado'],
+      );
+    await expect.poll(fetchEnturmacoes, { timeout: 10000 }).toEqual([
+      {
+        turma_id: 'd0000000-0000-0000-0000-000000000003',
         status: 'matriculado',
-      }),
-    });
+        ano_letivo_id: ANO_LETIVO_ID,
+      },
+    ]);
+    await executar(
+      'update public.enturmacoes set turma_id = $1, status = $2, data_encerramento = null where aluno_id = $3 and ano_letivo_id = $4',
+      [TURMA_1A_ID, 'matriculado', ALUNO_JOAO_ID, ANO_LETIVO_ID],
+    );
   });
 });

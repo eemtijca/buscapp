@@ -107,7 +107,7 @@ export async function idsDeTurmasDoResponsavel(responsavelId: string): Promise<s
 
 export async function listarDisciplinas(consulta: ListarDisciplinas) {
   return prisma.disciplinas.findMany({
-    where: (consulta.ativo !== undefined ? { ativo: consulta.ativo } : {}),
+    where: consulta.ativo !== undefined ? { ativo: consulta.ativo } : {},
     orderBy: { nome: 'asc' },
   });
 }
@@ -255,8 +255,7 @@ export async function buscarAnoLetivoVigente() {
 export type ResultadoAtivacaoAnoLetivo =
   | { tipo: 'ok'; ano: Awaited<ReturnType<typeof atualizarAnoLetivo>> }
   | { tipo: 'nao_encontrado' }
-  | { tipo: 'ja_ativo' }
-  | { tipo: 'arquivado' };
+  | { tipo: 'ja_ativo' };
 
 /**
  * Virada de ano letivo em transação única: arquiva o vigente, ativa o alvo e
@@ -269,7 +268,6 @@ export async function executarAtivacaoAnoLetivo(
   return prisma.$transaction(async (tx) => {
     const alvo = await tx.anos_letivos.findUnique({ where: { id: anoId } });
     if (!alvo) return { tipo: 'nao_encontrado' };
-    if (alvo.status === 'arquivado') return { tipo: 'arquivado' };
     if (alvo.ativo) return { tipo: 'ja_ativo' };
 
     const vigente = await tx.anos_letivos.findFirst({

@@ -232,7 +232,7 @@ export async function excluirHorario(id: string) {
 export async function listarTags(consulta: ListarTagsComportamento) {
   const ativo = consulta.ativo === undefined ? undefined : consulta.ativo === 'true';
   return prisma.tags_comportamento.findMany({
-    where: (ativo !== undefined ? { ativo } : {}),
+    where: ativo !== undefined ? { ativo } : {},
     orderBy: { nome: 'asc' },
   });
 }

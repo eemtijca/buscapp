@@ -390,9 +390,6 @@ export async function ativarAnoLetivo(id: string, usuarioId: string): Promise<An
 
   if (resultado.tipo === 'nao_encontrado') throw erroNaoEncontrado('Ano letivo não encontrado.');
   if (resultado.tipo === 'ja_ativo') throw erroValidacao('Este ano letivo já está ativo.');
-  if (resultado.tipo === 'arquivado') {
-    throw erroValidacao('Um ano letivo arquivado não pode ser reativado.');
-  }
 
   publicarEvento({ tabela: 'anos_letivos' });
   return paraAnoLetivo(resultado.ano);

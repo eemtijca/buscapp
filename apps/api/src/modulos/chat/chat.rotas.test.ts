@@ -5,7 +5,6 @@ import { construirApp } from '../../app.js';
 import { prisma } from '../../nucleo/banco/cliente.js';
 import { gerarHashSenha } from '../../nucleo/autenticacao/senhas.js';
 
-const ANO_LETIVO_ID = 'b0000000-0000-0000-0000-000000000001';
 const marcador = Date.now();
 
 const gestaoId = randomUUID();
@@ -32,6 +31,7 @@ const emails = {
 const MENSAGEM_FORA_HORARIO = `Canal fechado no momento do teste ${marcador}.`;
 
 let app: FastifyInstance;
+let anoPrivadoId: string;
 let cookieGestao: string;
 let cookieProfessor: string;
 let cookieResponsavel: string;
@@ -82,7 +82,7 @@ async function criarPerfil(
 async function criarAluno(id: string, nome: string, matricula: string) {
   await prisma.alunos.create({ data: { id, nome, matricula } });
   await prisma.enturmacoes.create({
-    data: { aluno_id: id, turma_id: turmaId, ano_letivo_id: ANO_LETIVO_ID },
+    data: { aluno_id: id, turma_id: turmaId, ano_letivo_id: anoPrivadoId },
   });
 }
 
@@ -101,8 +101,29 @@ function erroDe(resposta: { json: () => unknown }): { codigo: string; mensagem: 
   return (resposta.json() as { erro: { codigo: string; mensagem: string } }).erro;
 }
 
+/** Cria um ano letivo exclusivo da suíte para isolar as turmas do seed canônico. */
+async function criarAnoLetivoPrivado(): Promise<string> {
+  const existentes = await prisma.anos_letivos.findMany({ select: { ano: true } });
+  const usados = new Set(existentes.map((registro) => registro.ano));
+  let ano = 2100;
+  while (usados.has(ano)) ano -= 1;
+  if (ano < 2000) throw new Error('Não há ano letivo disponível para os testes.');
+
+  const criado = await prisma.anos_letivos.create({
+    data: {
+      ano,
+      status: 'planejado',
+      data_inicio: new Date(`${ano}-02-01`),
+      data_fim: new Date(`${ano}-12-20`),
+      ativo: false,
+    },
+  });
+  return criado.id;
+}
+
 beforeAll(async () => {
   app = await construirApp();
+  anoPrivadoId = await criarAnoLetivoPrivado();
 
   await criarPerfil(gestaoId, emails.gestao, 'gestao', []);
   await criarPerfil(professorId, emails.professor, 'professor', []);
@@ -113,7 +134,7 @@ beforeAll(async () => {
   await prisma.turmas.create({
     data: {
       id: turmaId,
-      ano_letivo_id: ANO_LETIVO_ID,
+      ano_letivo_id: anoPrivadoId,
       serie: '1ª',
       letra: 'A',
       nome_completo: '1ª A',
@@ -233,6 +254,7 @@ afterAll(async () => {
   await prisma.vinculos_responsaveis.deleteMany({ where: { aluno_id: { in: alunosIds } } });
   await prisma.alunos.deleteMany({ where: { id: { in: alunosIds } } });
   await prisma.turmas.deleteMany({ where: { id: turmaId } });
+  await prisma.anos_letivos.delete({ where: { id: anoPrivadoId } }).catch(() => {});
   await prisma.sessoes.deleteMany({ where: { perfil_id: { in: perfisIds } } });
   await prisma.perfis.deleteMany({ where: { id: { in: perfisIds } } });
   await app.close();

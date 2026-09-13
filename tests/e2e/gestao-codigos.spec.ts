@@ -3,11 +3,13 @@ import { login } from '../suporte/sessao.js';
 import { SENHA_ADMIN } from '../suporte/dados.js';
 import { emailUnico } from '../suporte/dados.js';
 import {
+  apiFetch,
+  contarNotificacoesCodigo,
   criarUsuarioApi,
   deletarUsuario,
-  restApi,
-  contarNotificacoesCodigo,
+  loginApi,
 } from '../suporte/api.js';
+import { executar, excluirLinhas, inserirLinhas } from '../suporte/banco.js';
 
 test.describe('Gestão - Códigos', () => {
   test('CT13 - Página de códigos carrega com abas', async ({ page }) => {
@@ -186,14 +188,14 @@ test.describe('Códigos — Workflow completo (regressão pendente)', () => {
     let userId = '';
 
     try {
-      const criado = await criarUsuarioApi(nome, email);
+      const criado = await criarUsuarioApi({ nome, email, papel: 'responsavel' });
       userId = criado.id;
-      expect(criado.codigo.length).toBe(6);
+      expect(criado.codigo).toHaveLength(6);
 
-      await restApi(`/rest/v1/codigos_redefinicao?email=eq.${email}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ expira_em: '2020-01-01T00:00:00Z' }),
-      });
+      await executar('update public.codigos_redefinicao set expira_em = $1 where email = $2', [
+        '2020-01-01T00:00:00Z',
+        email,
+      ]);
 
       await page.goto('/solicitar-codigo');
       await page.fill('input[type="email"]', email);
@@ -248,7 +250,7 @@ test.describe('Códigos — Deduplicação', () => {
     let userId = '';
 
     try {
-      const criado = await criarUsuarioApi(nome, email);
+      const criado = await criarUsuarioApi({ nome, email, papel: 'responsavel' });
       userId = criado.id;
 
       await page.goto('/solicitar-codigo');
@@ -288,18 +290,18 @@ test.describe('Códigos — Bloqueio por tentativas', () => {
     const SENHA_VALIDA = `Bloqueio${Date.now()}!a1`;
     let userId = '';
 
-    const cfgRes = await restApi(
-      '/rest/v1/configuracoes_sistema?id=eq.1&select=max_tentativas_codigo',
-    );
-    const cfgData = (await cfgRes.json()) as { max_tentativas_codigo: number }[];
-    const maxOrig = cfgData[0]?.max_tentativas_codigo ?? 5;
-    await restApi('/rest/v1/configuracoes_sistema?id=eq.1', {
-      method: 'PATCH',
-      body: JSON.stringify({ max_tentativas_codigo: 3 }),
+    const { cookie } = await loginApi('gestao@escola.edu.br', SENHA_ADMIN);
+    const cfgRes = await apiFetch('/api/configuracoes', { cookie });
+    const cfgData = (await cfgRes.json()) as { configuracao: { max_tentativas_codigo: number } };
+    const maxOrig = cfgData.configuracao.max_tentativas_codigo ?? 5;
+    await apiFetch('/api/configuracoes', {
+      metodo: 'PUT',
+      cookie,
+      corpo: { max_tentativas_codigo: 3 },
     });
 
     try {
-      const criado = await criarUsuarioApi(nome, email);
+      const criado = await criarUsuarioApi({ nome, email, papel: 'responsavel' });
       userId = criado.id;
 
       await page.goto('/redefinir-senha-codigo');
@@ -322,14 +324,13 @@ test.describe('Códigos — Bloqueio por tentativas', () => {
       await expect(linha).toBeVisible({ timeout: 10000 });
       await expect(linha.getByText('bloqueado', { exact: true })).toBeVisible();
     } finally {
-      await restApi('/rest/v1/configuracoes_sistema?id=eq.1', {
-        method: 'PATCH',
-        body: JSON.stringify({ max_tentativas_codigo: maxOrig }),
+      await apiFetch('/api/configuracoes', {
+        metodo: 'PUT',
+        cookie,
+        corpo: { max_tentativas_codigo: maxOrig },
       }).catch(() => {});
       if (userId) await deletarUsuario(userId);
-      await restApi(`/rest/v1/codigos_redefinicao_tentativas?email=eq.${email}`, {
-        method: 'DELETE',
-      }).catch(() => {});
+      await excluirLinhas('codigos_redefinicao_tentativas', 'email = $1', [email]).catch(() => {});
     }
   });
 });
@@ -353,19 +354,19 @@ test.describe('Gestão — Configuração de códigos', () => {
     await expect(page.locator('.alert-success')).toBeVisible({ timeout: 10000 });
     await expect(page.locator('.alert-success')).toContainText(/salva com sucesso/);
 
+    const { cookie } = await loginApi('gestao@escola.edu.br', SENHA_ADMIN);
     await expect
       .poll(async () => {
-        const res = await restApi(
-          '/rest/v1/configuracoes_sistema?id=eq.1&select=max_tentativas_codigo',
-        );
-        const data = (await res.json()) as { max_tentativas_codigo: number }[];
-        return data[0]?.max_tentativas_codigo;
+        const res = await apiFetch('/api/configuracoes', { cookie });
+        const data = (await res.json()) as { configuracao: { max_tentativas_codigo: number } };
+        return data.configuracao.max_tentativas_codigo;
       })
       .toBe(novoMax);
 
-    await restApi('/rest/v1/configuracoes_sistema?id=eq.1', {
-      method: 'PATCH',
-      body: JSON.stringify({ max_tentativas_codigo: 5 }),
+    await apiFetch('/api/configuracoes', {
+      metodo: 'PUT',
+      cookie,
+      corpo: { max_tentativas_codigo: 5 },
     }).catch(() => {});
   });
 });
@@ -377,10 +378,10 @@ test.describe('Códigos — Revogação e nova solicitação (regressão)', () =
     let userId = '';
 
     try {
-      const criado = await criarUsuarioApi(nome, email);
+      const criado = await criarUsuarioApi({ nome, email, papel: 'responsavel' });
       userId = criado.id;
       const codigoInicial = criado.codigo;
-      expect(codigoInicial.length).toBe(6);
+      expect(codigoInicial).toHaveLength(6);
 
       await page.goto('/solicitar-codigo');
       await page.fill('input[type="email"]', email);
@@ -474,7 +475,8 @@ async function inserirCodigo(
   const corpo: Record<string, unknown> = {
     email,
     perfil_id: perfilId,
-    codigo,
+    // A API guarda apenas o HMAC; o valor semeado não é recuperável.
+    codigo_hash: `e2e-${estado}-${codigo}`,
     expira_em: new Date(agora.getTime() + 3600000).toISOString(),
   };
   if (estado === 'usado') corpo.usado_em = agora.toISOString();
@@ -483,7 +485,7 @@ async function inserirCodigo(
     corpo.expira_em = new Date(agora.getTime() - 1000).toISOString();
     corpo.revogado_em = agora.toISOString();
   }
-  await restApi('/rest/v1/codigos_redefinicao', { method: 'POST', body: JSON.stringify(corpo) });
+  await inserirLinhas('codigos_redefinicao', [corpo]);
 }
 
 test.describe('Códigos — Limpar não ativos', () => {
@@ -493,7 +495,7 @@ test.describe('Códigos — Limpar não ativos', () => {
     let userId = '';
 
     try {
-      const criado = await criarUsuarioApi(nome, email);
+      const criado = await criarUsuarioApi({ nome, email, papel: 'responsavel' });
       userId = criado.id;
 
       await inserirCodigo(criado.id, email, '111111', 'usado');
@@ -535,7 +537,7 @@ test.describe('Códigos — Copiar ao clicar', () => {
     let userId = '';
 
     try {
-      const criado = await criarUsuarioApi('Copy Click', email);
+      const criado = await criarUsuarioApi({ nome: 'Copy Click', email, papel: 'responsavel' });
       userId = criado.id;
 
       await page.goto('/solicitar-codigo');
@@ -575,12 +577,28 @@ test.describe('Códigos — Copiar ao clicar', () => {
     let userId = '';
 
     try {
-      const criado = await criarUsuarioApi('Copy Tabela', email);
+      const criado = await criarUsuarioApi({ nome: 'Copy Tabela', email, papel: 'responsavel' });
       userId = criado.id;
-      const codigoInicial = criado.codigo;
+
+      await page.goto('/solicitar-codigo');
+      await page.fill('input[type="email"]', email);
+      await page.click('button[type="submit"]');
+      await expect(page.getByText('Solicitação enviada com sucesso!')).toBeVisible({
+        timeout: 15000,
+      });
 
       await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
       await page.goto('/gestao/codigos');
+      const card = page.locator('.card').filter({ hasText: email });
+      await expect(card).toBeVisible({ timeout: 10000 });
+      await card.getByRole('button', { name: 'Gerar' }).click();
+      await page.locator('.modal button:has-text("Sim, gerar")').click();
+      const modalCodeEl = page.locator('.modal code.font-monospace');
+      await expect(modalCodeEl).toBeVisible({ timeout: 10000 });
+      const codigo = (await modalCodeEl.textContent())?.trim() ?? '';
+      expect(codigo.length).toBe(6);
+      await page.locator('.modal button:has-text("Concluído")').click();
+
       await page.locator('button:has-text("Códigos")').click();
       const linha = page.locator('tr').filter({ hasText: email });
       await expect(linha.first()).toBeVisible({ timeout: 10000 });
@@ -591,7 +609,7 @@ test.describe('Códigos — Copiar ao clicar', () => {
       await expect(page.getByText('Código copiado!')).toBeVisible({ timeout: 5000 });
       await expect
         .poll(async () => page.evaluate(() => navigator.clipboard.readText()))
-        .toBe(codigoInicial);
+        .toBe(codigo);
     } finally {
       if (userId) await deletarUsuario(userId);
     }

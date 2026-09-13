@@ -1,43 +1,21 @@
 import { test, expect } from '@playwright/test';
 import { login } from '../suporte/sessao.js';
-import {
-  SENHA_ADMIN,
-  SENHA_PROF,
-  emailUnico,
-  SERVICE_KEY,
-  URL_SUPABASE,
-} from '../suporte/dados.js';
-import { restApi, obterToken, deletarUsuario } from '../suporte/api.js';
-
-// Cria usuário temporário isolado via edge function.
-async function criarUsuarioTemp(
-  nome: string,
-  email: string,
-  papel: 'professor' | 'responsavel' = 'professor',
-): Promise<string> {
-  const token = await obterToken('gestao@escola.edu.br', SENHA_ADMIN);
-  const res = await fetch(`${URL_SUPABASE}/functions/v1/criar-usuario`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      apikey: SERVICE_KEY,
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({ nome, email, papel }),
-  });
-  if (!res.ok) throw new Error(`criarUsuarioTemp ${res.status}`);
-  const { id } = (await res.json()) as { id: string };
-  return id;
-}
+import { SENHA_ADMIN, SENHA_PROF, emailUnico } from '../suporte/dados.js';
+import { criarUsuarioApi, deletarUsuario } from '../suporte/api.js';
+import { excluirLinhas } from '../suporte/banco.js';
 
 test.describe('Gestão - Usuários - Salvamento limpa estado de edição', () => {
   test('CT-Dirty-1: usuário editado e salvo permite sair sem confirmação', async ({ page }) => {
     const email = emailUnico('dirty1-');
-    const id = await criarUsuarioTemp('Usuario Dirty 1', email, 'professor');
+    const { id } = await criarUsuarioApi({
+      nome: 'Usuario Dirty 1',
+      email,
+      papel: 'professor',
+    });
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto(`/gestao/usuarios/${id}`);
     await page.waitForSelector('#campoNome');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     const nomeInput = page.locator('#campoNome');
     await nomeInput.fill('');
@@ -59,16 +37,19 @@ test.describe('Gestão - Usuários - Salvamento limpa estado de edição', () =>
     expect(dialogShown).toBe(false);
 
     await deletarUsuario(id);
-    await restApi(`/rest/v1/perfis?id=eq.${id}`, { method: 'DELETE' });
   });
 
   test('CT-Dirty-2: usuário editado sem salvar exige confirmação ao sair', async ({ page }) => {
     const email = emailUnico('dirty2-');
-    const id = await criarUsuarioTemp('Usuario Dirty 2', email, 'responsavel');
+    const { id } = await criarUsuarioApi({
+      nome: 'Usuario Dirty 2',
+      email,
+      papel: 'responsavel',
+    });
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto(`/gestao/usuarios/${id}`);
     await page.waitForSelector('#campoNome');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
     await expect(page.locator('#campoNome')).toHaveValue('Usuario Dirty 2');
 
     const input = page.locator('#campoNome');
@@ -91,7 +72,6 @@ test.describe('Gestão - Usuários - Salvamento limpa estado de edição', () =>
     await expect(page).toHaveURL(/\/gestao$/);
 
     await deletarUsuario(id);
-    await restApi(`/rest/v1/perfis?id=eq.${id}`, { method: 'DELETE' });
   });
 
   test('CT-Dirty-3: novo aluno criado permite sair sem confirmação', async ({ page }) => {
@@ -99,7 +79,7 @@ test.describe('Gestão - Usuários - Salvamento limpa estado de edição', () =>
     const mat = `TEST${Date.now()}`;
     await page.goto('/gestao/alunos/novo');
     await page.waitForSelector('#campoNome');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     await page.fill('#campoNome', 'Aluno Teste Dirty');
     await page.fill('#campoMatricula', mat);
@@ -119,7 +99,7 @@ test.describe('Gestão - Usuários - Salvamento limpa estado de edição', () =>
     await page.waitForURL(/\/gestao\/alunos/);
     expect(dialogShown).toBe(false);
 
-    await restApi(`/rest/v1/alunos?matricula=eq.${mat}`, { method: 'DELETE' });
+    await excluirLinhas('alunos', 'matricula = $1', [mat]);
   });
 });
 
@@ -128,7 +108,7 @@ test.describe('Navegação - Indicador de carregamento', () => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao');
     await page.waitForSelector('text=Gestão');
-    await page.route('**/rest/v1/perfis*', async (route) => {
+    await page.route('**/api/usuarios*', async (route) => {
       await new Promise((r) => setTimeout(r, 500));
       await route.continue();
     });
@@ -137,14 +117,14 @@ test.describe('Navegação - Indicador de carregamento', () => {
     await expect(page.locator('.tela-carregamento')).toContainText(/Carregando Usuários/i);
     await navPromise;
     await expect(page.locator('.tela-carregamento')).toBeHidden({ timeout: 3000 });
-    await page.unroute('**/rest/v1/perfis*');
+    await page.unroute('**/api/usuarios*');
   });
 
   test('CT-Load-2: rota com carregamento sob demanda', async ({ page }) => {
     await login(page, 'prof1@escola.edu.br', SENHA_PROF);
     await page.goto('/professor');
     await page.waitForSelector('text=Professor');
-    await page.route('**/rest/v1/perfis*', async (route) => {
+    await page.route('**/api/usuarios*', async (route) => {
       await new Promise((r) => setTimeout(r, 400));
       await route.continue();
     });
@@ -153,14 +133,14 @@ test.describe('Navegação - Indicador de carregamento', () => {
     await nav;
     await expect(page).toHaveURL(/\/professor\/frequencia/);
     await expect(page.locator('h1, h5')).toBeVisible();
-    await page.unroute('**/rest/v1/perfis*');
+    await page.unroute('**/api/usuarios*');
   });
 
   test('CT-Load-3: indicador é responsivo em viewport estreito', async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 800 });
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
     const p = page.goto('/gestao/turmas');
     await expect(page.locator('.tela-carregamento__conteudo')).toBeVisible({ timeout: 3000 });
     const box = await page.locator('.tela-carregamento__conteudo').boundingBox();
@@ -213,7 +193,7 @@ test.describe('Gestão - Mensagens de feedback', () => {
     await page.click('button:has-text("Novo ano letivo")');
     await page.waitForSelector('.modal');
     const ano = String(new Date().getFullYear() + 10 + Math.floor(Math.random() * 10));
-    await restApi(`/rest/v1/anos_letivos?ano=eq.${ano}`, { method: 'DELETE' });
+    await excluirLinhas('anos_letivos', 'ano = $1', [ano]);
     await page.fill('#campoAno', ano);
     await page.fill('#campoDataInicio', `${ano}-02-01`);
     await page.fill('#campoDataFim', `${ano}-12-20`);
@@ -224,7 +204,7 @@ test.describe('Gestão - Mensagens de feedback', () => {
     await expect(success.locator('.btn-close')).toBeVisible();
     await success.locator('.btn-close').click();
     await expect(success).toBeHidden();
-    await restApi(`/rest/v1/anos_letivos?ano=eq.${ano}`, { method: 'DELETE' });
+    await excluirLinhas('anos_letivos', 'ano = $1', [ano]);
   });
 });
 
@@ -235,7 +215,7 @@ test.describe('Gestão - Bloqueio de ações durante operações', () => {
     await page.waitForSelector('form');
     await page.fill('#campoNome', 'Bloqueio Teste');
     await page.fill('#campoEmail', emailUnico('bloq-'));
-    await page.route('**/functions/v1/criar-usuario', async (route) => {
+    await page.route('**/api/usuarios', async (route) => {
       await new Promise((r) => setTimeout(r, 1000));
       await route.continue();
     });
@@ -245,7 +225,7 @@ test.describe('Gestão - Bloqueio de ações durante operações', () => {
     });
     await expect(page.locator('button:has-text("Cancelar")')).toBeDisabled();
     await clickPromise;
-    await page.unroute('**/functions/v1/criar-usuario');
+    await page.unroute('**/api/usuarios');
   });
 
   test('CT-Block-2: ações permanecem habilitadas fora de carregamento', async ({ page }) => {

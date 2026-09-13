@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { login, logout } from '../suporte/sessao.js';
-import { SENHA_ADMIN, SERVICE_KEY, URL_SUPABASE } from '../suporte/dados.js';
+import { SENHA_ADMIN } from '../suporte/dados.js';
+import { excluirLinhas, executar } from '../suporte/banco.js';
 
 test.describe('Gestão - Ranking e Ocorrências', () => {
   test('CT20 - Pagina de ranking de risco carrega', async ({ page }) => {
@@ -48,14 +49,20 @@ test.describe('Gestão - Registro de infrequências', () => {
   });
 
   test('CT-N3 - Chamada por turma registra faltas com confirmação', async ({ page }) => {
-    const limparFaltasDeHoje = () =>
-      fetch(
-        `${URL_SUPABASE}/rest/v1/frequencias?data_aula=eq.${new Date().toISOString().slice(0, 10)}&tipo_registro=eq.chamada_aula`,
-        {
-          method: 'DELETE',
-          headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` },
-        },
+    const hoje = new Date().toISOString().slice(0, 10);
+    const limparFaltasDeHoje = async () => {
+      await executar(
+        `delete from public.justificativas_faltas
+          where frequencia_id in (
+            select id from public.frequencias
+             where data_aula = $1 and tipo_registro = 'chamada_aula'
+          )`,
+        [hoje],
       );
+      await excluirLinhas('frequencias', "data_aula = $1 and tipo_registro = 'chamada_aula'", [
+        hoje,
+      ]);
+    };
     await limparFaltasDeHoje();
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/infrequencias');

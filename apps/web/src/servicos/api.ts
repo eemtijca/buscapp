@@ -58,15 +58,17 @@ async function interpretarResposta<T>(resposta: Response): Promise<T> {
 
   return dados as T;
 }
-
 /** Cliente tipado da API própria; usa cookies de sessão first-party. */
 export async function api<T>(caminho: string, opcoes: OpcoesRequisicao = {}): Promise<T> {
+  const temCorpo = opcoes.corpo !== undefined;
+  const cabecalhos: Record<string, string> = {};
+  if (!opcoes.formData && temCorpo) cabecalhos['Content-Type'] = 'application/json';
+
   const resposta = await fetch(montarUrl(caminho, opcoes.parametros), {
     method: opcoes.metodo ?? 'GET',
     credentials: 'include',
-    headers: opcoes.formData ? undefined : { 'Content-Type': 'application/json' },
-    body:
-      opcoes.formData ?? (opcoes.corpo !== undefined ? JSON.stringify(opcoes.corpo) : undefined),
+    headers: cabecalhos,
+    body: opcoes.formData ?? (temCorpo ? JSON.stringify(opcoes.corpo) : undefined),
   });
 
   return interpretarResposta<T>(resposta);

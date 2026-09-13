@@ -1,99 +1,95 @@
 import { test, expect } from '@playwright/test';
 import { login } from '../suporte/sessao.js';
-import {
-  SENHA_ADMIN,
-  SENHA_RESP,
-  SENHA_PROF,
-  SERVICE_KEY,
-  URL_SUPABASE,
-} from '../suporte/dados.js';
-import { restApi } from '../suporte/api.js';
+import { SENHA_ADMIN, SENHA_RESP, SENHA_PROF } from '../suporte/dados.js';
+import { apiFetch, loginApi, excluirLinhas, inserirLinhas } from '../suporte/api.js';
+import { consultar, executar } from '../suporte/banco.js';
 
-// Setup global de chat — cria conversas e mensagens idempotentes antes de todos os testes deste arquivo.
+// Setup global de chat — recria conversas e mensagens idempotentes antes de todos os testes deste arquivo.
+const RESPONSAVEL_ID = 'a0000000-0000-0000-0000-000000000005';
+const GESTAO_ID = 'a0000000-0000-0000-0000-000000000001';
+const ALUNO1_ID = 'e0000000-0000-0000-0000-000000000001';
+const ALUNO2_ID = 'e0000000-0000-0000-0000-000000000002';
+const TURMA_ID = 'd0000000-0000-0000-0000-000000000001';
+const CONV1_ID = 'f0000000-0000-0000-0000-000000000001';
+const CONV2_ID = 'f0000000-0000-0000-0000-000000000002';
+
 test.beforeAll(async () => {
-  const headers = {
-    'Content-Type': 'application/json',
-    apikey: SERVICE_KEY,
-    Authorization: `Bearer ${SERVICE_KEY}`,
-    Prefer: 'resolution=merge-duplicates,return=representation',
-  };
-  async function api(url: string, options: RequestInit = {}) {
-    const res = await fetch(`${URL_SUPABASE}${url}`, { headers, ...options });
-    if (!res.ok) {
-      const corpo = await res.text().catch(() => '');
-      throw new Error(
-        `Falha no setup do chat (${options.method ?? 'GET'} ${url}): ${res.status} ${corpo}`,
-      );
-    }
-    return res;
+  const anteriores = await consultar<{ id: string }>(
+    'select id from public.conversas where responsavel_id = $1 and aluno_id = any($2::uuid[])',
+    [RESPONSAVEL_ID, [ALUNO1_ID, ALUNO2_ID]],
+  );
+  if (anteriores.length > 0) {
+    await excluirLinhas('notificacoes', `metadados->>'conversa_id' = any($1::text[])`, [
+      anteriores.map((conversa) => conversa.id),
+    ]);
   }
-  const RESPONSAVEL_ID = 'a0000000-0000-0000-0000-000000000005';
-  const ALUNO1_ID = 'e0000000-0000-0000-0000-000000000001';
-  const ALUNO2_ID = 'e0000000-0000-0000-0000-000000000002';
-  async function upsertConversa(alunoId: string): Promise<string> {
-    const res = await api('/rest/v1/conversas?on_conflict=responsavel_id,aluno_id', {
-      method: 'POST',
-      body: JSON.stringify({
-        turma_id: 'd0000000-0000-0000-0000-000000000001',
-        responsavel_id: RESPONSAVEL_ID,
-        aluno_id: alunoId,
-        ativa: true,
-      }),
-    });
-    const data = (await res.json()) as { id: string }[];
-    const convId = data?.[0]?.id;
-    if (!convId) throw new Error('Falha ao capturar id da conversa no setup do chat.');
-    return convId;
-  }
-  const CONV1 = await upsertConversa(ALUNO1_ID);
-  await upsertConversa(ALUNO2_ID);
-  for (const msg of [
+  await excluirLinhas('conversas', 'responsavel_id = $1 and aluno_id = any($2::uuid[])', [
+    RESPONSAVEL_ID,
+    [ALUNO1_ID, ALUNO2_ID],
+  ]);
+
+  await inserirLinhas('conversas', [
+    {
+      id: CONV1_ID,
+      turma_id: TURMA_ID,
+      responsavel_id: RESPONSAVEL_ID,
+      aluno_id: ALUNO1_ID,
+      ativa: true,
+    },
+    {
+      id: CONV2_ID,
+      turma_id: TURMA_ID,
+      responsavel_id: RESPONSAVEL_ID,
+      aluno_id: ALUNO2_ID,
+      ativa: true,
+    },
+  ]);
+
+  await inserirLinhas('mensagens', [
     {
       id: 'f0000000-0000-0000-0000-000000000011',
-      conversa_id: CONV1,
-      remetente_id: 'a0000000-0000-0000-0000-000000000005',
+      conversa_id: CONV1_ID,
+      remetente_id: RESPONSAVEL_ID,
       conteudo: 'Bom dia, gostaria de saber como está meu filho',
       created_at: '2026-07-20T08:00:00Z',
     },
     {
       id: 'f0000000-0000-0000-0000-000000000012',
-      conversa_id: CONV1,
-      remetente_id: 'a0000000-0000-0000-0000-000000000001',
+      conversa_id: CONV1_ID,
+      remetente_id: GESTAO_ID,
       conteudo: 'Bom dia! O João está bem, participando das aulas.',
       created_at: '2026-07-20T08:15:00Z',
     },
     {
       id: 'f0000000-0000-0000-0000-000000000013',
-      conversa_id: CONV1,
+      conversa_id: CONV1_ID,
       remetente_id: 'a0000000-0000-0000-0000-000000000002',
       conteudo: 'Confirmo! Ele tem se destacado em matemática.',
       created_at: '2026-07-20T08:30:00Z',
     },
     {
       id: 'f0000000-0000-0000-0000-000000000014',
-      conversa_id: CONV1,
-      remetente_id: 'a0000000-0000-0000-0000-000000000005',
+      conversa_id: CONV1_ID,
+      remetente_id: RESPONSAVEL_ID,
       conteudo: 'Que bom! Obrigado pela atenção.',
       created_at: '2026-07-20T09:00:00Z',
     },
-  ]) {
-    await api('/rest/v1/mensagens?on_conflict=id', { method: 'POST', body: JSON.stringify(msg) });
-  }
-  await api(`/rest/v1/conversas?id=eq.${CONV1}`, {
-    method: 'PATCH',
-    body: JSON.stringify({ ultima_mensagem_em: '2026-07-20T09:00:00Z' }),
-  });
-  await api(`/rest/v1/notificacoes?metadados->>conversa_id=eq.${CONV1}`, { method: 'DELETE' });
-  await api('/rest/v1/notificacoes', {
-    method: 'POST',
-    body: JSON.stringify({
-      destinatario_id: 'a0000000-0000-0000-0000-000000000001',
+  ]);
+
+  await executar('update public.conversas set ultima_mensagem_em = $1 where id = $2', [
+    '2026-07-20T09:00:00Z',
+    CONV1_ID,
+  ]);
+  await excluirLinhas('notificacoes', `metadados->>'conversa_id' = $1`, [CONV1_ID]);
+  await inserirLinhas('notificacoes', [
+    {
+      destinatario_id: GESTAO_ID,
       tipo: 'mensagem',
       titulo: 'Nova mensagem de Maria Silva',
       corpo: 'Bom dia, gostaria de saber como está meu filho',
-      metadados: { conversa_id: CONV1 },
-    }),
-  });
+      metadados: { conversa_id: CONV1_ID },
+    },
+  ]);
 });
 
 test.describe('Responsável — Chat', () => {
@@ -138,10 +134,7 @@ test.describe('Responsável — Chat', () => {
     await expect(page.getByText('Nenhuma conversa encontrada')).toBeVisible();
   });
   test('CT71 - Input desabilitado fora do horário letivo (responsável)', async ({ page }) => {
-    await restApi('/rest/v1/horarios_letivos?ativo=eq.true', {
-      method: 'PATCH',
-      body: JSON.stringify({ ativo: false }),
-    });
+    await executar('update public.horarios_letivos set ativo = false where ativo = true');
     try {
       await login(page, 'resp1@email.com', SENHA_RESP);
       await page.goto('/responsavel/chat');
@@ -153,10 +146,9 @@ test.describe('Responsável — Chat', () => {
       await expect(textarea).toBeDisabled();
       await expect(page.locator('.alert-warning')).toBeVisible();
     } finally {
-      await restApi('/rest/v1/horarios_letivos?ativo=eq.false', {
-        method: 'PATCH',
-        body: JSON.stringify({ ativo: true }),
-      }).catch(() => {});
+      await executar('update public.horarios_letivos set ativo = true where ativo = false').catch(
+        () => {},
+      );
     }
   });
   test.skip('CT72 - Botão voltar aparece no mobile', async ({ page }) => {
@@ -197,44 +189,34 @@ test.describe('Gestão — Chat', () => {
   test('CT75 - Selecionar conversa exibe mensagens', async ({ page }) => {
     const marcador = `CT75-${Date.now()}`;
     const FA = 'e0000000-0000-0000-0000-000000000001';
-    const FT = 'd0000000-0000-0000-0000-000000000001';
     const FR = 'a0000000-0000-0000-0000-000000000005';
     let mensagemId = '';
     try {
-      const busca = await fetch(
-        `${URL_SUPABASE}/rest/v1/conversas?responsavel_id=eq.${FR}&aluno_id=eq.${FA}&select=id`,
-        { headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` } },
+      const { cookie } = await loginApi('gestao@escola.edu.br', SENHA_ADMIN);
+      const existentes = await consultar<{ id: string }>(
+        'select id from public.conversas where responsavel_id = $1 and aluno_id = $2',
+        [FR, FA],
       );
-      const existentes = (await busca.json()) as Array<{ id: string }>;
       let conversaId = existentes[0]?.id ?? '';
       if (!conversaId) {
-        conversaId = crypto.randomUUID();
-        await restApi('/rest/v1/conversas', {
-          method: 'POST',
-          body: JSON.stringify({
-            id: conversaId,
-            responsavel_id: FR,
-            aluno_id: FA,
-            turma_id: FT,
-            ativa: true,
-          }),
+        const criada = await apiFetch('/api/conversas', {
+          metodo: 'POST',
+          cookie,
+          corpo: { aluno_id: FA, responsavel_id: FR },
         });
+        if (!criada.ok) {
+          throw new Error(`Setup conversa: ${criada.status} ${await criada.text()}`);
+        }
+        conversaId = ((await criada.json()) as { conversa: { id: string } }).conversa.id;
       }
-      const msgRes = await restApi('/rest/v1/mensagens?select=id', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          apikey: SERVICE_KEY,
-          Authorization: `Bearer ${SERVICE_KEY}`,
-          Prefer: 'return=representation',
-        },
-        body: JSON.stringify({
-          conversa_id: conversaId,
-          remetente_id: 'a0000000-0000-0000-0000-000000000001',
-          conteudo: `${marcador} mensagem de histórico.`,
-        }),
+      const msgRes = await apiFetch(`/api/conversas/${conversaId}/mensagens`, {
+        metodo: 'POST',
+        cookie,
+        corpo: { conteudo: `${marcador} mensagem de histórico.` },
       });
-      mensagemId = ((await msgRes.json()) as Array<{ id: string }>)[0]?.id ?? '';
+      if (!msgRes.ok) throw new Error(`Setup mensagem: ${msgRes.status} ${await msgRes.text()}`);
+      mensagemId = ((await msgRes.json()) as { mensagem: { id: string } }).mensagem.id;
+
       await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
       await page.goto('/gestao/chat');
       const item = page.locator('.chat-sidebar button').filter({ hasText: marcador });
@@ -245,13 +227,9 @@ test.describe('Gestão — Chat', () => {
       });
     } finally {
       if (mensagemId) {
-        await restApi(`/rest/v1/mensagens?id=eq.${mensagemId}`, { method: 'DELETE' }).catch(
-          () => {},
-        );
+        await excluirLinhas('mensagens', 'id = $1', [mensagemId]).catch(() => {});
       }
-      await restApi(`/rest/v1/notificacoes?corpo=ilike.*${marcador}*`, { method: 'DELETE' }).catch(
-        () => {},
-      );
+      await excluirLinhas('notificacoes', 'corpo ilike $1', [`%${marcador}%`]).catch(() => {});
     }
   });
   test('CT76 - Header de navegação com título chat', async ({ page }) => {

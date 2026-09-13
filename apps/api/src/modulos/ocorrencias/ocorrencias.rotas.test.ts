@@ -5,7 +5,6 @@ import { construirApp } from '../../app.js';
 import { prisma } from '../../nucleo/banco/cliente.js';
 import { gerarHashSenha } from '../../nucleo/autenticacao/senhas.js';
 
-const ANO_LETIVO_ID = 'b0000000-0000-0000-0000-000000000001';
 const DISCIPLINA_MATEMATICA = 'c0000000-0000-0000-0000-000000000004';
 const marcador = Date.now();
 
@@ -32,6 +31,7 @@ const alunosIds = [alunoTurmaId, alunoForaId, alunoFilhoId];
 const perfisIds = [gestaoId, profComId, profSemId, respComId, respSemId];
 
 let app: FastifyInstance;
+let anoPrivadoId: string;
 let cookieGestao: string;
 let cookieProfCom: string;
 let cookieProfSem: string;
@@ -90,8 +90,35 @@ async function criarOcorrenciaViaApi(
   return resposta.json().ocorrencia;
 }
 
+/** Isola as listagens do seed canônico, preservando apenas as ocorrências criadas por esta suíte. */
+function apenasOcorrenciasDoTeste(ocorrencias: Array<{ id: string }>): string[] {
+  const doTeste = [ocorrenciaTurmaId, ocorrenciaForaId, ocorrenciaFilhoId];
+  return ocorrencias.map((ocorrencia) => ocorrencia.id).filter((id) => doTeste.includes(id));
+}
+
+/** Cria um ano letivo exclusivo da suíte para isolar as turmas do seed canônico. */
+async function criarAnoLetivoPrivado(): Promise<string> {
+  const existentes = await prisma.anos_letivos.findMany({ select: { ano: true } });
+  const usados = new Set(existentes.map((registro) => registro.ano));
+  let ano = 2100;
+  while (usados.has(ano)) ano -= 1;
+  if (ano < 2000) throw new Error('Não há ano letivo disponível para os testes.');
+
+  const criado = await prisma.anos_letivos.create({
+    data: {
+      ano,
+      status: 'planejado',
+      data_inicio: new Date(`${ano}-02-01`),
+      data_fim: new Date(`${ano}-12-20`),
+      ativo: false,
+    },
+  });
+  return criado.id;
+}
+
 beforeAll(async () => {
   app = await construirApp();
+  anoPrivadoId = await criarAnoLetivoPrivado();
 
   await criarPerfil(gestaoId, emails.gestao, 'gestao', []);
   await criarPerfil(profComId, emails.profCom, 'professor', ['ocorrencias']);
@@ -103,7 +130,7 @@ beforeAll(async () => {
     data: [
       {
         id: turmaProfId,
-        ano_letivo_id: ANO_LETIVO_ID,
+        ano_letivo_id: anoPrivadoId,
         serie: '1ª',
         letra: 'A',
         nome_completo: `1ª A ${marcador}`,
@@ -111,7 +138,7 @@ beforeAll(async () => {
       },
       {
         id: turmaForaId,
-        ano_letivo_id: ANO_LETIVO_ID,
+        ano_letivo_id: anoPrivadoId,
         serie: '2ª',
         letra: 'B',
         nome_completo: `2ª B ${marcador}`,
@@ -140,9 +167,9 @@ beforeAll(async () => {
 
   await prisma.enturmacoes.createMany({
     data: [
-      { aluno_id: alunoTurmaId, turma_id: turmaProfId, ano_letivo_id: ANO_LETIVO_ID },
-      { aluno_id: alunoForaId, turma_id: turmaForaId, ano_letivo_id: ANO_LETIVO_ID },
-      { aluno_id: alunoFilhoId, turma_id: turmaForaId, ano_letivo_id: ANO_LETIVO_ID },
+      { aluno_id: alunoTurmaId, turma_id: turmaProfId, ano_letivo_id: anoPrivadoId },
+      { aluno_id: alunoForaId, turma_id: turmaForaId, ano_letivo_id: anoPrivadoId },
+      { aluno_id: alunoFilhoId, turma_id: turmaForaId, ano_letivo_id: anoPrivadoId },
     ],
   });
 
@@ -199,6 +226,7 @@ afterAll(async () => {
   });
   await prisma.alunos.deleteMany({ where: { id: { in: alunosIds } } });
   await prisma.turmas.deleteMany({ where: { id: { in: [turmaProfId, turmaForaId] } } });
+  await prisma.anos_letivos.delete({ where: { id: anoPrivadoId } }).catch(() => {});
   await prisma.sessoes.deleteMany({ where: { perfil_id: { in: perfisIds } } });
   await prisma.perfis.deleteMany({ where: { id: { in: perfisIds } } });
   await app.close();
@@ -298,14 +326,18 @@ describe('GET /api/ocorrencias', () => {
       cookies: { buscapp_sessao: cookieGestao },
     });
     expect(porTipo.statusCode).toBe(200);
-    expect(porTipo.json().ocorrencias.length).toBe(3);
+    const idsPorTipo = apenasOcorrenciasDoTeste(porTipo.json().ocorrencias);
+    expect(idsPorTipo).toHaveLength(3);
+    expect(idsPorTipo).toEqual(
+      expect.arrayContaining([ocorrenciaTurmaId, ocorrenciaForaId, ocorrenciaFilhoId]),
+    );
 
     const porTipoSuspensao = await app.inject({
       method: 'GET',
       url: '/api/ocorrencias?tipo=suspensao',
       cookies: { buscapp_sessao: cookieGestao },
     });
-    expect(porTipoSuspensao.json().ocorrencias.map((o: { id: string }) => o.id)).toEqual([
+    expect(apenasOcorrenciasDoTeste(porTipoSuspensao.json().ocorrencias)).toEqual([
       ocorrenciaForaId,
     ]);
 
@@ -324,7 +356,8 @@ describe('GET /api/ocorrencias', () => {
       url: '/api/ocorrencias?status=aberta',
       cookies: { buscapp_sessao: cookieGestao },
     });
-    expect(abertas.json().ocorrencias.length).toBe(3);
+    expect(abertas.statusCode).toBe(200);
+    expect(apenasOcorrenciasDoTeste(abertas.json().ocorrencias)).toHaveLength(3);
   });
 });
 
@@ -350,7 +383,7 @@ describe('GET /api/ocorrencias/:id', () => {
       id: ocorrenciaTurmaId,
       aluno_id: alunoTurmaId,
       turma_id: turmaProfId,
-      ano_letivo_id: ANO_LETIVO_ID,
+      ano_letivo_id: anoPrivadoId,
       professor_id: profComId,
       status: 'aberta',
     });
@@ -429,7 +462,7 @@ describe('POST /api/ocorrencias', () => {
     expect(ocorrencia).toMatchObject({
       aluno_id: alunoTurmaId,
       turma_id: turmaProfId,
-      ano_letivo_id: ANO_LETIVO_ID,
+      ano_letivo_id: anoPrivadoId,
       professor_id: gestaoId,
       status: 'aberta',
       exige_presenca_responsavel: true,
@@ -526,7 +559,7 @@ describe('registros de comportamento', () => {
       aluno_id: alunoTurmaId,
       professor_id: profComId,
       turma_id: turmaProfId,
-      ano_letivo_id: ANO_LETIVO_ID,
+      ano_letivo_id: anoPrivadoId,
       descricao: 'Ajudou os colegas durante a atividade em grupo.',
     });
     expect(registro.aluno).toEqual({ id: alunoTurmaId, nome: 'Aluno Turma' });

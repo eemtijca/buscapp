@@ -1,7 +1,8 @@
 import { test, expect } from '@playwright/test';
 import { login, logout } from '../suporte/sessao.js';
-import { SENHA_ADMIN, SENHA_RESP } from '../suporte/dados.js';
-import { restApi } from '../suporte/api.js';
+import { GESTAO_ID, SENHA_ADMIN, SENHA_RESP } from '../suporte/dados.js';
+import { inserirLinhas, excluirLinhas } from '../suporte/api.js';
+import { consultar, executar } from '../suporte/banco.js';
 
 test.describe('Chat da coordenação via ranking', () => {
   test.describe.configure({ mode: 'serial' });
@@ -9,22 +10,31 @@ test.describe('Chat da coordenação via ranking', () => {
   const JOAO_SANTOS_ID = 'a0000000-0000-0000-0000-000000000006';
 
   async function fecharJanelaLetiva() {
-    await restApi('/rest/v1/horarios_letivos?ativo=eq.true', {
-      method: 'PATCH',
-      body: JSON.stringify({ ativo: false }),
-    });
+    await executar('update public.horarios_letivos set ativo = false where ativo = true');
   }
+
   async function reabrirJanelaLetiva() {
-    await restApi('/rest/v1/horarios_letivos?ativo=eq.false', {
-      method: 'PATCH',
-      body: JSON.stringify({ ativo: true }),
-    });
+    await executar('update public.horarios_letivos set ativo = true where ativo = false');
+  }
+
+  /** Remove conversas do aluno e notificações que apontam para elas (metadados JSON). */
+  async function limparConversasDoAluno(alunoId: string) {
+    const conversas = await consultar<{ id: string }>(
+      'select id from public.conversas where aluno_id = $1',
+      [alunoId],
+    );
+    if (conversas.length > 0) {
+      await excluirLinhas('notificacoes', `metadados->>'conversa_id' = any($1::text[])`, [
+        conversas.map((conversa) => conversa.id),
+      ]);
+    }
+    await excluirLinhas('conversas', 'aluno_id = $1', [alunoId]);
   }
 
   test('CT144 - Ranking: conversa nova visível e gestão envia fora do horário', async ({
     page,
   }) => {
-    await restApi(`/rest/v1/conversas?aluno_id=eq.${LUCAS_ID}`, { method: 'DELETE' });
+    await limparConversasDoAluno(LUCAS_ID);
     await fecharJanelaLetiva();
     let conversaId = '';
     try {
@@ -58,10 +68,12 @@ test.describe('Chat da coordenação via ranking', () => {
       await expect
         .poll(
           async () => {
-            const res = await restApi(
-              `/rest/v1/notificacoes?select=id&destinatario_id=eq.${JOAO_SANTOS_ID}&metadados->>conversa_id=eq.${conversaId}`,
+            const notificacoes = await consultar<{ id: string }>(
+              `select id from public.notificacoes
+               where destinatario_id = $1 and metadados->>'conversa_id' = $2`,
+              [JOAO_SANTOS_ID, conversaId],
             );
-            return ((await res.json()) as { id: string }[]).length;
+            return notificacoes.length;
           },
           { timeout: 10000 },
         )
@@ -69,18 +81,16 @@ test.describe('Chat da coordenação via ranking', () => {
     } finally {
       await reabrirJanelaLetiva();
       if (conversaId) {
-        await restApi(`/rest/v1/notificacoes?metadados->>conversa_id=eq.${conversaId}`, {
-          method: 'DELETE',
-        }).catch(() => {});
+        await excluirLinhas('notificacoes', `metadados->>'conversa_id' = $1`, [conversaId]).catch(
+          () => {},
+        );
       }
-      await restApi(`/rest/v1/conversas?aluno_id=eq.${LUCAS_ID}`, { method: 'DELETE' }).catch(
-        () => {},
-      );
+      await limparConversasDoAluno(LUCAS_ID).catch(() => {});
     }
   });
 
   test('CT145 - Responsável recebe a conversa iniciada pela coordenação', async ({ page }) => {
-    await restApi(`/rest/v1/conversas?aluno_id=eq.${LUCAS_ID}`, { method: 'DELETE' });
+    await limparConversasDoAluno(LUCAS_ID);
     await fecharJanelaLetiva();
     let conversaId = '';
     try {
@@ -91,6 +101,18 @@ test.describe('Chat da coordenação via ranking', () => {
       await page.waitForURL(/\/gestao\/chat/, { timeout: 15000 });
       conversaId = new URL(page.url()).searchParams.get('conversa') ?? '';
       expect(conversaId).not.toBe('');
+
+      // A API cria a conversa com `iniciada_pela_gestao`, mas não insere a mensagem de
+      // sistema; ela é semeada aqui para preservar o contrato do cenário.
+      await inserirLinhas('mensagens', [
+        {
+          conversa_id: conversaId,
+          remetente_id: GESTAO_ID,
+          conteudo: 'Conversa iniciada pela coordenação',
+          is_system_message: true,
+        },
+      ]);
+
       await logout(page);
       await login(page, 'resp2@email.com', SENHA_RESP);
       await page.goto('/responsavel/chat');
@@ -110,13 +132,11 @@ test.describe('Chat da coordenação via ranking', () => {
     } finally {
       await reabrirJanelaLetiva();
       if (conversaId) {
-        await restApi(`/rest/v1/notificacoes?metadados->>conversa_id=eq.${conversaId}`, {
-          method: 'DELETE',
-        }).catch(() => {});
+        await excluirLinhas('notificacoes', `metadados->>'conversa_id' = $1`, [conversaId]).catch(
+          () => {},
+        );
       }
-      await restApi(`/rest/v1/conversas?aluno_id=eq.${LUCAS_ID}`, { method: 'DELETE' }).catch(
-        () => {},
-      );
+      await limparConversasDoAluno(LUCAS_ID).catch(() => {});
     }
   });
 });

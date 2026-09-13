@@ -110,7 +110,15 @@ function validarNome(): boolean {
     erroValidacao.value = r.mensagemPadrao ?? 'Formato inválido.';
     return false;
   }
-  // Unicidade de rótulo/chave é validada pelo servidor (409); a mensagem retornada é exibida.
+  const duplicada = opcoes.value.some(
+    (opcao) =>
+      opcao.id !== editandoId.value &&
+      opcao.rotulo.trim().toLowerCase() === rotulo.trim().toLowerCase(),
+  );
+  if (duplicada) {
+    erroValidacao.value = `Já existe uma opção chamada "${rotulo}".`;
+    return false;
+  }
   return true;
 }
 

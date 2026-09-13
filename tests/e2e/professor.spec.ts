@@ -73,7 +73,7 @@ test.describe('Professor - Ocorrência com tags', () => {
   test('CT57 - Tags carregam do banco e descrição se preenche', async ({ page }) => {
     await login(page, 'prof1@escola.edu.br', SENHA_PROF);
     await page.goto('/professor/ocorrencia');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
     await page.waitForSelector('input[type="checkbox"]', { timeout: 15000 });
     await expect(async () => {
       const checkbox = page.locator('input[type="checkbox"]').first();

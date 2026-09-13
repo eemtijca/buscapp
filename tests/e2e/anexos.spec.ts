@@ -1,12 +1,10 @@
 import { test, expect } from '@playwright/test';
 import { login } from '../suporte/sessao.js';
-import { SENHA_ADMIN, SENHA_RESP, SERVICE_KEY, URL_SUPABASE } from '../suporte/dados.js';
+import { SENHA_ADMIN, SENHA_RESP } from '../suporte/dados.js';
+import { apiFetch, loginApi, inserirLinhas, excluirLinhas } from '../suporte/api.js';
 
 test.describe('Gestão/Responsável — Visualizador de anexo (blob)', () => {
-  const JUST_ID = '10000000-0000-0000-0000-000000000001';
-  const ANEXO_ID = '20000000-0000-0000-0000-000000000001';
   const FREQ_ID = '30000000-0000-0000-0000-000000000001';
-  const RESP_ID = 'a0000000-0000-0000-0000-000000000005';
   const ALUNO_ID = 'e0000000-0000-0000-0000-000000000001';
   const TURMA_ID = 'd0000000-0000-0000-0000-000000000001';
   const PROF_ID = 'a0000000-0000-0000-0000-000000000002';
@@ -15,76 +13,49 @@ test.describe('Gestão/Responsável — Visualizador de anexo (blob)', () => {
   const PERIODO = 'Manhã';
   const TIPO_REGISTRO = 'chamada_aula';
   const NOME_ARQUIVO = 'comprovante.png';
-  const STORAGE_PATH = `${RESP_ID}/blobtest/comprovante-${Date.now()}.png`;
-
-  async function seedApi(url: string, options: RequestInit = {}) {
-    const res = await fetch(`${URL_SUPABASE}${url}`, {
-      headers: {
-        'Content-Type': 'application/json',
-        apikey: SERVICE_KEY,
-        Authorization: `Bearer ${SERVICE_KEY}`,
-        Prefer: 'resolution=merge-duplicates,return=representation',
-      },
-      ...options,
-    });
-    if (!res.ok) throw new Error(`Setup ${options.method ?? 'GET'} ${url}: ${res.status}`);
-    return res;
-  }
+  const MOTIVO = 'Anexo para testes do visualizador (blob).';
 
   test.beforeAll(async () => {
-    const loginRes = await fetch(`${URL_SUPABASE}/auth/v1/token?grant_type=password`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', apikey: SERVICE_KEY },
-      body: JSON.stringify({ email: 'resp1@email.com', password: SENHA_RESP }),
-    });
-    if (!loginRes.ok) throw new Error(`Setup login resp1: ${loginRes.status}`);
-    const { access_token: tokenResp } = (await loginRes.json()) as { access_token: string };
+    // Remove fixtures de execuções anteriores para o visualizador não listar duplicatas.
+    await excluirLinhas('justificativas_faltas', 'aluno_id = $1 and data_falta = $2', [
+      ALUNO_ID,
+      DATA_FALTA,
+    ]);
+    await excluirLinhas(
+      'frequencias',
+      'aluno_id = $1 and data_aula = $2 and periodo = $3 and tipo_registro = $4',
+      [ALUNO_ID, DATA_FALTA, PERIODO, TIPO_REGISTRO],
+    );
+
+    const { cookie } = await loginApi('resp1@email.com', SENHA_RESP);
+
     const png = Buffer.from(
       'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
       'base64',
     );
-    const upload = await fetch(`${URL_SUPABASE}/storage/v1/object/justificativas/${STORAGE_PATH}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'image/png',
-        apikey: SERVICE_KEY,
-        Authorization: `Bearer ${tokenResp}`,
-      },
-      body: png,
-    });
-    if (!upload.ok) throw new Error(`Setup upload anexo: ${upload.status}`);
-    await seedApi('/rest/v1/anexos?on_conflict=id', {
-      method: 'POST',
-      body: JSON.stringify({
-        id: ANEXO_ID,
-        storage_path: STORAGE_PATH,
-        nome_arquivo: NOME_ARQUIVO,
-        mime_type: 'image/png',
-        tamanho_bytes: png.length,
-        criado_por: RESP_ID,
-      }),
-    });
-    await seedApi('/rest/v1/justificativas_faltas?on_conflict=id', {
-      method: 'POST',
-      body: JSON.stringify({
-        id: JUST_ID,
-        responsavel_id: RESP_ID,
+    const formData = new FormData();
+    formData.append('arquivo', new Blob([png], { type: 'image/png' }), NOME_ARQUIVO);
+
+    const upload = await apiFetch('/api/anexos', { metodo: 'POST', formData, cookie });
+    if (!upload.ok) throw new Error(`Setup upload anexo: ${upload.status} ${await upload.text()}`);
+    const { anexo } = (await upload.json()) as { anexo: { id: string } };
+
+    const justificativa = await apiFetch('/api/justificativas', {
+      metodo: 'POST',
+      cookie,
+      corpo: {
         aluno_id: ALUNO_ID,
         data_falta: DATA_FALTA,
-        motivo: 'Anexo para testes do visualizador (blob).',
-      }),
+        motivo: MOTIVO,
+        anexo_ids: [anexo.id],
+      },
     });
-    await seedApi('/rest/v1/justificativa_anexos?on_conflict=justificativa_id,anexo_id', {
-      method: 'POST',
-      body: JSON.stringify({ justificativa_id: JUST_ID, anexo_id: ANEXO_ID }),
-    });
-    await seedApi(
-      `/rest/v1/frequencias?aluno_id=eq.${ALUNO_ID}&data_aula=eq.${DATA_FALTA}&periodo=eq.${PERIODO}&tipo_registro=eq.${TIPO_REGISTRO}`,
-      { method: 'DELETE' },
-    );
-    await seedApi('/rest/v1/frequencias?on_conflict=client_request_id', {
-      method: 'POST',
-      body: JSON.stringify({
+    if (!justificativa.ok) {
+      throw new Error(`Setup justificativa: ${justificativa.status} ${await justificativa.text()}`);
+    }
+
+    await inserirLinhas('frequencias', [
+      {
         id: FREQ_ID,
         client_request_id: FREQ_ID,
         aluno_id: ALUNO_ID,
@@ -95,14 +66,14 @@ test.describe('Gestão/Responsável — Visualizador de anexo (blob)', () => {
         periodo: PERIODO,
         tipo_registro: TIPO_REGISTRO,
         status: 'ausente',
-      }),
-    });
+      },
+    ]);
   });
 
   test('CT22A - Gestão: Ver anexo abre modal com imagem via blob (sem token)', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/justificativas');
-    const item = page.locator('article').filter({ hasText: 'Anexo para testes do visualizador' });
+    const item = page.locator('article').filter({ hasText: MOTIVO });
     const botao = item.getByRole('button', { name: /Ver anexo/ });
     await expect(botao).toBeVisible({ timeout: 10000 });
     await botao.click();
@@ -119,7 +90,7 @@ test.describe('Gestão/Responsável — Visualizador de anexo (blob)', () => {
   test('CT22B - Gestão: modal mostra nome e botão Baixar', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/justificativas');
-    const item = page.locator('article').filter({ hasText: 'Anexo para testes do visualizador' });
+    const item = page.locator('article').filter({ hasText: MOTIVO });
     await item.getByRole('button', { name: /Ver anexo/ }).click();
     const modal = page.locator('.modal.show');
     await expect(modal.locator('img')).toBeVisible({ timeout: 10000 });
@@ -133,7 +104,7 @@ test.describe('Gestão/Responsável — Visualizador de anexo (blob)', () => {
   test('CT22C - Gestão: Fechar encerra o modal', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/justificativas');
-    const item = page.locator('article').filter({ hasText: 'Anexo para testes do visualizador' });
+    const item = page.locator('article').filter({ hasText: MOTIVO });
     await item.getByRole('button', { name: /Ver anexo/ }).click();
     const modal = page.locator('.modal.show');
     await expect(modal).toBeVisible();

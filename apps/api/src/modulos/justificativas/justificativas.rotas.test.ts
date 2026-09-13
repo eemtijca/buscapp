@@ -5,7 +5,6 @@ import { construirApp } from '../../app.js';
 import { prisma } from '../../nucleo/banco/cliente.js';
 import { gerarHashSenha } from '../../nucleo/autenticacao/senhas.js';
 
-const ANO_LETIVO_ID = 'b0000000-0000-0000-0000-000000000001';
 const DISCIPLINA_MATEMATICA = 'c0000000-0000-0000-0000-000000000004';
 const DATA_FALTA = '2026-09-10';
 const DATA_FIM = '2026-09-11';
@@ -35,6 +34,7 @@ const emails = {
 };
 
 let app: FastifyInstance;
+let anoPrivadoId: string;
 let cookieGestao: string;
 let cookieProfCom: string;
 let cookieProfSem: string;
@@ -87,8 +87,29 @@ function dataCivil(data: Date): string {
   return data.toISOString().slice(0, 10);
 }
 
+/** Cria um ano letivo exclusivo da suíte para isolar as turmas do seed canônico. */
+async function criarAnoLetivoPrivado(): Promise<string> {
+  const existentes = await prisma.anos_letivos.findMany({ select: { ano: true } });
+  const usados = new Set(existentes.map((registro) => registro.ano));
+  let ano = 2100;
+  while (usados.has(ano)) ano -= 1;
+  if (ano < 2000) throw new Error('Não há ano letivo disponível para os testes.');
+
+  const criado = await prisma.anos_letivos.create({
+    data: {
+      ano,
+      status: 'planejado',
+      data_inicio: new Date(`${ano}-02-01`),
+      data_fim: new Date(`${ano}-12-20`),
+      ativo: false,
+    },
+  });
+  return criado.id;
+}
+
 beforeAll(async () => {
   app = await construirApp();
+  anoPrivadoId = await criarAnoLetivoPrivado();
 
   await criarPerfil(gestaoId, emails.gestao, 'gestao');
   await criarPerfil(profComId, emails.profCom, 'professor', ['frequencia', 'ocorrencias']);
@@ -99,7 +120,7 @@ beforeAll(async () => {
   await prisma.turmas.create({
     data: {
       id: turmaId,
-      ano_letivo_id: ANO_LETIVO_ID,
+      ano_letivo_id: anoPrivadoId,
       serie: '2ª',
       letra: 'A',
       nome_completo: '2ª A',
@@ -109,7 +130,7 @@ beforeAll(async () => {
   await prisma.turmas.create({
     data: {
       id: turmaAlheiaId,
-      ano_letivo_id: ANO_LETIVO_ID,
+      ano_letivo_id: anoPrivadoId,
       serie: '2ª',
       letra: 'B',
       nome_completo: '2ª B',
@@ -135,10 +156,10 @@ beforeAll(async () => {
   });
 
   await prisma.enturmacoes.create({
-    data: { aluno_id: alunoVisivelId, turma_id: turmaId, ano_letivo_id: ANO_LETIVO_ID },
+    data: { aluno_id: alunoVisivelId, turma_id: turmaId, ano_letivo_id: anoPrivadoId },
   });
   await prisma.enturmacoes.create({
-    data: { aluno_id: alunoForaId, turma_id: turmaAlheiaId, ano_letivo_id: ANO_LETIVO_ID },
+    data: { aluno_id: alunoForaId, turma_id: turmaAlheiaId, ano_letivo_id: anoPrivadoId },
   });
 
   await prisma.vinculos_responsaveis.create({
@@ -154,7 +175,7 @@ beforeAll(async () => {
         aluno_id: alunoVisivelId,
         professor_id: profComId,
         turma_id: turmaId,
-        ano_letivo_id: ANO_LETIVO_ID,
+        ano_letivo_id: anoPrivadoId,
         data_aula: paraData(DATA_FALTA),
         periodo: '1º Horário',
         status: 'ausente',
@@ -163,7 +184,7 @@ beforeAll(async () => {
         aluno_id: alunoVisivelId,
         professor_id: profComId,
         turma_id: turmaId,
-        ano_letivo_id: ANO_LETIVO_ID,
+        ano_letivo_id: anoPrivadoId,
         data_aula: paraData(DATA_FALTA),
         periodo: '2º Horário',
         status: 'ausente',
@@ -172,7 +193,7 @@ beforeAll(async () => {
         aluno_id: alunoVisivelId,
         professor_id: profComId,
         turma_id: turmaId,
-        ano_letivo_id: ANO_LETIVO_ID,
+        ano_letivo_id: anoPrivadoId,
         data_aula: paraData(DATA_FORA),
         periodo: '1º Horário',
         status: 'ausente',
@@ -245,6 +266,7 @@ afterAll(async () => {
   });
   await prisma.alunos.deleteMany({ where: { id: { in: [alunoVisivelId, alunoForaId] } } });
   await prisma.turmas.deleteMany({ where: { id: { in: [turmaId, turmaAlheiaId] } } });
+  await prisma.anos_letivos.delete({ where: { id: anoPrivadoId } }).catch(() => {});
   await prisma.sessoes.deleteMany({
     where: { perfil_id: { in: [gestaoId, profComId, profSemId, respComId, respSemId] } },
   });

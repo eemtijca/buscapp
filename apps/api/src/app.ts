@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import cookie from '@fastify/cookie';
+import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
 import fastifyStatic from '@fastify/static';
 import Fastify, { type FastifyError, type FastifyInstance } from 'fastify';
@@ -9,7 +10,7 @@ import {
   validatorCompiler,
   type ZodTypeProvider,
 } from 'fastify-type-provider-zod';
-import { ambiente } from './ambiente.js';
+import { ambiente, origensPermitidas } from './ambiente.js';
 import { ErroHttp } from './nucleo/http/erros.js';
 import { rotasEventos } from './nucleo/http/rotas-eventos.js';
 import { rotasSaude } from './nucleo/http/rotas-saude.js';
@@ -64,6 +65,11 @@ export async function construirApp(): Promise<FastifyInstance> {
   });
 
   await app.register(cookie);
+  await app.register(cors, {
+    origin: origensPermitidas,
+    credentials: true,
+    methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  });
   await app.register(multipart, { limits: { fileSize: 10 * 1024 * 1024, files: 1 } });
   await app.register(rotasSaude);
   await app.register(rotasEventos);

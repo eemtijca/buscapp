@@ -5,7 +5,6 @@ import { construirApp } from '../../app.js';
 import { prisma } from '../../nucleo/banco/cliente.js';
 import { gerarHashSenha } from '../../nucleo/autenticacao/senhas.js';
 
-const ANO_LETIVO_ID = 'b0000000-0000-0000-0000-000000000001';
 const marcador = Date.now();
 
 const gestaoId = randomUUID();
@@ -17,6 +16,7 @@ const emails = {
 };
 
 let app: FastifyInstance;
+let anoPrivadoId: string;
 let cookieGestao: string;
 let cookieProfessor: string;
 let configuracaoInicial: Awaited<ReturnType<typeof prisma.configuracoes_sistema.findUniqueOrThrow>>;
@@ -56,8 +56,29 @@ async function criarPerfil(
   });
 }
 
+/** Cria um ano letivo exclusivo da suíte para isolar as turmas do seed canônico. */
+async function criarAnoLetivoPrivado(): Promise<string> {
+  const existentes = await prisma.anos_letivos.findMany({ select: { ano: true } });
+  const usados = new Set(existentes.map((registro) => registro.ano));
+  let ano = 2100;
+  while (usados.has(ano)) ano -= 1;
+  if (ano < 2000) throw new Error('Não há ano letivo disponível para os testes.');
+
+  const criado = await prisma.anos_letivos.create({
+    data: {
+      ano,
+      status: 'planejado',
+      data_inicio: new Date(`${ano}-02-01`),
+      data_fim: new Date(`${ano}-12-20`),
+      ativo: false,
+    },
+  });
+  return criado.id;
+}
+
 beforeAll(async () => {
   app = await construirApp();
+  anoPrivadoId = await criarAnoLetivoPrivado();
 
   await criarPerfil(gestaoId, emails.gestao, 'gestao');
   await criarPerfil(professorId, emails.professor, 'professor');
@@ -95,6 +116,7 @@ afterAll(async () => {
   await prisma.horarios_letivos.deleteMany({
     where: { dia_semana: 6, hora_inicio: new Date('1970-01-01T20:30:00.000Z') },
   });
+  await prisma.anos_letivos.delete({ where: { id: anoPrivadoId } }).catch(() => {});
   await prisma.sessoes.deleteMany({
     where: { perfil_id: { in: [gestaoId, professorId] } },
   });
@@ -461,7 +483,7 @@ describe('tags de comportamento', () => {
     });
     const turma = await prisma.turmas.create({
       data: {
-        ano_letivo_id: ANO_LETIVO_ID,
+        ano_letivo_id: anoPrivadoId,
         serie: '1ª',
         letra: 'A',
         nome_completo: `Turma Tag ${marcador}`,
@@ -472,7 +494,7 @@ describe('tags de comportamento', () => {
       data: {
         aluno_id: aluno.id,
         turma_id: turma.id,
-        ano_letivo_id: ANO_LETIVO_ID,
+        ano_letivo_id: anoPrivadoId,
         titulo: `Ocorrência tag ${marcador}`,
         descricao: 'Ocorrência criada para referenciar a tag de teste.',
         tipo: [],

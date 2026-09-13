@@ -30,7 +30,11 @@ export function publicarEvento(evento: EventoInvalidacao): void {
   }
 }
 
-export function conectarEventos(usuarioId: string, resposta: FastifyReply): void {
+export function conectarEventos(
+  usuarioId: string,
+  resposta: FastifyReply,
+  origemPermitida?: string,
+): void {
   resposta.hijack();
   const bruto = resposta.raw;
 
@@ -39,6 +43,13 @@ export function conectarEventos(usuarioId: string, resposta: FastifyReply): void
     'Cache-Control': 'no-cache, no-transform',
     Connection: 'keep-alive',
     'X-Accel-Buffering': 'no',
+    ...(origemPermitida
+      ? {
+          'Access-Control-Allow-Origin': origemPermitida,
+          'Access-Control-Allow-Credentials': 'true',
+          Vary: 'Origin',
+        }
+      : {}),
   });
   bruto.write(': conectado\n\n');
 

@@ -1,17 +1,18 @@
 import { test, expect } from '@playwright/test';
-import { login } from '../suporte/sessao.js';
-import { SENHA_ADMIN, SENHA_PROF } from '../suporte/dados.js';
-import { garantirFuncoes, encerrarFuncoes, restaurarSenha } from '../suporte/sessao.js';
+import { login, restaurarSenha } from '../suporte/sessao.js';
+import {
+  PROF1_ID,
+  PROF2_ID,
+  RESP1_ID,
+  SENHA_ADMIN,
+  SENHA_PROF,
+  SENHA_RESP,
+} from '../suporte/dados.js';
 
 test.beforeAll(async () => {
-  await restaurarSenha('a0000000-0000-0000-0000-000000000002', SENHA_PROF);
-  await restaurarSenha('a0000000-0000-0000-0000-000000000003', SENHA_PROF);
-  await restaurarSenha('a0000000-0000-0000-0000-000000000005', process.env.SEED_SENHA_RESP!);
-  await garantirFuncoes();
-});
-
-test.afterAll(() => {
-  encerrarFuncoes();
+  await restaurarSenha(PROF1_ID, SENHA_PROF);
+  await restaurarSenha(PROF2_ID, SENHA_PROF);
+  await restaurarSenha(RESP1_ID, SENHA_RESP);
 });
 
 test.describe('Autenticação', () => {

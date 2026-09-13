@@ -13,6 +13,7 @@ export const codigoRedefinicaoSchema = z.object({
   expira_em: z.string(),
   created_at: z.string(),
   status: statusCodigoSchema,
+  bloqueado: z.boolean(),
 });
 
 export type CodigoRedefinicao = z.infer<typeof codigoRedefinicaoSchema>;

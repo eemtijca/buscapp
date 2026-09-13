@@ -13,6 +13,7 @@ import { ErroHttp } from './nucleo/http/erros.js';
 import { rotasSaude } from './nucleo/http/rotas-saude.js';
 import { rotasAlunos } from './modulos/alunos/alunos.rotas.js';
 import { rotasAuth } from './modulos/auth/auth.rotas.js';
+import { rotasUsuarios } from './modulos/usuarios/usuarios.rotas.js';
 
 /** Monta a aplicação Fastify; exposta separadamente para testes com `inject`. */
 export async function construirApp(): Promise<FastifyInstance> {
@@ -53,6 +54,7 @@ export async function construirApp(): Promise<FastifyInstance> {
   await app.register(rotasSaude);
   await app.register(rotasAuth);
   await app.register(rotasAlunos);
+  await app.register(rotasUsuarios);
 
   const distWeb = path.resolve(process.cwd(), ambiente.WEB_DIST);
   if (existsSync(path.join(distWeb, 'index.html'))) {

@@ -65,9 +65,10 @@ Usuários de desenvolvimento: `gestao@escola.edu.br` / `Admin123!`,
 - [x] Fase 1B — Fastify + Prisma 7.10 + Docker Compose + baseline do schema
 - [x] Fase 1C — workflows de qualidade, testes, migrações e publicação
 - [x] Fase 2 — autenticação própria (sessões, senhas, códigos HMAC) + dados canônicos + seed
-- [~] Fase 3 — data layer por domínio: autorização por escopo e domínio `alunos` concluídos;
-  demais domínios pendentes (usuários, frequências, ocorrências, justificativas, anexos,
-  chat, notificações, configurações, estrutura escolar, monitoramento)
+- [~] Fase 3 — data layer por domínio: autorização por escopo e domínios `alunos` e
+  `usuarios` concluídos; demais domínios pendentes (frequências, ocorrências,
+  justificativas, anexos, chat, notificações, configurações, estrutura escolar,
+  monitoramento)
 - [ ] Fase 4 — cutover do frontend para cookies
 - [ ] Fase 5 — armazenamento e SSE
 - [ ] Fase 6 — remoção do Supabase (SDK, CLI, edge functions, skills, docs)

@@ -26,7 +26,12 @@
     "test:db": "bash scripts/test-db.sh",
     "test:typecheck": "run-s type-check",
     "test:lint": "run-s lint:*",
-    "test:build": "run-s build-only"
+    "test:build": "run-s build-only",
+    "dev:api": "npm run dev -w @buscapp/api",
+    "db:generate": "npm run generate -w @buscapp/api",
+    "db:migrate": "npm run migrate:deploy -w @buscapp/api",
+    "compose:up": "docker compose up -d --build",
+    "compose:down": "docker compose down"
   },
   "devDependencies": {
     "@playwright/test": "^1.61.1",

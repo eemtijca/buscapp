@@ -1,0 +1,16 @@
+node_modules
+**/node_modules
+**/dist
+**/generated
+**/coverage
+.git
+.github
+.env
+.env.*
+!.env.example
+uploads
+supabase/.temp
+test-results
+playwright-report
+blob-report
+.playwright

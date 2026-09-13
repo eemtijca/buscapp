@@ -3,9 +3,8 @@ import { computed, onMounted, ref, watch, nextTick } from 'vue';
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router';
 import { useGestaoUsuarios } from '@/composables/useGestaoUsuarios';
 import { useOpcoesConfiguracao } from '@/composables/useOpcoesConfiguracao';
-import { useAnoLetivo } from '@/composables/useAnoLetivo';
 import { useFormSnapshot } from '@/composables/useFormSnapshot';
-import { supabaseClient } from '@/servicos/supabase';
+import { api } from '@/servicos/api';
 import {
   mensagemSucesso as criarMensagemSucesso,
   mensagemErroExplicita,
@@ -18,12 +17,44 @@ import ModalConfirmacao from '@/componentes/ModalConfirmacao.vue';
 import type { Turma, Enturmacao, VinculoResponsavel } from '@/tipos/database';
 import type { OpcaoCheckbox } from '@/tipos/componentes';
 
+interface EnturmacaoApi {
+  id: string;
+  aluno_id: string;
+  turma_id: string;
+  ano_letivo_id: string;
+  status: string;
+  data_matricula: string;
+  data_encerramento: string | null;
+  observacoes: string | null;
+  created_at: string;
+  updated_at: string;
+  turma: { id: string; nome_completo: string };
+}
+
+interface VinculoApi {
+  id: string;
+  responsavel_id: string;
+  aluno_id: string;
+  tipo_relacao: string;
+  contato_prioritario: boolean;
+  ativo: boolean;
+  created_at: string;
+  responsavel_nome?: string | null;
+}
+
 const route = useRoute();
 const router = useRouter();
-const { buscarAlunos, buscarTurmas, buscarUsuarios, criarAluno, atualizarAluno, carregando, erro } =
-  useGestaoUsuarios();
+const {
+  buscarAlunos,
+  buscarTurmas,
+  buscarUsuarios,
+  criarAluno,
+  atualizarAluno,
+  criarUsuario,
+  carregando,
+  erro,
+} = useGestaoUsuarios();
 const { buscarOpcoes } = useOpcoesConfiguracao();
-const { buscarAnoLetivoAtivo } = useAnoLetivo();
 
 const modoEdicao = ref(false);
 const alunoId = ref<string | null>(null);
@@ -252,37 +283,59 @@ function mostrarSucesso(msg: string) {
 
 async function carregarEnturmacao() {
   if (!alunoId.value) return;
-  const { data: enturmacoes } = await supabaseClient
-    .from('enturmacoes')
-    .select('*, turmas!enturmacoes_turma_id_fkey(nome_completo)')
-    .eq('aluno_id', alunoId.value)
-    .eq('status', 'matriculado')
-    .order('created_at', { ascending: false })
-    .limit(1);
-  if (enturmacoes && enturmacoes.length > 0) {
-    enturmacaoAtual.value = enturmacoes[0] as unknown as Enturmacao;
-    turmaAtualNome.value =
-      ((enturmacoes[0] as Record<string, unknown>).turmas as Record<string, string> | null)
-        ?.nome_completo ?? '';
+  try {
+    const { enturmacoes } = await api<{ enturmacoes: EnturmacaoApi[] }>('/api/enturmacoes', {
+      parametros: { aluno_id: alunoId.value, status: 'matriculado' },
+    });
+    const atual = enturmacoes[0];
+    if (atual) {
+      enturmacaoAtual.value = {
+        id: atual.id,
+        aluno_id: atual.aluno_id,
+        turma_id: atual.turma_id,
+        ano_letivo_id: atual.ano_letivo_id,
+        status: atual.status,
+        data_matricula: atual.data_matricula,
+        data_encerramento: atual.data_encerramento,
+        observacoes: atual.observacoes,
+        created_at: atual.created_at,
+        updated_at: atual.updated_at,
+      };
+      turmaAtualNome.value = atual.turma?.nome_completo ?? '';
+    } else {
+      enturmacaoAtual.value = null;
+      turmaAtualNome.value = '';
+    }
+  } catch (e) {
+    console.error('[AlunoFormView] Erro ao carregar enturmação:', e);
   }
 }
 
 async function carregarVinculos() {
   if (!alunoId.value) return;
-  const { data: vinculosData } = await supabaseClient
-    .from('vinculos_responsaveis')
-    .select('*, perfis!vinculos_responsaveis_responsavel_id_fkey(nome, email)')
-    .eq('aluno_id', alunoId.value)
-    .eq('ativo', true);
-  if (vinculosData) {
-    vinculos.value = vinculosData.map((v: Record<string, unknown>) => ({
-      ...v,
-      responsavel_nome: (v.perfis as Record<string, string> | null)?.nome ?? '—',
-      responsavel_email: (v.perfis as Record<string, string> | null)?.email ?? '—',
-    })) as unknown as (VinculoResponsavel & {
-      responsavel_nome?: string;
-      responsavel_email?: string;
-    })[];
+  try {
+    const { vinculos: vinculosApi } = await api<{ vinculos: VinculoApi[] }>('/api/vinculos', {
+      parametros: { aluno_id: alunoId.value, ativo: 'true' },
+    });
+    const responsaveis = await buscarUsuarios({ papel: 'responsavel' });
+    const responsavelPorId = new Map(responsaveis.map((r) => [r.id, r]));
+    vinculos.value = vinculosApi.map((v) => {
+      const responsavel = responsavelPorId.get(v.responsavel_id);
+      return {
+        id: v.id,
+        responsavel_id: v.responsavel_id,
+        aluno_id: v.aluno_id,
+        tipo_relacao: v.tipo_relacao,
+        contato_prioritario: v.contato_prioritario,
+        ativo: v.ativo,
+        created_at: v.created_at,
+        updated_at: v.created_at,
+        responsavel_nome: v.responsavel_nome ?? responsavel?.nome ?? '—',
+        responsavel_email: responsavel?.email ?? '—',
+      };
+    });
+  } catch (e) {
+    console.error('[AlunoFormView] Erro ao carregar vínculos:', e);
   }
 }
 
@@ -293,49 +346,23 @@ async function salvarAlterarEnturmacao() {
   }
   salvando.value = true;
   try {
-    const anoLetivo = await buscarAnoLetivoAtivo();
-    if (!anoLetivo) {
-      mostrarErro('Nenhum ano letivo ativo encontrado.');
-      return;
-    }
-    const anoLetivoId = anoLetivo.id;
-
-    if (enturmacaoAtual.value && enturmacaoAtual.value.ano_letivo_id === anoLetivoId) {
-      // Reaproveita a linha existente para respeitar a unicidade de aluno e ano letivo.
-      const { error } = await supabaseClient
-        .from('enturmacoes')
-        .update({
-          turma_id: novaTurmaId.value,
-          status: 'matriculado',
-          data_encerramento: null,
-          data_matricula: novaDataMatricula.value,
-        })
-        .eq('id', enturmacaoAtual.value.id);
-      if (error) {
-        mostrarErro('Falha ao alterar enturmação.');
-        return;
-      }
-    } else {
-      if (enturmacaoAtual.value) {
-        await supabaseClient
-          .from('enturmacoes')
-          .update({ status: 'transferido', data_encerramento: hoje() })
-          .eq('id', enturmacaoAtual.value.id);
-      }
-      const { error } = await supabaseClient.from('enturmacoes').insert({
+    // O servidor reutiliza a linha do ano letivo (unicidade de aluno e ano) ou
+    // encerra a matrícula anterior e cria a nova — tudo em transação.
+    await api('/api/enturmacoes', {
+      metodo: 'POST',
+      corpo: {
         aluno_id: alunoId.value,
         turma_id: novaTurmaId.value,
-        ano_letivo_id: anoLetivoId,
-        status: 'matriculado',
         data_matricula: novaDataMatricula.value,
-      });
-      if (error) {
-        mostrarErro('Falha ao alterar enturmação.');
-        return;
-      }
-    }
+      },
+    });
     alterarEnturmacao.value = false;
     await carregarEnturmacao();
+    mostrarSucesso('Enturmação alterada com sucesso.');
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'Falha ao alterar enturmação.';
+    console.error('[AlunoFormView] Erro ao alterar enturmação:', msg);
+    mostrarErro(msg);
   } finally {
     salvando.value = false;
   }
@@ -347,76 +374,59 @@ async function salvarNovoResponsavel() {
   try {
     let responsavelId: string | null = null;
     if (novoRespTipo.value === 'existente') {
-      if (!novoRespEmail.value.trim()) {
+      const email = novoRespEmail.value.trim();
+      if (!email) {
         mostrarErro('Informe o e-mail do responsável.');
         return;
       }
-      const { data: perfis } = await supabaseClient
-        .from('perfis')
-        .select('id')
-        .eq('email', novoRespEmail.value.trim())
-        .limit(1);
-      if (!perfis || perfis.length === 0) {
+      const usuarios = await buscarUsuarios({ busca: email });
+      const encontrado = usuarios.find(
+        (u) => (u.email ?? '').toLowerCase() === email.toLowerCase(),
+      );
+      if (!encontrado) {
         mostrarErro('Nenhum usuário encontrado com esse e-mail.');
         return;
       }
-      const perfilEncontrado = perfis[0];
-      if (!perfilEncontrado) {
-        mostrarErro('Nenhum usuário encontrado com esse e-mail.');
-        return;
-      }
-      responsavelId = perfilEncontrado.id;
+      responsavelId = encontrado.id;
     } else {
       if (!novoRespNome.value.trim() || !novoRespEmail.value.trim()) {
         mostrarErro('Nome e e-mail são obrigatórios.');
         return;
       }
-      const { data: sessionData } = await supabaseClient.auth.getSession();
-      const token = sessionData?.session?.access_token;
-      if (!token) {
-        mostrarErro('Sessão expirada.');
-        return;
-      }
-      const funcaoUrl =
-        import.meta.env.VITE_EDGE_FUNCTIONS_URL ??
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
-      const resp = await fetch(`${funcaoUrl}/criar-usuario`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          nome: novoRespNome.value.trim(),
-          email: novoRespEmail.value.trim(),
-          papel: 'responsavel',
-          telefone: novoRespTelefone.value.trim() || null,
-        }),
+      const criado = await criarUsuario({
+        nome: novoRespNome.value.trim(),
+        email: novoRespEmail.value.trim(),
+        papel: 'responsavel',
+        telefone: novoRespTelefone.value.trim() || undefined,
       });
-      const resultado = await resp.json();
-      if (!resp.ok || !resultado.id) {
-        mostrarErro(resultado.error || 'Falha ao criar responsável.');
+      if (!criado.id) {
+        mostrarErro(erro.value || 'Falha ao criar responsável.');
         return;
       }
-      responsavelId = resultado.id;
+      responsavelId = criado.id;
     }
-    const { error: errVinculo } = await supabaseClient.from('vinculos_responsaveis').insert({
-      responsavel_id: responsavelId,
-      aluno_id: alunoId.value,
-      tipo_relacao: novoTipoVinculo.value as VinculoResponsavel['tipo_relacao'],
-      contato_prioritario: vinculos.value.length === 0,
-      ativo: true,
+
+    await api('/api/vinculos', {
+      metodo: 'POST',
+      corpo: {
+        responsavel_id: responsavelId,
+        aluno_id: alunoId.value,
+        tipo_relacao: novoTipoVinculo.value,
+        contato_prioritario: vinculos.value.length === 0,
+      },
     });
-    if (errVinculo) {
-      mostrarErro('Falha ao vincular responsável.');
-      return;
-    }
+
     adicionarResponsavel.value = false;
     novoRespEmail.value = '';
     novoRespNome.value = '';
     novoRespTelefone.value = '';
     novoTipoVinculo.value = 'outro';
     await carregarVinculos();
+    mostrarSucesso('Responsável vinculado com sucesso.');
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'Falha ao vincular responsável.';
+    console.error('[AlunoFormView] Erro ao vincular responsável:', msg);
+    mostrarErro(msg);
   } finally {
     salvando.value = false;
   }
@@ -441,21 +451,13 @@ onMounted(async () => {
       matricula.value = aluno.matricula;
       status.value = aluno.status;
       dataNascimento.value = aluno.data_nascimento ?? '';
-    }
-    const { data: alunoFull } = await supabaseClient
-      .from('alunos')
-      .select(
-        'codigo_inep, data_matricula, transporte_escolar, alimentacao_diferenciada, necessidades_especiais, documentos_recebidos',
-      )
-      .eq('id', id)
-      .single();
-    if (alunoFull) {
-      codigoInep.value = alunoFull.codigo_inep ?? '';
-      if (alunoFull.data_matricula) dataMatricula.value = alunoFull.data_matricula.slice(0, 10);
-      transporteEscolar.value = alunoFull.transporte_escolar ?? false;
-      alimentacaoDiferenciada.value = alunoFull.alimentacao_diferenciada ?? false;
-      necessidadesEspeciais.value = alunoFull.necessidades_especiais ?? false;
-      documentosRecebidos.value = alunoFull.documentos_recebidos ?? [];
+      codigoInep.value = aluno.codigo_inep ?? '';
+      if (aluno.data_matricula) dataMatricula.value = aluno.data_matricula.slice(0, 10);
+      observacoes.value = aluno.observacoes ?? '';
+      transporteEscolar.value = aluno.transporte_escolar;
+      alimentacaoDiferenciada.value = aluno.alimentacao_diferenciada;
+      necessidadesEspeciais.value = aluno.necessidades_especiais;
+      documentosRecebidos.value = aluno.documentos_recebidos;
     }
     await Promise.all([carregarEnturmacao(), carregarVinculos()]);
   } else {
@@ -597,7 +599,10 @@ async function salvar() {
         updates.necessidades_especiais = necessidadesEspeciais.value;
         updates.documentos_recebidos = documentosRecebidos.value;
         if (Object.keys(updates).length) {
-          await supabaseClient.from('alunos').update(updates).eq('id', id);
+          await atualizarAluno(
+            id,
+            updates as Parameters<typeof atualizarAluno>[1] & typeof updates,
+          );
         }
         limparDraft();
         resetSnapshot();

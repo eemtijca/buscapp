@@ -7,12 +7,13 @@ import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh';
 import CartaoAlertaResponsavel from '@/componentes/CartaoAlertaResponsavel.vue';
 import VisualizadorAnexo from '@/componentes/VisualizadorAnexo.vue';
 import type { AlertaResponsavel } from '@/tipos/componentes';
-import { supabaseClient } from '@/servicos/supabase';
+import type { TagComportamento } from '@/tipos/database';
+import { api } from '@/servicos/api';
 
 const router = useRouter();
 const route = useRoute();
 const { usuario } = useAutenticacao();
-const { buscarAlertasResponsavel } = useMonitoramento();
+const { buscarAlertasResponsavel, buscarJustificativasPendentes } = useMonitoramento();
 const {
   ultimaAtualizacao,
   estaAtualizando,
@@ -24,20 +25,42 @@ const {
 const alertas = ref<AlertaResponsavel[]>([]);
 const alertaSelecionado = ref<AlertaResponsavel | null>(null);
 const mostrarModal = ref(false);
-const anexoSelecionado = ref<{ path: string; nome: string; mime?: string } | null>(null);
+const anexoSelecionado = ref<{ id: string; nome: string; mime?: string } | null>(null);
 
 const tagsMap = ref<Record<string, { rotulo: string; icone: string }>>({});
 
+// O alerta expõe o `storage_path` do anexo, mas o download autenticado exige o id.
+let anexoIdPorPath = new Map<string, string>();
+
 async function carregarTags() {
-  const { data } = await supabaseClient
-    .from('tags_comportamento')
-    .select('nome, icone, descricao')
-    .eq('ativo', true);
-  const map: Record<string, { rotulo: string; icone: string }> = {};
-  for (const t of data ?? []) {
-    map[t.nome] = { rotulo: t.descricao ?? t.nome, icone: t.icone ?? 'tag' };
+  try {
+    const { tags } = await api<{ tags: TagComportamento[] }>('/api/tags-comportamento', {
+      parametros: { ativo: 'true' },
+    });
+    const map: Record<string, { rotulo: string; icone: string }> = {};
+    for (const t of tags) {
+      map[t.nome] = { rotulo: t.descricao ?? t.nome, icone: t.icone ?? 'tag' };
+    }
+    tagsMap.value = map;
+  } catch (e) {
+    console.error('[AlertasView] Erro ao carregar as tags de comportamento:', e);
+    tagsMap.value = {};
   }
-  tagsMap.value = map;
+}
+
+/** Associa o caminho de armazenamento do anexo ao id usado no endpoint de download. */
+async function carregarAnexos() {
+  try {
+    const justificativas = await buscarJustificativasPendentes();
+    const mapa = new Map<string, string>();
+    for (const j of justificativas) {
+      if (j.anexoPath && j.anexoId) mapa.set(j.anexoPath, j.anexoId);
+    }
+    anexoIdPorPath = mapa;
+  } catch (e) {
+    console.error('[AlertasView] Erro ao mapear anexos das justificativas:', e);
+    anexoIdPorPath = new Map();
+  }
 }
 
 function abrirJustificativa(payload: { alertaId: string; frequenciaId?: string }) {
@@ -48,13 +71,14 @@ function abrirJustificativa(payload: { alertaId: string; frequenciaId?: string }
 
 function verAnexo(alertaId: string) {
   const alerta = alertas.value.find((a) => a.id === alertaId);
-  if (alerta?.anexoPath) {
-    anexoSelecionado.value = {
-      path: alerta.anexoPath,
-      nome: alerta.anexoNome ?? 'anexo',
-      mime: alerta.anexoMime,
-    };
-  }
+  if (!alerta?.anexoPath) return;
+  const anexoId = anexoIdPorPath.get(alerta.anexoPath);
+  if (!anexoId) return;
+  anexoSelecionado.value = {
+    id: anexoId,
+    nome: alerta.anexoNome ?? 'anexo',
+    mime: alerta.anexoMime,
+  };
 }
 
 function verDetalhes(alertaId: string) {
@@ -71,11 +95,11 @@ function fecharModal() {
 }
 
 async function carregarAlertas() {
-  if (usuario.value) {
-    alertas.value = await buscarAlertasResponsavel(usuario.value.id);
-    await nextTick();
-    destacarAlertaDeepLink();
-  }
+  if (!usuario.value) return;
+  const [lista] = await Promise.all([buscarAlertasResponsavel(usuario.value.id), carregarAnexos()]);
+  alertas.value = lista;
+  await nextTick();
+  destacarAlertaDeepLink();
 }
 
 /** Destaca os alertas via ?aluno= (deep-link da notificação). */
@@ -403,7 +427,7 @@ onUnmounted(() => {
 
     <VisualizadorAnexo
       :aberto="!!anexoSelecionado"
-      :storage-path="anexoSelecionado?.path ?? ''"
+      :anexo-id="anexoSelecionado?.id ?? ''"
       :nome-arquivo="anexoSelecionado?.nome ?? ''"
       :mime-type="anexoSelecionado?.mime"
       @fechar="anexoSelecionado = null"

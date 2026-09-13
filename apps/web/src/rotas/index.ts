@@ -1,5 +1,4 @@
 import { createRouter, createWebHistory } from 'vue-router';
-import { supabaseClient, decodificarToken } from '@/servicos/supabase';
 import { useAutenticacao } from '@/composables/useAutenticacao';
 import { iniciarNavegacao, finalizarNavegacao } from '@/composables/useNavegacao';
 import LayoutPrincipal from '@/layouts/LayoutPrincipal.vue';
@@ -381,35 +380,22 @@ const router = createRouter({
 
 router.beforeEach(async (to, _from) => {
   iniciarNavegacao(to);
-  const {
-    data: { session },
-  } = await supabaseClient.auth.getSession();
+  const { usuario, garantirUsuario } = useAutenticacao();
 
-  let perfilPapel: string | null = null;
-  let perfilStatus: string | null = null;
-  let perfilModulos: string[] = [];
+  // Recupera a sessão por cookie antes de qualquer decisão de rota.
+  await garantirUsuario();
 
-  if (session) {
-    // Lê o papel das claims do JWT emitidas pelo Custom Access Token Hook.
-    const claims = decodificarToken(session.access_token);
-    perfilPapel = (claims?.papel as string) ?? null;
-
-    // Consulta status e módulos do perfil para as validações da rota.
-    const { data } = await supabaseClient
-      .from('perfis')
-      .select('status, acesso_modulos')
-      .eq('id', session.user.id)
-      .single();
-    perfilStatus = (data as { status?: string } | null)?.status ?? null;
-    perfilModulos = (data as { acesso_modulos?: string[] } | null)?.acesso_modulos ?? [];
-  }
+  const perfil = usuario.value;
+  const perfilPapel = perfil?.papel ?? null;
+  const perfilStatus = perfil?.status ?? null;
+  const perfilModulos = perfil?.acesso_modulos ?? [];
 
   // Conta desativada permanece apenas na tela própria.
-  if (session && perfilStatus === 'inativo' && to.name !== 'conta-desativada') {
+  if (perfil && perfilStatus === 'inativo' && to.name !== 'conta-desativada') {
     return { name: 'conta-desativada' };
   }
 
-  if (session && to.path === '/') {
+  if (perfil && to.path === '/') {
     const destino = perfilPapel ? homePorPapel[perfilPapel] : '/';
     if (destino !== to.path) {
       return destino;
@@ -418,13 +404,9 @@ router.beforeEach(async (to, _from) => {
   }
 
   if (to.meta?.requerAutenticacao) {
-    if (!session) {
+    if (!perfil) {
       return { name: 'login' };
     }
-
-    const { garantirUsuario } = useAutenticacao();
-    // Views montam com usuario já pronto; evita telas que não carregam nem inscrevem realtime.
-    await garantirUsuario();
 
     const papeisPermitidos = to.meta.papeisPermitidos;
 

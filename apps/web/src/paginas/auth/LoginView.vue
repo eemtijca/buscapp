@@ -2,7 +2,6 @@
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAutenticacao } from '@/composables/useAutenticacao';
-import { armazenamento } from '@/servicos/supabase';
 import { traduzirErro } from '@/utils/traduzirErro';
 
 const router = useRouter();
@@ -30,10 +29,8 @@ async function handleLogin(): Promise<void> {
   carregando.value = true;
   erro.value = null;
 
-  armazenamento.definirLembrar(lembrar.value);
-
   try {
-    await login(email.value.trim(), senha.value);
+    await login(email.value.trim(), senha.value, lembrar.value);
 
     // Após o login o perfil já está carregado em usuario.value pelo composable.
     const papel = usuario.value?.papel;

@@ -1,14 +1,6 @@
 import { ref, type Ref } from 'vue';
-import { supabaseClient } from '@/servicos/supabase';
-import { useAnoLetivo } from '@/composables/useAnoLetivo';
-import type {
-  Aluno,
-  CodigoRedefinicao,
-  Perfil,
-  Turma,
-  VinculoResponsavel,
-  Disciplina,
-} from '@/tipos/database';
+import { api, ErroApi } from '@/servicos/api';
+import type { Disciplina, Turma } from '@/tipos/database';
 import type {
   UsuarioItem,
   AlunoItem,
@@ -18,10 +10,92 @@ import type {
   DadosCriacaoAluno,
 } from '@/tipos/componentes';
 
+interface UsuarioDto {
+  id: string;
+  nome: string;
+  email: string | null;
+  papel: UsuarioItem['papel'];
+  status: UsuarioItem['status'];
+  telefone: string | null;
+  cargo: string | null;
+  notificacoes_ativas: boolean;
+  acesso_modulos: string[];
+  ultimo_acesso_em: string | null;
+}
+
+interface AlunoDto {
+  id: string;
+  nome: string;
+  matricula: string;
+  codigo_inep: string | null;
+  status: AlunoItem['status'];
+  observacoes: string | null;
+  data_nascimento: string | null;
+  data_matricula: string | null;
+  transporte_escolar: boolean;
+  alimentacao_diferenciada: boolean;
+  necessidades_especiais: boolean;
+  documentos_recebidos: string[];
+}
+
+interface EnturmacaoDto {
+  id: string;
+  aluno_id: string;
+  turma_id: string;
+  ano_letivo_id: string;
+  status: string;
+  data_matricula: string;
+  data_encerramento: string | null;
+  observacoes: string | null;
+  created_at: string;
+  updated_at: string;
+  turma: { id: string; nome_completo: string };
+  ano_letivo: { id: string; ano: number };
+}
+
+interface VinculoDto {
+  id: string;
+  responsavel_id: string;
+  aluno_id: string;
+  tipo_relacao: string;
+  contato_prioritario: boolean;
+  ativo: boolean;
+  created_at: string;
+  responsavel_nome?: string | null;
+}
+
+interface CodigoDto {
+  id: string;
+  email: string;
+  perfil_id: string;
+  perfil_nome: string | null;
+  usado_em: string | null;
+  revogado_em: string | null;
+  expira_em: string;
+  created_at: string;
+  status: CodigoGerado['status'];
+}
+
+interface NotificacaoDto {
+  id: string;
+  tipo: string;
+  metadados: Record<string, unknown> | null;
+  created_at: string;
+}
+
+function mensagemDeErro(erroCapturado: unknown, padrao: string): string {
+  if (erroCapturado instanceof ErroApi) return erroCapturado.message;
+  if (erroCapturado instanceof Error && erroCapturado.message) return erroCapturado.message;
+  return padrao;
+}
+
+function hojeIso(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
 export function useGestaoUsuarios() {
   const carregando: Ref<boolean> = ref(false);
   const erro: Ref<string | null> = ref(null);
-  const { buscarAnoLetivoAtivo } = useAnoLetivo();
 
   // Usuários (perfis)
 
@@ -33,35 +107,27 @@ export function useGestaoUsuarios() {
     carregando.value = true;
     erro.value = null;
     try {
-      let query = supabaseClient.from('perfis').select('*').order('nome');
+      const parametros: Record<string, string> = {};
+      if (filtro?.papel && filtro.papel !== 'todos') parametros.papel = filtro.papel;
+      if (filtro?.status && filtro.status !== 'todos') parametros.status = filtro.status;
+      if (filtro?.busca) parametros.busca = filtro.busca;
 
-      if (filtro?.papel && filtro.papel !== 'todos') {
-        query = query.eq('papel', filtro.papel);
-      }
-      if (filtro?.status && filtro.status !== 'todos') {
-        query = query.eq('status', filtro.status);
-      }
-      if (filtro?.busca) {
-        query = query.or(`nome.ilike.%${filtro.busca}%,email.ilike.%${filtro.busca}%`);
-      }
+      const { usuarios } = await api<{ usuarios: UsuarioDto[] }>('/api/usuarios', { parametros });
 
-      const { data, error: err } = await query;
-      if (err) throw err;
-
-      return ((data ?? []) as unknown as Perfil[]).map((p) => ({
-        id: p.id,
-        nome: p.nome,
-        email: p.email,
-        papel: p.papel,
-        status: p.status,
-        telefone: p.telefone,
-        cargo: p.cargo,
-        ultimo_acesso: p.ultimo_acesso_em,
-        notificacoes_ativas: p.notificacoes_ativas,
-        acesso_modulos: p.acesso_modulos ?? [],
+      return usuarios.map((u) => ({
+        id: u.id,
+        nome: u.nome,
+        email: u.email,
+        papel: u.papel,
+        status: u.status,
+        telefone: u.telefone,
+        cargo: u.cargo,
+        ultimo_acesso: u.ultimo_acesso_em,
+        notificacoes_ativas: u.notificacoes_ativas,
+        acesso_modulos: u.acesso_modulos ?? [],
       }));
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
+      const msg = mensagemDeErro(e, 'Não foi possível carregar a lista de usuários.');
       console.error('[useGestaoUsuarios] Erro ao buscar usuários:', msg);
       erro.value = 'Não foi possível carregar a lista de usuários.';
       return [];
@@ -76,37 +142,23 @@ export function useGestaoUsuarios() {
     carregando.value = true;
     erro.value = null;
     try {
-      const { data: sessionData } = await supabaseClient.auth.getSession();
-      const token = sessionData?.session?.access_token;
-      if (!token) throw new Error('Sessão não encontrada.');
-
-      const funcaoUrl =
-        import.meta.env.VITE_EDGE_FUNCTIONS_URL ??
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
-      const url = `${funcaoUrl}/criar-usuario`;
-
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
+      const resultado = await api<{
+        usuario: UsuarioDto;
+        codigo: string;
+        senha_temporaria: string;
+      }>('/api/usuarios', {
+        metodo: 'POST',
+        corpo: {
           nome: dados.nome,
           email: dados.email,
           papel: dados.papel,
           telefone: dados.telefone ?? null,
           cargo: dados.cargo ?? null,
-        }),
+        },
       });
-
-      const resultado = await response.json();
-      if (!response.ok) {
-        throw new Error(resultado.error ?? 'Erro ao criar usuário.');
-      }
-      return { id: resultado.id as string, codigo: (resultado.codigo as string) ?? null };
+      return { id: resultado.usuario.id, codigo: resultado.codigo ?? null };
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
+      const msg = mensagemDeErro(e, 'Falha ao criar usuário.');
       console.error('[useGestaoUsuarios] Erro ao criar usuário:', msg);
       erro.value = msg;
       return { id: null, codigo: null };
@@ -115,40 +167,42 @@ export function useGestaoUsuarios() {
     }
   }
 
-  function mensagemErroAtualizacao(e: unknown): string {
-    const err = e as { code?: string; constraint?: string } | null;
-    if (err?.code === '23514') {
-      if (err.constraint === 'chk_perfis_modulos_catalogo') {
-        return 'Módulo de acesso inválido. Recarregue a página e revise os módulos selecionados.';
-      }
-      return 'Dados inválidos. Verifique os campos e tente novamente.';
-    }
-    return 'Falha ao atualizar usuário.';
-  }
-
   async function atualizarUsuario(
     id: string,
     dados: Partial<{
       nome: string;
+      email: string;
       telefone: string;
       cargo: string;
       status: string;
+      notificacoes_ativas: boolean;
       acesso_modulos: string[];
     }>,
   ): Promise<boolean> {
     carregando.value = true;
     erro.value = null;
     try {
-      const { error: err } = await supabaseClient
-        .from('perfis')
-        .update(dados as Record<string, unknown>)
-        .eq('id', id);
-      if (err) throw err;
+      const { status, ...dadosCadastrais } = dados;
+      if (Object.keys(dadosCadastrais).length > 0) {
+        await api<{ usuario: UsuarioDto }>(`/api/usuarios/${id}`, {
+          metodo: 'PUT',
+          corpo: dadosCadastrais,
+        });
+      }
+      if (status) {
+        if (status !== 'ativo' && status !== 'inativo') {
+          throw new Error('Apenas os status "ativo" e "inativo" podem ser definidos manualmente.');
+        }
+        await api<{ usuario: UsuarioDto }>(`/api/usuarios/${id}/status`, {
+          metodo: 'PATCH',
+          corpo: { status },
+        });
+      }
       return true;
     } catch (e) {
-      const msg = e instanceof Error ? e.message : JSON.stringify(e);
+      const msg = mensagemDeErro(e, 'Falha ao atualizar usuário.');
       console.error('[useGestaoUsuarios] Erro ao atualizar usuário:', msg);
-      erro.value = mensagemErroAtualizacao(e);
+      erro.value = msg;
       return false;
     } finally {
       carregando.value = false;
@@ -169,56 +223,38 @@ export function useGestaoUsuarios() {
     carregando.value = true;
     erro.value = null;
     try {
-      let query = supabaseClient.from('alunos').select('*').order('nome');
+      const parametros: Record<string, string> = {};
+      if (filtro?.status && filtro.status !== 'todos') parametros.status = filtro.status;
+      if (filtro?.busca) parametros.busca = filtro.busca;
 
-      if (filtro?.status && filtro.status !== 'todos') {
-        query = query.eq('status', filtro.status);
-      }
-      if (filtro?.busca) {
-        query = query.or(`nome.ilike.%${filtro.busca}%,matricula.ilike.%${filtro.busca}%`);
-      }
+      const [{ alunos }, { enturmacoes }] = await Promise.all([
+        api<{ alunos: AlunoDto[] }>('/api/alunos', { parametros }),
+        api<{ enturmacoes: EnturmacaoDto[] }>('/api/enturmacoes', {
+          parametros: { status: 'matriculado' },
+        }),
+      ]);
 
-      const { data, error: err } = await query;
-      if (err) throw err;
+      const turmaPorAluno = new Map(
+        enturmacoes.map((e) => [e.aluno_id, e.turma?.nome_completo ?? null]),
+      );
 
-      const alunos = (data ?? []) as unknown as Aluno[];
-      const alunoIds = alunos.map((a) => a.id);
-
-      const { data: enturmacoes } = await supabaseClient
-        .from('enturmacoes')
-        .select('aluno_id, turma_id')
-        .in('aluno_id', alunoIds)
-        .eq('status', 'matriculado');
-
-      const turmaIds = [...new Set((enturmacoes ?? []).map((e) => e.turma_id))];
-      const { data: turmas } = await supabaseClient
-        .from('turmas')
-        .select('id, nome_completo')
-        .in('id', turmaIds);
-
-      const turmaMap = new Map((turmas ?? []).map((t) => [t.id, t.nome_completo]));
-      const enturmacaoMap = new Map((enturmacoes ?? []).map((e) => [e.aluno_id, e.turma_id]));
-
-      return alunos.map((a) => {
-        const turmaId = enturmacaoMap.get(a.id);
-        return {
-          id: a.id,
-          nome: a.nome,
-          matricula: a.matricula,
-          turma: turmaId ? (turmaMap.get(turmaId) ?? null) : null,
-          status: a.status,
-          data_nascimento: a.data_nascimento,
-          codigo_inep: a.codigo_inep,
-          data_matricula: a.data_matricula,
-          observacoes: a.observacoes,
-          transporte_escolar: a.transporte_escolar,
-          alimentacao_diferenciada: a.alimentacao_diferenciada,
-          necessidades_especiais: a.necessidades_especiais,
-          documentos_recebidos: a.documentos_recebidos ?? [],
-        };
-      });
+      return alunos.map((a) => ({
+        id: a.id,
+        nome: a.nome,
+        matricula: a.matricula,
+        turma: turmaPorAluno.get(a.id) ?? null,
+        status: a.status,
+        data_nascimento: a.data_nascimento,
+        codigo_inep: a.codigo_inep,
+        data_matricula: a.data_matricula,
+        observacoes: a.observacoes,
+        transporte_escolar: a.transporte_escolar,
+        alimentacao_diferenciada: a.alimentacao_diferenciada,
+        necessidades_especiais: a.necessidades_especiais,
+        documentos_recebidos: a.documentos_recebidos ?? [],
+      }));
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
+      const msg = mensagemDeErro(e, 'Não foi possível carregar a lista de alunos.');
       console.error('[useGestaoUsuarios] Erro ao buscar alunos:', msg);
       erro.value = 'Não foi possível carregar a lista de alunos.';
       return [];
@@ -231,68 +267,71 @@ export function useGestaoUsuarios() {
     carregando.value = true;
     erro.value = null;
     try {
-      const { data: aluno, error: errAluno } = await supabaseClient
-        .from('alunos')
-        .insert({
+      const { aluno } = await api<{ aluno: AlunoDto }>('/api/alunos', {
+        metodo: 'POST',
+        corpo: {
           nome: dados.nome,
           matricula: dados.matricula,
           data_nascimento: dados.data_nascimento ?? null,
           observacoes: dados.observacoes ?? null,
-        })
-        .select('id')
-        .single();
-
-      if (errAluno) throw errAluno;
-      const alunoId = (aluno as unknown as Aluno).id;
+        },
+      });
 
       if (dados.turma_id) {
-        const ano = await buscarAnoLetivoAtivo();
-        if (ano) {
-          await supabaseClient.from('enturmacoes').insert({
-            aluno_id: alunoId,
-            turma_id: dados.turma_id,
-            ano_letivo_id: ano.id,
-            data_matricula: new Date().toISOString().split('T')[0],
+        try {
+          await api('/api/enturmacoes', {
+            metodo: 'POST',
+            corpo: {
+              aluno_id: aluno.id,
+              turma_id: dados.turma_id,
+              data_matricula: hojeIso(),
+            },
           });
+        } catch (e) {
+          console.error('[useGestaoUsuarios] Erro ao enturmar aluno:', mensagemDeErro(e, ''));
         }
       }
 
       if (dados.responsavel_email) {
-        const { data: perfisExistentes } = await supabaseClient
-          .from('perfis')
-          .select('id')
-          .eq('email', dados.responsavel_email)
-          .single();
-
-        let responsavelId: string | null = null;
-
-        if (perfisExistentes) {
-          responsavelId = (perfisExistentes as unknown as Perfil).id;
-        } else if (dados.responsavel_nome) {
-          const { id: idCriado } = await criarUsuario({
-            nome: dados.responsavel_nome,
-            email: dados.responsavel_email,
-            papel: 'responsavel',
-            telefone: dados.responsavel_telefone,
+        try {
+          const { usuarios } = await api<{ usuarios: UsuarioDto[] }>('/api/usuarios', {
+            parametros: { busca: dados.responsavel_email },
           });
-          if (idCriado) responsavelId = idCriado;
-        }
+          const emailNormalizado = dados.responsavel_email.toLowerCase();
+          let responsavelId: string | null =
+            usuarios.find((u) => u.email?.toLowerCase() === emailNormalizado)?.id ?? null;
 
-        if (responsavelId) {
-          await supabaseClient.from('vinculos_responsaveis').insert({
-            responsavel_id: responsavelId,
-            aluno_id: alunoId,
-            tipo_relacao: (dados.tipo_vinculo as VinculoResponsavel['tipo_relacao']) ?? 'outro',
-            contato_prioritario: true,
-          });
+          if (!responsavelId && dados.responsavel_nome) {
+            const criado = await criarUsuario({
+              nome: dados.responsavel_nome,
+              email: dados.responsavel_email,
+              papel: 'responsavel',
+              telefone: dados.responsavel_telefone,
+            });
+            responsavelId = criado.id;
+          }
+
+          if (responsavelId) {
+            await api('/api/vinculos', {
+              metodo: 'POST',
+              corpo: {
+                responsavel_id: responsavelId,
+                aluno_id: aluno.id,
+                tipo_relacao: dados.tipo_vinculo ?? 'outro',
+                contato_prioritario: true,
+              },
+            });
+          }
+        } catch (e) {
+          console.error('[useGestaoUsuarios] Erro ao vincular responsável:', mensagemDeErro(e, ''));
         }
       }
 
-      return alunoId;
+      return aluno.id;
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
+      const msg = mensagemDeErro(e, 'Falha ao criar aluno. Verifique se a matrícula já existe.');
       console.error('[useGestaoUsuarios] Erro ao criar aluno:', msg);
-      erro.value = 'Falha ao criar aluno. Verifique se a matrícula já existe.';
+      erro.value = msg;
       return null;
     } finally {
       carregando.value = false;
@@ -306,22 +345,27 @@ export function useGestaoUsuarios() {
       matricula: string;
       status: string;
       data_nascimento: string;
+      data_matricula: string;
+      codigo_inep: string;
       observacoes: string;
+      transporte_escolar: boolean;
+      alimentacao_diferenciada: boolean;
+      necessidades_especiais: boolean;
+      documentos_recebidos: string[];
     }>,
   ): Promise<boolean> {
     carregando.value = true;
     erro.value = null;
     try {
-      const { error: err } = await supabaseClient
-        .from('alunos')
-        .update(dados as Record<string, unknown>)
-        .eq('id', id);
-      if (err) throw err;
+      await api<{ aluno: AlunoDto }>(`/api/alunos/${id}`, {
+        metodo: 'PUT',
+        corpo: dados,
+      });
       return true;
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
+      const msg = mensagemDeErro(e, 'Falha ao atualizar aluno.');
       console.error('[useGestaoUsuarios] Erro ao atualizar aluno:', msg);
-      erro.value = 'Falha ao atualizar aluno.';
+      erro.value = msg;
       return false;
     } finally {
       carregando.value = false;
@@ -334,59 +378,47 @@ export function useGestaoUsuarios() {
     carregando.value = true;
     erro.value = null;
     try {
-      const { data, error: err } = await supabaseClient
-        .from('notificacoes')
-        .select('*')
-        .eq('tipo', 'codigo_redefinicao')
-        .eq('lida', false)
-        .order('created_at', { ascending: false });
+      const { notificacoes } = await api<{ notificacoes: NotificacaoDto[] }>('/api/notificacoes', {
+        parametros: { lida: 'false', limite: 100 },
+      });
 
-      if (err) throw err;
+      const relevantes = notificacoes.filter((n) => n.tipo === 'codigo_redefinicao');
+      const perfilIds = [
+        ...new Set(
+          relevantes
+            .map((n) => n.metadados?.perfil_id)
+            .filter((id): id is string => typeof id === 'string' && id.length > 0),
+        ),
+      ];
 
-      const notificacoes = (data ?? []) as unknown as Array<{
-        id: string;
-        metadados: { email?: string; perfil_id?: string };
-        created_at: string;
-      }>;
-
-      const perfilIds = notificacoes
-        .map((n) => n.metadados?.perfil_id)
-        .filter((id): id is string => !!id);
-
-      const perfisMap = new Map<string, { nome: string; papel: string }>();
+      const perfisMap = new Map<string, { nome: string; papel: UsuarioItem['papel'] }>();
       if (perfilIds.length > 0) {
-        const { data: perfis } = await supabaseClient
-          .from('perfis')
-          .select('id, nome, papel')
-          .in('id', perfilIds);
-        for (const p of perfis ?? []) {
-          const perfil = p as unknown as Perfil;
-          perfisMap.set(perfil.id, { nome: perfil.nome, papel: perfil.papel });
+        const usuarios = await buscarUsuarios();
+        for (const u of usuarios) {
+          perfisMap.set(u.id, { nome: u.nome, papel: u.papel });
         }
       }
 
       const resultados: SolicitacaoCodigo[] = [];
-
-      for (const n of notificacoes) {
+      for (const n of relevantes) {
         const email = n.metadados?.email;
         const perfilId = n.metadados?.perfil_id;
+        if (typeof email !== 'string' || typeof perfilId !== 'string') continue;
 
-        if (email && perfilId) {
-          const perfil = perfisMap.get(perfilId);
-          resultados.push({
-            id: n.id,
-            email,
-            perfil_id: perfilId,
-            nome: perfil?.nome ?? 'Desconhecido',
-            papel: (perfil?.papel as SolicitacaoCodigo['papel']) ?? 'responsavel',
-            criado_em: n.created_at,
-          });
-        }
+        const perfil = perfisMap.get(perfilId);
+        resultados.push({
+          id: n.id,
+          email,
+          perfil_id: perfilId,
+          nome: perfil?.nome ?? 'Desconhecido',
+          papel: perfil?.papel ?? 'responsavel',
+          criado_em: n.created_at,
+        });
       }
 
       return resultados;
     } catch (e) {
-      const msg = e instanceof Error ? e.message : JSON.stringify(e);
+      const msg = mensagemDeErro(e, 'Não foi possível carregar as notificações.');
       console.error('[useGestaoUsuarios] Erro ao buscar notificações:', msg);
       erro.value = 'Não foi possível carregar as notificações.';
       return [];
@@ -399,15 +431,14 @@ export function useGestaoUsuarios() {
     carregando.value = true;
     erro.value = null;
     try {
-      const { data, error: err } = await supabaseClient.rpc('fn_gerar_codigo_redefinicao', {
-        p_perfil_id: perfilId,
+      const { codigo } = await api<{ codigo: string }>(`/api/codigos/perfil/${perfilId}`, {
+        metodo: 'POST',
       });
-      if (err) throw err;
-      return data as string;
+      return codigo;
     } catch (e) {
-      const msg = e instanceof Error ? e.message : JSON.stringify(e);
+      const msg = mensagemDeErro(e, 'Falha ao gerar código de redefinição.');
       console.error('[useGestaoUsuarios] Erro ao gerar código:', msg);
-      erro.value = 'Falha ao gerar código de redefinição.';
+      erro.value = msg;
       return null;
     } finally {
       carregando.value = false;
@@ -418,65 +449,23 @@ export function useGestaoUsuarios() {
     carregando.value = true;
     erro.value = null;
     try {
-      const { data, error: err } = await supabaseClient
-        .from('codigos_redefinicao')
-        .select('*, perfis!codigos_redefinicao_perfil_id_fkey!inner(nome)')
-        .order('created_at', { ascending: false });
+      const { codigos } = await api<{ codigos: CodigoDto[] }>('/api/codigos');
 
-      if (err) throw err;
-
-      const codigos = (data ?? []) as unknown as (CodigoRedefinicao & {
-        perfis: { nome: string };
-      })[];
-
-      const criadorIds = [...new Set(codigos.map((c) => c.criado_por).filter(Boolean))];
-      const criadorMap = new Map<string, string>();
-
-      if (criadorIds.length > 0) {
-        const { data: criadores } = await supabaseClient
-          .from('perfis')
-          .select('id, nome')
-          .in('id', criadorIds);
-        for (const c of criadores ?? []) {
-          criadorMap.set((c as unknown as Perfil).id, (c as unknown as Perfil).nome);
-        }
-      }
-
-      // E-mails com bloqueio ativo por excesso de tentativas
-      const emailsBloqueados = new Set<string>();
-      const { data: bloqueados } = await supabaseClient
-        .from('codigos_redefinicao_tentativas')
-        .select('email')
-        .gt('bloqueado_ate', new Date().toISOString());
-      for (const b of bloqueados ?? []) {
-        emailsBloqueados.add((b as unknown as { email: string }).email);
-      }
-
-      return codigos.map((c) => {
-        const agora = new Date();
-        const expira = new Date(c.expira_em);
-        let status: 'ativo' | 'usado' | 'expirado' | 'revogado' | 'bloqueado';
-        if (c.usado_em) status = 'usado';
-        else if (c.revogado_em) status = 'revogado';
-        else if (expira < agora) status = 'expirado';
-        else if (emailsBloqueados.has(c.email)) status = 'bloqueado';
-        else status = 'ativo';
-
-        return {
-          id: c.id,
-          email: c.email,
-          nome: c.perfis.nome,
-          codigo: c.codigo,
-          criado_por_nome: c.criado_por ? (criadorMap.get(c.criado_por) ?? null) : null,
-          usado_em: c.usado_em,
-          revogado_em: c.revogado_em,
-          expira_em: c.expira_em,
-          criado_em: c.created_at,
-          status,
-        };
-      });
+      return codigos.map((c) => ({
+        id: c.id,
+        email: c.email,
+        nome: c.perfil_nome ?? 'Desconhecido',
+        // A API própria não devolve o código em texto claro na listagem (apenas HMAC).
+        codigo: '',
+        criado_por_nome: null,
+        usado_em: c.usado_em,
+        revogado_em: c.revogado_em,
+        expira_em: c.expira_em,
+        criado_em: c.created_at,
+        status: c.status,
+      }));
     } catch (e) {
-      const msg = e instanceof Error ? e.message : JSON.stringify(e);
+      const msg = mensagemDeErro(e, 'Não foi possível carregar os códigos.');
       console.error('[useGestaoUsuarios] Erro ao buscar códigos:', msg);
       erro.value = 'Não foi possível carregar os códigos.';
       return [];
@@ -487,10 +476,7 @@ export function useGestaoUsuarios() {
 
   async function marcarNotificacaoLida(notificacaoId: string): Promise<void> {
     try {
-      await supabaseClient
-        .from('notificacoes')
-        .update({ lida: true, lida_em: new Date().toISOString() })
-        .eq('id', notificacaoId);
+      await api(`/api/notificacoes/${notificacaoId}/lida`, { metodo: 'PATCH' });
     } catch (e) {
       console.error('[useGestaoUsuarios] Erro ao marcar notificação como lida:', e);
     }
@@ -498,11 +484,12 @@ export function useGestaoUsuarios() {
 
   async function limparCodigosNaoAtivos(): Promise<number> {
     try {
-      const { data, error: err } = await supabaseClient.rpc('fn_limpar_codigos_nao_ativos');
-      if (err) throw err;
-      return (data as number) ?? 0;
+      const { removidos } = await api<{ removidos: number }>('/api/codigos/limpar', {
+        metodo: 'POST',
+      });
+      return removidos ?? 0;
     } catch (e) {
-      const msg = e instanceof Error ? e.message : JSON.stringify(e);
+      const msg = mensagemDeErro(e, 'Falha ao limpar códigos.');
       console.error('[useGestaoUsuarios] Erro ao limpar códigos:', msg);
       throw e;
     }
@@ -512,12 +499,10 @@ export function useGestaoUsuarios() {
 
   async function buscarTurmas(): Promise<Turma[]> {
     try {
-      const { data } = await supabaseClient
-        .from('turmas')
-        .select('*')
-        .eq('ativo', true)
-        .order('nome_completo');
-      return (data ?? []) as unknown as Turma[];
+      const { turmas } = await api<{ turmas: Turma[] }>('/api/turmas', {
+        parametros: { ativo: true },
+      });
+      return [...turmas].sort((a, b) => a.nome_completo.localeCompare(b.nome_completo));
     } catch {
       return [];
     }
@@ -525,12 +510,10 @@ export function useGestaoUsuarios() {
 
   async function buscarDisciplinas(): Promise<Disciplina[]> {
     try {
-      const { data } = await supabaseClient
-        .from('disciplinas')
-        .select('*')
-        .eq('ativo', true)
-        .order('nome');
-      return (data ?? []) as unknown as Disciplina[];
+      const { disciplinas } = await api<{ disciplinas: Disciplina[] }>('/api/disciplinas', {
+        parametros: { ativo: true },
+      });
+      return [...disciplinas].sort((a, b) => a.nome.localeCompare(b.nome));
     } catch {
       return [];
     }

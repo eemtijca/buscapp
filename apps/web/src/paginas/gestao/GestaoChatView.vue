@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { useAutenticacao } from '@/composables/useAutenticacao';
 import { useMonitoramento } from '@/composables/useMonitoramento';
 import { useNotificacoes } from '@/composables/useNotificacoes';
-import { supabaseClient } from '@/servicos/supabase';
+import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh';
 import ChatPainelDuplo from '@/componentes/ChatPainelDuplo.vue';
 import type { ContatoChat, MensagemChat } from '@/tipos/componentes';
 import { avatarCor } from '@/utils/chatUtils';
@@ -47,9 +47,8 @@ const podeEnviar = computed(() => {
   return contatoAtivo.value?.iniciadaPelaGestao === true;
 });
 
+const { inscrever, encerrar } = useRealtimeRefresh();
 let timeoutStatus: ReturnType<typeof setTimeout> | null = null;
-let canalMensagens: ReturnType<typeof supabaseClient.channel> | null = null;
-let canalContatos: ReturnType<typeof supabaseClient.channel> | null = null;
 let intervaloRelogio: number | null = null;
 
 function mostrarStatus(msg: string) {
@@ -97,8 +96,6 @@ async function selecionarConversa(conversaId: string) {
   abertaPorDetalhe.value = !contato;
   contatoAtivo.value = contato ?? det.contato;
 
-  inscreverCanalMensagens(conversaId);
-
   if (contato) contato.naoLidas = 0;
 }
 
@@ -133,61 +130,18 @@ async function handleOcultarConversa() {
   }
 }
 
-function mergeMensagens(novas: MensagemChat[]) {
-  const existentes = new Set(mensagens.value.map((m) => m.id));
-  for (const msg of novas) {
-    if (!existentes.has(msg.id)) {
-      mensagens.value.push(msg);
-    }
-  }
+/** Recarrega contatos e, se houver, as mensagens da conversa aberta. */
+async function recarregarChat() {
+  const conversaAntes = conversaAtivaId.value;
+  await carregarContatos();
+  if (!usuario.value || !conversaAntes || conversaAtivaId.value !== conversaAntes) return;
+  const det = await buscarConversaDetalhe(conversaAntes, usuario.value.id);
+  mensagens.value = det.mensagens;
+  contatoAtivo.value = contatos.value.find((c) => c.conversaId === conversaAntes) ?? det.contato;
 }
 
-function inscreverCanalMensagens(conversaId: string) {
-  if (canalMensagens) supabaseClient.removeChannel(canalMensagens);
-
-  canalMensagens = supabaseClient
-    .channel(`chat-msg-${conversaId}`)
-    .on(
-      'postgres_changes',
-      {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'mensagens',
-        filter: `conversa_id=eq.${conversaId}`,
-      },
-      async () => {
-        if (!usuario.value) return;
-        const det = await buscarConversaDetalhe(conversaId, usuario.value.id);
-        mergeMensagens(det.mensagens);
-      },
-    )
-    .on(
-      'postgres_changes',
-      {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'mensagens',
-        filter: `conversa_id=eq.${conversaId}`,
-      },
-      (payload) => {
-        const msg = mensagens.value.find((m) => m.id === payload.new.id);
-        if (msg) msg.lida = payload.new.lida_em !== null;
-      },
-    )
-    .subscribe();
-}
-
-function inscreverCanalContatos() {
-  if (!usuario.value || canalContatos) return;
-  canalContatos = supabaseClient
-    .channel('chat-contatos-gestao')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'mensagens' }, () =>
-      carregarContatos(),
-    )
-    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'conversas' }, () =>
-      carregarContatos(),
-    )
-    .subscribe();
+async function inscreverChat() {
+  await inscrever([{ tabela: 'mensagens' }, { tabela: 'conversas' }], recarregarChat);
 }
 
 function handleVoltar() {
@@ -201,7 +155,7 @@ onMounted(async () => {
   horarioAtivo.value = horarioProtegidoAtivo();
   if (usuario.value) {
     await carregarContatos();
-    inscreverCanalContatos();
+    await inscreverChat();
     const conversaInicial = route.query.conversa as string | undefined;
     if (conversaInicial && !conversaAtivaId.value) {
       await selecionarConversa(conversaInicial);
@@ -215,13 +169,12 @@ onMounted(async () => {
 watch(usuario, async (val) => {
   if (val && contatos.value.length === 0) {
     await carregarContatos();
-    inscreverCanalContatos();
+    await inscreverChat();
   }
 });
 
 onUnmounted(() => {
-  if (canalMensagens) supabaseClient.removeChannel(canalMensagens);
-  if (canalContatos) supabaseClient.removeChannel(canalContatos);
+  encerrar();
   if (intervaloRelogio) window.clearInterval(intervaloRelogio);
   if (timeoutStatus) clearTimeout(timeoutStatus);
 });

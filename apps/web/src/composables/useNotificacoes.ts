@@ -1,5 +1,6 @@
 import { ref, type Ref } from 'vue';
-import { supabaseClient } from '@/servicos/supabase';
+import { api } from '@/servicos/api';
+import { inscreverEventos } from '@/servicos/eventos';
 import { timestampRelativo } from '@/utils/chatUtils';
 import type { Notificacao } from '@/tipos/database';
 import type { NotificacaoItem } from '@/tipos/componentes';
@@ -11,13 +12,18 @@ const notificacoes: Ref<NotificacaoItem[]> = ref([]);
 const carregando: Ref<boolean> = ref(false);
 
 const ATRASO_DEBOUNCE_MS = 500;
-const ATRASO_MAXIMO_RECONEXAO_MS = 15000;
+const INTERVALO_POLLING_MS = 30_000;
+const LIMITE_NOTIFICACOES = 20;
 
-let canal: ReturnType<typeof supabaseClient.channel> | null = null;
+interface RespostaNotificacoes {
+  notificacoes: Notificacao[];
+  nao_lidas: number;
+}
+
 let usuarioId: string | null = null;
 let timerRecarga: ReturnType<typeof setTimeout> | null = null;
-let timerReconexao: ReturnType<typeof setTimeout> | null = null;
-let tentativasReconexao = 0;
+let timerPolling: ReturnType<typeof setInterval> | null = null;
+let cancelarEventos: (() => void) | null = null;
 let ouvinteVisibilidadeRegistrado = false;
 
 const ICONE_TIPO: Record<string, string> = {
@@ -74,33 +80,31 @@ async function carregar() {
   if (!usuarioId) return;
   carregando.value = true;
   try {
-    const { data } = await supabaseClient
-      .from('notificacoes')
-      .select('*')
-      .eq('destinatario_id', usuarioId)
-      .order('created_at', { ascending: false })
-      .limit(20);
+    const resposta = await api<RespostaNotificacoes>('/api/notificacoes', {
+      parametros: { limite: LIMITE_NOTIFICACOES },
+    });
 
-    if (!data) {
-      notificacoes.value = [];
-      naoLidasMensagens.value = 0;
-      naoLidasOutros.value = 0;
-      return;
-    }
-
-    const items = (data as unknown as Notificacao[]).map((n) => ({
+    const itens: NotificacaoItem[] = resposta.notificacoes.map((n) => ({
       id: n.id,
       tipo: n.tipo,
       titulo: n.titulo,
       corpo: n.corpo,
       tempoRelativo: timestampRelativo(n.created_at),
       lida: n.lida,
-      rota: rotaPorTipo(n.tipo, n.metadados as Record<string, unknown> | null),
+      rota: rotaPorTipo(n.tipo, n.metadados),
     }));
 
-    naoLidasMensagens.value = items.filter((n) => n.tipo === 'mensagem' && !n.lida).length;
-    naoLidasOutros.value = items.filter((n) => n.tipo !== 'mensagem' && !n.lida).length;
-    notificacoes.value = items.filter((n) => n.tipo !== 'mensagem');
+    const naoLidas = itens.filter((n) => !n.lida);
+    if (resposta.nao_lidas === 0) {
+      naoLidasMensagens.value = 0;
+      naoLidasOutros.value = 0;
+    } else {
+      naoLidasMensagens.value = naoLidas.filter((n) => n.tipo === 'mensagem').length;
+      naoLidasOutros.value = naoLidas.filter((n) => n.tipo !== 'mensagem').length;
+    }
+    notificacoes.value = itens.filter((n) => n.tipo !== 'mensagem');
+  } catch {
+    /* Falha transitória: o SSE e o polling de segurança tentam novamente. */
   } finally {
     carregando.value = false;
   }
@@ -114,96 +118,52 @@ function recarregarDebounced() {
   }, ATRASO_DEBOUNCE_MS);
 }
 
-async function garantirTokenRealtime() {
-  const {
-    data: { session },
-  } = await supabaseClient.auth.getSession();
-  if (session?.access_token) {
-    supabaseClient.realtime.setAuth(session.access_token);
-  }
-}
-
 function aoMudarVisibilidade() {
   if (document.visibilityState === 'visible' && usuarioId) {
     void carregar();
   }
 }
 
-function agendarReconexao() {
-  if (!usuarioId || timerReconexao) return;
-  const atraso = Math.min(1000 * 2 ** tentativasReconexao, ATRASO_MAXIMO_RECONEXAO_MS);
-  tentativasReconexao += 1;
-  timerReconexao = setTimeout(() => {
-    timerReconexao = null;
-    if (!usuarioId) return;
-    const id = usuarioId;
-    desinscreverCanal();
-    void inscrever(id);
-  }, atraso);
-}
-
-function desinscreverCanal() {
-  if (canal) {
-    supabaseClient.removeChannel(canal);
-    canal = null;
+function cancelarInscricoes() {
+  if (timerRecarga) {
+    clearTimeout(timerRecarga);
+    timerRecarga = null;
+  }
+  if (timerPolling) {
+    clearInterval(timerPolling);
+    timerPolling = null;
+  }
+  if (cancelarEventos) {
+    cancelarEventos();
+    cancelarEventos = null;
   }
 }
 
-async function inscrever(userId: string) {
-  if (canal && usuarioId === userId) return;
-  usuarioId = userId;
-  tentativasReconexao = 0;
-
-  await garantirTokenRealtime();
-
-  canal = supabaseClient
-    .channel('notificacoes-global')
-    .on(
-      'postgres_changes',
-      {
-        event: '*',
-        schema: 'public',
-        table: 'notificacoes',
-        filter: `destinatario_id=eq.${userId}`,
-      },
-      recarregarDebounced,
-    )
-    .subscribe((status) => {
-      if (status === 'SUBSCRIBED') {
-        tentativasReconexao = 0;
-        void carregar();
-      } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-        agendarReconexao();
-      }
-    });
-}
-
 async function iniciar(userId: string) {
-  if (canal && usuarioId === userId) return;
-  desinscreverCanal();
+  if (cancelarEventos && usuarioId === userId) return;
+
+  cancelarInscricoes();
   usuarioId = userId;
-  carregar();
 
   if (!ouvinteVisibilidadeRegistrado && typeof document !== 'undefined') {
     ouvinteVisibilidadeRegistrado = true;
     document.addEventListener('visibilitychange', aoMudarVisibilidade);
   }
 
-  await inscrever(userId);
+  await carregar();
+
+  // Atualização em tempo real por SSE mais polling de segurança.
+  cancelarEventos = inscreverEventos((tabela) => {
+    if (tabela === 'notificacoes') recarregarDebounced();
+  });
+  timerPolling = setInterval(() => {
+    if (usuarioId) void carregar();
+  }, INTERVALO_POLLING_MS);
 }
 
 function parar() {
-  if (timerRecarga) {
-    clearTimeout(timerRecarga);
-    timerRecarga = null;
-  }
-  if (timerReconexao) {
-    clearTimeout(timerReconexao);
-    timerReconexao = null;
-  }
-  desinscreverCanal();
+  cancelarInscricoes();
   usuarioId = null;
-  tentativasReconexao = 0;
   naoLidasMensagens.value = 0;
   naoLidasOutros.value = 0;
   notificacoes.value = [];
@@ -211,38 +171,41 @@ function parar() {
 
 async function marcarTodasComoLidas() {
   if (!usuarioId) return;
-  await supabaseClient
-    .from('notificacoes')
-    .update({ lida: true, lida_em: new Date().toISOString() })
-    .eq('destinatario_id', usuarioId)
-    .eq('lida', false);
+  try {
+    await api('/api/notificacoes/lidas', { metodo: 'PATCH' });
+  } catch {
+    /* A recarga abaixo reconcilia o estado real. */
+  }
   await carregar();
 }
 
 async function limparTodas() {
   if (!usuarioId) return;
-  await supabaseClient.from('notificacoes').delete().eq('destinatario_id', usuarioId);
+  try {
+    await api('/api/notificacoes', { metodo: 'DELETE' });
+  } catch {
+    /* A recarga abaixo reconcilia o estado real. */
+  }
   await carregar();
 }
 
 async function marcarLida(id: string) {
-  await supabaseClient
-    .from('notificacoes')
-    .update({ lida: true, lida_em: new Date().toISOString() })
-    .eq('id', id);
+  try {
+    await api(`/api/notificacoes/${id}/lida`, { metodo: 'PATCH' });
+  } catch {
+    /* A recarga abaixo reconcilia o estado real. */
+  }
   await carregar();
 }
 
-/** Limpa as notificações de mensagem de uma conversa lida; o banco propaga o resto. */
+/** Limpa as notificações de mensagem de uma conversa lida; a API propaga o restante. */
 async function marcarNotificacoesConversaLidas(conversaId: string) {
   if (!usuarioId) return;
-  await supabaseClient
-    .from('notificacoes')
-    .update({ lida: true, lida_em: new Date().toISOString() })
-    .eq('destinatario_id', usuarioId)
-    .eq('tipo', 'mensagem')
-    .eq('lida', false)
-    .eq('metadados->>conversa_id', conversaId);
+  try {
+    await api(`/api/notificacoes/conversa/${conversaId}/lidas`, { metodo: 'PATCH' });
+  } catch {
+    /* A recarga abaixo reconcilia o estado real. */
+  }
   await carregar();
 }
 

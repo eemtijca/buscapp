@@ -66,8 +66,7 @@ export async function api<T>(caminho: string, opcoes: OpcoesRequisicao = {}): Pr
     credentials: 'include',
     headers: opcoes.formData ? undefined : { 'Content-Type': 'application/json' },
     body:
-      opcoes.formData ??
-      (opcoes.corpo !== undefined ? JSON.stringify(opcoes.corpo) : undefined),
+      opcoes.formData ?? (opcoes.corpo !== undefined ? JSON.stringify(opcoes.corpo) : undefined),
   });
 
   return interpretarResposta<T>(resposta);

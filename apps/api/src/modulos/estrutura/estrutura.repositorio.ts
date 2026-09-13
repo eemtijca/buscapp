@@ -107,9 +107,7 @@ export async function idsDeTurmasDoResponsavel(responsavelId: string): Promise<s
 
 export async function listarDisciplinas(consulta: ListarDisciplinas) {
   return prisma.disciplinas.findMany({
-    where: {
-      ...(consulta.ativo !== undefined ? { ativo: consulta.ativo } : {}),
-    },
+    where: (consulta.ativo !== undefined ? { ativo: consulta.ativo } : {}),
     orderBy: { nome: 'asc' },
   });
 }

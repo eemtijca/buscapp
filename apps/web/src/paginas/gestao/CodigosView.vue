@@ -3,7 +3,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useGestaoUsuarios } from '@/composables/useGestaoUsuarios';
 import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh';
-import { supabaseClient } from '@/servicos/supabase';
+import { api } from '@/servicos/api';
 import type { SolicitacaoCodigo, CodigoGerado } from '@/tipos/componentes';
 
 const router = useRouter();
@@ -26,11 +26,13 @@ const {
   ultimaAtualizacao,
   estaAtualizando,
   statusConexao,
-  aoConectar,
   atualizar: refresh,
+  inscrever,
+  encerrar,
 } = useRealtimeRefresh();
 
 const codigosVisiveis = ref<Set<string>>(new Set());
+const codigosSessao = ref<Record<string, string>>({});
 const guiaAtiva = ref<'pendentes' | 'recentes'>('pendentes');
 
 const filtroBusca = ref('');
@@ -49,11 +51,6 @@ const limpandoCodigos = ref(false);
 const codigoCopiado = ref(false);
 let timerCopiado: ReturnType<typeof setTimeout> | null = null;
 
-const idsConhecidosNotificacoes = ref(new Set<string>());
-const idsConhecidosCodigos = ref(new Set<string>());
-
-let canalNotificacoes: ReturnType<typeof supabaseClient.channel>;
-let canalCodigos: ReturnType<typeof supabaseClient.channel>;
 let timerGlobal: ReturnType<typeof setInterval> | null = null;
 
 function mostrarSucesso(msg: string) {
@@ -111,6 +108,11 @@ function toggleVisibilidade(codigoId: string) {
   codigosVisiveis.value = novo;
 }
 
+/** A API própria não devolve o código em texto claro; exibimos apenas os gerados nesta sessão. */
+function codigoExibivel(codigo: CodigoGerado): string {
+  return codigo.codigo || codigosSessao.value[codigo.email] || '';
+}
+
 function tempoRestanteFormatado(expiraEm: string): { texto: string; classe: string; pct: number } {
   const diff = new Date(expiraEm).getTime() - Date.now();
   if (diff <= 0) return { texto: 'Expirado', classe: 'text-danger', pct: 100 };
@@ -164,22 +166,20 @@ function abrirConfirmacaoGerar(solicitacao: SolicitacaoCodigo) {
 }
 
 async function confirmarGerar() {
-  if (!solicitacaoSelecionada.value) return;
+  const solicitacao = solicitacaoSelecionada.value;
+  if (!solicitacao) return;
   modalConfirmacaoGerar.value = false;
   gerandoCodigo.value = true;
   try {
-    const codigo = await gerarCodigoRedefinicao(solicitacaoSelecionada.value.perfil_id);
+    const codigo = await gerarCodigoRedefinicao(solicitacao.perfil_id);
     if (codigo) {
       codigoGeradoAtual.value = codigo;
+      codigosSessao.value = { ...codigosSessao.value, [solicitacao.email]: codigo };
       modalCodigoGerado.value = true;
-      await marcarNotificacaoLida(solicitacaoSelecionada.value.id);
-      // fn_gerar_codigo_redefinicao atende as solicitações; remove as entradas locais.
-      solicitacoes.value = solicitacoes.value.filter(
-        (s) => s.perfil_id !== solicitacaoSelecionada.value!.perfil_id,
-      );
-      const novos = await buscarCodigosGerados();
-      codigosGerados.value = novos;
-      novos.forEach((c) => idsConhecidosCodigos.value.add(c.id));
+      await marcarNotificacaoLida(solicitacao.id);
+      // A geração atende a solicitação pendente; remove a entrada local.
+      solicitacoes.value = solicitacoes.value.filter((s) => s.perfil_id !== solicitacao.perfil_id);
+      codigosGerados.value = await buscarCodigosGerados();
     } else {
       mostrarErro(erro.value || 'Falha ao gerar código.');
     }
@@ -235,16 +235,12 @@ function abrirConfirmacaoRevogar(codigo: CodigoGerado) {
 }
 
 async function confirmarRevogar() {
-  if (!codigoParaRevogar.value) return;
+  const alvo = codigoParaRevogar.value;
+  if (!alvo) return;
   modalRevogar.value = false;
   try {
-    const { error: err } = await supabaseClient.rpc('fn_revogar_codigo', {
-      p_codigo_id: codigoParaRevogar.value.id,
-    });
-    if (err) throw err;
-    const novos = await buscarCodigosGerados();
-    codigosGerados.value = novos;
-    novos.forEach((c) => idsConhecidosCodigos.value.add(c.id));
+    await api(`/api/codigos/${alvo.id}/revogar`, { metodo: 'PATCH' });
+    codigosGerados.value = await buscarCodigosGerados();
     mostrarSucesso('Código revogado com sucesso.');
   } catch (e) {
     mostrarErro(e instanceof Error ? e.message : 'Erro ao revogar código.');
@@ -266,9 +262,7 @@ async function confirmarLimpar() {
   limpandoCodigos.value = true;
   try {
     const removidos = await limparCodigosNaoAtivos();
-    const novos = await buscarCodigosGerados();
-    codigosGerados.value = novos;
-    novos.forEach((c) => idsConhecidosCodigos.value.add(c.id));
+    codigosGerados.value = await buscarCodigosGerados();
     mostrarSucesso(
       removidos > 0
         ? `${removidos} código${removidos !== 1 ? 's' : ''} removido${removidos !== 1 ? 's' : ''}.`
@@ -283,21 +277,14 @@ async function confirmarLimpar() {
 
 async function atualizarManual() {
   await refresh(async () => {
-    solicitacoes.value = await buscarNotificacoesCodigos();
-    solicitacoes.value.forEach((s) => idsConhecidosNotificacoes.value.add(s.id));
-    const novos = await buscarCodigosGerados();
-    codigosGerados.value = novos;
-    novos.forEach((c) => idsConhecidosCodigos.value.add(c.id));
+    await carregarDados();
     mostrarSucesso('Dados atualizados.');
   });
 }
 
 async function carregarDados() {
   solicitacoes.value = await buscarNotificacoesCodigos();
-  solicitacoes.value.forEach((s) => idsConhecidosNotificacoes.value.add(s.id));
-  const novos = await buscarCodigosGerados();
-  codigosGerados.value = novos;
-  novos.forEach((c) => idsConhecidosCodigos.value.add(c.id));
+  codigosGerados.value = await buscarCodigosGerados();
 }
 
 function fecharModalCodigo() {
@@ -305,50 +292,10 @@ function fecharModalCodigo() {
   codigoGeradoAtual.value = null;
 }
 
-async function recarregarAposConexao() {
-  solicitacoes.value = await buscarNotificacoesCodigos();
-  solicitacoes.value.forEach((s) => idsConhecidosNotificacoes.value.add(s.id));
-  const novos = await buscarCodigosGerados();
-  codigosGerados.value = novos;
-  novos.forEach((c) => idsConhecidosCodigos.value.add(c.id));
-}
-
 onMounted(async () => {
   await carregarDados();
 
-  canalNotificacoes = supabaseClient
-    .channel('codigos-notificacoes')
-    .on(
-      'postgres_changes',
-      {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'notificacoes',
-        filter: 'tipo=eq.codigo_redefinicao',
-      },
-      async (payload) => {
-        const notif = payload.new as Record<string, unknown>;
-        if (idsConhecidosNotificacoes.value.has(notif.id as string)) return;
-        solicitacoes.value = await buscarNotificacoesCodigos();
-        solicitacoes.value.forEach((s) => idsConhecidosNotificacoes.value.add(s.id));
-      },
-    )
-    .subscribe(aoConectar(recarregarAposConexao));
-
-  canalCodigos = supabaseClient
-    .channel('codigos-redefinicao')
-    .on(
-      'postgres_changes',
-      { event: '*', schema: 'public', table: 'codigos_redefinicao' },
-      async (payload) => {
-        const cod = payload.new as Record<string, unknown>;
-        if (idsConhecidosCodigos.value.has(cod.id as string)) return;
-        const novos = await buscarCodigosGerados();
-        codigosGerados.value = novos;
-        novos.forEach((c) => idsConhecidosCodigos.value.add(c.id));
-      },
-    )
-    .subscribe();
+  await inscrever([{ tabela: 'notificacoes' }, { tabela: 'codigos_redefinicao' }], carregarDados);
 
   timerGlobal = setInterval(() => {
     codigosGerados.value.forEach((c) => {
@@ -363,8 +310,7 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
-  if (canalNotificacoes) supabaseClient.removeChannel(canalNotificacoes);
-  if (canalCodigos) supabaseClient.removeChannel(canalCodigos);
+  encerrar();
   if (timerGlobal) clearInterval(timerGlobal);
   if (timerCopiado) clearTimeout(timerCopiado);
   document.removeEventListener('visibilitychange', recalcularTimers);
@@ -615,29 +561,38 @@ onUnmounted(() => {
                   <td class="text-body-secondary small d-none d-md-table-cell">{{ c.email }}</td>
                   <td>
                     <div class="d-flex align-items-center gap-2">
-                      <code
-                        v-if="codigosVisiveis.has(c.id)"
-                        class="user-select-all text-primary"
-                        role="button"
-                        tabindex="0"
-                        title="Copiar código"
-                        style="cursor: pointer"
-                        @click="copiarCodigoDaTabela(c.codigo)"
-                        @keydown.enter="copiarCodigoDaTabela(c.codigo)"
-                        >{{ c.codigo }}</code
+                      <template v-if="codigoExibivel(c)">
+                        <code
+                          v-if="codigosVisiveis.has(c.id)"
+                          class="user-select-all text-primary"
+                          role="button"
+                          tabindex="0"
+                          title="Copiar código"
+                          style="cursor: pointer"
+                          @click="copiarCodigoDaTabela(codigoExibivel(c))"
+                          @keydown.enter="copiarCodigoDaTabela(codigoExibivel(c))"
+                          >{{ codigoExibivel(c) }}</code
+                        >
+                        <span v-else class="text-body-tertiary">••••••</span>
+                        <button
+                          type="button"
+                          class="btn btn-sm btn-link p-0 text-body-secondary"
+                          :title="codigosVisiveis.has(c.id) ? 'Ocultar' : 'Mostrar'"
+                          @click="toggleVisibilidade(c.id)"
+                        >
+                          <i
+                            :class="codigosVisiveis.has(c.id) ? 'bi bi-eye-slash' : 'bi bi-eye'"
+                            aria-hidden="true"
+                          ></i>
+                        </button>
+                      </template>
+                      <span
+                        v-else
+                        class="text-body-tertiary small"
+                        title="Por segurança, o código só é exibido no momento da geração."
                       >
-                      <span v-else class="text-body-tertiary">••••••</span>
-                      <button
-                        type="button"
-                        class="btn btn-sm btn-link p-0 text-body-secondary"
-                        :title="codigosVisiveis.has(c.id) ? 'Ocultar' : 'Mostrar'"
-                        @click="toggleVisibilidade(c.id)"
-                      >
-                        <i
-                          :class="codigosVisiveis.has(c.id) ? 'bi bi-eye-slash' : 'bi bi-eye'"
-                          aria-hidden="true"
-                        ></i>
-                      </button>
+                        <i class="bi bi-lock me-1" aria-hidden="true"></i>não exibido
+                      </span>
                     </div>
                   </td>
                   <td>
@@ -882,7 +837,9 @@ onUnmounted(() => {
               </p>
               <p class="mb-0">
                 <span class="text-body-secondary">Código:</span>
-                <code class="ms-1 text-primary">{{ codigoParaRevogar.codigo }}</code>
+                <code class="ms-1 text-primary">{{
+                  codigoExibivel(codigoParaRevogar) || '—'
+                }}</code>
               </p>
             </div>
             <p class="small text-danger mt-2 mb-0">

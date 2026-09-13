@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch, nextTick } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch, nextTick } from 'vue';
 import { useRouter, onBeforeRouteLeave } from 'vue-router';
-import { supabaseClient } from '@/servicos/supabase';
+import { api } from '@/servicos/api';
 import { useOpcoesConfiguracao } from '@/composables/useOpcoesConfiguracao';
 import { useFormSnapshot } from '@/composables/useFormSnapshot';
+import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh';
 import {
   mensagemSucesso as criarMensagemSucesso,
   mensagemErroExplicita,
@@ -11,19 +12,33 @@ import {
 import CampoFormulario from '@/componentes/CampoFormulario.vue';
 import Combobox from '@/componentes/Combobox.vue';
 import type { OpcaoCombobox } from '@/componentes/Combobox.vue';
-import type { AtribuicaoProfessor, Perfil, Turma, Disciplina } from '@/tipos/database';
+import type { AtribuicaoProfessor, Turma, Disciplina } from '@/tipos/database';
 import type { OpcaoCheckbox } from '@/tipos/componentes';
 
 interface AtribuicaoItem extends AtribuicaoProfessor {
   professor_nome?: string;
   turma_nome?: string;
-  disciplina_nome?: string;
+  disciplina_nome?: string | null;
+}
+
+/** Atribuição devolvida pela API, com professor, turma e disciplina já resolvidos. */
+interface AtribuicaoApi extends AtribuicaoProfessor {
+  professor: { id: string; nome: string };
+  turma: { id: string; nome_completo: string };
+  disciplina: { id: string; nome: string } | null;
+}
+
+/** Resumo de usuário usado no combo de professores. */
+interface ProfessorResumo {
+  id: string;
+  nome: string;
 }
 
 const router = useRouter();
+const { inscrever, encerrar } = useRealtimeRefresh();
 
 const atribuicoes = ref<AtribuicaoItem[]>([]);
-const professores = ref<Perfil[]>([]);
+const professores = ref<ProfessorResumo[]>([]);
 const turmas = ref<Turma[]>([]);
 const disciplinas = ref<Disciplina[]>([]);
 const carregando = ref(false);
@@ -136,36 +151,22 @@ async function carregarDados() {
   carregando.value = true;
   try {
     const [resAtribuicoes, resProfessores, resTurmas, resDisciplinas] = await Promise.all([
-      supabaseClient
-        .from('atribuicoes_professores')
-        .select(
-          `
-          *,
-          perfis!atribuicoes_professores_professor_id_fkey (nome),
-          turmas!atribuicoes_professores_turma_id_fkey (nome_completo),
-          disciplinas!atribuicoes_professores_disciplina_id_fkey (nome)
-        `,
-        )
-        .order('created_at', { ascending: false }),
-      supabaseClient.from('perfis').select('id, nome').eq('papel', 'professor').order('nome'),
-      supabaseClient
-        .from('turmas')
-        .select('id, nome_completo')
-        .eq('ativo', true)
-        .order('nome_completo'),
-      supabaseClient.from('disciplinas').select('id, nome').eq('ativo', true).order('nome'),
+      api<{ atribuicoes: AtribuicaoApi[] }>('/api/atribuicoes'),
+      api<{ usuarios: ProfessorResumo[] }>('/api/usuarios', { parametros: { papel: 'professor' } }),
+      api<{ turmas: Turma[] }>('/api/turmas', { parametros: { ativo: 'true' } }),
+      api<{ disciplinas: Disciplina[] }>('/api/disciplinas', { parametros: { ativo: 'true' } }),
     ]);
 
-    atribuicoes.value = (resAtribuicoes.data ?? []).map((a: Record<string, unknown>) => ({
+    atribuicoes.value = resAtribuicoes.atribuicoes.map((a) => ({
       ...a,
-      professor_nome: (a.perfis as Record<string, string> | null)?.nome ?? '—',
-      turma_nome: (a.turmas as Record<string, string> | null)?.nome_completo ?? '—',
-      disciplina_nome: (a.disciplinas as Record<string, string> | null)?.nome ?? null,
-    })) as AtribuicaoItem[];
+      professor_nome: a.professor?.nome ?? '—',
+      turma_nome: a.turma?.nome_completo ?? '—',
+      disciplina_nome: a.disciplina?.nome ?? null,
+    }));
 
-    professores.value = (resProfessores.data ?? []) as Perfil[];
-    turmas.value = (resTurmas.data ?? []) as Turma[];
-    disciplinas.value = (resDisciplinas.data ?? []) as Disciplina[];
+    professores.value = resProfessores.usuarios;
+    turmas.value = resTurmas.turmas;
+    disciplinas.value = resDisciplinas.disciplinas;
   } catch {
     mostrarErro('Falha ao carregar dados.');
   } finally {
@@ -221,19 +222,18 @@ async function salvar() {
     };
 
     if (modoEdicao.value && editandoId.value) {
-      const { error } = await supabaseClient
-        .from('atribuicoes_professores')
-        .update(payload)
-        .eq('id', editandoId.value);
-      if (error) {
-        mostrarErro(mensagemErroExplicita('Atribuição', formPapel.value, 'atualizar', error));
+      try {
+        await api(`/api/atribuicoes/${editandoId.value}`, { metodo: 'PUT', corpo: payload });
+      } catch (e) {
+        mostrarErro(mensagemErroExplicita('Atribuição', formPapel.value, 'atualizar', e));
         return;
       }
       mostrarSucesso(criarMensagemSucesso('Atribuição', formPapel.value, 'atualizada'));
     } else {
-      const { error } = await supabaseClient.from('atribuicoes_professores').insert(payload);
-      if (error) {
-        mostrarErro(mensagemErroExplicita('Atribuição', formPapel.value, 'criar', error));
+      try {
+        await api('/api/atribuicoes', { metodo: 'POST', corpo: payload });
+      } catch (e) {
+        mostrarErro(mensagemErroExplicita('Atribuição', formPapel.value, 'criar', e));
         return;
       }
       mostrarSucesso(criarMensagemSucesso('Atribuição', formPapel.value, 'criada'));
@@ -248,14 +248,14 @@ async function salvar() {
 
 async function alternarAtivo(atribuicao: AtribuicaoItem) {
   const novoValor = !atribuicao.ativo;
-  const { error } = await supabaseClient
-    .from('atribuicoes_professores')
-    .update({ ativo: novoValor })
-    .eq('id', atribuicao.id);
-  if (!error) {
+  try {
+    await api(`/api/atribuicoes/${atribuicao.id}/status`, {
+      metodo: 'PATCH',
+      corpo: { ativo: novoValor },
+    });
     atribuicao.ativo = novoValor;
     mostrarSucesso(novoValor ? 'Atribuição ativada.' : 'Atribuição desativada.');
-  } else {
+  } catch {
     mostrarErro('Falha ao alterar status.');
   }
 }
@@ -269,6 +269,14 @@ const papelBadge = (papel: string) => {
 onMounted(async () => {
   opcoesPapel.value = await buscarOpcoes('papel_atribuicao');
   await carregarDados();
+  await inscrever(
+    [{ tabela: 'atribuicoes_professores' }, { tabela: 'turmas' }, { tabela: 'disciplinas' }],
+    carregarDados,
+  );
+});
+
+onUnmounted(() => {
+  encerrar();
 });
 </script>
 

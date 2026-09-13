@@ -5,13 +5,14 @@ import { useAutenticacao } from '@/composables/useAutenticacao';
 import { useMonitoramento } from '@/composables/useMonitoramento';
 import { useOpcoesConfiguracao } from '@/composables/useOpcoesConfiguracao';
 import { useAlturaUniformeCards } from '@/composables/useAlturaUniformeCards';
-import { supabaseClient } from '@/servicos/supabase';
+import { api } from '@/servicos/api';
 import CampoFormulario from '@/componentes/CampoFormulario.vue';
 import Combobox from '@/componentes/Combobox.vue';
 import GrupoCheckbox from '@/componentes/GrupoCheckbox.vue';
 import CartaoSelecao from '@/componentes/CartaoSelecao.vue';
 import ModalConfirmacao from '@/componentes/ModalConfirmacao.vue';
 import type { AlunoFrequencia, OpcaoCheckbox } from '@/tipos/componentes';
+import type { TagComportamento } from '@/tipos/database';
 
 const router = useRouter();
 const { usuario } = useAutenticacao();
@@ -128,18 +129,14 @@ async function confirmar() {
 
 onMounted(async () => {
   opcoesTipo.value = await buscarOpcoes('tipo_ocorrencia');
-  const { data: tagsData } = await supabaseClient
-    .from('tags_comportamento')
-    .select('nome, icone, descricao')
-    .eq('ativo', true)
-    .order('nome');
-  opcoesTags.value = (tagsData ?? []).map(
-    (t: { nome: string; icone: string | null; descricao: string | null }) => ({
-      valor: t.nome,
-      rotulo: t.descricao ?? t.nome,
-      icone: t.icone ?? undefined,
-    }),
-  );
+  const { tags } = await api<{ tags: TagComportamento[] }>('/api/tags-comportamento', {
+    parametros: { ativo: 'true' },
+  });
+  opcoesTags.value = tags.map((t) => ({
+    valor: t.nome,
+    rotulo: t.descricao ?? t.nome,
+    icone: t.icone ?? undefined,
+  }));
   alunos.value = await buscarAlunosParaFrequencia();
 });
 </script>

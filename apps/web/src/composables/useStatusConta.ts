@@ -1,5 +1,5 @@
 import { useRouter, type Router } from 'vue-router';
-import { supabaseClient } from '@/servicos/supabase';
+import { api } from '@/servicos/api';
 
 export type StatusPerfilConta = 'ativo' | 'pendente' | 'inativo';
 
@@ -16,23 +16,14 @@ let ouvinteRegistrado: ((event: Event) => void) | null = null;
 let ultimaVerificacaoEm = 0;
 let emVerificacao = false;
 
-/** Consulta o status do perfil autenticado; a leitura própria por RLS permite detectar desativação. */
+/** Consulta o status do perfil autenticado; 401 ou falha transitória devolvem null. */
 async function verificarStatus(): Promise<StatusPerfilConta | null> {
-  const {
-    data: { session },
-  } = await supabaseClient.auth.getSession();
-
-  if (!session?.user?.id) return null;
-
-  const { data } = await supabaseClient
-    .from('perfis')
-    .select('status')
-    .eq('id', session.user.id)
-    .single();
-
-  if (!data) return null;
-
-  return (data as { status: StatusPerfilConta }).status;
+  try {
+    const { perfil } = await api<{ perfil: { status: StatusPerfilConta } }>('/api/auth/me');
+    return perfil.status;
+  } catch {
+    return null;
+  }
 }
 
 function pararOuvintes() {

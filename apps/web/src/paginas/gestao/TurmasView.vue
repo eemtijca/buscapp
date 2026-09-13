@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch, nextTick } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch, nextTick } from 'vue';
 import { useRouter, onBeforeRouteLeave } from 'vue-router';
-import { supabaseClient } from '@/servicos/supabase';
+import { api } from '@/servicos/api';
 import { useOpcoesConfiguracao } from '@/composables/useOpcoesConfiguracao';
 import { useAnoLetivo } from '@/composables/useAnoLetivo';
 import { useFormSnapshot } from '@/composables/useFormSnapshot';
+import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh';
 import {
   mensagemSucesso as criarMensagemSucesso,
   mensagemErroExplicita,
@@ -19,6 +20,7 @@ const router = useRouter();
 
 const { buscarOpcoes } = useOpcoesConfiguracao();
 const { buscarAnoLetivoAtivo } = useAnoLetivo();
+const { inscrever, encerrar } = useRealtimeRefresh();
 
 const turmas = ref<Turma[]>([]);
 const opcoesSerie = ref<OpcaoCheckbox[]>([]);
@@ -101,8 +103,8 @@ async function carregarTurmas() {
   try {
     opcoesSerie.value = await buscarOpcoes('serie_turma');
     opcoesLetra.value = await buscarOpcoes('letra_turma');
-    const { data } = await supabaseClient.from('turmas').select('*').order('nome_completo');
-    turmas.value = data ?? [];
+    const { turmas: lista } = await api<{ turmas: Turma[] }>('/api/turmas');
+    turmas.value = lista;
   } catch {
     mostrarErro('Falha ao carregar turmas.');
   } finally {
@@ -139,23 +141,19 @@ async function salvar() {
   carregando.value = true;
   try {
     if (modoEdicao.value && editandoId.value) {
-      const { error } = await supabaseClient
-        .from('turmas')
-        .update({
-          serie: formSerie.value,
-          letra: formLetra.value,
-          capacidade: formCapacidade.value,
-          ativo: formAtivo.value,
-        })
-        .eq('id', editandoId.value);
-      if (error) {
+      try {
+        await api(`/api/turmas/${editandoId.value}`, {
+          metodo: 'PUT',
+          corpo: {
+            serie: formSerie.value,
+            letra: formLetra.value,
+            capacidade: formCapacidade.value,
+            ativo: formAtivo.value,
+          },
+        });
+      } catch (e) {
         mostrarErro(
-          mensagemErroExplicita(
-            'Turma',
-            `${formSerie.value} ${formLetra.value}`,
-            'atualizar',
-            error,
-          ),
+          mensagemErroExplicita('Turma', `${formSerie.value} ${formLetra.value}`, 'atualizar', e),
         );
         return;
       }
@@ -175,16 +173,20 @@ async function salvar() {
         );
         return;
       }
-      const { error } = await supabaseClient.from('turmas').insert({
-        serie: formSerie.value,
-        letra: formLetra.value,
-        capacidade: formCapacidade.value,
-        ativo: formAtivo.value,
-        ano_letivo_id: anoLetivo.id,
-      });
-      if (error) {
+      try {
+        await api('/api/turmas', {
+          metodo: 'POST',
+          corpo: {
+            serie: formSerie.value,
+            letra: formLetra.value,
+            capacidade: formCapacidade.value,
+            ativo: formAtivo.value,
+            ano_letivo_id: anoLetivo.id,
+          },
+        });
+      } catch (e) {
         mostrarErro(
-          mensagemErroExplicita('Turma', `${formSerie.value} ${formLetra.value}`, 'criar', error),
+          mensagemErroExplicita('Turma', `${formSerie.value} ${formLetra.value}`, 'criar', e),
         );
         return;
       }
@@ -202,19 +204,26 @@ async function salvar() {
 
 async function alternarAtivo(turma: Turma) {
   const novoValor = !turma.ativo;
-  const { error } = await supabaseClient
-    .from('turmas')
-    .update({ ativo: novoValor })
-    .eq('id', turma.id);
-  if (!error) {
+  try {
+    await api(`/api/turmas/${turma.id}/status`, {
+      metodo: 'PATCH',
+      corpo: { ativo: novoValor },
+    });
     turma.ativo = novoValor;
     mostrarSucesso(novoValor ? 'Turma ativada.' : 'Turma desativada.');
-  } else {
+  } catch {
     mostrarErro('Falha ao alterar status.');
   }
 }
 
-onMounted(carregarTurmas);
+onMounted(async () => {
+  await carregarTurmas();
+  await inscrever([{ tabela: 'turmas' }], carregarTurmas);
+});
+
+onUnmounted(() => {
+  encerrar();
+});
 </script>
 
 <template>

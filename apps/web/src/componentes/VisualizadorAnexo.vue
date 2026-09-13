@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
-import { supabaseClient } from '@/servicos/supabase';
+import { baixarArquivo } from '@/servicos/api';
 
 const props = defineProps<{
   aberto: boolean;
-  storagePath: string;
+  anexoId: string;
   nomeArquivo: string;
   mimeType?: string;
 }>();
@@ -22,6 +22,8 @@ const esImagem = computed(() => props.mimeType?.startsWith('image/') ?? false);
 const esPdf = computed(() => props.mimeType === 'application/pdf');
 
 function limpar() {
+  // Invalida qualquer download em andamento antes de descartar o blob atual.
+  sequencia++;
   if (blobUrl.value) {
     URL.revokeObjectURL(blobUrl.value);
     blobUrl.value = null;
@@ -31,25 +33,21 @@ function limpar() {
 }
 
 async function carregar() {
-  if (!props.aberto || !props.storagePath) return;
+  if (!props.aberto || !props.anexoId) return;
   limpar();
   carregando.value = true;
   const id = ++sequencia;
-  const { data, error } = await supabaseClient.storage
-    .from('justificativas')
-    .download(props.storagePath);
-  if (id !== sequencia) return;
-  if (error || !data) {
-    carregando.value = false;
+  try {
+    const data = await baixarArquivo(`/api/anexos/${props.anexoId}/arquivo`);
+    if (id !== sequencia) return;
+    if (!props.aberto) return;
+    blobUrl.value = URL.createObjectURL(data);
+  } catch {
+    if (id !== sequencia) return;
     erro.value = 'Não foi possível carregar o anexo.';
-    return;
+  } finally {
+    if (id === sequencia) carregando.value = false;
   }
-  if (!props.aberto) {
-    carregando.value = false;
-    return;
-  }
-  blobUrl.value = URL.createObjectURL(data);
-  carregando.value = false;
 }
 
 function fechar() {
@@ -61,7 +59,7 @@ function aoPressionarTecla(evento: KeyboardEvent) {
   if (evento.key === 'Escape' && props.aberto) fechar();
 }
 
-watch(() => [props.aberto, props.storagePath], carregar);
+watch(() => [props.aberto, props.anexoId], carregar);
 
 onMounted(() => {
   window.addEventListener('keydown', aoPressionarTecla);

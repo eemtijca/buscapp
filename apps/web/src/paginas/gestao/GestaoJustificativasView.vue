@@ -22,7 +22,7 @@ const {
 const justificativas = ref<JustificativaPendente[]>([]);
 const mensagemSucesso = ref<string | null>(null);
 const mensagemErro = ref<string | null>(null);
-const anexoSelecionado = ref<{ path: string; nome: string; mime?: string } | null>(null);
+const anexoSelecionado = ref<{ id: string; nome: string; mime?: string } | null>(null);
 
 function mostrarSucesso(msg: string) {
   mensagemSucesso.value = msg;
@@ -40,9 +40,9 @@ const justificativasPendentes = computed(() =>
 
 function verAnexoJustificativa(justId: string) {
   const j = justificativas.value.find((x) => x.id === justId);
-  if (j?.anexoPath) {
+  if (j?.anexoId) {
     anexoSelecionado.value = {
-      path: j.anexoPath,
+      id: j.anexoId,
       nome: j.anexoNome ?? 'anexo',
       mime: j.anexoMime,
     };
@@ -157,7 +157,7 @@ onUnmounted(() => {
 
     <VisualizadorAnexo
       :aberto="!!anexoSelecionado"
-      :storage-path="anexoSelecionado?.path ?? ''"
+      :anexo-id="anexoSelecionado?.id ?? ''"
       :nome-arquivo="anexoSelecionado?.nome ?? ''"
       :mime-type="anexoSelecionado?.mime"
       @fechar="anexoSelecionado = null"

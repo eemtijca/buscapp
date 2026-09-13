@@ -3,16 +3,16 @@ import { computed, ref, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useAutenticacao } from '@/composables/useAutenticacao';
 import { useMonitoramento } from '@/composables/useMonitoramento';
-import { supabaseClient } from '@/servicos/supabase';
+import { api } from '@/servicos/api';
 import FormularioJustificativa from '@/componentes/FormularioJustificativa.vue';
 import Combobox from '@/componentes/Combobox.vue';
 import type { OpcaoCombobox } from '@/componentes/Combobox.vue';
-import type { Aluno } from '@/tipos/database';
+import type { Aluno, Frequencia } from '@/tipos/database';
 
 const router = useRouter();
 const route = useRoute();
 const { usuario } = useAutenticacao();
-const { buscarFilhosDoResponsavel, enviarJustificativa, processarAnexoAsync } = useMonitoramento();
+const { buscarFilhosDoResponsavel, enviarJustificativa } = useMonitoramento();
 
 const filhos = ref<Aluno[]>([]);
 const filhoSelecionado = ref<Aluno | null>(null);
@@ -53,14 +53,12 @@ async function handleEnviarJustificativa(payload: {
     payload.dataInicio,
     payload.dataFim,
     payload.motivo,
+    payload.arquivo,
   );
 
   if (result.success) {
     mensagemSucesso.value = 'Justificativa enviada com sucesso.';
     formKey.value++;
-    if (payload.arquivo && result.justificativaId) {
-      processarAnexoAsync(result.justificativaId, usuario.value.id, payload.arquivo);
-    }
   } else {
     mensagemErro.value = 'Falha ao enviar justificativa. Tente novamente.';
   }
@@ -75,19 +73,17 @@ async function inicializar() {
   filhos.value = await buscarFilhosDoResponsavel(usuario.value.id);
 
   if (frequenciaId) {
-    const { data: freqData } = await supabaseClient
-      .from('frequencias')
-      .select('aluno_id, data_aula, periodo')
-      .eq('id', frequenciaId)
-      .single();
-
-    if (freqData) {
-      const f = freqData as unknown as { aluno_id: string; data_aula: string; periodo: string };
-      dataPrefill.value = f.data_aula;
-      dataDesabilitada.value = !!f.data_aula;
-      const aluno = filhos.value.find((a) => a.id === f.aluno_id);
+    try {
+      const { frequencia } = await api<{ frequencia: Frequencia }>(
+        `/api/frequencias/${frequenciaId}`,
+      );
+      dataPrefill.value = frequencia.data_aula;
+      dataDesabilitada.value = !!frequencia.data_aula;
+      const aluno = filhos.value.find((a) => a.id === frequencia.aluno_id);
       if (aluno) filhoSelecionado.value = aluno;
-      detalhesAusencia.value = `Período: ${f.periodo}`;
+      detalhesAusencia.value = `Período: ${frequencia.periodo}`;
+    } catch (e) {
+      console.error('[JustificativaView] Erro ao buscar a frequência do deep-link:', e);
     }
   }
 

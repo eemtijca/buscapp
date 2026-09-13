@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { onMounted, ref, computed } from 'vue';
-import { supabaseClient } from '@/servicos/supabase';
+import { api } from '@/servicos/api';
 import { mensagemSucesso as msgSucesso, mensagemErroExplicita } from '@/utils/mensagemExplicita';
 import CampoFormulario from '@/componentes/CampoFormulario.vue';
 import ModalConfirmacao from '@/componentes/ModalConfirmacao.vue';
+import type { ConfiguracaoSistema } from '@/tipos/database';
 
 const carregando = ref(false);
 const salvando = ref(false);
@@ -131,44 +132,30 @@ function mostrarErro(msg: string) {
 async function carregar() {
   carregando.value = true;
   try {
-    const { data } = await supabaseClient.from('configuracoes_sistema').select('*').single();
-    if (data) {
-      escolaNome.value = data.escola_nome;
-      limiteCritico.value = data.limite_critico_faltas;
-      limitePreventivo.value = data.limite_preventivo_faltas;
-      diasExpurgo.value = data.dias_expurgo_anexos;
-      mensagemForaHorario.value = data.mensagem_fora_horario ?? '';
-      minutosValidadeCodigo.value = data.minutos_validade_codigo ?? 60;
-      maxTentativasCodigo.value = data.max_tentativas_codigo ?? 5;
-      minutosBloqueioCodigo.value = data.minutos_bloqueio_codigo ?? 15;
-      diasRetencaoCodigos.value = data.dias_retencao_codigos ?? 30;
-      pesoFalta.value = (data as unknown as { peso_falta?: number }).peso_falta ?? 1;
-      pesoOcorrencia.value = (data as unknown as { peso_ocorrencia?: number }).peso_ocorrencia ?? 1;
-      pesoRecencia.value = (data as unknown as { peso_recencia?: number }).peso_recencia ?? 1;
-      janelaRecenciaDias.value =
-        (data as unknown as { janela_recencia_dias?: number }).janela_recencia_dias ?? 14;
-      limiteScoreMedio.value =
-        (data as unknown as { limite_score_medio?: number }).limite_score_medio ?? 40;
-      limiteScoreAlto.value =
-        (data as unknown as { limite_score_alto?: number }).limite_score_alto ?? 75;
-      pesoOcorrenciaGrave.value =
-        (data as unknown as { peso_ocorrencia_grave?: number }).peso_ocorrencia_grave ?? 15;
-      forcarMedioEmGrave.value =
-        (data as unknown as { forcar_medio_em_grave?: boolean }).forcar_medio_em_grave ?? true;
-      janelaOcorrenciaDias.value =
-        (data as unknown as { janela_ocorrencia_dias?: number }).janela_ocorrencia_dias ?? 90;
-      decaimentoOcorrenciaTipo.value =
-        (data as unknown as { decaimento_ocorrencia_tipo?: string }).decaimento_ocorrencia_tipo ??
-        'janela';
-      pesoResolvida.value = (data as unknown as { peso_resolvida?: number }).peso_resolvida ?? 0.5;
-      pesoComportamentoPositivo.value =
-        (data as unknown as { peso_comportamento_positivo?: number }).peso_comportamento_positivo ??
-        5;
-      janelaPositivoDias.value =
-        (data as unknown as { janela_positivo_dias?: number }).janela_positivo_dias ?? 30;
-      bonusPresencaConfirmada.value =
-        (data as unknown as { bonus_presenca_confirmada?: number }).bonus_presenca_confirmada ?? 10;
-    }
+    const { configuracao } = await api<{ configuracao: ConfiguracaoSistema }>('/api/configuracoes');
+    escolaNome.value = configuracao.escola_nome;
+    limiteCritico.value = configuracao.limite_critico_faltas;
+    limitePreventivo.value = configuracao.limite_preventivo_faltas;
+    diasExpurgo.value = configuracao.dias_expurgo_anexos;
+    mensagemForaHorario.value = configuracao.mensagem_fora_horario ?? '';
+    minutosValidadeCodigo.value = configuracao.minutos_validade_codigo ?? 60;
+    maxTentativasCodigo.value = configuracao.max_tentativas_codigo ?? 5;
+    minutosBloqueioCodigo.value = configuracao.minutos_bloqueio_codigo ?? 15;
+    diasRetencaoCodigos.value = configuracao.dias_retencao_codigos ?? 30;
+    pesoFalta.value = configuracao.peso_falta ?? 1;
+    pesoOcorrencia.value = configuracao.peso_ocorrencia ?? 1;
+    pesoRecencia.value = configuracao.peso_recencia ?? 1;
+    janelaRecenciaDias.value = configuracao.janela_recencia_dias ?? 14;
+    limiteScoreMedio.value = configuracao.limite_score_medio ?? 40;
+    limiteScoreAlto.value = configuracao.limite_score_alto ?? 75;
+    pesoOcorrenciaGrave.value = configuracao.peso_ocorrencia_grave ?? 15;
+    forcarMedioEmGrave.value = configuracao.forcar_medio_em_grave ?? true;
+    janelaOcorrenciaDias.value = configuracao.janela_ocorrencia_dias ?? 90;
+    decaimentoOcorrenciaTipo.value = configuracao.decaimento_ocorrencia_tipo ?? 'janela';
+    pesoResolvida.value = configuracao.peso_resolvida ?? 0.5;
+    pesoComportamentoPositivo.value = configuracao.peso_comportamento_positivo ?? 5;
+    janelaPositivoDias.value = configuracao.janela_positivo_dias ?? 30;
+    bonusPresencaConfirmada.value = configuracao.bonus_presenca_confirmada ?? 10;
   } catch {
     mostrarErro('Falha ao carregar.');
   } finally {
@@ -186,9 +173,9 @@ async function salvar() {
   if (!validar()) return;
   salvando.value = true;
   try {
-    const { error } = await supabaseClient
-      .from('configuracoes_sistema')
-      .update({
+    await api('/api/configuracoes', {
+      metodo: 'PUT',
+      corpo: {
         escola_nome: escolaNome.value.trim(),
         limite_critico_faltas: limiteCritico.value,
         limite_preventivo_faltas: limitePreventivo.value,
@@ -212,9 +199,8 @@ async function salvar() {
         peso_comportamento_positivo: pesoComportamentoPositivo.value,
         janela_positivo_dias: janelaPositivoDias.value,
         bonus_presenca_confirmada: bonusPresencaConfirmada.value,
-      })
-      .eq('id', 1);
-    if (error) throw error;
+      },
+    });
     mostrarSucesso(msgSucesso('Configurações do sistema', escolaNome.value || 'gerais', 'salva'));
   } catch (e) {
     mostrarErro(

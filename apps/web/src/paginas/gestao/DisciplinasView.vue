@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { onMounted, ref, watch, nextTick } from 'vue';
+import { onMounted, onUnmounted, ref, watch, nextTick } from 'vue';
 import { useRouter, onBeforeRouteLeave } from 'vue-router';
-import { supabaseClient } from '@/servicos/supabase';
+import { api } from '@/servicos/api';
 import { useFormSnapshot } from '@/composables/useFormSnapshot';
+import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh';
 import {
   mensagemSucesso as criarMensagemSucesso,
   mensagemErroExplicita,
@@ -11,6 +12,7 @@ import CampoFormulario from '@/componentes/CampoFormulario.vue';
 import type { Disciplina } from '@/tipos/database';
 
 const router = useRouter();
+const { inscrever, encerrar } = useRealtimeRefresh();
 
 const disciplinas = ref<Disciplina[]>([]);
 const carregando = ref(false);
@@ -81,8 +83,8 @@ function resetForm() {
 async function carregarDisciplinas() {
   carregando.value = true;
   try {
-    const { data } = await supabaseClient.from('disciplinas').select('*').order('nome');
-    disciplinas.value = data ?? [];
+    const { disciplinas: lista } = await api<{ disciplinas: Disciplina[] }>('/api/disciplinas');
+    disciplinas.value = lista;
   } catch {
     mostrarErro('Falha ao carregar disciplinas.');
   } finally {
@@ -130,29 +132,34 @@ async function salvar() {
   carregando.value = true;
   try {
     if (modoEdicao.value && editandoId.value) {
-      const { error } = await supabaseClient
-        .from('disciplinas')
-        .update({
-          nome: formNome.value.trim(),
-          codigo_sige: formCodigoSige.value.trim() || null,
-          carga_horaria: formCargaHoraria.value,
-          ativo: formAtivo.value,
-        })
-        .eq('id', editandoId.value);
-      if (error) {
-        mostrarErro(mensagemErroExplicita('Disciplina', formNome.value, 'atualizar', error));
+      try {
+        await api(`/api/disciplinas/${editandoId.value}`, {
+          metodo: 'PUT',
+          corpo: {
+            nome: formNome.value.trim(),
+            codigo_sige: formCodigoSige.value.trim() || null,
+            carga_horaria: formCargaHoraria.value,
+            ativo: formAtivo.value,
+          },
+        });
+      } catch (e) {
+        mostrarErro(mensagemErroExplicita('Disciplina', formNome.value, 'atualizar', e));
         return;
       }
       mostrarSucesso(criarMensagemSucesso('Disciplina', formNome.value, 'atualizada'));
     } else {
-      const { error } = await supabaseClient.from('disciplinas').insert({
-        nome: formNome.value.trim(),
-        codigo_sige: formCodigoSige.value.trim() || null,
-        carga_horaria: formCargaHoraria.value,
-        ativo: formAtivo.value,
-      });
-      if (error) {
-        mostrarErro(mensagemErroExplicita('Disciplina', formNome.value, 'criar', error));
+      try {
+        await api('/api/disciplinas', {
+          metodo: 'POST',
+          corpo: {
+            nome: formNome.value.trim(),
+            codigo_sige: formCodigoSige.value.trim() || null,
+            carga_horaria: formCargaHoraria.value,
+            ativo: formAtivo.value,
+          },
+        });
+      } catch (e) {
+        mostrarErro(mensagemErroExplicita('Disciplina', formNome.value, 'criar', e));
         return;
       }
       mostrarSucesso(criarMensagemSucesso('Disciplina', formNome.value, 'criada'));
@@ -167,19 +174,26 @@ async function salvar() {
 
 async function alternarAtivo(disciplina: Disciplina) {
   const novoValor = !disciplina.ativo;
-  const { error } = await supabaseClient
-    .from('disciplinas')
-    .update({ ativo: novoValor })
-    .eq('id', disciplina.id);
-  if (!error) {
+  try {
+    await api(`/api/disciplinas/${disciplina.id}/status`, {
+      metodo: 'PATCH',
+      corpo: { ativo: novoValor },
+    });
     disciplina.ativo = novoValor;
     mostrarSucesso(novoValor ? 'Disciplina ativada.' : 'Disciplina desativada.');
-  } else {
+  } catch {
     mostrarErro('Falha ao alterar status.');
   }
 }
 
-onMounted(carregarDisciplinas);
+onMounted(async () => {
+  await carregarDisciplinas();
+  await inscrever([{ tabela: 'disciplinas' }], carregarDisciplinas);
+});
+
+onUnmounted(() => {
+  encerrar();
+});
 </script>
 
 <template>

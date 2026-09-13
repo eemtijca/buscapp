@@ -1,11 +1,14 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
-import { supabaseClient } from '@/servicos/supabase';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { api } from '@/servicos/api';
+import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh';
 import CampoFormulario from '@/componentes/CampoFormulario.vue';
 import Combobox from '@/componentes/Combobox.vue';
 import type { OpcaoCombobox } from '@/componentes/Combobox.vue';
 import SeletorIcone from '@/componentes/SeletorIcone.vue';
 import type { TagComportamento } from '@/tipos/database';
+
+const { inscrever, encerrar } = useRealtimeRefresh();
 
 const tags = ref<TagComportamento[]>([]);
 const carregando = ref(false);
@@ -52,8 +55,8 @@ function resetForm() {
 async function carregar() {
   carregando.value = true;
   try {
-    const { data } = await supabaseClient.from('tags_comportamento').select('*').order('nome');
-    tags.value = data ?? [];
+    const { tags: lista } = await api<{ tags: TagComportamento[] }>('/api/tags-comportamento');
+    tags.value = lista;
   } catch {
     mostrarErro('Falha ao carregar tags.');
   } finally {
@@ -90,18 +93,6 @@ function validarPeso(): boolean {
   return true;
 }
 
-async function contarUsoTag(nome: string): Promise<number> {
-  try {
-    const { count } = await supabaseClient
-      .from('ocorrencias')
-      .select('id', { count: 'exact', head: true })
-      .filter('tags_comportamento', 'cs', `{${nome}}`);
-    return count ?? 0;
-  } catch {
-    return 0;
-  }
-}
-
 async function salvar() {
   if (!formNome.value.trim()) {
     mostrarErro('Preencha o nome da tag.');
@@ -111,37 +102,27 @@ async function salvar() {
   carregando.value = true;
   try {
     if (modoEdicao.value && editandoId.value) {
-      const atual = tags.value.find((t) => t.id === editandoId.value);
-      const novoNome = formNome.value.trim();
-      if (atual && atual.nome !== novoNome) {
-        const uso = await contarUsoTag(atual.nome);
-        if (uso > 0) {
-          mostrarErro(
-            `Não é possível renomear: a tag é usada em ${uso} ocorrência(s). Desative-a em vez de renomear.`,
-          );
-          return;
-        }
-      }
-      await supabaseClient
-        .from('tags_comportamento')
-        .update({
-          nome: novoNome,
-          categoria: formCategoria.value,
-          icone: formIcone.value.trim() || null,
-          descricao: formDescricao.value.trim() || null,
-          peso_pontuacao: formPeso.value,
-          ativo: formAtivo.value,
-        })
-        .eq('id', editandoId.value);
-      mostrarSucesso('Tag atualizada.');
-    } else {
-      await supabaseClient.from('tags_comportamento').insert({
+      const corpo = {
         nome: formNome.value.trim(),
         categoria: formCategoria.value,
         icone: formIcone.value.trim() || null,
         descricao: formDescricao.value.trim() || null,
         peso_pontuacao: formPeso.value,
         ativo: formAtivo.value,
+      };
+      await api(`/api/tags-comportamento/${editandoId.value}`, { metodo: 'PUT', corpo });
+      mostrarSucesso('Tag atualizada.');
+    } else {
+      await api('/api/tags-comportamento', {
+        metodo: 'POST',
+        corpo: {
+          nome: formNome.value.trim(),
+          categoria: formCategoria.value,
+          icone: formIcone.value.trim() || null,
+          descricao: formDescricao.value.trim() || null,
+          peso_pontuacao: formPeso.value,
+          ativo: formAtivo.value,
+        },
       });
       mostrarSucesso('Tag criada.');
     }
@@ -157,10 +138,10 @@ async function salvar() {
 
 async function alternarAtivo(item: TagComportamento) {
   try {
-    await supabaseClient
-      .from('tags_comportamento')
-      .update({ ativo: !item.ativo })
-      .eq('id', item.id);
+    await api(`/api/tags-comportamento/${item.id}/status`, {
+      metodo: 'PATCH',
+      corpo: { ativo: !item.ativo },
+    });
     await carregar();
   } catch {
     mostrarErro('Falha ao alternar status.');
@@ -171,24 +152,24 @@ async function excluir(id: string) {
   const item = tags.value.find((t) => t.id === id);
   if (!item) return;
   if (!confirm(`Excluir a tag "${item.nome}"?`)) return;
-  const uso = await contarUsoTag(item.nome);
-  if (uso > 0) {
-    mostrarErro(
-      `Não é possível excluir: a tag é usada em ${uso} ocorrência(s). Desative-a para deixá-la indisponível.`,
-    );
-    return;
-  }
   try {
-    const { error } = await supabaseClient.from('tags_comportamento').delete().eq('id', id);
-    if (error) throw error;
+    await api(`/api/tags-comportamento/${id}`, { metodo: 'DELETE' });
     mostrarSucesso('Tag excluída.');
     await carregar();
-  } catch {
-    mostrarErro('Falha ao excluir. A tag pode estar vinculada a registros de comportamento.');
+  } catch (e) {
+    // A API recusa com 409 `tag_em_uso` e mensagem contextual.
+    mostrarErro(e instanceof Error ? e.message : 'Falha ao excluir.');
   }
 }
 
-onMounted(carregar);
+onMounted(async () => {
+  await carregar();
+  await inscrever([{ tabela: 'tags_comportamento' }], carregar);
+});
+
+onUnmounted(() => {
+  encerrar();
+});
 </script>
 
 <template>

@@ -6,6 +6,7 @@ import {
   removerLoteFrequenciaSchema,
   resumirFrequenciasSchema,
   resumoAlunoFrequenciaSchema,
+  uuidSchema,
 } from '@buscapp/contratos';
 import type { FastifyRequest } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
@@ -16,7 +17,14 @@ import {
   exigirPapel,
   usuarioAtual,
 } from '../../nucleo/autenticacao/middleware.js';
-import { listar, registrar, registrarLote, removerLote, resumir } from './frequencias.servico.js';
+import {
+  listar,
+  obter,
+  registrar,
+  registrarLote,
+  removerLote,
+  resumir,
+} from './frequencias.servico.js';
 
 const podeLer = exigirPapel('gestao', 'professor', 'responsavel');
 const podeLancar = exigirPapel('gestao', 'professor');
@@ -106,6 +114,20 @@ export const rotasFrequencias: FastifyPluginAsyncZod = async (app) => {
       },
     },
     async (pedido) => ({ resumo: await resumir(usuarioAtual(pedido), pedido.query) }),
+  );
+
+  app.get(
+    '/api/frequencias/:id',
+    {
+      preHandler: [autenticar, podeLer],
+      schema: {
+        tags: ['frequencias'],
+        summary: 'Retorna uma frequência visível para o usuário',
+        params: z.object({ id: uuidSchema }),
+        response: { 200: z.object({ frequencia: frequenciaSchema }) },
+      },
+    },
+    async (pedido) => ({ frequencia: await obter(usuarioAtual(pedido), pedido.params.id) }),
   );
 
   app.get(

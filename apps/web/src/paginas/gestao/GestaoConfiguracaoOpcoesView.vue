@@ -1,17 +1,19 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref, computed, nextTick } from 'vue';
 import { useRoute } from 'vue-router';
-import { supabaseClient } from '@/servicos/supabase';
+import { api } from '@/servicos/api';
 import { useOpcoesConfiguracao } from '@/composables/useOpcoesConfiguracao';
 import { useAlturaUniformeCards } from '@/composables/useAlturaUniformeCards';
+import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh';
 import CampoFormulario from '@/componentes/CampoFormulario.vue';
 import CartaoSelecao from '@/componentes/CartaoSelecao.vue';
-import { obterRegra, gerarChave, normalizarChaveTexto } from '@/utils/opcoesConfiguracao';
+import { obterRegra, gerarChave } from '@/utils/opcoesConfiguracao';
 import type { OpcaoConfiguracao } from '@/tipos/database';
 import Sortable from 'sortablejs';
 
 const route = useRoute();
 const { limparCache } = useOpcoesConfiguracao();
+const { inscrever, encerrar } = useRealtimeRefresh();
 
 const tipo = computed(() => route.params.tipo as string);
 
@@ -108,22 +110,7 @@ function validarNome(): boolean {
     erroValidacao.value = r.mensagemPadrao ?? 'Formato inválido.';
     return false;
   }
-  const norm = normalizarChaveTexto(rotulo);
-  const existente = opcoes.value.find(
-    (o) => o.id !== editandoId.value && normalizarChaveTexto(o.rotulo) === norm,
-  );
-  if (existente) {
-    erroValidacao.value = existente.ativo
-      ? `Já existe uma opção chamada "${existente.rotulo}".`
-      : `Já existe uma opção chamada "${existente.rotulo}" (inativa). Reative-a na lista para reutilizá-la.`;
-    return false;
-  }
-  const chave = gerarChave(rotulo, tipo.value);
-  const colisao = opcoes.value.find((o) => o.chave === chave && o.id !== editandoId.value);
-  if (colisao) {
-    erroValidacao.value = `Já existe uma opção com a chave "${chave}". Escolha outro nome.`;
-    return false;
-  }
+  // Unicidade de rótulo/chave é validada pelo servidor (409); a mensagem retornada é exibida.
   return true;
 }
 
@@ -206,16 +193,11 @@ async function salvarOrdem() {
     if (id) updates.push({ id, ordem: i + 1 });
   });
   try {
-    const results = await Promise.allSettled(
-      updates.map((u) =>
-        supabaseClient.from('opcoes_configuracao').update({ ordem: u.ordem }).eq('id', u.id),
-      ),
-    );
-    if (results.some((r) => r.status === 'rejected')) {
-      opcoes.value = snapshotPreReordenacao.value.map((o) => ({ ...o }));
-      initSortable();
-      mostrarErro('Falha ao salvar a ordem. A ordem foi restaurada.');
-      return;
+    if (updates.length) {
+      await api('/api/opcoes/reordenar', {
+        metodo: 'PATCH',
+        corpo: { itens: updates },
+      });
     }
     modoReordenar.value = false;
     destroySortable();
@@ -240,12 +222,10 @@ function cancelarReordenar() {
 async function carregar() {
   carregando.value = true;
   try {
-    const { data } = await supabaseClient
-      .from('opcoes_configuracao')
-      .select('*')
-      .eq('tipo', tipo.value)
-      .order('ordem');
-    opcoes.value = data ?? [];
+    const { opcoes: lista } = await api<{ opcoes: OpcaoConfiguracao[] }>('/api/opcoes', {
+      parametros: { tipo: tipo.value },
+    });
+    opcoes.value = lista;
   } catch {
     mostrarErro('Falha ao carregar.');
   } finally {
@@ -269,50 +249,33 @@ function abrirEditar(item: OpcaoConfiguracao) {
   modalAberto.value = true;
 }
 
-async function verificarUso(chave: string): Promise<number> {
-  const usos = regra.value.verificarUso;
-  if (!usos.length) return 0;
-  let total = 0;
-  for (const c of usos) {
-    const q = c.isArray
-      ? supabaseClient
-          .from(c.tabela)
-          .select('id', { count: 'exact', head: true })
-          .filter(c.coluna, 'cs', `{${chave}}`)
-      : supabaseClient
-          .from(c.tabela)
-          .select('id', { count: 'exact', head: true })
-          .eq(c.coluna, chave);
-    const { count } = await q;
-    total += count ?? 0;
-  }
-  return total;
-}
-
 async function salvar() {
   if (!validarNome()) return;
   carregando.value = true;
   const rotulo = rotuloFinal();
   try {
     if (modoEdicao.value && editandoId.value) {
-      await supabaseClient
-        .from('opcoes_configuracao')
-        .update({
+      await api(`/api/opcoes/${editandoId.value}`, {
+        metodo: 'PUT',
+        corpo: {
           rotulo,
           ativo: formAtivo.value,
-        })
-        .eq('id', editandoId.value);
+        },
+      });
       mostrarSucesso('Opção atualizada.');
     } else {
       const chave = gerarChave(rotulo, tipo.value);
       const maxOrdem = opcoes.value.reduce((max, o) => Math.max(max, o.ordem), 0);
-      await supabaseClient.from('opcoes_configuracao').insert({
-        tipo: tipo.value,
-        chave,
-        rotulo,
-        icone: regra.value.icone,
-        ordem: maxOrdem + 1,
-        ativo: formAtivo.value,
+      await api('/api/opcoes', {
+        metodo: 'POST',
+        corpo: {
+          tipo: tipo.value,
+          chave,
+          rotulo,
+          icone: regra.value.icone,
+          ordem: maxOrdem + 1,
+          ativo: formAtivo.value,
+        },
       });
       mostrarSucesso('Opção criada.');
     }
@@ -327,30 +290,40 @@ async function salvar() {
 }
 
 async function alternarAtivo(item: OpcaoConfiguracao) {
-  await supabaseClient.from('opcoes_configuracao').update({ ativo: !item.ativo }).eq('id', item.id);
-  limparCache(tipo.value);
-  await carregar();
+  try {
+    await api(`/api/opcoes/${item.id}`, {
+      metodo: 'PUT',
+      corpo: { ativo: !item.ativo },
+    });
+    limparCache(tipo.value);
+    await carregar();
+  } catch (e) {
+    mostrarErro(e instanceof Error ? e.message : String(e));
+  }
 }
 
 async function excluir(id: string) {
   const item = opcoes.value.find((o) => o.id === id);
   if (!item) return;
   if (!confirm(`Excluir "${item.rotulo}"?`)) return;
-  const uso = await verificarUso(item.chave);
-  if (uso > 0) {
-    mostrarErro(
-      `Não é possível excluir "${item.rotulo}": está referenciada por ${uso} registro(s). Desative-a para deixá-la indisponível.`,
-    );
-    return;
+  try {
+    await api(`/api/opcoes/${id}`, { metodo: 'DELETE' });
+    limparCache(tipo.value);
+    mostrarSucesso(`"${item.rotulo}" excluído.`);
+    await carregar();
+  } catch (e) {
+    mostrarErro(e instanceof Error ? e.message : String(e));
   }
-  await supabaseClient.from('opcoes_configuracao').delete().eq('id', id);
-  limparCache(tipo.value);
-  mostrarSucesso(`"${item.rotulo}" excluído.`);
-  await carregar();
 }
 
-onMounted(carregar);
-onUnmounted(destroySortable);
+onMounted(async () => {
+  await carregar();
+  await inscrever([{ tabela: 'opcoes_configuracao' }], carregar);
+});
+onUnmounted(() => {
+  destroySortable();
+  encerrar();
+});
 </script>
 
 <template>

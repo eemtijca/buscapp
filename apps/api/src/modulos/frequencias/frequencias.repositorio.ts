@@ -55,6 +55,10 @@ export async function buscarFrequenciaPorClientRequestId(clientRequestId: string
   return prisma.frequencias.findUnique({ where: { client_request_id: clientRequestId } });
 }
 
+export async function buscarFrequenciaPorId(id: string) {
+  return prisma.frequencias.findUnique({ where: { id } });
+}
+
 export async function buscarFrequenciaPorContexto(
   alunoId: string,
   dataAula: Date,

@@ -4,7 +4,7 @@ import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router';
 import { useGestaoUsuarios } from '@/composables/useGestaoUsuarios';
 import { useOpcoesConfiguracao } from '@/composables/useOpcoesConfiguracao';
 import { useFormSnapshot } from '@/composables/useFormSnapshot';
-import { supabaseClient } from '@/servicos/supabase';
+import { api } from '@/servicos/api';
 import {
   mensagemSucesso as criarMensagemSucesso,
   mensagemErroExplicita,
@@ -21,9 +21,35 @@ import type {
 } from '@/tipos/database';
 import type { OpcaoCheckbox } from '@/tipos/componentes';
 
+interface AtribuicaoApi {
+  id: string;
+  professor_id: string;
+  turma_id: string;
+  disciplina_id: string | null;
+  papel: string;
+  data_inicio: string;
+  data_fim: string | null;
+  ativo: boolean;
+  created_at: string;
+  updated_at: string;
+  turma: { id: string; nome_completo: string };
+}
+
+interface VinculoApi {
+  id: string;
+  responsavel_id: string;
+  aluno_id: string;
+  tipo_relacao: string;
+  contato_prioritario: boolean;
+  ativo: boolean;
+  created_at: string;
+  responsavel_nome?: string | null;
+}
+
 const route = useRoute();
 const router = useRouter();
-const { buscarUsuarios, criarUsuario, atualizarUsuario, carregando, erro } = useGestaoUsuarios();
+const { buscarUsuarios, buscarAlunos, criarUsuario, atualizarUsuario, carregando, erro } =
+  useGestaoUsuarios();
 const { buscarOpcoes } = useOpcoesConfiguracao();
 
 const modoEdicao = ref(false);
@@ -215,41 +241,57 @@ onMounted(async () => {
       resetSnapshot();
       return;
     }
-    const { data: perfil } = await supabaseClient
-      .from('perfis')
-      .select('notificacoes_ativas, acesso_modulos')
-      .eq('id', id)
-      .single();
-    if (perfil) {
-      notificacoesAtivas.value = perfil.notificacoes_ativas;
-      const salvas = filtrarModulosValidos(perfil.acesso_modulos);
-      acessoModulos.value = salvas.length ? salvas : moduloPadrao();
-    }
+    notificacoesAtivas.value = usuario.notificacoes_ativas;
+    const salvas = filtrarModulosValidos(usuario.acesso_modulos);
+    acessoModulos.value = salvas.length ? salvas : moduloPadrao();
+
     if (usuario.papel === 'professor') {
-      const { data: atribs } = await supabaseClient
-        .from('atribuicoes_professores')
-        .select('*, turmas!atribuicoes_professores_turma_id_fkey(nome_completo)')
-        .eq('professor_id', id)
-        .order('created_at', { ascending: false });
-      if (atribs) {
-        atribuicoes.value = atribs.map((a: Record<string, unknown>) => ({
-          ...a,
-          turma_nome: (a.turmas as Record<string, string> | null)?.nome_completo ?? '—',
-        })) as (AtribuicaoProfessor & { turma_nome?: string })[];
+      try {
+        const { atribuicoes: atribuicoesApi } = await api<{ atribuicoes: AtribuicaoApi[] }>(
+          '/api/atribuicoes',
+          { parametros: { professor_id: id } },
+        );
+        atribuicoes.value = atribuicoesApi
+          .map((a) => ({
+            id: a.id,
+            professor_id: a.professor_id,
+            turma_id: a.turma_id,
+            disciplina_id: a.disciplina_id,
+            papel: a.papel,
+            data_inicio: a.data_inicio,
+            data_fim: a.data_fim,
+            ativo: a.ativo,
+            created_at: a.created_at,
+            updated_at: a.updated_at,
+            turma_nome: a.turma?.nome_completo ?? '—',
+          }))
+          .sort((a, b) => b.created_at.localeCompare(a.created_at));
+      } catch (e) {
+        console.error('[UsuarioFormView] Erro ao buscar atribuições:', e);
       }
     }
     if (usuario.papel === 'responsavel') {
-      const { data: vincs } = await supabaseClient
-        .from('vinculos_responsaveis')
-        .select('*, alunos!vinculos_responsaveis_aluno_id_fkey(nome)')
-        .eq('responsavel_id', id)
-        .eq('ativo', true)
-        .order('created_at', { ascending: false });
-      if (vincs) {
-        vinculos.value = vincs.map((v: Record<string, unknown>) => ({
-          ...v,
-          aluno_nome: (v.alunos as Record<string, string> | null)?.nome ?? '—',
-        })) as (VinculoResponsavel & { aluno_nome?: string })[];
+      try {
+        const { vinculos: vinculosApi } = await api<{ vinculos: VinculoApi[] }>('/api/vinculos', {
+          parametros: { responsavel_id: id, ativo: 'true' },
+        });
+        const alunos = await buscarAlunos();
+        const nomePorAluno = new Map(alunos.map((a) => [a.id, a.nome]));
+        vinculos.value = vinculosApi
+          .map((v) => ({
+            id: v.id,
+            responsavel_id: v.responsavel_id,
+            aluno_id: v.aluno_id,
+            tipo_relacao: v.tipo_relacao,
+            contato_prioritario: v.contato_prioritario,
+            ativo: v.ativo,
+            created_at: v.created_at,
+            updated_at: v.created_at,
+            aluno_nome: nomePorAluno.get(v.aluno_id) ?? '—',
+          }))
+          .sort((a, b) => b.created_at.localeCompare(a.created_at));
+      } catch (e) {
+        console.error('[UsuarioFormView] Erro ao buscar vínculos:', e);
       }
     }
   }
@@ -342,12 +384,20 @@ async function salvar() {
         cargo: cargo.value.trim() || undefined,
       });
       if (id) {
-        await supabaseClient.from('perfis').update(dadosExtras).eq('id', id);
+        const extrasOk = await atualizarUsuario(
+          id,
+          dadosExtras as Parameters<typeof atualizarUsuario>[1] & typeof dadosExtras,
+        );
         limparDraft();
         resetSnapshot();
         pausarSnapshot(false);
         usuarioCriado.value = true;
         codigoCriado.value = codigo;
+        if (!extrasOk) {
+          mostrarErro(
+            erro.value || 'Usuário criado, mas não foi possível salvar os módulos de acesso.',
+          );
+        }
         if (codigo) {
           mostrarSucesso(
             criarMensagemSucesso('Usuário', nome.value, 'criado') +

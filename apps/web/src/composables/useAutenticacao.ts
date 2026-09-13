@@ -1,186 +1,94 @@
 import { ref, type Ref } from 'vue';
-import { supabaseClient, decodificarToken, armazenamento } from '@/servicos/supabase';
+import { api, ErroApi } from '@/servicos/api';
 import { useMonitoramento } from '@/composables/useMonitoramento';
-import type { Perfil, PapelUsuario } from '@/tipos/database';
+import type { Perfil } from '@/tipos/database';
 
 const usuario: Ref<Perfil | null> = ref(null);
 const carregando: Ref<boolean> = ref(true);
 
-/** Fallback para tokens sem claims de nome e papel emitidos antes do Custom Access Token Hook. */
-async function carregarPerfil() {
-  const {
-    data: { session },
-  } = await supabaseClient.auth.getSession();
+/** Evita requisições concorrentes ao mesmo endpoint durante o boot da aplicação. */
+let carregamentoEmAndamento: Promise<void> | null = null;
 
-  if (!session?.user?.id) {
-    usuario.value = null;
-    return;
-  }
+/** Indica que o servidor já respondeu de forma definitiva sobre a sessão atual. */
+let sessaoVerificada = false;
 
-  const { data } = await supabaseClient
-    .from('perfis')
-    .select('*')
-    .eq('id', session.user.id)
-    .single();
+/** Busca o perfil autenticado; 401 significa sessão ausente ou expirada. */
+function carregarPerfil(): Promise<void> {
+  if (carregamentoEmAndamento) return carregamentoEmAndamento;
 
-  if (data) {
-    usuario.value = data as unknown as Perfil;
-  }
+  carregamentoEmAndamento = (async () => {
+    try {
+      const { perfil } = await api<{ perfil: Perfil }>('/api/auth/me');
+      usuario.value = perfil;
+      sessaoVerificada = true;
+    } catch (erro) {
+      if (erro instanceof ErroApi && erro.status === 401) {
+        usuario.value = null;
+        sessaoVerificada = true;
+      }
+      // Falha de rede mantém o estado atual para uma nova tentativa futura.
+    } finally {
+      carregando.value = false;
+      carregamentoEmAndamento = null;
+    }
+  })();
+
+  return carregamentoEmAndamento;
 }
 
-/** Carrega acesso_modulos do perfil no banco e mescla no usuário montado pelas claims do JWT. */
-async function carregarModulosDoPerfil(id: string) {
-  try {
-    const { data } = await supabaseClient
-      .from('perfis')
-      .select('acesso_modulos')
-      .eq('id', id)
-      .single();
-    const modulos = (data as { acesso_modulos?: string[] } | null)?.acesso_modulos;
-    if (usuario.value && usuario.value.id === id) {
-      usuario.value = { ...usuario.value, acesso_modulos: modulos ?? [] };
-    }
-  } catch {
-    /* mantém a lista vazia em caso de falha */
-  }
-}
-
-/** Ouvinte global único para INITIAL_SESSION, SIGNED_IN, TOKEN_REFRESHED e SIGNED_OUT. */
-supabaseClient.auth.onAuthStateChange((event, session) => {
-  if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-    if (session?.access_token) {
-      const claims = decodificarToken(session.access_token);
-
-      if (claims?.papel && claims?.nome) {
-        // Preserva módulos já carregados do banco em refreshes do token
-        const modulosConhecidos =
-          usuario.value?.id === claims.sub ? usuario.value.acesso_modulos : [];
-        usuario.value = {
-          id: claims.sub,
-          nome: claims.nome,
-          papel: claims.papel as PapelUsuario,
-          email: claims.email ?? null,
-          telefone: null,
-          cargo: null,
-          notificacoes_ativas: true,
-          acesso_modulos: modulosConhecidos,
-          permissoes: [],
-          status: 'ativo',
-          ultimo_acesso_em: null,
-          created_at: '',
-          updated_at: '',
-        };
-        void carregarModulosDoPerfil(claims.sub);
-      } else {
-        carregarPerfil();
-      }
-    }
-    carregando.value = false;
-  } else if (event === 'INITIAL_SESSION') {
-    if (session?.access_token) {
-      const claims = decodificarToken(session.access_token);
-      if (claims?.papel && claims?.nome) {
-        const modulosConhecidos =
-          usuario.value?.id === claims.sub ? usuario.value.acesso_modulos : [];
-        usuario.value = {
-          id: claims.sub,
-          nome: claims.nome,
-          papel: claims.papel as PapelUsuario,
-          email: claims.email ?? null,
-          telefone: null,
-          cargo: null,
-          notificacoes_ativas: true,
-          acesso_modulos: modulosConhecidos,
-          permissoes: [],
-          status: 'ativo',
-          ultimo_acesso_em: null,
-          created_at: '',
-          updated_at: '',
-        };
-        void carregarModulosDoPerfil(claims.sub);
-      } else {
-        // Tokens sem claims de papel/nome precisam do perfil do banco antes das telas montarem.
-        void carregarPerfil();
-      }
-    }
-    carregando.value = false;
-  } else if (event === 'SIGNED_OUT') {
-    usuario.value = null;
-    carregando.value = false;
-    supabaseClient.removeAllChannels();
-  }
-});
+// Busca a sessão uma única vez no carregamento do módulo; a guarda de rotas aguarda esse resultado.
+void carregarPerfil();
 
 export function useAutenticacao() {
-  /** Autentica com email e senha; o ouvinte onAuthStateChange preenche o usuário via claims do JWT. */
-  async function login(email: string, senha: string) {
-    const { data, error } = await supabaseClient.auth.signInWithPassword({
-      email,
-      password: senha,
+  /** Autentica com email e senha; o cookie de sessão é definido pela API. */
+  async function login(email: string, senha: string, lembrar = false): Promise<Perfil> {
+    const { perfil } = await api<{ perfil: Perfil }>('/api/auth/login', {
+      metodo: 'POST',
+      corpo: { email, senha, lembrar },
     });
 
-    if (error) throw error;
-
-    if (!usuario.value) {
-      await carregarPerfil();
-    }
-
-    return data;
+    usuario.value = perfil;
+    sessaoVerificada = true;
+    carregando.value = false;
+    return perfil;
   }
 
-  /** Encerra a sessão local sem afetar outras abas. */
-  async function logout() {
-    supabaseClient.removeAllChannels();
-    await supabaseClient.auth.signOut({ scope: 'local' });
-    armazenamento.limparTudo();
-    useMonitoramento().limparCachesGlobais();
-    usuario.value = null;
+  /** Encerra a sessão no servidor e zera o estado local, mesmo em caso de falha de rede. */
+  async function logout(): Promise<void> {
+    try {
+      await api('/api/auth/logout', { metodo: 'POST' });
+    } catch {
+      /* Sessão local é encerrada de qualquer forma. */
+    } finally {
+      useMonitoramento().limparCachesGlobais();
+      usuario.value = null;
+      sessaoVerificada = true;
+      carregando.value = false;
+    }
   }
 
   async function verificarSessao(): Promise<boolean> {
     return !!usuario.value;
   }
 
-  /** Garante usuario populado para a sessão atual; evita views montando antes do onAuthStateChange. */
+  /** Garante usuario populado para a sessão atual; evita views montando antes da guarda. */
   async function garantirUsuario(): Promise<void> {
-    if (usuario.value) return;
+    if (usuario.value || sessaoVerificada) return;
     await carregarPerfil();
   }
 
   async function solicitarCodigoRedefinicao(email: string) {
-    const funcaoUrl =
-      import.meta.env.VITE_EDGE_FUNCTIONS_URL ??
-      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
-    const url = `${funcaoUrl}/solicitar-codigo`;
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email }),
+    return api<{ ok: true }>('/api/auth/solicitar-codigo', {
+      metodo: 'POST',
+      corpo: { email },
     });
-    const resultado = await response.json();
-    if (!response.ok) {
-      throw new Error(resultado.error ?? 'Erro ao solicitar código.');
-    }
-    return resultado;
   }
 
   async function redefinirSenhaComCodigo(email: string, codigo: string, novaSenha: string) {
-    const funcaoUrl =
-      import.meta.env.VITE_EDGE_FUNCTIONS_URL ??
-      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
-    const url = `${funcaoUrl}/redefinir-senha-codigo`;
-
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, codigo, novaSenha }),
+    return api<{ ok: true }>('/api/auth/redefinir-senha', {
+      metodo: 'POST',
+      corpo: { email, codigo, novaSenha },
     });
-
-    const resultado = await response.json();
-    if (!response.ok) {
-      throw new Error(resultado.error ?? 'Erro ao redefinir senha.');
-    }
-    return resultado;
   }
 
   return {

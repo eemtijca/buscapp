@@ -1,5 +1,5 @@
 import { ref, type Ref } from 'vue';
-import { supabaseClient } from '@/servicos/supabase';
+import { inscreverEventos, inscreverStatus, type StatusStream } from '@/servicos/eventos';
 
 export type StatusConexao = 'conectado' | 'desconectado';
 
@@ -10,22 +10,17 @@ export interface ConfiguracaoEvento {
 }
 
 const ATRASO_DEBOUNCE_MS = 500;
-const ATRASO_MAXIMO_RECONEXAO_MS = 15000;
-
-let contadorCanais = 0;
 
 export function useRealtimeRefresh() {
   const ultimaAtualizacao: Ref<Date | null> = ref(null);
   const estaAtualizando: Ref<boolean> = ref(false);
   const statusConexao: Ref<StatusConexao> = ref('desconectado');
 
-  let canal: ReturnType<typeof supabaseClient.channel> | null = null;
-  let configsAtuais: ConfiguracaoEvento[] = [];
   let fnRecarga: (() => Promise<void>) | null = null;
   let timerDebounce: ReturnType<typeof setTimeout> | null = null;
-  let timerReconexao: ReturnType<typeof setTimeout> | null = null;
-  let tentativasReconexao = 0;
   let ativo = false;
+  let cancelarEventos: (() => void) | null = null;
+  let cancelarStatus: (() => void) | null = null;
 
   function marcarConectado() {
     statusConexao.value = 'conectado';
@@ -35,14 +30,15 @@ export function useRealtimeRefresh() {
     statusConexao.value = 'desconectado';
   }
 
+  /** Compatibilidade com inscrições legadas que informam o status da conexão. */
   function aoConectar(fn: () => Promise<void>) {
     return async (status: string) => {
       if (status === 'SUBSCRIBED') {
-        statusConexao.value = 'conectado';
+        marcarConectado();
         await fn();
         ultimaAtualizacao.value = new Date();
       } else {
-        statusConexao.value = 'desconectado';
+        marcarDesconectado();
       }
     };
   }
@@ -54,15 +50,6 @@ export function useRealtimeRefresh() {
       ultimaAtualizacao.value = new Date();
     } finally {
       estaAtualizando.value = false;
-    }
-  }
-
-  async function garantirTokenRealtime() {
-    const {
-      data: { session },
-    } = await supabaseClient.auth.getSession();
-    if (session?.access_token) {
-      supabaseClient.realtime.setAuth(session.access_token);
     }
   }
 
@@ -86,29 +73,20 @@ export function useRealtimeRefresh() {
   }
 
   function aoMudarVisibilidade() {
-    if (document.visibilityState === 'visible' && ativo && canal) {
+    if (document.visibilityState === 'visible' && ativo) {
       void dispararRecarga();
     }
   }
 
-  function desinscreverCanal() {
-    if (canal) {
-      const c = canal;
-      canal = null;
-      void supabaseClient.removeChannel(c);
+  function cancelarInscricoes() {
+    if (cancelarEventos) {
+      cancelarEventos();
+      cancelarEventos = null;
     }
-  }
-
-  function agendarReconexao() {
-    if (!ativo || timerReconexao) return;
-    const atraso = Math.min(1000 * 2 ** tentativasReconexao, ATRASO_MAXIMO_RECONEXAO_MS);
-    tentativasReconexao += 1;
-    timerReconexao = setTimeout(() => {
-      timerReconexao = null;
-      if (!ativo) return;
-      desinscreverCanal();
-      void inscrever(configsAtuais);
-    }, atraso);
+    if (cancelarStatus) {
+      cancelarStatus();
+      cancelarStatus = null;
+    }
   }
 
   async function inscrever(
@@ -120,45 +98,27 @@ export function useRealtimeRefresh() {
       clearTimeout(timerDebounce);
       timerDebounce = null;
     }
-    if (timerReconexao) {
-      clearTimeout(timerReconexao);
-      timerReconexao = null;
-    }
-    desinscreverCanal();
+    cancelarInscricoes();
 
     if (!configs.length) return;
 
-    configsAtuais = configs;
     if (recarregar) fnRecarga = recarregar;
     ativo = true;
-    tentativasReconexao = 0;
 
-    await garantirTokenRealtime();
+    const tabelas = new Set(configs.map((cfg) => cfg.tabela));
 
-    contadorCanais += 1;
-    let construtor = supabaseClient.channel(`realtime-refresh-${contadorCanais}`);
-    for (const cfg of configs) {
-      construtor = construtor.on(
-        'postgres_changes',
-        {
-          event: cfg.evento ?? '*',
-          schema: 'public',
-          table: cfg.tabela,
-          ...(cfg.filtro ? { filter: cfg.filtro } : {}),
-        },
-        recarregarDebounced,
-      );
-    }
-
-    canal = construtor.subscribe((status) => {
-      if (status === 'SUBSCRIBED') {
-        tentativasReconexao = 0;
+    // O EventSource é único e reconecta sozinho; sinalizamos a recarga ao (re)abrir o stream.
+    cancelarStatus = inscreverStatus((novoStatus: StatusStream) => {
+      if (novoStatus === 'conectado') {
         marcarConectado();
         void dispararRecarga();
-      } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+      } else {
         marcarDesconectado();
-        if (status !== 'CLOSED') agendarReconexao();
       }
+    });
+
+    cancelarEventos = inscreverEventos((tabela) => {
+      if (tabelas.has(tabela)) recarregarDebounced();
     });
 
     if (typeof document !== 'undefined') {
@@ -168,17 +128,12 @@ export function useRealtimeRefresh() {
 
   function encerrar() {
     ativo = false;
-    configsAtuais = [];
     fnRecarga = null;
     if (timerDebounce) {
       clearTimeout(timerDebounce);
       timerDebounce = null;
     }
-    if (timerReconexao) {
-      clearTimeout(timerReconexao);
-      timerReconexao = null;
-    }
-    desinscreverCanal();
+    cancelarInscricoes();
     if (typeof document !== 'undefined') {
       document.removeEventListener('visibilitychange', aoMudarVisibilidade);
     }

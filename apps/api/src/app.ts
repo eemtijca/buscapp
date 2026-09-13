@@ -26,6 +26,7 @@ import { rotasMonitoramento } from './modulos/monitoramento/monitoramento.rotas.
 import { rotasNotificacoes } from './modulos/notificacoes/notificacoes.rotas.js';
 import { rotasOcorrencias } from './modulos/ocorrencias/ocorrencias.rotas.js';
 import { rotasUsuarios } from './modulos/usuarios/usuarios.rotas.js';
+import { rotasVinculos } from './modulos/vinculos/vinculos.rotas.js';
 
 /** Monta a aplicação Fastify; exposta separadamente para testes com `inject`. */
 export async function construirApp(): Promise<FastifyInstance> {
@@ -71,6 +72,7 @@ export async function construirApp(): Promise<FastifyInstance> {
   await app.register(rotasUsuarios);
   await app.register(rotasAnexos);
   await app.register(rotasCodigos);
+  await app.register(rotasVinculos);
   await app.register(rotasEstrutura);
   await app.register(rotasFrequencias);
   await app.register(rotasOcorrencias);

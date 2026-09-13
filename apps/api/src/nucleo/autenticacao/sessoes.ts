@@ -40,7 +40,6 @@ export async function perfilDaSessao(token: string): Promise<PerfilAutenticado |
   if (!sessao || sessao.revogada_em || sessao.expira_em <= new Date()) return null;
 
   const perfil = sessao.perfis;
-  if (perfil.status === 'inativo') return null;
 
   void prisma.sessoes
     .update({ where: { id: sessao.id }, data: { ultimo_uso_em: new Date() } })

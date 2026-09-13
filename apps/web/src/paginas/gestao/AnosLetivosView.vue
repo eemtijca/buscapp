@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { onMounted, ref, nextTick, watch } from 'vue';
+import { onMounted, onUnmounted, ref, nextTick, watch } from 'vue';
 import { useRouter, onBeforeRouteLeave } from 'vue-router';
-import { supabaseClient } from '@/servicos/supabase';
+import { api } from '@/servicos/api';
 import { useFormSnapshot } from '@/composables/useFormSnapshot';
+import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh';
 import {
   mensagemSucesso as criarMensagemSucesso,
   mensagemErroExplicita,
@@ -11,6 +12,7 @@ import CampoFormulario from '@/componentes/CampoFormulario.vue';
 import type { AnoLetivo } from '@/tipos/database';
 
 const router = useRouter();
+const { inscrever, encerrar } = useRealtimeRefresh();
 
 const anos = ref<AnoLetivo[]>([]);
 const carregando = ref(false);
@@ -79,12 +81,8 @@ function resetForm() {
 async function carregarAnos() {
   carregando.value = true;
   try {
-    const { error, data } = await supabaseClient
-      .from('anos_letivos')
-      .select('*')
-      .order('ano', { ascending: false });
-    if (error) throw error;
-    anos.value = data ?? [];
+    const { anos_letivos } = await api<{ anos_letivos: AnoLetivo[] }>('/api/anos-letivos');
+    anos.value = anos_letivos;
   } catch {
     mostrarErro('Falha ao carregar anos letivos.');
   } finally {
@@ -143,53 +141,32 @@ async function salvar() {
   carregando.value = true;
   try {
     if (modoEdicao.value && editandoId.value) {
-      const { error } = await supabaseClient
-        .from('anos_letivos')
-        .update({
-          ano: formAno.value,
-          data_inicio: formDataInicio.value,
-          data_fim: formDataFim.value,
-        })
-        .eq('id', editandoId.value);
-      if (error) {
-        if (error.code === '23505') {
-          mostrarErro(
-            mensagemErroExplicita(
-              'Ano letivo',
-              String(formAno.value),
-              'atualizar',
-              'Já existe um ano letivo para este ano.',
-            ),
-          );
-        } else {
-          mostrarErro(
-            mensagemErroExplicita('Ano letivo', String(formAno.value), 'atualizar', error),
-          );
-        }
+      try {
+        await api(`/api/anos-letivos/${editandoId.value}`, {
+          metodo: 'PUT',
+          corpo: {
+            ano: formAno.value,
+            data_inicio: formDataInicio.value,
+            data_fim: formDataFim.value,
+          },
+        });
+      } catch (e) {
+        mostrarErro(mensagemErroExplicita('Ano letivo', String(formAno.value), 'atualizar', e));
         return;
       }
       mostrarSucesso(criarMensagemSucesso('Ano letivo', String(formAno.value), 'atualizado'));
     } else {
-      const { error } = await supabaseClient.from('anos_letivos').insert({
-        ano: formAno.value,
-        status: 'planejado',
-        ativo: false,
-        data_inicio: formDataInicio.value,
-        data_fim: formDataFim.value,
-      });
-      if (error) {
-        if (error.code === '23505') {
-          mostrarErro(
-            mensagemErroExplicita(
-              'Ano letivo',
-              String(formAno.value),
-              'criar',
-              'Já existe um ano letivo para este ano.',
-            ),
-          );
-        } else {
-          mostrarErro(mensagemErroExplicita('Ano letivo', String(formAno.value), 'criar', error));
-        }
+      try {
+        await api('/api/anos-letivos', {
+          metodo: 'POST',
+          corpo: {
+            ano: formAno.value,
+            data_inicio: formDataInicio.value,
+            data_fim: formDataFim.value,
+          },
+        });
+      } catch (e) {
+        mostrarErro(mensagemErroExplicita('Ano letivo', String(formAno.value), 'criar', e));
         return;
       }
       mostrarSucesso(
@@ -214,11 +191,10 @@ async function ativar(ano: AnoLetivo) {
 
   carregando.value = true;
   try {
-    const { error } = await supabaseClient.rpc('ativar_ano_letivo', {
-      p_ano_id: ano.id,
-    });
-    if (error) {
-      mostrarErro(error.message || 'Falha ao ativar ano letivo.');
+    try {
+      await api(`/api/anos-letivos/${ano.id}/ativar`, { metodo: 'POST' });
+    } catch (e) {
+      mostrarErro(mensagemErroExplicita('Ano letivo', String(ano.ano), 'ativar', e));
       return;
     }
     mostrarSucesso(`Ano letivo ${ano.ano} ativado.`);
@@ -228,7 +204,14 @@ async function ativar(ano: AnoLetivo) {
   }
 }
 
-onMounted(carregarAnos);
+onMounted(async () => {
+  await carregarAnos();
+  await inscrever([{ tabela: 'anos_letivos' }], carregarAnos);
+});
+
+onUnmounted(() => {
+  encerrar();
+});
 </script>
 
 <template>

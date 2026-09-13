@@ -10,12 +10,17 @@ import type {
   TipoRegistroFrequencia,
 } from '@buscapp/contratos';
 import type { PerfilAutenticado } from '../../nucleo/autenticacao/tipos.js';
-import { garantirTurmaDoProfessor, idsDeAlunosVisiveis } from '../../nucleo/autorizacao/escopo.js';
+import {
+  garantirTurmaDoProfessor,
+  idsDeAlunosVisiveis,
+  podeVerAluno,
+} from '../../nucleo/autorizacao/escopo.js';
 import { publicarEvento } from '../../nucleo/eventos/barramento.js';
-import { erroNaoAutorizado, erroValidacao } from '../../nucleo/http/erros.js';
+import { erroNaoAutorizado, erroNaoEncontrado, erroValidacao } from '../../nucleo/http/erros.js';
 import {
   buscarEnturmacoesAtivasPorAlunos,
   buscarFrequenciaPorClientRequestId,
+  buscarFrequenciaPorId,
   buscarFrequenciaPorContexto,
   criarFrequencia,
   criarFrequencias,
@@ -328,4 +333,12 @@ export async function resumir(
   }
 
   return [...resumo.values()];
+}
+
+export async function obter(usuario: PerfilAutenticado, id: string): Promise<Frequencia> {
+  const frequencia = await buscarFrequenciaPorId(id);
+  if (!frequencia || !(await podeVerAluno(usuario, frequencia.aluno_id))) {
+    throw erroNaoEncontrado('Frequência não encontrada.');
+  }
+  return paraFrequencia(frequencia);
 }

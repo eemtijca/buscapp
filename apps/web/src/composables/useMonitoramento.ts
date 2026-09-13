@@ -1,16 +1,15 @@
 import { ref, type Ref } from 'vue';
-import { supabaseClient } from '@/servicos/supabase';
-import { useAnoLetivo } from '@/composables/useAnoLetivo';
+import { api, enviarArquivo } from '@/servicos/api';
+import { useOpcoesConfiguracao } from '@/composables/useOpcoesConfiguracao';
 import { comprimirImagem } from '@/utils/comprimirImagem';
 import { safeDate } from '@/utils/chatUtils';
 import type {
   Aluno,
+  ConfiguracaoSistema,
+  Enturmacao,
   Frequencia,
-  Ocorrencia,
-  Perfil,
-  Turma,
-  VinculoResponsavel,
-  JustificativaFalta,
+  HorarioLetivo,
+  TagComportamento,
 } from '@/tipos/database';
 import type {
   AlunoFrequencia,
@@ -53,6 +52,103 @@ let cacheConfigSistema: {
 } | null = null;
 let cacheHorarios: HorarioProtegido | null = null;
 
+/** Enturmação com os joins devolvidos pela API (`turma` e `ano_letivo`). */
+interface EnturmacaoApi extends Enturmacao {
+  turma: { id: string; nome_completo: string };
+  ano_letivo: { id: string; ano: number };
+}
+
+/** Ocorrência com aluno, professor e catálogo de tags já resolvidos pela API. */
+interface OcorrenciaApi {
+  id: string;
+  aluno_id: string;
+  aluno: { id: string; nome: string };
+  professor_id: string | null;
+  professor: { id: string; nome: string } | null;
+  turma_id: string;
+  ano_letivo_id: string;
+  titulo: string;
+  descricao: string;
+  tipo: string[];
+  status: 'aberta' | 'em_andamento' | 'resolvida' | 'arquivada';
+  exige_presenca_responsavel: boolean;
+  presenca_responsavel_confirmada: boolean;
+  data_confirmacao_presenca: string | null;
+  data_ocorrencia: string;
+  closed_at: string | null;
+  tags_comportamento: string[];
+  lista_tags: TagComportamento[];
+  notificar_coordenacao: boolean;
+  notificar_responsavel: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Anexo enxuto retornado dentro da justificativa. */
+interface AnexoJustificativaApi {
+  id: string;
+  nome_arquivo: string;
+  mime_type: string;
+  storage_path: string;
+}
+
+/** Justificativa com aluno, responsável e anexos já resolvidos pela API. */
+interface JustificativaApi {
+  id: string;
+  responsavel_id: string;
+  aluno_id: string;
+  frequencia_id: string | null;
+  data_falta: string;
+  data_fim: string | null;
+  motivo: string;
+  status: 'pendente' | 'aceita' | 'recusada';
+  avaliado_por: string | null;
+  avaliado_em: string | null;
+  parecer: string | null;
+  aluno: { id: string; nome: string };
+  responsavel: { id: string; nome: string };
+  anexos: AnexoJustificativaApi[];
+  created_at: string;
+  updated_at: string;
+}
+
+/** Registro de comportamento com as tags do catálogo embutidas. */
+interface RegistroComportamentoApi {
+  id: string;
+  aluno_id: string;
+  professor_id: string;
+  turma_id: string;
+  ano_letivo_id: string;
+  data_hora: string;
+  descricao: string | null;
+  tags: TagComportamento[];
+}
+
+/** Conversa do chat com contatos, prévia da última mensagem e não lidas. */
+interface ConversaApi {
+  id: string;
+  responsavel: { id: string; nome: string };
+  aluno: { id: string; nome: string };
+  turma: { id: string; nome_completo: string };
+  ultima_mensagem_em: string | null;
+  ultima_mensagem: { conteudo: string; created_at: string } | null;
+  nao_lidas: number;
+  ativa: boolean;
+  iniciada_pela_gestao: boolean;
+}
+
+/** Mensagem do chat com o autor resolvido pela API. */
+interface MensagemApi {
+  id: string;
+  conversa_id: string;
+  remetente_id: string;
+  autor: { id: string; nome: string; papel: 'professor' | 'gestao' | 'responsavel' };
+  conteudo: string;
+  is_system_message: boolean;
+  lida_em: string | null;
+  created_at: string;
+}
+
 /** Monta a configuração do termômetro a partir do cache. */
 function obterConfigTermometro(): ConfigTermometro {
   const c = cacheConfigSistema;
@@ -77,54 +173,32 @@ function obterConfigTermometro(): ConfigTermometro {
   };
 }
 
+/** Carrega as configurações gerais da API e mantém em cache de sessão. */
 async function carregarConfigSistema(): Promise<void> {
   if (cacheConfigSistema) return;
   try {
-    const { data } = await supabaseClient
-      .from('configuracoes_sistema')
-      .select(
-        'limite_critico_faltas, limite_preventivo_faltas, mensagem_fora_horario, peso_falta, peso_ocorrencia, peso_recencia, janela_recencia_dias, limite_score_medio, limite_score_alto, peso_ocorrencia_grave, forcar_medio_em_grave, janela_ocorrencia_dias, decaimento_ocorrencia_tipo, peso_resolvida, peso_comportamento_positivo, janela_positivo_dias, bonus_presenca_confirmada',
-      )
-      .single();
-    const row = data as unknown as {
-      limite_critico_faltas?: number;
-      limite_preventivo_faltas?: number;
-      mensagem_fora_horario?: string;
-      peso_falta?: number;
-      peso_ocorrencia?: number;
-      peso_recencia?: number;
-      janela_recencia_dias?: number;
-      limite_score_medio?: number;
-      limite_score_alto?: number;
-      peso_ocorrencia_grave?: number;
-      forcar_medio_em_grave?: boolean;
-      janela_ocorrencia_dias?: number;
-      decaimento_ocorrencia_tipo?: string;
-      peso_resolvida?: number;
-      peso_comportamento_positivo?: number;
-      janela_positivo_dias?: number;
-      bonus_presenca_confirmada?: number;
-    } | null;
+    const { configuracao } = await api<{ configuracao: ConfiguracaoSistema }>('/api/configuracoes');
     cacheConfigSistema = {
-      critico: row?.limite_critico_faltas ?? 25,
-      preventivo: row?.limite_preventivo_faltas ?? 10,
-      pesoFalta: row?.peso_falta ?? 1,
-      pesoOcorrencia: row?.peso_ocorrencia ?? 1,
-      pesoRecencia: row?.peso_recencia ?? 1,
-      janelaRecenciaDias: row?.janela_recencia_dias ?? 14,
-      limiteScoreMedio: row?.limite_score_medio ?? 40,
-      limiteScoreAlto: row?.limite_score_alto ?? 75,
-      pesoOcorrenciaGrave: row?.peso_ocorrencia_grave ?? 15,
-      forcarMedioEmGrave: row?.forcar_medio_em_grave ?? true,
-      janelaOcorrenciaDias: row?.janela_ocorrencia_dias ?? 90,
+      critico: configuracao.limite_critico_faltas ?? 25,
+      preventivo: configuracao.limite_preventivo_faltas ?? 10,
+      pesoFalta: configuracao.peso_falta ?? 1,
+      pesoOcorrencia: configuracao.peso_ocorrencia ?? 1,
+      pesoRecencia: configuracao.peso_recencia ?? 1,
+      janelaRecenciaDias: configuracao.janela_recencia_dias ?? 14,
+      limiteScoreMedio: configuracao.limite_score_medio ?? 40,
+      limiteScoreAlto: configuracao.limite_score_alto ?? 75,
+      pesoOcorrenciaGrave: configuracao.peso_ocorrencia_grave ?? 15,
+      forcarMedioEmGrave: configuracao.forcar_medio_em_grave ?? true,
+      janelaOcorrenciaDias: configuracao.janela_ocorrencia_dias ?? 90,
       decaimentoOcorrenciaTipo:
-        (row?.decaimento_ocorrencia_tipo as 'nenhum' | 'janela' | 'exponencial') ?? 'janela',
-      pesoResolvida: row?.peso_resolvida ?? 0.5,
-      pesoComportamentoPositivo: row?.peso_comportamento_positivo ?? 5,
-      janelaPositivoDias: row?.janela_positivo_dias ?? 30,
-      bonusPresencaConfirmada: row?.bonus_presenca_confirmada ?? 10,
+        (configuracao.decaimento_ocorrencia_tipo as 'nenhum' | 'janela' | 'exponencial') ??
+        'janela',
+      pesoResolvida: configuracao.peso_resolvida ?? 0.5,
+      pesoComportamentoPositivo: configuracao.peso_comportamento_positivo ?? 5,
+      janelaPositivoDias: configuracao.janela_positivo_dias ?? 30,
+      bonusPresencaConfirmada: configuracao.bonus_presenca_confirmada ?? 10,
       mensagemForaHorario:
-        row?.mensagem_fora_horario ??
+        configuracao.mensagem_fora_horario ??
         'O canal de diálogo está fora do horário escolar. Mensagens enviadas agora serão respondidas quando a coordenação estiver disponível.',
     };
   } catch {
@@ -174,6 +248,7 @@ function diasEntre(a: string, b: string): number {
 function limparCachesGlobais(): void {
   cacheConfigSistema = null;
   cacheHorarios = null;
+  useOpcoesConfiguracao().limparCache();
 }
 
 function formatarData(iso: string): string {
@@ -206,52 +281,46 @@ function formatarDataHorario(iso: string): { data: string; horario: string } {
   }
 }
 
+/** Iniciais do nome para o avatar do chat. */
+function iniciaisDoNome(nome: string): string {
+  return nome
+    .split(' ')
+    .slice(0, 2)
+    .map((p: string) => p[0])
+    .join('')
+    .toUpperCase();
+}
+
 export function useMonitoramento() {
   const carregando: Ref<boolean> = ref(false);
   const erro: Ref<string | null> = ref(null);
-  const { buscarAnoLetivoAtivo } = useAnoLetivo();
 
   async function buscarAlunosParaFrequencia(dataAula?: string): Promise<AlunoFrequencia[]> {
     carregando.value = true;
     erro.value = null;
     try {
-      const { data: alunosData, error: errAlunos } = await supabaseClient
-        .from('alunos')
-        .select('*')
-        .order('nome', { ascending: true });
-
-      if (errAlunos) throw errAlunos;
-
-      const alunos = (alunosData ?? []) as unknown as Aluno[];
+      const { alunos } = await api<{ alunos: Aluno[] }>('/api/alunos');
       const alunoIds = alunos.map((a) => a.id);
 
-      const { data: enturmacoesData } = await supabaseClient
-        .from('enturmacoes')
-        .select('aluno_id, turma_id, ano_letivo_id')
-        .in('aluno_id', alunoIds)
-        .eq('status', 'matriculado');
+      const [{ enturmacoes }, ausencias] = await Promise.all([
+        api<{ enturmacoes: EnturmacaoApi[] }>('/api/enturmacoes', {
+          parametros: { status: 'matriculado' },
+        }),
+        dataAula && alunoIds.length
+          ? api<{ frequencias: Frequencia[] }>('/api/frequencias', {
+              parametros: {
+                aluno_ids: alunoIds,
+                data_aula: dataAula,
+                tipo_registro: 'chamada_aula',
+                status: 'ausente',
+              },
+            })
+          : Promise.resolve({ frequencias: [] as Frequencia[] }),
+      ]);
 
-      const enturmacoes = (enturmacoesData ?? []) as unknown as Array<{
-        aluno_id: string;
-        turma_id: string;
-        ano_letivo_id: string;
-      }>;
-
-      const turmaIds = [...new Set(enturmacoes.map((e) => e.turma_id))];
-      const { data: turmasData } = await supabaseClient
-        .from('turmas')
-        .select('id, nome_completo')
-        .in('id', turmaIds);
-
-      const turmaNomeMap = new Map(
-        (turmasData ?? []).map((t: unknown) => [(t as Turma).id, (t as Turma).nome_completo]),
-      );
-
+      const visiveis = new Set(alunoIds);
       const enturmacaoAlunoMap = new Map(
-        enturmacoes.map((e) => [
-          e.aluno_id,
-          { turma_id: e.turma_id, ano_letivo_id: e.ano_letivo_id },
-        ]),
+        enturmacoes.filter((e) => visiveis.has(e.aluno_id)).map((e) => [e.aluno_id, e]),
       );
 
       const ausentesSet = new Set<string>();
@@ -259,31 +328,14 @@ export function useMonitoramento() {
       const observacoesAluno = new Map<string, string | null>();
       const motivosAluno = new Map<string, string[]>();
 
-      if (dataAula) {
-        const { data: ausencias } = await supabaseClient
-          .from('frequencias')
-          .select('aluno_id, periodo, observacao, motivos_ausencia')
-          .in('aluno_id', alunoIds)
-          .eq('data_aula', dataAula)
-          .eq('tipo_registro', 'chamada_aula')
-          .eq('status', 'ausente')
-          .is('deleted_at', null);
-
-        for (const a of ausencias ?? []) {
-          const reg = a as unknown as {
-            aluno_id: string;
-            periodo: string;
-            observacao: string | null;
-            motivos_ausencia: string[];
-          };
-          const id = reg.aluno_id;
-          ausentesSet.add(id);
-          if (!periodosAluno.has(id)) periodosAluno.set(id, []);
-          periodosAluno.get(id)!.push(reg.periodo);
-          observacoesAluno.set(id, reg.observacao);
-          if (reg.motivos_ausencia?.length) {
-            motivosAluno.set(id, reg.motivos_ausencia);
-          }
+      for (const reg of ausencias.frequencias) {
+        const id = reg.aluno_id;
+        ausentesSet.add(id);
+        if (!periodosAluno.has(id)) periodosAluno.set(id, []);
+        periodosAluno.get(id)!.push(reg.periodo);
+        observacoesAluno.set(id, reg.observacao);
+        if (reg.motivos_ausencia?.length) {
+          motivosAluno.set(id, reg.motivos_ausencia);
         }
       }
 
@@ -293,7 +345,7 @@ export function useMonitoramento() {
           id: aluno.id,
           nome: aluno.nome,
           matricula: aluno.matricula,
-          turma: ent ? (turmaNomeMap.get(ent.turma_id) ?? null) : null,
+          turma: ent ? ent.turma.nome_completo : null,
           turma_id: ent?.turma_id ?? null,
           ausente: ausentesSet.has(aluno.id),
           periodosAusentes: periodosAluno.get(aluno.id) ?? [],
@@ -313,51 +365,49 @@ export function useMonitoramento() {
 
   async function registrarFrequenciaEmMassa(
     alunos: AlunoFrequencia[],
-    professorId: string,
+    _professorId: string,
     dataAula: string,
     periodos: string[],
   ): Promise<{ registradas: number; erro: string | null }> {
     carregando.value = true;
     erro.value = null;
     try {
-      const ausentes = alunos.filter((a) => a.ausente);
-      if (!ausentes.length) {
+      const ausentes = alunos.filter((a) => a.ausente && a.turma_id);
+      if (!ausentes.length || !periodos.length) {
         return { registradas: 0, erro: null };
       }
 
-      const anoLetivo = await buscarAnoLetivoAtivo();
-
-      if (!anoLetivo) throw new Error('Nenhum ano letivo ativo encontrado.');
-      const anoLetivoId = anoLetivo.id;
+      // O lote é por turma: agrupa os ausentes para respeitar o vínculo aluno-turma.
+      const porTurma = new Map<string, AlunoFrequencia[]>();
+      for (const aluno of ausentes) {
+        const turmaId = aluno.turma_id as string;
+        const lista = porTurma.get(turmaId) ?? [];
+        lista.push(aluno);
+        porTurma.set(turmaId, lista);
+      }
 
       let totalRegistradas = 0;
 
-      for (const periodo of periodos) {
-        const insercoes = ausentes.map((aluno) => ({
-          aluno_id: aluno.id,
-          professor_id: professorId,
-          turma_id: aluno.turma_id,
-          ano_letivo_id: anoLetivoId,
-          data_aula: dataAula,
-          periodo,
-          tipo_registro: 'chamada_aula' as const,
-          status: 'ausente' as const,
-        }));
+      for (const [turmaId, alunosTurma] of porTurma) {
+        for (const periodo of periodos) {
+          const resposta = await api<{ registradas?: number; idempotente?: boolean }>(
+            '/api/frequencias/lote',
+            {
+              metodo: 'POST',
+              corpo: {
+                turma_id: turmaId,
+                data_aula: dataAula,
+                periodo,
+                tipo_registro: 'chamada_aula',
+                ausentes: alunosTurma.map((aluno) => ({ aluno_id: aluno.id })),
+                client_request_id: crypto.randomUUID(),
+              },
+            },
+          );
 
-        const ausentesIds = ausentes.map((a) => a.id);
-        await supabaseClient
-          .from('frequencias')
-          .delete()
-          .in('aluno_id', ausentesIds)
-          .eq('data_aula', dataAula)
-          .eq('periodo', periodo)
-          .eq('tipo_registro', 'chamada_aula')
-          .is('deleted_at', null);
-
-        const { error: err } = await supabaseClient.from('frequencias').insert(insercoes);
-
-        if (err) throw err;
-        totalRegistradas += ausentes.length;
+          // Resposta idempotente significa que as ausências já estavam registradas.
+          totalRegistradas += resposta.registradas ?? alunosTurma.length;
+        }
       }
 
       return { registradas: totalRegistradas, erro: null };
@@ -374,7 +424,7 @@ export function useMonitoramento() {
 
   async function registrarAusenciaEmPeriodo(
     alunoId: string,
-    professorId: string,
+    _professorId: string,
     dataAula: string,
     periodo: string,
     observacao?: string,
@@ -383,40 +433,17 @@ export function useMonitoramento() {
     carregando.value = true;
     erro.value = null;
     try {
-      const { data: enturmacao } = await supabaseClient
-        .from('enturmacoes')
-        .select('turma_id, ano_letivo_id')
-        .eq('aluno_id', alunoId)
-        .eq('status', 'matriculado')
-        .single();
-
-      if (!enturmacao) throw new Error('Aluno não encontrado em nenhuma turma.');
-      const tId = (enturmacao as unknown as { turma_id: string }).turma_id;
-      const aId = (enturmacao as unknown as { ano_letivo_id: string }).ano_letivo_id;
-
-      await supabaseClient
-        .from('frequencias')
-        .delete()
-        .eq('aluno_id', alunoId)
-        .eq('data_aula', dataAula)
-        .eq('periodo', periodo)
-        .eq('tipo_registro', 'chamada_aula')
-        .is('deleted_at', null);
-
-      const { error: err } = await supabaseClient.from('frequencias').insert({
-        aluno_id: alunoId,
-        professor_id: professorId,
-        turma_id: tId,
-        ano_letivo_id: aId,
-        data_aula: dataAula,
-        periodo,
-        tipo_registro: 'chamada_aula',
-        status: 'ausente',
-        observacao: observacao || null,
-        motivos_ausencia: motivos ?? [],
+      await api('/api/frequencias', {
+        metodo: 'POST',
+        corpo: {
+          aluno_id: alunoId,
+          data_aula: dataAula,
+          periodo,
+          observacao: observacao || null,
+          motivos_ausencia: motivos ?? [],
+          tipo_registro: 'chamada_aula',
+        },
       });
-
-      if (err) throw err;
       return true;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -430,7 +457,7 @@ export function useMonitoramento() {
 
   async function registrarOcorrenciaGrave(
     alunoId: string,
-    professorId: string,
+    _professorId: string,
     descricao: string,
     tipos: string[] = ['grave'],
     exigePresencaResponsavel = false,
@@ -441,29 +468,19 @@ export function useMonitoramento() {
     carregando.value = true;
     erro.value = null;
     try {
-      const { data: enturmacao } = await supabaseClient
-        .from('enturmacoes')
-        .select('turma_id, ano_letivo_id')
-        .eq('aluno_id', alunoId)
-        .eq('status', 'matriculado')
-        .single();
-      if (!enturmacao) throw new Error('Aluno não está matriculado em nenhuma turma.');
-
-      const { error: err } = await supabaseClient.from('ocorrencias').insert({
-        aluno_id: alunoId,
-        professor_id: professorId,
-        turma_id: enturmacao.turma_id,
-        ano_letivo_id: enturmacao.ano_letivo_id,
-        titulo: descricao.slice(0, 100),
-        descricao,
-        tipo: tipos,
-        exige_presenca_responsavel: exigePresencaResponsavel,
-        tags_comportamento: tags ?? [],
-        notificar_coordenacao: notificarCoordenacao,
-        notificar_responsavel: notificarResponsavel,
+      await api('/api/ocorrencias', {
+        metodo: 'POST',
+        corpo: {
+          aluno_id: alunoId,
+          titulo: descricao.slice(0, 100),
+          descricao,
+          tipo: tipos,
+          exige_presenca_responsavel: exigePresencaResponsavel,
+          tags_comportamento: tags ?? [],
+          notificar_coordenacao: notificarCoordenacao,
+          notificar_responsavel: notificarResponsavel,
+        },
       });
-
-      if (err) throw err;
       return true;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -482,39 +499,27 @@ export function useMonitoramento() {
     try {
       const cfg = obterConfigTermometro();
 
-      const { data: alunosData, error: errAlunos } = await supabaseClient
-        .from('alunos')
-        .select('*')
-        .order('nome', { ascending: true });
-
-      if (errAlunos) throw errAlunos;
-      const alunos = (alunosData ?? []) as unknown as Aluno[];
-
-      const { data: frequenciasData, error: errFreq } = await supabaseClient
-        .from('frequencias')
-        .select('aluno_id, data_aula, status')
-        .eq('status', 'ausente')
-        .is('deleted_at', null);
-
-      if (errFreq) throw errFreq;
-      const frequencias = (frequenciasData ?? []) as unknown as Pick<
-        Frequencia,
-        'aluno_id' | 'data_aula' | 'status'
-      >[];
+      const [
+        { alunos },
+        { frequencias },
+        { justificativas },
+        { ocorrencias: ocorrenciasApi },
+        { tags },
+      ] = await Promise.all([
+        api<{ alunos: Aluno[] }>('/api/alunos'),
+        api<{ frequencias: Frequencia[] }>('/api/frequencias', {
+          parametros: { status: 'ausente' },
+        }),
+        api<{ justificativas: JustificativaApi[] }>('/api/justificativas', {
+          parametros: { status: 'aceita' },
+        }),
+        api<{ ocorrencias: OcorrenciaApi[] }>('/api/ocorrencias'),
+        api<{ tags: TagComportamento[] }>('/api/tags-comportamento'),
+      ]);
 
       // Justificativas aceitas para abater faltas do ranking.
-      const alunoIds = alunos.map((a) => a.id);
-      const { data: justsData } = await supabaseClient
-        .from('justificativas_faltas')
-        .select('aluno_id, data_falta, data_fim')
-        .in('aluno_id', alunoIds)
-        .eq('status', 'aceita');
       const justificadas = new Set<string>();
-      for (const j of (justsData ?? []) as unknown as Array<{
-        aluno_id: string;
-        data_falta: string;
-        data_fim: string | null;
-      }>) {
+      for (const j of justificativas) {
         const fim = j.data_fim ?? j.data_falta;
         const inicio = new Date(j.data_falta + 'T00:00:00');
         const fimD = new Date(fim + 'T00:00:00');
@@ -523,36 +528,9 @@ export function useMonitoramento() {
         }
       }
 
-      const { data: ocorrenciasData, error: errOco } = await supabaseClient
-        .from('ocorrencias')
-        .select(
-          'aluno_id, tipo, status, presenca_responsavel_confirmada, exige_presenca_responsavel, tags_comportamento, created_at',
-        );
-
-      if (errOco) throw errOco;
-      const ocorrenciasRaw = (ocorrenciasData ?? []) as unknown as Array<
-        Pick<
-          Ocorrencia,
-          | 'aluno_id'
-          | 'tipo'
-          | 'status'
-          | 'presenca_responsavel_confirmada'
-          | 'exige_presenca_responsavel'
-          | 'tags_comportamento'
-          | 'created_at'
-        >
-      >[];
-
       // Mapa de peso por tag para cálculo ponderado.
-      const { data: tagsData } = await supabaseClient
-        .from('tags_comportamento')
-        .select('nome, peso_pontuacao, categoria');
       const pesoPorTag = new Map<string, { peso: number; categoria: string }>();
-      for (const t of (tagsData ?? []) as unknown as Array<{
-        nome: string;
-        peso_pontuacao: number;
-        categoria: string;
-      }>) {
+      for (const t of tags) {
         pesoPorTag.set(t.nome, { peso: t.peso_pontuacao, categoria: t.categoria });
       }
 
@@ -566,17 +544,7 @@ export function useMonitoramento() {
         const ausenciasInjust = todasAusencias.filter(
           (f) => !justificadas.has(`${aluno.id}:${f.data_aula}`),
         );
-        const ocos = (
-          ocorrenciasRaw as unknown as Array<{
-            aluno_id: string;
-            tipo: string[];
-            status: string;
-            presenca_responsavel_confirmada: boolean;
-            exige_presenca_responsavel: boolean;
-            tags_comportamento: string[];
-            created_at: string;
-          }>
-        ).filter((o) => o.aluno_id === aluno.id);
+        const ocos = ocorrenciasApi.filter((o) => o.aluno_id === aluno.id);
 
         const faltasRecentes = ausenciasInjust.filter((f) => f.data_aula >= janelaIso).length;
         const ultima = ausenciasInjust
@@ -614,9 +582,6 @@ export function useMonitoramento() {
           };
         });
 
-        // Conta comportamentos positivos recentes para desconto no score.
-        // Busca será feita no termômetro individual; no ranking usa 0 para performance.
-
         const { nivel } = calcularTermometro(
           {
             faltasInjustificadas: ausenciasInjust.length,
@@ -638,9 +603,7 @@ export function useMonitoramento() {
           totalOcorrencias: ocos.length,
           nivel,
           ultimaAusencia: ultima ? formatarData(ultima) : undefined,
-          exigePresencaResponsavel: (
-            ocos as unknown as Array<{ exige_presenca_responsavel: boolean }>
-          ).some((o) => o.exige_presenca_responsavel),
+          exigePresencaResponsavel: ocos.some((o) => o.exige_presenca_responsavel),
         };
       });
 
@@ -666,31 +629,17 @@ export function useMonitoramento() {
     carregando.value = true;
     erro.value = null;
     try {
-      const { data: ocoData, error: err } = await supabaseClient
-        .from('ocorrencias')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (err) throw err;
-      const ocorrencias = (ocoData ?? []) as unknown as Ocorrencia[];
-
-      const alunoIds = [...new Set(ocorrencias.map((o) => o.aluno_id))];
-      const { data: alunosData } = await supabaseClient
-        .from('alunos')
-        .select('*')
-        .in('id', alunoIds);
-      const alunos = (alunosData ?? []) as unknown as Aluno[];
-
-      const profIds = [...new Set(ocorrencias.map((o) => o.professor_id))];
-      const { data: profData } = await supabaseClient.from('perfis').select('*').in('id', profIds);
-      const professores = (profData ?? []) as unknown as Perfil[];
+      const [{ ocorrencias }, { alunos }] = await Promise.all([
+        api<{ ocorrencias: OcorrenciaApi[] }>('/api/ocorrencias'),
+        // A ocorrência traz apenas nome do aluno; a matrícula completa a listagem.
+        api<{ alunos: Aluno[] }>('/api/alunos'),
+      ]);
 
       return ocorrencias.map((oc) => {
         const aluno = alunos.find((a) => a.id === oc.aluno_id);
-        const prof = professores.find((p) => p.id === oc.professor_id);
         return {
           id: oc.id,
-          alunoNome: aluno?.nome ?? 'Aluno não encontrado',
+          alunoNome: oc.aluno?.nome ?? aluno?.nome ?? 'Aluno não encontrado',
           alunoMatricula: aluno?.matricula ?? '—',
           turma: null,
           descricao: oc.descricao,
@@ -699,7 +648,7 @@ export function useMonitoramento() {
           notificar_coordenacao: oc.notificar_coordenacao,
           notificar_responsavel: oc.notificar_responsavel,
           data: formatarData(oc.created_at),
-          professorNome: prof?.nome,
+          professorNome: oc.professor?.nome,
           exigePresencaResponsavel: oc.exige_presenca_responsavel,
           bloqueado: oc.exige_presenca_responsavel,
         };
@@ -719,12 +668,10 @@ export function useMonitoramento() {
     novoValor: boolean,
   ): Promise<boolean> {
     try {
-      const { error: err } = await supabaseClient
-        .from('ocorrencias')
-        .update({ exige_presenca_responsavel: novoValor })
-        .eq('id', ocorrenciaId);
-
-      if (err) throw err;
+      await api(`/api/ocorrencias/${ocorrenciaId}`, {
+        metodo: 'PATCH',
+        corpo: { exige_presenca_responsavel: novoValor },
+      });
       return true;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -740,17 +687,11 @@ export function useMonitoramento() {
     novoStatus: 'resolvida' | 'arquivada' | 'aberta' | 'em_andamento',
   ): Promise<boolean> {
     try {
-      const payload: Record<string, unknown> = { status: novoStatus };
-      if (novoStatus === 'resolvida' || novoStatus === 'arquivada') {
-        payload.closed_at = new Date().toISOString();
-      } else {
-        payload.closed_at = null;
-      }
-      const { error: err } = await supabaseClient
-        .from('ocorrencias')
-        .update(payload)
-        .eq('id', ocorrenciaId);
-      if (err) throw err;
+      // O fechamento (`closed_at`) é derivado do status pela própria API.
+      await api(`/api/ocorrencias/${ocorrenciaId}`, {
+        metodo: 'PATCH',
+        corpo: { status: novoStatus },
+      });
       return true;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -763,14 +704,10 @@ export function useMonitoramento() {
   /** Confirma a presença do responsável, reduzindo o peso no termômetro. */
   async function confirmarPresencaResponsavel(ocorrenciaId: string): Promise<boolean> {
     try {
-      const { error: err } = await supabaseClient
-        .from('ocorrencias')
-        .update({
-          presenca_responsavel_confirmada: true,
-          data_confirmacao_presenca: new Date().toISOString(),
-        })
-        .eq('id', ocorrenciaId);
-      if (err) throw err;
+      await api(`/api/ocorrencias/${ocorrenciaId}`, {
+        metodo: 'PATCH',
+        corpo: { presenca_responsavel_confirmada: true },
+      });
       return true;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -784,111 +721,26 @@ export function useMonitoramento() {
     carregando.value = true;
     erro.value = null;
     try {
-      const { data: justData, error: err } = await supabaseClient
-        .from('justificativas_faltas')
-        .select('*')
-        .order('created_at', { ascending: false });
+      const { justificativas } = await api<{ justificativas: JustificativaApi[] }>(
+        '/api/justificativas',
+      );
 
-      if (err) throw err;
-      const justificativas = (justData ?? []) as unknown as JustificativaFalta[];
-
-      const alunoIds = [...new Set(justificativas.map((j) => j.aluno_id))];
-      const { data: alunosData } = await supabaseClient
-        .from('alunos')
-        .select('*')
-        .in('id', alunoIds);
-      const alunos = (alunosData ?? []) as unknown as Aluno[];
-
-      const respIds = [...new Set(justificativas.map((j) => j.responsavel_id))];
-      const { data: respData } = await supabaseClient.from('perfis').select('*').in('id', respIds);
-      const responsaveis = (respData ?? []) as unknown as Perfil[];
-
-      const justIds = justificativas.map((j) => j.id);
-      const { data: jaData } = await supabaseClient
-        .from('justificativa_anexos')
-        .select('justificativa_id, anexo_id')
-        .in('justificativa_id', justIds);
-
-      const jaList = (jaData ?? []) as unknown as Array<{
-        justificativa_id: string;
-        anexo_id: string;
-      }>;
-
-      const anexoIds = [...new Set(jaList.map((ja) => ja.anexo_id))];
-      const anexoMap = new Map<
-        string,
-        {
-          nome_arquivo: string;
-          storage_path: string;
-          mime_type: string;
-          processado_em: string | null;
-        }
-      >();
-
-      if (anexoIds.length) {
-        const { data: anexosData } = await supabaseClient
-          .from('anexos')
-          .select('id, nome_arquivo, storage_path, mime_type, processado_em')
-          .in('id', anexoIds);
-
-        const anexos = (anexosData ?? []) as unknown as Array<{
-          id: string;
-          nome_arquivo: string;
-          storage_path: string;
-          mime_type: string;
-          processado_em: string | null;
-        }>;
-        for (const a of anexos) {
-          anexoMap.set(a.id, a);
-        }
-      }
-
-      const justAnexoMap = new Map<
-        string,
-        {
-          anexoId: string;
-          nome: string;
-          storagePath: string;
-          mimeType: string;
-          processadoEm: string | null;
-        }
-      >();
-      for (const ja of jaList) {
-        const a = anexoMap.get(ja.anexo_id);
-        if (a) {
-          justAnexoMap.set(ja.justificativa_id, {
-            anexoId: ja.anexo_id,
-            nome: a.nome_arquivo,
-            storagePath: a.storage_path,
-            mimeType: a.mime_type,
-            processadoEm: a.processado_em,
-          });
-        }
-      }
-
-      const result: JustificativaPendente[] = [];
-      for (const j of justificativas) {
-        const aluno = alunos.find((a) => a.id === j.aluno_id);
-        const responsavel = responsaveis.find((r) => r.id === j.responsavel_id);
-        const anexo = justAnexoMap.get(j.id);
-
-        result.push({
+      return justificativas.map((j) => {
+        const anexo = j.anexos[0];
+        return {
           id: j.id,
-          alunoNome: aluno?.nome ?? 'Aluno não encontrado',
-          responsavelNome: responsavel?.nome ?? 'Responsável não vinculado',
+          alunoNome: j.aluno?.nome ?? 'Aluno não encontrado',
+          responsavelNome: j.responsavel?.nome ?? 'Responsável não vinculado',
           dataAusencia: formatarData(j.data_falta),
           dataFim: j.data_fim ? formatarData(j.data_fim) : null,
           motivo: j.motivo,
-          anexoPath: anexo?.storagePath,
-          anexoNome: anexo?.nome,
-          anexoMime: anexo?.mimeType,
-          anexoId: anexo?.anexoId ?? undefined,
-          processadoEm: anexo?.processadoEm ?? undefined,
+          anexoPath: anexo?.storage_path,
+          anexoNome: anexo?.nome_arquivo,
+          anexoMime: anexo?.mime_type,
+          anexoId: anexo?.id,
           status: j.status as JustificativaPendente['status'],
-        });
-      }
-
-      return result;
+        };
+      });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       console.error('[useMonitoramento] Erro ao buscar justificativas:', msg);
@@ -902,48 +754,15 @@ export function useMonitoramento() {
   async function validarJustificativa(
     justificativaId: string,
     acao: 'aceitar' | 'recusar',
-    gestaoId?: string,
+    _gestaoId?: string,
   ): Promise<boolean> {
     try {
       const status = acao === 'aceitar' ? 'aceita' : 'recusada';
-      const updateData: Record<string, unknown> = {
-        status,
-        avaliado_em: new Date().toISOString(),
-      };
-      if (gestaoId) updateData.avaliado_por = gestaoId;
-
-      const { error: err } = await supabaseClient
-        .from('justificativas_faltas')
-        .update(updateData)
-        .eq('id', justificativaId);
-
-      if (err) throw err;
-
-      if (acao === 'aceitar') {
-        const { data: justData } = await supabaseClient
-          .from('justificativas_faltas')
-          .select('aluno_id, data_falta, data_fim')
-          .eq('id', justificativaId)
-          .single();
-
-        if (justData) {
-          const j = justData as unknown as {
-            aluno_id: string;
-            data_falta: string;
-            data_fim: string | null;
-          };
-          const dataFim = j.data_fim ?? j.data_falta;
-
-          await supabaseClient
-            .from('frequencias')
-            .update({ status: 'justificado' })
-            .eq('aluno_id', j.aluno_id)
-            .eq('status', 'ausente')
-            .gte('data_aula', j.data_falta)
-            .lte('data_aula', dataFim);
-        }
-      }
-
+      // O aceite dispara o trigger que marca as frequências do período como justificadas.
+      await api(`/api/justificativas/${justificativaId}`, {
+        metodo: 'PATCH',
+        corpo: { status },
+      });
       return true;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -1017,28 +836,13 @@ export function useMonitoramento() {
     ];
   }
 
-  async function buscarFilhosDoResponsavel(responsavelId: string): Promise<Aluno[]> {
+  async function buscarFilhosDoResponsavel(_responsavelId: string): Promise<Aluno[]> {
     carregando.value = true;
     erro.value = null;
     try {
-      const { data: vinculos, error: errVinc } = await supabaseClient
-        .from('vinculos_responsaveis')
-        .select('aluno_id')
-        .eq('responsavel_id', responsavelId);
-
-      if (errVinc) throw errVinc;
-
-      const alunoIds = (vinculos ?? []).map((v) => (v as unknown as VinculoResponsavel).aluno_id);
-      if (!alunoIds.length) return [];
-
-      const { data: alunos, error: errAlunos } = await supabaseClient
-        .from('alunos')
-        .select('*')
-        .in('id', alunoIds)
-        .order('nome', { ascending: true });
-
-      if (errAlunos) throw errAlunos;
-      return (alunos ?? []) as unknown as Aluno[];
+      // O escopo por papel já restringe a listagem aos filhos do responsável autenticado.
+      const { alunos } = await api<{ alunos: Aluno[] }>('/api/alunos');
+      return alunos;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       console.error('[useMonitoramento] Erro ao buscar filhos do responsável:', msg);
@@ -1058,27 +862,35 @@ export function useMonitoramento() {
     await carregarConfigSistema();
     const cfg = obterConfigTermometro();
     try {
-      const { data: freqs, error: errF } = await supabaseClient
-        .from('frequencias')
-        .select('id, data_aula')
-        .eq('aluno_id', alunoId)
-        .eq('status', 'ausente')
-        .is('deleted_at', null);
+      const janelaPos = new Date();
+      janelaPos.setDate(janelaPos.getDate() - cfg.janelaPositivoDias);
+      const janelaPosIso = janelaPos.toISOString().slice(0, 10);
 
-      if (errF) throw errF;
-      const todasFreqs = (freqs ?? []) as unknown as Array<{ id: string; data_aula: string }>;
+      const [
+        { frequencias: todasFreqs },
+        { justificativas: justs },
+        { ocorrencias: ocosRaw },
+        { tags },
+        registros,
+      ] = await Promise.all([
+        api<{ frequencias: Frequencia[] }>('/api/frequencias', {
+          parametros: { aluno_id: alunoId, status: 'ausente' },
+        }),
+        api<{ justificativas: JustificativaApi[] }>('/api/justificativas', {
+          parametros: { aluno_id: alunoId, status: 'aceita' },
+        }),
+        api<{ ocorrencias: OcorrenciaApi[] }>('/api/ocorrencias', {
+          parametros: { aluno_id: alunoId },
+        }),
+        api<{ tags: TagComportamento[] }>('/api/tags-comportamento'),
+        api<{ registros: RegistroComportamentoApi[] }>('/api/registros-comportamento', {
+          parametros: { aluno_id: alunoId, data_inicio: janelaPosIso },
+        }),
+      ]);
 
       // Faltas justificadas com status aceito não compõem o score e formam a base de ausências injustificadas.
-      const { data: justs } = await supabaseClient
-        .from('justificativas_faltas')
-        .select('data_falta, data_fim')
-        .eq('aluno_id', alunoId)
-        .eq('status', 'aceita');
       const datasJustificadas = new Set<string>();
-      for (const j of (justs ?? []) as unknown as Array<{
-        data_falta: string;
-        data_fim: string | null;
-      }>) {
+      for (const j of justs) {
         const fim = j.data_fim ?? j.data_falta;
         const ini = new Date(j.data_falta + 'T00:00:00');
         const fimD = new Date(fim + 'T00:00:00');
@@ -1116,35 +928,11 @@ export function useMonitoramento() {
       if (cnt30 > cnt60) tendencia = 'alta';
       else if (cnt30 < cnt60) tendencia = 'queda';
 
-      const { data: ocos, error: errO } = await supabaseClient
-        .from('ocorrencias')
-        .select(
-          'id, tipo, status, presenca_responsavel_confirmada, tags_comportamento, exige_presenca_responsavel, created_at',
-        )
-        .eq('aluno_id', alunoId);
-
-      if (errO) throw errO;
-      const ocosRaw = (ocos ?? []) as unknown as Array<{
-        id: string;
-        tipo: string[];
-        status: string;
-        presenca_responsavel_confirmada: boolean;
-        tags_comportamento: string[];
-        exige_presenca_responsavel: boolean;
-        created_at: string;
-      }>;
       const totalOcorrencias = ocosRaw.length;
 
       // Consulta os pesos das tags para o cálculo ponderado das ocorrências.
-      const { data: tagsData } = await supabaseClient
-        .from('tags_comportamento')
-        .select('nome, peso_pontuacao, categoria');
       const pesoPorTag = new Map<string, { peso: number; categoria: string }>();
-      for (const t of (tagsData ?? []) as unknown as Array<{
-        nome: string;
-        peso_pontuacao: number;
-        categoria: string;
-      }>) {
+      for (const t of tags) {
         pesoPorTag.set(t.nome, { peso: t.peso_pontuacao, categoria: t.categoria });
       }
 
@@ -1176,39 +964,9 @@ export function useMonitoramento() {
       });
 
       // Conta comportamentos positivos recentes para desconto.
-      let comportamentosPositivos = 0;
-      try {
-        const janelaPos = new Date();
-        janelaPos.setDate(janelaPos.getDate() - cfg.janelaPositivoDias);
-        const janelaPosIso = janelaPos.toISOString().slice(0, 10);
-        const { data: regsPos } = await supabaseClient
-          .from('registros_comportamento')
-          .select('id, data_hora')
-          .eq('aluno_id', alunoId)
-          .gte('data_hora', janelaPosIso + 'T00:00:00');
-        const regIds = (regsPos ?? []).map((r) => (r as { id: string }).id);
-        if (regIds.length) {
-          const { data: tagIds } = await supabaseClient
-            .from('registro_comportamento_tags')
-            .select('tag_id, registro_id')
-            .in('registro_id', regIds);
-          const positivoIds = new Set(
-            ((tagsData ?? []) as unknown as Array<{ id: string; categoria: string }>)
-              .filter((t) => t.categoria === 'positivo')
-              .map((t) => t.id),
-          );
-          const regsComPositivo = new Set<string>();
-          for (const r of (tagIds ?? []) as unknown as Array<{
-            tag_id: string;
-            registro_id: string;
-          }>) {
-            if (positivoIds.has(r.tag_id)) regsComPositivo.add(r.registro_id);
-          }
-          comportamentosPositivos = regsComPositivo.size;
-        }
-      } catch {
-        comportamentosPositivos = 0;
-      }
+      const comportamentosPositivos = registros.registros.filter((r) =>
+        r.tags.some((tag) => tag.categoria === 'positivo'),
+      ).length;
 
       const { score, nivel, fatores } = calcularTermometro(
         {
@@ -1269,26 +1027,23 @@ export function useMonitoramento() {
     }
   }
 
-  async function buscarAlertasResponsavel(responsavelId: string): Promise<AlertaResponsavel[]> {
+  async function buscarAlertasResponsavel(_responsavelId: string): Promise<AlertaResponsavel[]> {
     try {
-      const filhos = await buscarFilhosDoResponsavel(responsavelId);
+      const filhos = await buscarFilhosDoResponsavel(_responsavelId);
       if (!filhos.length) return [];
 
       const alunoIds = filhos.map((f) => f.id);
-      const { data: justsData } = await supabaseClient
-        .from('justificativas_faltas')
-        .select('id, aluno_id, data_falta, data_fim, status, motivo')
-        .in('aluno_id', alunoIds)
-        .in('status', ['pendente', 'aceita', 'recusada']);
+      const [{ justificativas }, { frequencias }, { ocorrencias: ocorrenciasApi }] =
+        await Promise.all([
+          api<{ justificativas: JustificativaApi[] }>('/api/justificativas'),
+          api<{ frequencias: Frequencia[] }>('/api/frequencias', {
+            parametros: { aluno_ids: alunoIds, status: 'ausente' },
+          }),
+          api<{ ocorrencias: OcorrenciaApi[] }>('/api/ocorrencias'),
+        ]);
 
-      const justs = (justsData ?? []) as unknown as Array<{
-        id: string;
-        aluno_id: string;
-        data_falta: string;
-        data_fim: string | null;
-        status: string;
-        motivo: string;
-      }>;
+      const visiveis = new Set(alunoIds);
+      const justs = justificativas.filter((j) => visiveis.has(j.aluno_id));
 
       const justMap = new Map<string, { status: string; motivo: string }>();
       for (const j of justs) {
@@ -1302,37 +1057,12 @@ export function useMonitoramento() {
         }
       }
 
-      const justIds = justs.map((j) => j.id).filter(Boolean);
-      const { data: jaData } = await supabaseClient
-        .from('justificativa_anexos')
-        .select('justificativa_id, anexo_id')
-        .in('justificativa_id', justIds as string[]);
-      const jaList = (jaData ?? []) as unknown as Array<{
-        justificativa_id: string;
-        anexo_id: string;
-      }>;
-
-      const anexoIds = [...new Set(jaList.map((ja) => ja.anexo_id))];
-      const { data: anexosData } = await supabaseClient
-        .from('anexos')
-        .select('id, nome_arquivo, storage_path, mime_type')
-        .in('id', anexoIds);
-      const anexos = (anexosData ?? []) as unknown as Array<{
-        id: string;
-        nome_arquivo: string;
-        storage_path: string;
-        mime_type: string;
-      }>;
-      const anexoMap = new Map(anexos.map((a) => [a.id, a]));
-
       const anexoPorJustKey = new Map<
         string,
         { nome: string; storagePath: string; mimeType: string }
       >();
-      for (const ja of jaList) {
-        const j = justs.find((x) => x.id === ja.justificativa_id);
-        if (!j) continue;
-        const a = anexoMap.get(ja.anexo_id);
+      for (const j of justs) {
+        const a = j.anexos[0];
         if (!a?.storage_path) continue;
         const start = new Date(j.data_falta);
         const end = new Date(j.data_fim ?? j.data_falta);
@@ -1348,14 +1078,7 @@ export function useMonitoramento() {
       const alertas: AlertaResponsavel[] = [];
 
       for (const filho of filhos) {
-        const { data: freqs } = await supabaseClient
-          .from('frequencias')
-          .select('*')
-          .eq('aluno_id', filho.id)
-          .eq('status', 'ausente')
-          .order('data_aula', { ascending: false });
-
-        const ausencias = (freqs ?? []) as unknown as Frequencia[];
+        const ausencias = frequencias.filter((f) => f.aluno_id === filho.id);
         for (const aus of ausencias) {
           const { data: dataFormatada } = formatarDataHorario(aus.data_aula);
           const justKey = `${filho.id}:${aus.data_aula}`;
@@ -1395,14 +1118,8 @@ export function useMonitoramento() {
           });
         }
 
-        const { data: ocos } = await supabaseClient
-          .from('ocorrencias')
-          .select('*')
-          .eq('aluno_id', filho.id)
-          .order('created_at', { ascending: false });
-
-        const ocorrencias = (ocos ?? []) as unknown as Ocorrencia[];
-        for (const oc of ocorrencias) {
+        const ocos = ocorrenciasApi.filter((o) => o.aluno_id === filho.id);
+        for (const oc of ocos) {
           const { data: dataFormatada } = formatarDataHorario(oc.created_at);
           alertas.push({
             id: `oc-${oc.id}`,
@@ -1429,27 +1146,47 @@ export function useMonitoramento() {
 
   async function enviarJustificativa(
     alunoId: string,
-    responsavelId: string,
+    _responsavelId: string,
     dataInicio: string,
     dataFim: string | null,
     motivo: string,
+    arquivo?: File | null,
   ): Promise<{ success: boolean; justificativaId: string | null }> {
     erro.value = null;
+    let anexoId: string | null = null;
     try {
-      const dataFimNormalized = dataFim && dataFim.trim() ? dataFim : null;
-      const justificativaId = crypto.randomUUID();
-      const { error: justErr } = await supabaseClient.from('justificativas_faltas').insert({
-        id: justificativaId,
-        aluno_id: alunoId,
-        responsavel_id: responsavelId,
-        data_falta: dataInicio,
-        data_fim: dataFimNormalized,
-        motivo,
-      });
+      // O anexo é criado antes da justificativa para entrar em `anexo_ids`.
+      if (arquivo) {
+        const { blob, mimeType } = await comprimirImagem(arquivo);
+        const nome =
+          mimeType === 'image/jpeg' && arquivo.type !== 'image/jpeg'
+            ? arquivo.name.replace(/\.[^.]+$/, '.jpg')
+            : arquivo.name;
+        const { anexo } = await enviarArquivo<{ anexo: { id: string } }>('/api/anexos', blob, nome);
+        anexoId = anexo.id;
+      }
 
-      if (justErr) throw justErr;
-      return { success: true, justificativaId };
+      const dataFimNormalized = dataFim && dataFim.trim() ? dataFim : null;
+      const { justificativa } = await api<{ justificativa: { id: string } }>(
+        '/api/justificativas',
+        {
+          metodo: 'POST',
+          corpo: {
+            aluno_id: alunoId,
+            data_falta: dataInicio,
+            data_fim: dataFimNormalized,
+            motivo: motivo,
+            ...(anexoId ? { anexo_ids: [anexoId] } : {}),
+          },
+        },
+      );
+
+      return { success: true, justificativaId: justificativa.id };
     } catch (e) {
+      // Compensação: sem a justificativa o anexo recém-enviado não deve ficar órfão.
+      if (anexoId) {
+        await api(`/api/anexos/${anexoId}`, { metodo: 'DELETE' }).catch(() => undefined);
+      }
       const msg = e instanceof Error ? e.message : String(e);
       console.error('[useMonitoramento] Erro ao enviar justificativa:', msg);
       erro.value = 'Falha ao enviar justificativa. Tente novamente.';
@@ -1458,133 +1195,31 @@ export function useMonitoramento() {
   }
 
   async function processarAnexoAsync(
-    justificativaId: string,
-    responsavelId: string,
-    arquivo: File,
-  ) {
-    const edgeFunctionUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/processar-anexo`;
-    const ext = arquivo.type === 'image/jpeg' ? 'jpg' : (arquivo.name.split('.').pop() ?? 'bin');
-    const storagePath = `${responsavelId}/${justificativaId}/${Date.now()}-${justificativaId.slice(0, 8)}.${ext}`;
-
-    const removerStorage = () =>
-      supabaseClient.storage
-        .from('justificativas')
-        .remove([storagePath])
-        .catch(() => {});
-
-    try {
-      const { blob, mimeType, tamanhoComprimido } = await comprimirImagem(arquivo);
-
-      await supabaseClient.storage.from('justificativas').upload(storagePath, blob, {
-        contentType: mimeType,
-        upsert: false,
-      });
-
-      const anexoId = crypto.randomUUID();
-      const { error: anexoError } = await supabaseClient.from('anexos').insert({
-        id: anexoId,
-        storage_path: storagePath,
-        nome_arquivo: arquivo.name,
-        mime_type: mimeType,
-        tamanho_bytes: tamanhoComprimido,
-        criado_por: responsavelId,
-      });
-      if (anexoError) {
-        await removerStorage();
-        throw anexoError;
-      }
-
-      const { error: vinculoError } = await supabaseClient.from('justificativa_anexos').insert({
-        justificativa_id: justificativaId,
-        anexo_id: anexoId,
-      });
-      if (vinculoError) {
-        // Remove o anexo como compensação; linhas remanescentes são limpas pelo job de expurgo.
-        try {
-          await supabaseClient.from('anexos').delete().eq('id', anexoId);
-        } catch {
-          /* sem permissão de deleção pelo cliente */
-        }
-        await removerStorage();
-        throw vinculoError;
-      }
-
-      fetch(edgeFunctionUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ storagePath, mimeType: arquivo.type, anexoId }),
-      }).catch((e) =>
-        console.error('[useMonitoramento] Falha no processamento do anexo (edge):', e),
-      );
-    } catch (e) {
-      console.error('[useMonitoramento] Falha no processamento assíncrono do anexo:', e);
-    }
+    _justificativaId: string,
+    _responsavelId: string,
+    _arquivo: File,
+  ): Promise<void> {
+    // Otimização server-side descontinuada: o anexo sobe junto do envio da justificativa.
+    await Promise.resolve();
   }
 
   async function criarOuObterConversa(
     responsavelId: string,
     alunoId: string,
-    turmaId: string,
-    opcoes: {
+    _turmaId: string,
+    _opcoes: {
       mensagemSistemaDe?: string | null;
       textoSistema?: string;
       iniciadaPelaGestao?: boolean;
     } = {},
   ): Promise<string | null> {
     try {
-      const { data: existing } = await supabaseClient
-        .from('conversas')
-        .select('id')
-        .eq('responsavel_id', responsavelId)
-        .eq('aluno_id', alunoId)
-        .maybeSingle();
-
-      if (existing) {
-        return (existing as unknown as { id: string }).id;
-      }
-
-      const { data, error } = await supabaseClient
-        .from('conversas')
-        .insert({
-          responsavel_id: responsavelId,
-          aluno_id: alunoId,
-          turma_id: turmaId,
-          ativa: true,
-          iniciada_pela_gestao: opcoes.iniciadaPelaGestao ?? false,
-        })
-        .select('id')
-        .single();
-
-      if (error) throw error;
-      const convId = (data as unknown as { id: string }).id;
-
-      if (opcoes.mensagemSistemaDe) {
-        const agora = new Date().toISOString();
-        await supabaseClient.from('mensagens').insert({
-          conversa_id: convId,
-          remetente_id: opcoes.mensagemSistemaDe,
-          conteudo: opcoes.textoSistema ?? 'Conversa iniciada para acompanhamento escolar.',
-          is_system_message: true,
-          created_at: agora,
-        });
-
-        await supabaseClient
-          .from('conversas')
-          .update({ ultima_mensagem_em: agora })
-          .eq('id', convId);
-
-        if (opcoes.iniciadaPelaGestao) {
-          await supabaseClient.from('notificacoes').insert({
-            destinatario_id: responsavelId,
-            tipo: 'mensagem',
-            titulo: 'Coordenação iniciou uma conversa',
-            corpo: 'A coordenação escolar abriu um canal de diálogo para acompanhamento.',
-            metadados: { conversa_id: convId },
-          });
-        }
-      }
-
-      return convId;
+      // A API resolve turma, mensagem de sistema e notificações ao criar a conversa.
+      const { conversa } = await api<{ conversa: ConversaApi }>('/api/conversas', {
+        metodo: 'POST',
+        corpo: { aluno_id: alunoId, responsavel_id: responsavelId },
+      });
+      return conversa.id;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       console.error('[useMonitoramento] Erro ao criar/obter conversa:', msg);
@@ -1595,37 +1230,15 @@ export function useMonitoramento() {
 
   async function abrirConversaResponsavel(
     alunoId: string,
-    gestaoUserId?: string,
+    _gestaoUserId?: string,
   ): Promise<string | null> {
     try {
-      const { data: vinculos } = await supabaseClient
-        .from('vinculos_responsaveis')
-        .select('responsavel_id')
-        .eq('aluno_id', alunoId)
-        .eq('ativo', true)
-        .order('contato_prioritario', { ascending: false })
-        .limit(1);
-
-      const responsavelId = (vinculos?.[0] as { responsavel_id: string } | undefined)
-        ?.responsavel_id;
-      if (!responsavelId) return null;
-
-      const { data: enturmacoes } = await supabaseClient
-        .from('enturmacoes')
-        .select('turma_id')
-        .eq('aluno_id', alunoId)
-        .eq('status', 'matriculado')
-        .order('created_at', { ascending: false })
-        .limit(1);
-
-      const turmaId = (enturmacoes?.[0] as { turma_id: string } | undefined)?.turma_id;
-      if (!turmaId) return null;
-
-      return await criarOuObterConversa(responsavelId, alunoId, turmaId, {
-        mensagemSistemaDe: gestaoUserId ?? null,
-        textoSistema: 'Conversa iniciada pela coordenação para acompanhamento escolar.',
-        iniciadaPelaGestao: !!gestaoUserId,
+      // A API escolhe o responsável de contato prioritário quando a gestão abre a conversa.
+      const { conversa } = await api<{ conversa: ConversaApi }>('/api/conversas', {
+        metodo: 'POST',
+        corpo: { aluno_id: alunoId },
       });
+      return conversa.id;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       console.error('[useMonitoramento] Erro ao abrir conversa com responsável:', msg);
@@ -1645,70 +1258,23 @@ export function useMonitoramento() {
     userId: string,
   ): Promise<{ contato: ContatoChat | null; mensagens: MensagemChat[] }> {
     try {
-      const { data: convData } = await supabaseClient
-        .from('conversas')
-        .select(
-          '*, iniciada_pela_gestao, responsavel:perfis!conversas_responsavel_id_fkey(nome), aluno:alunos!conversas_aluno_id_fkey(nome), turma:turmas!conversas_turma_id_fkey(nome_completo)',
-        )
-        .eq('id', conversaId)
-        .single();
+      const [{ conversas }, { mensagens: mensagensApi }] = await Promise.all([
+        api<{ conversas: ConversaApi[] }>('/api/conversas'),
+        api<{ mensagens: MensagemApi[] }>(`/api/conversas/${conversaId}/mensagens`),
+      ]);
 
-      if (!convData) return { contato: null, mensagens: [] };
+      const conv = conversas.find((c) => c.id === conversaId);
+      if (!conv) return { contato: null, mensagens: [] };
 
-      const conv = convData as unknown as {
-        id: string;
-        iniciada_pela_gestao: boolean | null;
-        responsavel: { nome: string };
-        aluno: { nome: string };
-        turma: { nome_completo: string };
-      };
-
-      const { data: msgsData } = await supabaseClient
-        .from('mensagens')
-        .select('*')
-        .eq('conversa_id', conversaId)
-        .is('deleted_at', null)
-        .order('created_at', { ascending: true });
-
-      const remetenteIds = [
-        ...new Set(
-          (msgsData ?? []).map((m: unknown) => (m as { remetente_id: string }).remetente_id),
-        ),
-      ];
-
-      const { data: perfisData } = await supabaseClient
-        .from('perfis')
-        .select('id, nome, papel')
-        .in('id', remetenteIds);
-
-      const autores = new Map(
-        (perfisData ?? []).map((p: unknown) => [
-          (p as { id: string }).id,
-          {
-            nome: (p as { nome: string }).nome,
-            tipo: (p as { papel: string }).papel as 'responsavel' | 'gestao' | 'professor',
-          },
-        ]),
-      );
-
-      const mensagens: MensagemChat[] = (msgsData ?? []).map((m: unknown) => {
-        const msg = m as {
-          id: string;
-          conversa_id: string;
-          remetente_id: string;
-          conteudo: string;
-          is_system_message: boolean;
-          lida_em: string | null;
-          created_at: string;
-        };
-        const autor = autores.get(msg.remetente_id);
+      const mensagens: MensagemChat[] = mensagensApi.map((msg) => {
+        const autor = msg.autor;
         const raw = msg.created_at;
         const d = safeDate(raw);
         return {
           id: msg.id,
           conversaId: msg.conversa_id,
           remetenteId: msg.remetente_id,
-          autor: autor?.tipo ?? 'gestao',
+          autor: autor?.papel ?? 'gestao',
           nomeAutor: autor?.nome ?? (msg.is_system_message ? 'Sistema' : 'Equipe escolar'),
           texto: msg.conteudo,
           horario: d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
@@ -1733,10 +1299,15 @@ export function useMonitoramento() {
             (conv.turma?.nome_completo ? ' · ' + conv.turma.nome_completo : ''),
           avatarIniciais: '',
           avatarCor: '#008241',
-          ultimaMensagem: '',
-          ultimaData: '',
-          naoLidas: 0,
-          ativa: true,
+          ultimaMensagem: conv.ultima_mensagem?.conteudo ?? '',
+          ultimaData: conv.ultima_mensagem
+            ? safeDate(conv.ultima_mensagem.created_at).toLocaleDateString('pt-BR', {
+                day: '2-digit',
+                month: '2-digit',
+              })
+            : '',
+          naoLidas: conv.nao_lidas,
+          ativa: conv.ativa,
           iniciadaPelaGestao: conv.iniciada_pela_gestao ?? false,
         },
         mensagens,
@@ -1750,90 +1321,51 @@ export function useMonitoramento() {
 
   async function buscarContatosResponsavel(userId: string): Promise<ContatoChat[]> {
     try {
-      const { data: vinculos } = await supabaseClient
-        .from('vinculos_responsaveis')
-        .select('aluno_id')
-        .eq('responsavel_id', userId);
+      const filhos = await buscarFilhosDoResponsavel(userId);
+      if (!filhos.length) return [];
 
-      if (!vinculos || !vinculos.length) return [];
-
-      const alunoIds = (vinculos as unknown as { aluno_id: string }[]).map((v) => v.aluno_id);
-
-      const { data: alunos } = await supabaseClient
-        .from('alunos')
-        .select('id, nome')
-        .in('id', alunoIds);
-
-      if (!alunos) return [];
-
-      const { data: enturmacoes } = await supabaseClient
-        .from('enturmacoes')
-        .select('aluno_id, turma_id')
-        .in('aluno_id', alunoIds)
-        .eq('status', 'matriculado');
-
-      const turmaPorAluno = new Map(
-        (enturmacoes ?? []).map((e: unknown) => {
-          const ent = e as { aluno_id: string; turma_id: string };
-          return [ent.aluno_id, ent.turma_id];
-        }),
-      );
+      const { conversas } = await api<{ conversas: ConversaApi[] }>('/api/conversas');
+      const porAluno = new Map(conversas.map((c) => [c.aluno.id, c]));
 
       const contatos: ContatoChat[] = [];
 
-      for (const aluno of alunos as unknown as { id: string; nome: string }[]) {
-        const turmaId = turmaPorAluno.get(aluno.id);
-        if (!turmaId) continue;
+      for (const aluno of filhos) {
+        let conversa = porAluno.get(aluno.id);
 
-        const convId = await criarOuObterConversa(userId, aluno.id, turmaId, {
-          mensagemSistemaDe: userId,
-        });
-        if (!convId) continue;
+        if (!conversa) {
+          try {
+            // Mantém o comportamento antigo de abrir o canal já na listagem de contatos.
+            const resposta = await api<{ conversa: ConversaApi }>('/api/conversas', {
+              metodo: 'POST',
+              corpo: { aluno_id: aluno.id },
+            });
+            conversa = resposta.conversa;
+          } catch {
+            // Aluno sem enturmação ativa não possui canal de conversa.
+            continue;
+          }
+        }
 
-        const { data: ultima } = await supabaseClient
-          .from('mensagens')
-          .select('conteudo, created_at')
-          .eq('conversa_id', convId)
-          .eq('is_system_message', false)
-          .is('deleted_at', null)
-          .order('created_at', { ascending: false })
-          .limit(1);
-
-        const { count: naoLidas } = await supabaseClient
-          .from('mensagens')
-          .select('*', { count: 'exact', head: true })
-          .eq('conversa_id', convId)
-          .eq('is_system_message', false)
-          .is('deleted_at', null)
-          .is('lida_em', null)
-          .neq('remetente_id', userId);
-
-        const ultMsg = (ultima ?? [])[0] as { conteudo: string; created_at: string } | undefined;
-
+        const ultima = conversa.ultima_mensagem;
         contatos.push({
-          conversaId: convId,
+          conversaId: conversa.id,
           nomeContato: aluno.nome,
           subtitulo: 'Coordenação Escolar',
-          avatarIniciais: aluno.nome
-            .split(' ')
-            .slice(0, 2)
-            .map((p: string) => p[0])
-            .join('')
-            .toUpperCase(),
+          avatarIniciais: iniciaisDoNome(aluno.nome),
           avatarCor: '',
-          ultimaMensagem: ultMsg?.conteudo
-            ? ultMsg.conteudo.replace(/\n/g, ' ').slice(0, 40)
+          ultimaMensagem: ultima
+            ? ultima.conteudo.replace(/\n/g, ' ').slice(0, 40)
             : 'Nenhuma mensagem ainda',
-          ultimaData: ultMsg?.created_at
-            ? (() => {
-                const d = safeDate(ultMsg.created_at);
-                return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
-              })()
+          ultimaData: ultima
+            ? safeDate(ultima.created_at).toLocaleDateString('pt-BR', {
+                day: '2-digit',
+                month: '2-digit',
+              })
             : '',
-          naoLidas: naoLidas ?? 0,
+          naoLidas: conversa.nao_lidas,
           ativa: true,
           alunoId: aluno.id,
-          turmaId,
+          turmaId: conversa.turma.id,
         });
       }
 
@@ -1845,101 +1377,36 @@ export function useMonitoramento() {
     }
   }
 
-  async function buscarContatosGestao(userId: string): Promise<ContatoChat[]> {
-    return buscarContatosStaff(userId, false);
-  }
-
-  async function buscarContatosStaff(
-    userId: string,
-    apenasSuasTurmas: boolean,
-  ): Promise<ContatoChat[]> {
+  async function buscarContatosGestao(_userId: string): Promise<ContatoChat[]> {
     try {
-      let query = supabaseClient
-        .from('conversas')
-        .select(
-          'id, responsavel_id, aluno_id, turma_id, ativa, iniciada_pela_gestao, ultima_mensagem_em, responsavel:perfis!conversas_responsavel_id_fkey(nome), aluno:alunos!conversas_aluno_id_fkey(nome), turma:turmas!conversas_turma_id_fkey(nome_completo)',
-        );
+      const { conversas } = await api<{ conversas: ConversaApi[] }>('/api/conversas');
 
-      if (apenasSuasTurmas) {
-        const { data: turmas } = await supabaseClient
-          .from('atribuicoes_professores')
-          .select('turma_id')
-          .eq('professor_id', userId)
-          .eq('ativo', true);
-
-        if (!turmas?.length) return [];
-
-        const turmaIds = (turmas as unknown as { turma_id: string }[]).map((t) => t.turma_id);
-        query = query.in('turma_id', turmaIds);
-      }
-
-      const { data: convs } = await query.order('ultima_mensagem_em', { ascending: false });
-
-      if (!convs) return [];
-
-      const contatos: ContatoChat[] = [];
-
-      for (const conv of convs as unknown as Array<{
-        id: string;
-        responsavel_id: string;
-        aluno_id: string;
-        turma_id: string;
-        ativa: boolean;
-        iniciada_pela_gestao: boolean | null;
-        responsavel: { nome: string };
-        aluno: { nome: string };
-        turma: { nome_completo: string };
-      }>) {
-        const { data: ultima } = await supabaseClient
-          .from('mensagens')
-          .select('conteudo, created_at')
-          .eq('conversa_id', conv.id)
-          .eq('is_system_message', false)
-          .is('deleted_at', null)
-          .order('created_at', { ascending: false })
-          .limit(1);
-
-        const { count: naoLidas } = await supabaseClient
-          .from('mensagens')
-          .select('*', { count: 'exact', head: true })
-          .eq('conversa_id', conv.id)
-          .eq('is_system_message', false)
-          .is('deleted_at', null)
-          .is('lida_em', null)
-          .neq('remetente_id', userId);
-
-        const ultMsg = (ultima ?? [])[0] as { conteudo: string; created_at: string } | undefined;
+      return conversas.map((conv) => {
         const nomeResp = conv.responsavel?.nome ?? 'Responsável';
         const nomeAluno = conv.aluno?.nome ?? '';
         const nomeTurma = conv.turma?.nome_completo ?? '';
+        const ultima = conv.ultima_mensagem;
 
-        contatos.push({
+        return {
           conversaId: conv.id,
           nomeContato: nomeResp,
           subtitulo: nomeAluno + (nomeTurma ? ' · ' + nomeTurma : ''),
-          avatarIniciais: nomeResp
-            .split(' ')
-            .slice(0, 2)
-            .map((p: string) => p[0])
-            .join('')
-            .toUpperCase(),
+          avatarIniciais: iniciaisDoNome(nomeResp),
           avatarCor: '',
-          ultimaMensagem: ultMsg?.conteudo
-            ? ultMsg.conteudo.replace(/\n/g, ' ').slice(0, 40)
+          ultimaMensagem: ultima
+            ? ultima.conteudo.replace(/\n/g, ' ').slice(0, 40)
             : 'Nenhuma mensagem ainda',
-          ultimaData: ultMsg?.created_at
-            ? (() => {
-                const d = safeDate(ultMsg.created_at);
-                return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
-              })()
+          ultimaData: ultima
+            ? safeDate(ultima.created_at).toLocaleDateString('pt-BR', {
+                day: '2-digit',
+                month: '2-digit',
+              })
             : '',
-          naoLidas: naoLidas ?? 0,
+          naoLidas: conv.nao_lidas,
           ativa: conv.ativa,
           iniciadaPelaGestao: conv.iniciada_pela_gestao ?? false,
-        });
-      }
-
-      return contatos;
+        };
+      });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       console.error('[useMonitoramento] Erro ao buscar contatos da equipe:', msg);
@@ -1949,22 +1416,10 @@ export function useMonitoramento() {
 
   async function enviarMensagem(conversaId: string, conteudo: string): Promise<boolean> {
     try {
-      const user = (await supabaseClient.auth.getUser()).data.user;
-      if (!user) throw new Error('Usuário não autenticado');
-
-      const { error } = await supabaseClient.from('mensagens').insert({
-        conversa_id: conversaId,
-        remetente_id: user.id,
-        conteudo,
+      await api(`/api/conversas/${conversaId}/mensagens`, {
+        metodo: 'POST',
+        corpo: { conteudo, client_request_id: crypto.randomUUID() },
       });
-
-      if (error) throw error;
-
-      await supabaseClient
-        .from('conversas')
-        .update({ ultima_mensagem_em: new Date().toISOString() })
-        .eq('id', conversaId);
-
       return true;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -1974,14 +1429,9 @@ export function useMonitoramento() {
     }
   }
 
-  async function marcarMensagensComoLidas(conversaId: string, userId: string): Promise<void> {
+  async function marcarMensagensComoLidas(conversaId: string, _userId: string): Promise<void> {
     try {
-      await supabaseClient
-        .from('mensagens')
-        .update({ lida_em: new Date().toISOString() })
-        .eq('conversa_id', conversaId)
-        .neq('remetente_id', userId)
-        .is('lida_em', null);
+      await api(`/api/conversas/${conversaId}/lidas`, { metodo: 'PATCH' });
     } catch (e) {
       console.error('[useMonitoramento] Erro ao marcar mensagens como lidas:', e);
     }
@@ -1989,12 +1439,10 @@ export function useMonitoramento() {
 
   async function ocultarConversa(conversaId: string): Promise<boolean> {
     try {
-      const { error } = await supabaseClient
-        .from('conversas')
-        .update({ ativa: false })
-        .eq('id', conversaId);
-
-      if (error) throw error;
+      await api(`/api/conversas/${conversaId}`, {
+        metodo: 'PATCH',
+        corpo: { ativa: false },
+      });
       return true;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -2009,11 +1457,8 @@ export function useMonitoramento() {
     const msg =
       cacheConfigSistema?.mensagemForaHorario ?? 'O canal de diálogo está fora do horário escolar.';
     try {
-      const { data } = await supabaseClient
-        .from('horarios_letivos')
-        .select('dia_semana, hora_inicio, hora_fim, ativo')
-        .order('dia_semana');
-      if (!data || data.length === 0) {
+      const { horarios } = await api<{ horarios: HorarioLetivo[] }>('/api/horarios');
+      if (!horarios || horarios.length === 0) {
         // Banco sem configuração alguma assume a janela escolar padrão.
         cacheHorarios = {
           inicio: '07:00',
@@ -2024,14 +1469,7 @@ export function useMonitoramento() {
         return cacheHorarios;
       }
       // Janelas cadastradas mas todas desativadas: gestão fechou o canal por completo.
-      const janelas = (
-        data as Array<{
-          dia_semana: number;
-          hora_inicio: string;
-          hora_fim: string;
-          ativo: boolean;
-        }>
-      ).filter((h) => h.ativo);
+      const janelas = horarios.filter((h) => h.ativo);
       if (!janelas.length) {
         cacheHorarios = {
           inicio: '23:59',

@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
-import { supabaseClient } from '@/servicos/supabase';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { api } from '@/servicos/api';
+import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh';
 import CampoFormulario from '@/componentes/CampoFormulario.vue';
 import Combobox from '@/componentes/Combobox.vue';
 import type { OpcaoCombobox } from '@/componentes/Combobox.vue';
@@ -15,6 +16,8 @@ const diasSemana = [
   { valor: 5, rotulo: 'Sexta' },
   { valor: 6, rotulo: 'Sábado' },
 ];
+
+const { inscrever, encerrar } = useRealtimeRefresh();
 
 const horarios = ref<HorarioLetivo[]>([]);
 const carregando = ref(false);
@@ -59,12 +62,8 @@ function resetForm() {
 async function carregar() {
   carregando.value = true;
   try {
-    const { data } = await supabaseClient
-      .from('horarios_letivos')
-      .select('*')
-      .order('dia_semana')
-      .order('hora_inicio');
-    horarios.value = data ?? [];
+    const { horarios: lista } = await api<{ horarios: HorarioLetivo[] }>('/api/horarios');
+    horarios.value = lista;
   } catch {
     mostrarErro('Falha ao carregar horários.');
   } finally {
@@ -95,22 +94,25 @@ async function salvar() {
   carregando.value = true;
   try {
     if (modoEdicao.value && editandoId.value) {
-      await supabaseClient
-        .from('horarios_letivos')
-        .update({
+      await api(`/api/horarios/${editandoId.value}`, {
+        metodo: 'PUT',
+        corpo: {
           dia_semana: formDia.value,
           hora_inicio: formInicio.value,
           hora_fim: formFim.value,
           ativo: formAtivo.value,
-        })
-        .eq('id', editandoId.value);
+        },
+      });
       mostrarSucesso('Horário atualizado.');
     } else {
-      await supabaseClient.from('horarios_letivos').insert({
-        dia_semana: formDia.value,
-        hora_inicio: formInicio.value,
-        hora_fim: formFim.value,
-        ativo: formAtivo.value,
+      await api('/api/horarios', {
+        metodo: 'POST',
+        corpo: {
+          dia_semana: formDia.value,
+          hora_inicio: formInicio.value,
+          hora_fim: formFim.value,
+          ativo: formAtivo.value,
+        },
       });
       mostrarSucesso('Horário criado.');
     }
@@ -126,7 +128,10 @@ async function salvar() {
 
 async function alternarAtivo(item: HorarioLetivo) {
   try {
-    await supabaseClient.from('horarios_letivos').update({ ativo: !item.ativo }).eq('id', item.id);
+    await api(`/api/horarios/${item.id}/status`, {
+      metodo: 'PATCH',
+      corpo: { ativo: !item.ativo },
+    });
     await carregar();
   } catch {
     mostrarErro('Falha ao alternar status.');
@@ -136,7 +141,7 @@ async function alternarAtivo(item: HorarioLetivo) {
 async function excluir(id: string) {
   if (!confirm('Excluir este horário?')) return;
   try {
-    await supabaseClient.from('horarios_letivos').delete().eq('id', id);
+    await api(`/api/horarios/${id}`, { metodo: 'DELETE' });
     mostrarSucesso('Horário excluído.');
     await carregar();
   } catch {
@@ -144,7 +149,14 @@ async function excluir(id: string) {
   }
 }
 
-onMounted(carregar);
+onMounted(async () => {
+  await carregar();
+  await inscrever([{ tabela: 'horarios_letivos' }], carregar);
+});
+
+onUnmounted(() => {
+  encerrar();
+});
 </script>
 
 <template>

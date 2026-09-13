@@ -12,7 +12,8 @@ import type { OpcaoCombobox } from '@/componentes/Combobox.vue';
 import GrupoCheckbox from '@/componentes/GrupoCheckbox.vue';
 import ModalConfirmacao from '@/componentes/ModalConfirmacao.vue';
 import type { AlunoFrequencia, OcorrenciaGrave, OpcaoCheckbox } from '@/tipos/componentes';
-import { supabaseClient } from '@/servicos/supabase';
+import type { TagComportamento } from '@/tipos/database';
+import { api } from '@/servicos/api';
 
 const router = useRouter();
 const { usuario } = useAutenticacao();
@@ -104,18 +105,14 @@ async function alternarFormulario() {
   mostrarFormulario.value = !mostrarFormulario.value;
   if (mostrarFormulario.value && !alunos.value.length) {
     opcoesTipo.value = await buscarOpcoes('tipo_ocorrencia');
-    const { data: tagsData } = await supabaseClient
-      .from('tags_comportamento')
-      .select('nome, icone, descricao')
-      .eq('ativo', true)
-      .order('nome');
-    opcoesTags.value = (tagsData ?? []).map(
-      (t: { nome: string; icone: string | null; descricao: string | null }) => ({
-        valor: t.nome,
-        rotulo: t.descricao ?? t.nome,
-        icone: t.icone ?? undefined,
-      }),
-    );
+    const { tags: tagsApi } = await api<{ tags: TagComportamento[] }>('/api/tags-comportamento', {
+      parametros: { ativo: 'true' },
+    });
+    opcoesTags.value = tagsApi.map((t) => ({
+      valor: t.nome,
+      rotulo: t.descricao ?? t.nome,
+      icone: t.icone ?? undefined,
+    }));
     alunos.value = await buscarAlunosParaFrequencia();
   }
 }

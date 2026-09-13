@@ -1,5 +1,5 @@
 import { ref } from 'vue';
-import { supabaseClient } from '@/servicos/supabase';
+import { api } from '@/servicos/api';
 import type { OpcaoConfiguracao } from '@/tipos/database';
 import type { OpcaoCheckbox } from '@/tipos/componentes';
 
@@ -14,20 +14,15 @@ export function useOpcoesConfiguracao() {
 
     carregando.value = true;
     try {
-      const { data } = await supabaseClient
-        .from('opcoes_configuracao')
-        .select('chave, rotulo, icone')
-        .eq('tipo', tipo)
-        .eq('ativo', true)
-        .order('ordem');
+      const { opcoes: opcoesApi } = await api<{ opcoes: OpcaoConfiguracao[] }>('/api/opcoes', {
+        parametros: { tipo, ativo: 'true' },
+      });
 
-      const opcoes: OpcaoCheckbox[] = (data ?? []).map(
-        (o: Pick<OpcaoConfiguracao, 'chave' | 'rotulo' | 'icone'>) => ({
-          valor: o.chave,
-          rotulo: o.rotulo,
-          icone: o.icone ?? undefined,
-        }),
-      );
+      const opcoes: OpcaoCheckbox[] = opcoesApi.map((o) => ({
+        valor: o.chave,
+        rotulo: o.rotulo,
+        icone: o.icone ?? undefined,
+      }));
 
       cache.set(chaveCache, opcoes);
       return opcoes;

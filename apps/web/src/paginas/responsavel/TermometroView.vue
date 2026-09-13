@@ -9,7 +9,12 @@ import Combobox from '@/componentes/Combobox.vue';
 import type { OpcaoCombobox } from '@/componentes/Combobox.vue';
 import type { Aluno } from '@/tipos/database';
 import type { TermometroAtencao } from '@/tipos/componentes';
-import { supabaseClient } from '@/servicos/supabase';
+import { api } from '@/servicos/api';
+
+/** Enturmação com a turma resolvida pela API. */
+interface EnturmacaoApi {
+  turma: { id: string; nome_completo: string };
+}
 
 const router = useRouter();
 const { usuario } = useAutenticacao();
@@ -35,21 +40,10 @@ const filhoSelecionadoId = computed({
 /** Busca o nome da turma do aluno para exibir no termômetro. */
 async function buscarTurmaAluno(alunoId: string): Promise<string | null> {
   try {
-    const { data } = await supabaseClient
-      .from('enturmacoes')
-      .select('turma_id')
-      .eq('aluno_id', alunoId)
-      .eq('status', 'matriculado')
-      .limit(1)
-      .single();
-    const turmaId = (data as unknown as { turma_id: string } | null)?.turma_id;
-    if (!turmaId) return null;
-    const { data: turma } = await supabaseClient
-      .from('turmas')
-      .select('nome_completo')
-      .eq('id', turmaId)
-      .single();
-    return (turma as unknown as { nome_completo: string } | null)?.nome_completo ?? null;
+    const { enturmacoes } = await api<{ enturmacoes: EnturmacaoApi[] }>('/api/enturmacoes', {
+      parametros: { aluno_id: alunoId, status: 'matriculado' },
+    });
+    return enturmacoes[0]?.turma?.nome_completo ?? null;
   } catch {
     return null;
   }

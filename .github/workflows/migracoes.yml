@@ -1,0 +1,32 @@
+name: Migrações
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/api/prisma/migrations/**'
+      - 'apps/api/prisma/schema.prisma'
+  workflow_dispatch:
+
+concurrency:
+  group: migracoes
+  cancel-in-progress: false
+
+jobs:
+  migrar:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Aplica as migrações no banco de produção
+        run: npm run db:migrate -w @buscapp/api
+        env:
+          DATABASE_URL: ${{ secrets.DIRECT_URL_PROD }}

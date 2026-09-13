@@ -22,7 +22,7 @@ npx prisma migrate deploy
 
 if [ "$SEED" = "true" ]; then
   echo "Populando o banco com dados de desenvolvimento..."
-  npm run seed
+  node dist/prisma/seeds/dev.js
 fi
 
 echo "Iniciando a API..."

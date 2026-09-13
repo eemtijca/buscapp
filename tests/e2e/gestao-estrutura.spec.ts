@@ -69,7 +69,9 @@ test.describe('Gestão - Anos Letivos', () => {
     const { restApi } = await import('../suporte/api.js');
     await restApi(`/rest/v1/anos_letivos?ano=eq.${ANO_TESTE}`, { method: 'DELETE' });
   }
-  test.beforeAll(async () => { await limparAnoTeste(); });
+  test.beforeAll(async () => {
+    await limparAnoTeste();
+  });
   test.afterAll(async () => {
     const { restApi } = await import('../suporte/api.js');
     const { URL_SUPABASE, SERVICE_KEY } = await import('../suporte/dados.js');
@@ -80,7 +82,15 @@ test.describe('Gestão - Anos Letivos', () => {
       const resSeed = await restApi(`/rest/v1/anos_letivos?ano=eq.${ANO_CORRENTE}&select=id`);
       const corrente = ((await resSeed.json()) as { id: string }[])[0];
       if (corrente) {
-        await fetch(`${URL_SUPABASE}/rest/v1/rpc/ativar_ano_letivo`, { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` }, body: JSON.stringify({ p_ano_id: corrente.id }) });
+        await fetch(`${URL_SUPABASE}/rest/v1/rpc/ativar_ano_letivo`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            apikey: SERVICE_KEY,
+            Authorization: `Bearer ${SERVICE_KEY}`,
+          },
+          body: JSON.stringify({ p_ano_id: corrente.id }),
+        });
       }
     }
     await limparAnoTeste();
@@ -129,9 +139,7 @@ test.describe('Gestão - Anos Letivos', () => {
     await linhaNova.locator('button[title="Ativar (virada de ano)"]').click();
 
     await expect(linhaNova.locator('.badge')).toHaveText(/Ativo/i, { timeout: 5000 });
-    const linhaAnterior = page
-      .locator('tr')
-      .filter({ hasText: String(new Date().getFullYear()) });
+    const linhaAnterior = page.locator('tr').filter({ hasText: String(new Date().getFullYear()) });
     await expect(linhaAnterior.locator('.badge')).toHaveText(/Arquivado/i);
   });
 
@@ -142,14 +150,15 @@ test.describe('Gestão - Anos Letivos', () => {
     await page.waitForSelector('tbody tr');
 
     page.on('dialog', (d) => d.accept());
-    const linhaCorrente = page
-      .locator('tr')
-      .filter({ hasText: String(new Date().getFullYear()) });
+    const linhaCorrente = page.locator('tr').filter({ hasText: String(new Date().getFullYear()) });
     await linhaCorrente.locator('button[title="Ativar (virada de ano)"]').click();
 
     await expect(linhaCorrente.locator('.badge')).toHaveText(/Ativo/i, { timeout: 5000 });
     await expect(
-      page.locator('tr').filter({ hasText: String(ANO_TESTE) }).locator('.badge'),
+      page
+        .locator('tr')
+        .filter({ hasText: String(ANO_TESTE) })
+        .locator('.badge'),
     ).toHaveText(/Arquivado/i);
   });
 
@@ -157,9 +166,7 @@ test.describe('Gestão - Anos Letivos', () => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/anos-letivos');
     await page.waitForSelector('tbody tr');
-    const linhaCorrente = page
-      .locator('tr')
-      .filter({ hasText: String(new Date().getFullYear()) });
+    const linhaCorrente = page.locator('tr').filter({ hasText: String(new Date().getFullYear()) });
     await expect(linhaCorrente.locator('.badge')).toHaveText(/Ativo/i);
     await expect(linhaCorrente.locator('button[title="Ativar (virada de ano)"]')).toBeDisabled();
   });

@@ -27,7 +27,9 @@ test.describe('Professor - Frequência', () => {
     const botoes = page.locator('button[aria-label*="Marcar"]');
     const primeiro = botoes.first();
     const label = await primeiro.getAttribute('aria-label');
-    if (label?.includes('como ausente')) { await primeiro.click(); }
+    if (label?.includes('como ausente')) {
+      await primeiro.click();
+    }
     await page.click('button:has-text("Salvar frequência")');
     await expect(page.locator('.alert-success').first()).toBeVisible({ timeout: 10000 });
   });
@@ -47,7 +49,9 @@ test.describe('Professor - Frequência', () => {
     const botoes = page.locator('button[aria-label*="Marcar"]');
     const primeiro = botoes.first();
     const label = await primeiro.getAttribute('aria-label');
-    if (label?.includes('como ausente')) { await primeiro.click(); }
+    if (label?.includes('como ausente')) {
+      await primeiro.click();
+    }
     await page.click('button:has-text("Salvar frequência")');
     await expect(page.locator('.alert-success').first()).toBeVisible({ timeout: 10000 });
     await page.goto('/professor');
@@ -102,7 +106,9 @@ test.describe('Professor - Ausência com multisseleção', () => {
 });
 
 test.describe('Módulos de acesso - gating do professor', () => {
-  test('CT-N8 - Professor sem módulo de ocorrências não vê o card nem acessa a rota', async ({ page }) => {
+  test('CT-N8 - Professor sem módulo de ocorrências não vê o card nem acessa a rota', async ({
+    page,
+  }) => {
     await login(page, 'prof2@escola.edu.br', SENHA_PROF);
     await expect(page).toHaveURL(/\/professor/);
     await expect(page.getByText('Registrar frequência')).toBeVisible({ timeout: 15000 });
@@ -110,7 +116,9 @@ test.describe('Módulos de acesso - gating do professor', () => {
     await expect(page.getByText('Ocorrência grave')).toHaveCount(0);
     await page.goto('/professor/ocorrencia');
     await expect(page).toHaveURL(/\/professor\?moduloNegado=ocorrencias/);
-    await expect(page.locator('.alert-warning')).toContainText('Você não possui acesso ao módulo de ocorrências.');
+    await expect(page.locator('.alert-warning')).toContainText(
+      'Você não possui acesso ao módulo de ocorrências.',
+    );
     await page.goto('/professor/frequencia');
     await expect(page.locator('h1')).toContainText('Registrar frequência');
   });

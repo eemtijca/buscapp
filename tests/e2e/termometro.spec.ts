@@ -1,6 +1,12 @@
 import { test, expect } from '@playwright/test';
 import { login, logout } from '../suporte/sessao.js';
-import { SENHA_RESP, SENHA_ADMIN, ALUNO_JOAO_ID, TURMA_1A_ID, ANO_LETIVO_ID } from '../suporte/dados.js';
+import {
+  SENHA_RESP,
+  SENHA_ADMIN,
+  ALUNO_JOAO_ID,
+  TURMA_1A_ID,
+  ANO_LETIVO_ID,
+} from '../suporte/dados.js';
 import { restApi } from '../suporte/api.js';
 
 const PROF_ID = 'a0000000-0000-0000-0000-000000000002';
@@ -8,7 +14,9 @@ const ALUNO_TERM_ID = ALUNO_JOAO_ID; // João Miguel — filho de resp1
 
 async function limparTermometro() {
   await restApi(`/rest/v1/frequencias?aluno_id=eq.${ALUNO_TERM_ID}`, { method: 'DELETE' });
-  await restApi(`/rest/v1/justificativas_faltas?aluno_id=eq.${ALUNO_TERM_ID}`, { method: 'DELETE' });
+  await restApi(`/rest/v1/justificativas_faltas?aluno_id=eq.${ALUNO_TERM_ID}`, {
+    method: 'DELETE',
+  });
   await restApi(`/rest/v1/ocorrencias?aluno_id=eq.${ALUNO_TERM_ID}`, { method: 'DELETE' });
 }
 
@@ -36,7 +44,9 @@ async function criarFaltas(qtd: number, inicio: string) {
 }
 
 test.describe('Termômetro de atenção - textos e cabeçalho', () => {
-  test('CT-N1 - Card não repete o título da página e cita faltas e ocorrências', async ({ page }) => {
+  test('CT-N1 - Card não repete o título da página e cita faltas e ocorrências', async ({
+    page,
+  }) => {
     await login(page, 'resp1@email.com', SENHA_RESP);
     await page.goto('/responsavel/termometro');
     await expect(page.locator('h1')).toContainText('Termômetro de atenção');
@@ -57,7 +67,9 @@ test.describe('Termômetro — Barra segmentada inteligente', () => {
     await limparTermometro();
   });
 
-  test('CT-T1 - Barra móvel única colorida por nível (verde/amarelo/vermelho) com score', async ({ page }) => {
+  test('CT-T1 - Barra móvel única colorida por nível (verde/amarelo/vermelho) com score', async ({
+    page,
+  }) => {
     await criarFaltas(2, '2026-02-01');
     await login(page, 'resp1@email.com', SENHA_RESP);
     await page.goto('/responsavel/termometro');
@@ -68,11 +80,18 @@ test.describe('Termômetro — Barra segmentada inteligente', () => {
     // Barra móvel: apenas 1 segmento visível, cor depende do nível
     await expect(progress.locator('.progress-bar')).toHaveCount(1);
     await expect(progress.locator('.progress-bar')).toBeVisible();
-    await expect(progress.locator('.progress-bar.bg-success, .progress-bar.bg-warning, .progress-bar.bg-danger')).toBeVisible();
+    await expect(
+      progress.locator(
+        '.progress-bar.bg-success, .progress-bar.bg-warning, .progress-bar.bg-danger',
+      ),
+    ).toBeVisible();
     // Largura reflete o score (aria-valuenow)
     const score = await progress.getAttribute('aria-valuenow');
     expect(score).toMatch(/^\d+$/);
-    await expect(progress.locator('.progress-bar')).toHaveAttribute('style', new RegExp(`${score}%`));
+    await expect(progress.locator('.progress-bar')).toHaveAttribute(
+      'style',
+      new RegExp(`${score}%`),
+    );
     await expect(progress).toHaveAttribute('aria-valuenow', /^\d+$/);
     await expect(progress).toHaveAttribute('aria-valuetext', /(Tudo certo|Atenção|Risco alto)/);
     // Marcadores sutis de limiar
@@ -97,7 +116,10 @@ test.describe('Termômetro — Barra segmentada inteligente', () => {
     await login(page, 'resp1@email.com', SENHA_RESP);
     await page.goto('/responsavel/termometro');
     await expect(page.getByText('Tudo certo')).toBeVisible({ timeout: 10000 });
-    await expect(page.locator('.progress[role="progressbar"]')).toHaveAttribute('aria-valuetext', /Tudo certo/);
+    await expect(page.locator('.progress[role="progressbar"]')).toHaveAttribute(
+      'aria-valuetext',
+      /Tudo certo/,
+    );
     await logout(page);
     await limparTermometro();
     // 10 faltas -> nível médio (Atenção)
@@ -105,7 +127,10 @@ test.describe('Termômetro — Barra segmentada inteligente', () => {
     await login(page, 'resp1@email.com', SENHA_RESP);
     await page.goto('/responsavel/termometro');
     await expect(page.getByText('Atenção')).toBeVisible({ timeout: 10000 });
-    await expect(page.locator('.progress[role="progressbar"]')).toHaveAttribute('aria-valuetext', /Atenção/);
+    await expect(page.locator('.progress[role="progressbar"]')).toHaveAttribute(
+      'aria-valuetext',
+      /Atenção/,
+    );
   });
 
   test('CT-T3 - Ocorrência crítica ou exige presença força nível alto', async ({ page }) => {
@@ -113,7 +138,12 @@ test.describe('Termômetro — Barra segmentada inteligente', () => {
     await restApi('/rest/v1/tags_comportamento?nome=eq.TesteCriticoE2E', { method: 'DELETE' });
     await restApi('/rest/v1/tags_comportamento', {
       method: 'POST',
-      body: JSON.stringify({ nome: 'TesteCriticoE2E', categoria: 'critico', peso_pontuacao: 20, ativo: true }),
+      body: JSON.stringify({
+        nome: 'TesteCriticoE2E',
+        categoria: 'critico',
+        peso_pontuacao: 20,
+        ativo: true,
+      }),
     });
     await criarFaltas(1, '2026-04-01');
     // ocorrência grave sem gatilho crítico -> deve elevar para Atenção (barra aumenta) mas não para alto
@@ -135,7 +165,10 @@ test.describe('Termômetro — Barra segmentada inteligente', () => {
     await page.goto('/responsavel/termometro');
     await expect(page.getByText('Atenção')).toBeVisible({ timeout: 10000 });
     // Verifica que a barra refletiu o peso da ocorrência grave
-    await expect(page.locator('.progress[role="progressbar"]')).toHaveAttribute('aria-valuetext', /Atenção/);
+    await expect(page.locator('.progress[role="progressbar"]')).toHaveAttribute(
+      'aria-valuetext',
+      /Atenção/,
+    );
     await logout(page);
     await restApi(`/rest/v1/ocorrencias?aluno_id=eq.${ALUNO_TERM_ID}`, { method: 'DELETE' });
     // agora com tag crítica + exige presença -> alto
@@ -156,7 +189,10 @@ test.describe('Termômetro — Barra segmentada inteligente', () => {
     await login(page, 'resp1@email.com', SENHA_RESP);
     await page.goto('/responsavel/termometro');
     await expect(page.getByText('Risco alto')).toBeVisible({ timeout: 10000 });
-    await expect(page.locator('.progress[role="progressbar"]')).toHaveAttribute('aria-valuetext', /Risco alto/);
+    await expect(page.locator('.progress[role="progressbar"]')).toHaveAttribute(
+      'aria-valuetext',
+      /Risco alto/,
+    );
     // limpeza da tag de teste
     await restApi('/rest/v1/tags_comportamento?nome=eq.TesteCriticoE2E', { method: 'DELETE' });
   });
@@ -167,24 +203,50 @@ test.describe('Termômetro — Barra segmentada inteligente', () => {
     await login(page, 'resp1@email.com', SENHA_RESP);
     await page.goto('/responsavel/termometro');
     await expect(page.getByText('Atenção')).toBeVisible({ timeout: 10000 });
-    await expect(page.locator('.card').first().getByText(/10 falta\(s\) injust/).first()).toBeVisible();
+    await expect(
+      page
+        .locator('.card')
+        .first()
+        .getByText(/10 falta\(s\) injust/)
+        .first(),
+    ).toBeVisible();
     await logout(page);
     // cria justificativa aceita para 2026-05-01 (abate 1) -> volta para 9 -> baixo
     const respId = 'a0000000-0000-0000-0000-000000000005';
     await restApi('/rest/v1/justificativas_faltas', {
       method: 'POST',
-      body: JSON.stringify({ responsavel_id: respId, aluno_id: ALUNO_TERM_ID, data_falta: '2026-05-01', motivo: 'Atestado E2E T4', status: 'aceita' }),
+      body: JSON.stringify({
+        responsavel_id: respId,
+        aluno_id: ALUNO_TERM_ID,
+        data_falta: '2026-05-01',
+        motivo: 'Atestado E2E T4',
+        status: 'aceita',
+      }),
     });
     await login(page, 'resp1@email.com', SENHA_RESP);
     await page.goto('/responsavel/termometro');
     await expect(page.getByText('Tudo certo')).toBeVisible({ timeout: 10000 });
-    await expect(page.locator('.card').first().getByText(/9 falta\(s\) injust/).first()).toBeVisible();
-    await expect(page.locator('.card').first().getByText(/1 justificada/).first()).toBeVisible();
+    await expect(
+      page
+        .locator('.card')
+        .first()
+        .getByText(/9 falta\(s\) injust/)
+        .first(),
+    ).toBeVisible();
+    await expect(
+      page
+        .locator('.card')
+        .first()
+        .getByText(/1 justificada/)
+        .first(),
+    ).toBeVisible();
   });
 
   test('CT-T5 - Edição de pesos na gestão persiste e afeta a barra', async ({ page }) => {
     // salva valores originais
-    const cfgRes = await restApi('/rest/v1/configuracoes_sistema?id=eq.1&select=peso_falta,peso_ocorrencia,peso_recencia,janela_recencia_dias,limite_score_medio,limite_score_alto');
+    const cfgRes = await restApi(
+      '/rest/v1/configuracoes_sistema?id=eq.1&select=peso_falta,peso_ocorrencia,peso_recencia,janela_recencia_dias,limite_score_medio,limite_score_alto',
+    );
     const orig = (await cfgRes.json()) as Record<string, number>[];
     const o = orig[0];
     // altera pesos via UI
@@ -202,17 +264,28 @@ test.describe('Termômetro — Barra segmentada inteligente', () => {
     await expect(page.locator('.alert-success')).toBeVisible({ timeout: 10000 });
     await expect(page.locator('.alert-success')).toContainText(/salva com sucesso/);
     // verifica persistência
-    await expect.poll(async () => {
-      const r = await restApi('/rest/v1/configuracoes_sistema?id=eq.1&select=peso_falta,limite_score_medio');
-      const d = (await r.json()) as { peso_falta: number; limite_score_medio: number }[];
-      return `${d[0].peso_falta}-${d[0].limite_score_medio}`;
-    }).toBe('1.5-30');
+    await expect
+      .poll(async () => {
+        const r = await restApi(
+          '/rest/v1/configuracoes_sistema?id=eq.1&select=peso_falta,limite_score_medio',
+        );
+        const d = (await r.json()) as { peso_falta: number; limite_score_medio: number }[];
+        return `${d[0].peso_falta}-${d[0].limite_score_medio}`;
+      })
+      .toBe('1.5-30');
     // verifica prévia da barra reflete novos limites
     await expect(page.locator('.progress .progress-bar.bg-success')).toBeVisible();
     // restaura
     await restApi('/rest/v1/configuracoes_sistema?id=eq.1', {
       method: 'PATCH',
-      body: JSON.stringify({ peso_falta: o.peso_falta, peso_ocorrencia: o.peso_ocorrencia, peso_recencia: o.peso_recencia, janela_recencia_dias: o.janela_recencia_dias, limite_score_medio: o.limite_score_medio, limite_score_alto: o.limite_score_alto }),
+      body: JSON.stringify({
+        peso_falta: o.peso_falta,
+        peso_ocorrencia: o.peso_ocorrencia,
+        peso_recencia: o.peso_recencia,
+        janela_recencia_dias: o.janela_recencia_dias,
+        limite_score_medio: o.limite_score_medio,
+        limite_score_alto: o.limite_score_alto,
+      }),
     });
   });
 });

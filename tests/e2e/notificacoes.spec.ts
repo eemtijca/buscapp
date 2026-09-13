@@ -18,7 +18,9 @@ test.describe('Notificações — 403 regression', () => {
     await limpar();
   });
 
-  test('Responsável clica em notificação de ocorrência e vai para alertas com deep-link', async ({ page }) => {
+  test('Responsável clica em notificação de ocorrência e vai para alertas com deep-link', async ({
+    page,
+  }) => {
     const titulo = `Teste 403 ${Date.now()}`;
     await restApi('/rest/v1/notificacoes', {
       method: 'POST',
@@ -88,7 +90,9 @@ test.describe('Notificações — 403 regression', () => {
     await expect(page).not.toHaveURL(/\/403/);
   });
 
-  test('Professor clica em notificação de ocorrência e vai para sua página sem 403', async ({ page }) => {
+  test('Professor clica em notificação de ocorrência e vai para sua página sem 403', async ({
+    page,
+  }) => {
     const PROF_ID = 'a0000000-0000-0000-0000-000000000002';
     const titulo = `Ocorr Prof ${Date.now()}`;
     await restApi('/rest/v1/notificacoes', {
@@ -109,7 +113,10 @@ test.describe('Notificações — 403 regression', () => {
     await item.click();
     await expect(page).toHaveURL(/\/professor\/ocorrencia/, { timeout: 10000 });
     await expect(page).not.toHaveURL(/\/403/);
-    await restApi(`/rest/v1/notificacoes?destinatario_id=eq.${PROF_ID}&titulo=eq.${encodeURIComponent(titulo)}`, { method: 'DELETE' });
+    await restApi(
+      `/rest/v1/notificacoes?destinatario_id=eq.${PROF_ID}&titulo=eq.${encodeURIComponent(titulo)}`,
+      { method: 'DELETE' },
+    );
   });
 
   test('Gestão clica em ocorrência e vai para gestão sem 403', async ({ page }) => {
@@ -133,6 +140,9 @@ test.describe('Notificações — 403 regression', () => {
     await item.click();
     await expect(page).toHaveURL(/\/gestao\/ocorrencias/, { timeout: 10000 });
     await expect(page).not.toHaveURL(/\/403/);
-    await restApi(`/rest/v1/notificacoes?destinatario_id=eq.${GESTAO_ID}&titulo=eq.${encodeURIComponent(titulo)}`, { method: 'DELETE' });
+    await restApi(
+      `/rest/v1/notificacoes?destinatario_id=eq.${GESTAO_ID}&titulo=eq.${encodeURIComponent(titulo)}`,
+      { method: 'DELETE' },
+    );
   });
 });

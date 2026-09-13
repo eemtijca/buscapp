@@ -3,6 +3,9 @@
 FROM node:24-slim AS base
 WORKDIR /app
 ENV npm_config_update_notifier=false
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends openssl \
+  && rm -rf /var/lib/apt/lists/*
 
 FROM base AS deps
 COPY package.json package-lock.json ./
@@ -13,7 +16,7 @@ RUN npm ci
 
 FROM deps AS build
 COPY . .
-RUN npm run build -w @buscapp/web && npm run build -w @buscapp/api
+RUN npm run build -w @buscapp/contratos && npm run build -w @buscapp/web && npm run build -w @buscapp/api
 
 FROM base AS runtime
 ENV NODE_ENV=production
@@ -25,6 +28,7 @@ RUN npm ci --omit=dev --ignore-scripts
 
 COPY --from=build /app/apps/api/dist apps/api/dist
 COPY --from=build /app/apps/web/dist apps/web/dist
+COPY --from=build /app/packages/contratos/dist packages/contratos/dist
 COPY apps/api/prisma apps/api/prisma
 COPY apps/api/prisma.config.ts apps/api/prisma.config.ts
 COPY infra/docker/entrypoint.sh /usr/local/bin/entrypoint.sh

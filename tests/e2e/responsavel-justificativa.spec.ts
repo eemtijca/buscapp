@@ -4,11 +4,14 @@ import { SENHA_RESP } from '../suporte/dados.js';
 
 test.describe('Responsável — Anexo da justificativa por arrastar e soltar', () => {
   async function dataTransferComArquivo(page: Page, nome: string, tipo: string) {
-    return page.evaluateHandle(([nomeArg, tipoArg]) => {
-      const dt = new DataTransfer();
-      dt.items.add(new File(['conteudo de teste'], nomeArg, { type: tipoArg }));
-      return dt;
-    }, [nome, tipo]);
+    return page.evaluateHandle(
+      ([nomeArg, tipoArg]) => {
+        const dt = new DataTransfer();
+        dt.items.add(new File(['conteudo de teste'], nomeArg, { type: tipoArg }));
+        return dt;
+      },
+      [nome, tipo],
+    );
   }
 
   test('CT146 - Anexo aceito por arrastar e soltar e tipo inválido rejeitado', async ({ page }) => {

@@ -1,6 +1,12 @@
 import { test, expect } from '@playwright/test';
 import { login } from '../suporte/sessao.js';
-import { SENHA_ADMIN, SENHA_RESP, SENHA_PROF, SERVICE_KEY, URL_SUPABASE } from '../suporte/dados.js';
+import {
+  SENHA_ADMIN,
+  SENHA_RESP,
+  SENHA_PROF,
+  SERVICE_KEY,
+  URL_SUPABASE,
+} from '../suporte/dados.js';
 import { restApi } from '../suporte/api.js';
 
 // Setup global de chat — cria conversas e mensagens idempotentes antes de todos os testes deste arquivo.
@@ -13,14 +19,27 @@ test.beforeAll(async () => {
   };
   async function api(url: string, options: RequestInit = {}) {
     const res = await fetch(`${URL_SUPABASE}${url}`, { headers, ...options });
-    if (!res.ok) { const corpo = await res.text().catch(() => ''); throw new Error(`Falha no setup do chat (${options.method ?? 'GET'} ${url}): ${res.status} ${corpo}`); }
+    if (!res.ok) {
+      const corpo = await res.text().catch(() => '');
+      throw new Error(
+        `Falha no setup do chat (${options.method ?? 'GET'} ${url}): ${res.status} ${corpo}`,
+      );
+    }
     return res;
   }
   const RESPONSAVEL_ID = 'a0000000-0000-0000-0000-000000000005';
   const ALUNO1_ID = 'e0000000-0000-0000-0000-000000000001';
   const ALUNO2_ID = 'e0000000-0000-0000-0000-000000000002';
   async function upsertConversa(alunoId: string): Promise<string> {
-    const res = await api('/rest/v1/conversas?on_conflict=responsavel_id,aluno_id', { method: 'POST', body: JSON.stringify({ turma_id: 'd0000000-0000-0000-0000-000000000001', responsavel_id: RESPONSAVEL_ID, aluno_id: alunoId, ativa: true }) });
+    const res = await api('/rest/v1/conversas?on_conflict=responsavel_id,aluno_id', {
+      method: 'POST',
+      body: JSON.stringify({
+        turma_id: 'd0000000-0000-0000-0000-000000000001',
+        responsavel_id: RESPONSAVEL_ID,
+        aluno_id: alunoId,
+        ativa: true,
+      }),
+    });
     const data = (await res.json()) as { id: string }[];
     const convId = data?.[0]?.id;
     if (!convId) throw new Error('Falha ao capturar id da conversa no setup do chat.');
@@ -29,16 +48,52 @@ test.beforeAll(async () => {
   const CONV1 = await upsertConversa(ALUNO1_ID);
   await upsertConversa(ALUNO2_ID);
   for (const msg of [
-    { id: 'f0000000-0000-0000-0000-000000000011', conversa_id: CONV1, remetente_id: 'a0000000-0000-0000-0000-000000000005', conteudo: 'Bom dia, gostaria de saber como está meu filho', created_at: '2026-07-20T08:00:00Z' },
-    { id: 'f0000000-0000-0000-0000-000000000012', conversa_id: CONV1, remetente_id: 'a0000000-0000-0000-0000-000000000001', conteudo: 'Bom dia! O João está bem, participando das aulas.', created_at: '2026-07-20T08:15:00Z' },
-    { id: 'f0000000-0000-0000-0000-000000000013', conversa_id: CONV1, remetente_id: 'a0000000-0000-0000-0000-000000000002', conteudo: 'Confirmo! Ele tem se destacado em matemática.', created_at: '2026-07-20T08:30:00Z' },
-    { id: 'f0000000-0000-0000-0000-000000000014', conversa_id: CONV1, remetente_id: 'a0000000-0000-0000-0000-000000000005', conteudo: 'Que bom! Obrigado pela atenção.', created_at: '2026-07-20T09:00:00Z' },
+    {
+      id: 'f0000000-0000-0000-0000-000000000011',
+      conversa_id: CONV1,
+      remetente_id: 'a0000000-0000-0000-0000-000000000005',
+      conteudo: 'Bom dia, gostaria de saber como está meu filho',
+      created_at: '2026-07-20T08:00:00Z',
+    },
+    {
+      id: 'f0000000-0000-0000-0000-000000000012',
+      conversa_id: CONV1,
+      remetente_id: 'a0000000-0000-0000-0000-000000000001',
+      conteudo: 'Bom dia! O João está bem, participando das aulas.',
+      created_at: '2026-07-20T08:15:00Z',
+    },
+    {
+      id: 'f0000000-0000-0000-0000-000000000013',
+      conversa_id: CONV1,
+      remetente_id: 'a0000000-0000-0000-0000-000000000002',
+      conteudo: 'Confirmo! Ele tem se destacado em matemática.',
+      created_at: '2026-07-20T08:30:00Z',
+    },
+    {
+      id: 'f0000000-0000-0000-0000-000000000014',
+      conversa_id: CONV1,
+      remetente_id: 'a0000000-0000-0000-0000-000000000005',
+      conteudo: 'Que bom! Obrigado pela atenção.',
+      created_at: '2026-07-20T09:00:00Z',
+    },
   ]) {
     await api('/rest/v1/mensagens?on_conflict=id', { method: 'POST', body: JSON.stringify(msg) });
   }
-  await api(`/rest/v1/conversas?id=eq.${CONV1}`, { method: 'PATCH', body: JSON.stringify({ ultima_mensagem_em: '2026-07-20T09:00:00Z' }) });
+  await api(`/rest/v1/conversas?id=eq.${CONV1}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ ultima_mensagem_em: '2026-07-20T09:00:00Z' }),
+  });
   await api(`/rest/v1/notificacoes?metadados->>conversa_id=eq.${CONV1}`, { method: 'DELETE' });
-  await api('/rest/v1/notificacoes', { method: 'POST', body: JSON.stringify({ destinatario_id: 'a0000000-0000-0000-0000-000000000001', tipo: 'mensagem', titulo: 'Nova mensagem de Maria Silva', corpo: 'Bom dia, gostaria de saber como está meu filho', metadados: { conversa_id: CONV1 } }) });
+  await api('/rest/v1/notificacoes', {
+    method: 'POST',
+    body: JSON.stringify({
+      destinatario_id: 'a0000000-0000-0000-0000-000000000001',
+      tipo: 'mensagem',
+      titulo: 'Nova mensagem de Maria Silva',
+      corpo: 'Bom dia, gostaria de saber como está meu filho',
+      metadados: { conversa_id: CONV1 },
+    }),
+  });
 });
 
 test.describe('Responsável — Chat', () => {
@@ -56,7 +111,11 @@ test.describe('Responsável — Chat', () => {
     const items = page.locator('.chat-sidebar button');
     const count = await items.count();
     expect(count).toBeGreaterThanOrEqual(1);
-    if (count > 0) { await expect(items.first()).toContainText(/João|Maria|Ana|Pedro|Rafael|Lucas|Júlia|Thiago|Isabela/); }
+    if (count > 0) {
+      await expect(items.first()).toContainText(
+        /João|Maria|Ana|Pedro|Rafael|Lucas|Júlia|Thiago|Isabela/,
+      );
+    }
   });
   test('CT69 - Selecionar conversa exibe mensagens', async ({ page }) => {
     await login(page, 'resp1@email.com', SENHA_RESP);
@@ -79,7 +138,10 @@ test.describe('Responsável — Chat', () => {
     await expect(page.getByText('Nenhuma conversa encontrada')).toBeVisible();
   });
   test('CT71 - Input desabilitado fora do horário letivo (responsável)', async ({ page }) => {
-    await restApi('/rest/v1/horarios_letivos?ativo=eq.true', { method: 'PATCH', body: JSON.stringify({ ativo: false }) });
+    await restApi('/rest/v1/horarios_letivos?ativo=eq.true', {
+      method: 'PATCH',
+      body: JSON.stringify({ ativo: false }),
+    });
     try {
       await login(page, 'resp1@email.com', SENHA_RESP);
       await page.goto('/responsavel/chat');
@@ -91,7 +153,10 @@ test.describe('Responsável — Chat', () => {
       await expect(textarea).toBeDisabled();
       await expect(page.locator('.alert-warning')).toBeVisible();
     } finally {
-      await restApi('/rest/v1/horarios_letivos?ativo=eq.false', { method: 'PATCH', body: JSON.stringify({ ativo: true }) }).catch(() => {});
+      await restApi('/rest/v1/horarios_letivos?ativo=eq.false', {
+        method: 'PATCH',
+        body: JSON.stringify({ ativo: true }),
+      }).catch(() => {});
     }
   });
   test.skip('CT72 - Botão voltar aparece no mobile', async ({ page }) => {
@@ -101,7 +166,11 @@ test.describe('Responsável — Chat', () => {
     await page.waitForTimeout(3000);
     const items = page.locator('.chat-sidebar button');
     const count = await items.count();
-    if (count > 0) { await items.first().click(); await page.waitForTimeout(1500); await expect(page.locator('i.bi-arrow-left').first()).toBeVisible(); }
+    if (count > 0) {
+      await items.first().click();
+      await page.waitForTimeout(1500);
+      await expect(page.locator('i.bi-arrow-left').first()).toBeVisible();
+    }
   });
 });
 
@@ -121,7 +190,9 @@ test.describe('Gestão — Chat', () => {
     const items = page.locator('.chat-sidebar button');
     const count = await items.count();
     expect(count).toBeGreaterThanOrEqual(1);
-    await expect(page.locator('.chat-sidebar button').filter({ hasText: 'Maria Silva' }).first()).toBeVisible();
+    await expect(
+      page.locator('.chat-sidebar button').filter({ hasText: 'Maria Silva' }).first(),
+    ).toBeVisible();
   });
   test('CT75 - Selecionar conversa exibe mensagens', async ({ page }) => {
     const marcador = `CT75-${Date.now()}`;
@@ -130,21 +201,57 @@ test.describe('Gestão — Chat', () => {
     const FR = 'a0000000-0000-0000-0000-000000000005';
     let mensagemId = '';
     try {
-      const busca = await fetch(`${URL_SUPABASE}/rest/v1/conversas?responsavel_id=eq.${FR}&aluno_id=eq.${FA}&select=id`, { headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` } });
+      const busca = await fetch(
+        `${URL_SUPABASE}/rest/v1/conversas?responsavel_id=eq.${FR}&aluno_id=eq.${FA}&select=id`,
+        { headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` } },
+      );
       const existentes = (await busca.json()) as Array<{ id: string }>;
       let conversaId = existentes[0]?.id ?? '';
-      if (!conversaId) { conversaId = crypto.randomUUID(); await restApi('/rest/v1/conversas', { method: 'POST', body: JSON.stringify({ id: conversaId, responsavel_id: FR, aluno_id: FA, turma_id: FT, ativa: true }) }); }
-      const msgRes = await restApi('/rest/v1/mensagens?select=id', { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, Prefer: 'return=representation' }, body: JSON.stringify({ conversa_id: conversaId, remetente_id: 'a0000000-0000-0000-0000-000000000001', conteudo: `${marcador} mensagem de histórico.` }) });
+      if (!conversaId) {
+        conversaId = crypto.randomUUID();
+        await restApi('/rest/v1/conversas', {
+          method: 'POST',
+          body: JSON.stringify({
+            id: conversaId,
+            responsavel_id: FR,
+            aluno_id: FA,
+            turma_id: FT,
+            ativa: true,
+          }),
+        });
+      }
+      const msgRes = await restApi('/rest/v1/mensagens?select=id', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          apikey: SERVICE_KEY,
+          Authorization: `Bearer ${SERVICE_KEY}`,
+          Prefer: 'return=representation',
+        },
+        body: JSON.stringify({
+          conversa_id: conversaId,
+          remetente_id: 'a0000000-0000-0000-0000-000000000001',
+          conteudo: `${marcador} mensagem de histórico.`,
+        }),
+      });
       mensagemId = ((await msgRes.json()) as Array<{ id: string }>)[0]?.id ?? '';
       await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
       await page.goto('/gestao/chat');
       const item = page.locator('.chat-sidebar button').filter({ hasText: marcador });
       await expect(item).toBeVisible({ timeout: 10000 });
       await item.first().click();
-      await expect(page.locator('.chat-messages').getByText(marcador)).toBeVisible({ timeout: 10000 });
+      await expect(page.locator('.chat-messages').getByText(marcador)).toBeVisible({
+        timeout: 10000,
+      });
     } finally {
-      if (mensagemId) { await restApi(`/rest/v1/mensagens?id=eq.${mensagemId}`, { method: 'DELETE' }).catch(() => {}); }
-      await restApi(`/rest/v1/notificacoes?corpo=ilike.*${marcador}*`, { method: 'DELETE' }).catch(() => {});
+      if (mensagemId) {
+        await restApi(`/rest/v1/mensagens?id=eq.${mensagemId}`, { method: 'DELETE' }).catch(
+          () => {},
+        );
+      }
+      await restApi(`/rest/v1/notificacoes?corpo=ilike.*${marcador}*`, { method: 'DELETE' }).catch(
+        () => {},
+      );
     }
   });
   test('CT76 - Header de navegação com título chat', async ({ page }) => {
@@ -199,7 +306,11 @@ test.describe('Notificações — Popover', () => {
     const notifMenu = page.locator('.notif-menu');
     await expect(notifMenu).toBeVisible();
     const itemCount = await notifMenu.locator('button').count();
-    if (itemCount > 0) { await expect(notifMenu.locator('button').first()).toBeVisible(); } else { await expect(notifMenu.getByText('Nenhuma notificação')).toBeVisible(); }
+    if (itemCount > 0) {
+      await expect(notifMenu.locator('button').first()).toBeVisible();
+    } else {
+      await expect(notifMenu.getByText('Nenhuma notificação')).toBeVisible();
+    }
   });
 });
 
@@ -218,7 +329,11 @@ test.describe('Chat — Mobile', () => {
     await page.waitForTimeout(3000);
     const items = page.locator('.chat-sidebar button');
     const count = await items.count();
-    if (count > 0) { await items.first().click(); await page.waitForTimeout(1500); await expect(page.locator('i.bi-arrow-left').first()).toBeVisible(); }
+    if (count > 0) {
+      await items.first().click();
+      await page.waitForTimeout(1500);
+      await expect(page.locator('i.bi-arrow-left').first()).toBeVisible();
+    }
   });
   test('CT91 - Desktop: dois painéis visíveis', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 720 });
@@ -231,8 +346,14 @@ test.describe('Chat — Mobile', () => {
 });
 
 test.describe('Chat — Casos Extremos', () => {
-  test('CT92 - Rota /gestao/chat exige autenticação', async ({ page }) => { await page.goto('/gestao/chat'); await expect(page).toHaveURL('/'); });
-  test('CT94 - Rota /responsavel/chat exige autenticação', async ({ page }) => { await page.goto('/responsavel/chat'); await expect(page).toHaveURL('/'); });
+  test('CT92 - Rota /gestao/chat exige autenticação', async ({ page }) => {
+    await page.goto('/gestao/chat');
+    await expect(page).toHaveURL('/');
+  });
+  test('CT94 - Rota /responsavel/chat exige autenticação', async ({ page }) => {
+    await page.goto('/responsavel/chat');
+    await expect(page).toHaveURL('/');
+  });
 });
 
 test.describe('Chat — Resiliência', () => {
@@ -279,7 +400,9 @@ test.describe('Chat — Input', () => {
       await page.waitForTimeout(1000);
       const textarea = page.locator('textarea');
       const submitBtn = page.locator('button[type="submit"]');
-      if (!(await textarea.isDisabled())) { await expect(submitBtn).toBeDisabled(); }
+      if (!(await textarea.isDisabled())) {
+        await expect(submitBtn).toBeDisabled();
+      }
     }
   });
   test('CT100 - Tentativa de enviar so espacos', async ({ page }) => {
@@ -343,7 +466,11 @@ test.describe('Notificações — Casos Extremos', () => {
     await page.waitForTimeout(500);
     const notifMenu = page.locator('.notif-menu');
     const btnMarcar = notifMenu.locator('button:has-text("Marcar todas como lidas")');
-    if (await btnMarcar.isVisible()) { await btnMarcar.click(); await page.waitForTimeout(500); await expect(btnMarcar).not.toBeVisible(); }
+    if (await btnMarcar.isVisible()) {
+      await btnMarcar.click();
+      await page.waitForTimeout(500);
+      await expect(btnMarcar).not.toBeVisible();
+    }
   });
   test('CT105 - Notificação com rota de chat', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
@@ -351,7 +478,10 @@ test.describe('Notificações — Casos Extremos', () => {
     await page.locator('button[aria-label="Notificações"]').click();
     await page.waitForTimeout(500);
     const items = page.locator('.notif-menu button');
-    if ((await items.count()) > 0) { await items.first().click(); await page.waitForTimeout(1000); }
+    if ((await items.count()) > 0) {
+      await items.first().click();
+      await page.waitForTimeout(1000);
+    }
   });
   test('CT106 - Popover sem notificações mostra estado vazio', async ({ page }) => {
     await login(page, 'resp1@email.com', SENHA_RESP);
@@ -361,7 +491,11 @@ test.describe('Notificações — Casos Extremos', () => {
     const notifMenu = page.locator('.notif-menu');
     if (await notifMenu.isVisible()) {
       const hasItems = (await notifMenu.locator('button').count()) > 0;
-      if (hasItems) { await expect(notifMenu.locator('button').first()).toBeVisible(); } else { await expect(notifMenu.getByText('Nenhuma notificação')).toBeVisible(); }
+      if (hasItems) {
+        await expect(notifMenu.locator('button').first()).toBeVisible();
+      } else {
+        await expect(notifMenu.getByText('Nenhuma notificação')).toBeVisible();
+      }
     }
   });
 });

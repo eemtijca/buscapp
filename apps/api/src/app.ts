@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs';
 import path from 'node:path';
+import cookie from '@fastify/cookie';
 import fastifyStatic from '@fastify/static';
 import Fastify, { type FastifyError, type FastifyInstance } from 'fastify';
 import {
@@ -10,6 +11,7 @@ import {
 import { ambiente } from './ambiente.js';
 import { ErroHttp } from './nucleo/http/erros.js';
 import { rotasSaude } from './nucleo/http/rotas-saude.js';
+import { rotasAuth } from './modulos/auth/auth.rotas.js';
 
 /** Monta a aplicação Fastify; exposta separadamente para testes com `inject`. */
 export async function construirApp(): Promise<FastifyInstance> {
@@ -24,8 +26,6 @@ export async function construirApp(): Promise<FastifyInstance> {
 
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);
-
-  await app.register(rotasSaude);
 
   app.setErrorHandler((erro: FastifyError, _pedido, resposta) => {
     if (erro instanceof ErroHttp) {
@@ -47,6 +47,10 @@ export async function construirApp(): Promise<FastifyInstance> {
       erro: { codigo: 'interno', mensagem: 'Erro interno do servidor.' },
     });
   });
+
+  await app.register(cookie);
+  await app.register(rotasSaude);
+  await app.register(rotasAuth);
 
   const distWeb = path.resolve(process.cwd(), ambiente.WEB_DIST);
   if (existsSync(path.join(distWeb, 'index.html'))) {

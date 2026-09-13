@@ -18,7 +18,7 @@
     "lint:oxlint": "oxlint . --fix",
     "lint:eslint": "eslint . --fix --cache",
     "format": "prettier --write --experimental-cli apps/web/src apps/api/src packages/contratos/src",
-    "test": "run-s test:typecheck test:lint test:build test:api",
+    "test": "run-s test:typecheck test:lint test:build test:unit",
     "test:api": "bash scripts/test-api.sh",
     "test:e2e": "npx playwright test",
     "test:pwa": "VITE_SUPABASE_URL=http://localhost:54321 VITE_SUPABASE_PUBLISHABLE_KEY=test-anon-key run-s build-only test:pwa:run",
@@ -31,7 +31,8 @@
     "db:generate": "npm run generate -w @buscapp/api",
     "db:migrate": "npm run migrate:deploy -w @buscapp/api",
     "compose:up": "docker compose up -d --build",
-    "compose:down": "docker compose down"
+    "compose:down": "docker compose down",
+    "test:unit": "npm run test -w @buscapp/api"
   },
   "devDependencies": {
     "@playwright/test": "^1.61.1",

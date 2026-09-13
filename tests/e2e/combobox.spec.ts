@@ -15,7 +15,9 @@ test.describe('Combobox - todos os dropdowns viraram combobox', () => {
     await page.keyboard.press('Escape');
   });
 
-  test('CT-CB02 - Combobox de responsável existente no novo aluno permite pesquisar e selecionar', async ({ page }) => {
+  test('CT-CB02 - Combobox de responsável existente no novo aluno permite pesquisar e selecionar', async ({
+    page,
+  }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/alunos/novo');
     // Garante que o radio "Selecionar existente" está ativo por padrão
@@ -24,13 +26,20 @@ test.describe('Combobox - todos os dropdowns viraram combobox', () => {
     await expect(comboboxResp).toBeVisible({ timeout: 10000 });
     // Abre e verifica que há opções de responsáveis carregadas
     await comboboxResp.click();
-    await expect(page.locator('#campoRespEmail-lista [role="option"]').first()).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('#campoRespEmail-lista [role="option"]').first()).toBeVisible({
+      timeout: 10000,
+    });
     // Pesquisa por nome parcial (Maria -> Maria Silva do seed)
     await comboboxResp.fill('');
     await comboboxResp.pressSequentially('Maria', { delay: 40 });
-    await expect(page.locator('#campoRespEmail-lista [role="option"]', { hasText: 'Maria' }).first()).toBeVisible({ timeout: 8000 });
+    await expect(
+      page.locator('#campoRespEmail-lista [role="option"]', { hasText: 'Maria' }).first(),
+    ).toBeVisible({ timeout: 8000 });
     // Seleciona o primeiro resultado
-    await page.locator('#campoRespEmail-lista [role="option"]', { hasText: 'Maria' }).first().click();
+    await page
+      .locator('#campoRespEmail-lista [role="option"]', { hasText: 'Maria' })
+      .first()
+      .click();
     // O input deve exibir "Nome — email"
     await expect(comboboxResp).toHaveValue(/Maria.*@.*\..*/);
     // Alternar para "Criar novo" mostra campos adicionais e esconde combobox de busca
@@ -49,7 +58,9 @@ test.describe('Combobox - todos os dropdowns viraram combobox', () => {
     await page.waitForSelector('#campoSerie');
     await page.click('#campoSerie');
     await page.fill('#campoSerie', '2ª');
-    await expect(page.locator('#campoSerie-lista [role="option"]', { hasText: '2ª' })).toBeVisible();
+    await expect(
+      page.locator('#campoSerie-lista [role="option"]', { hasText: '2ª' }),
+    ).toBeVisible();
     await page.keyboard.press('Escape');
     await page.click('#campoLetra');
     await page.fill('#campoLetra', 'B');
@@ -58,35 +69,58 @@ test.describe('Combobox - todos os dropdowns viraram combobox', () => {
     await page.click('button:has-text("Cancelar")');
   });
 
-  test('CT-CB04 - Combobox de aluno em Ocorrência do professor filtra por nome', async ({ page }) => {
+  test('CT-CB04 - Combobox de aluno em Ocorrência do professor filtra por nome', async ({
+    page,
+  }) => {
     await login(page, 'prof1@escola.edu.br', SENHA_PROF);
     await page.goto('/professor/ocorrencia');
     const input = page.locator('#alunoSelect');
     await expect(input).toBeVisible({ timeout: 10000 });
     await input.click();
-    await expect(page.locator('#alunoSelect-lista [role="option"]').first()).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('#alunoSelect-lista [role="option"]').first()).toBeVisible({
+      timeout: 10000,
+    });
     // Digita parte do nome de aluno do seed
     await input.fill('João');
-    await expect(page.locator('#alunoSelect-lista [role="option"]', { hasText: 'João' }).first()).toBeVisible({ timeout: 8000 });
+    await expect(
+      page.locator('#alunoSelect-lista [role="option"]', { hasText: 'João' }).first(),
+    ).toBeVisible({ timeout: 8000 });
     await page.keyboard.press('Escape');
   });
 
-  test('CT-CB05 - Combobox de turma em Atribuições permite limpar e reselecionar', async ({ page }) => {
+  test('CT-CB05 - Combobox de turma em Atribuições permite limpar e reselecionar', async ({
+    page,
+  }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/atribuicoes');
     await page.click('button:has-text("Nova atribuição")');
     await expect(page.locator('#campoProfessor')).toBeVisible();
     await page.click('#campoProfessor');
-    await expect(page.locator('#campoProfessor-lista [role="option"]').first()).toBeVisible({ timeout: 10000 });
-    const primeiraOpcao = await page.locator('#campoProfessor-lista [role="option"]').first().textContent();
+    await expect(page.locator('#campoProfessor-lista [role="option"]').first()).toBeVisible({
+      timeout: 10000,
+    });
+    const primeiraOpcao = await page
+      .locator('#campoProfessor-lista [role="option"]')
+      .first()
+      .textContent();
     await page.locator('#campoProfessor-lista [role="option"]').first().click();
     await expect(page.locator('#campoProfessor')).not.toHaveValue('');
     // Limpar via botão X
-    await page.locator('.combobox-wrapper').filter({ has: page.locator('#campoProfessor') }).locator('button[aria-label="Limpar seleção"]').click();
+    await page
+      .locator('.combobox-wrapper')
+      .filter({ has: page.locator('#campoProfessor') })
+      .locator('button[aria-label="Limpar seleção"]')
+      .click();
     await expect(page.locator('#campoProfessor')).toHaveValue('');
     // Reseleciona para garantir que ainda funciona
     await page.click('#campoProfessor');
-    await expect(page.locator('#campoProfessor-lista [role="option"]', { hasText: primeiraOpcao?.trim().slice(0, 5) ?? '' }).first()).toBeVisible({ timeout: 8000 });
+    await expect(
+      page
+        .locator('#campoProfessor-lista [role="option"]', {
+          hasText: primeiraOpcao?.trim().slice(0, 5) ?? '',
+        })
+        .first(),
+    ).toBeVisible({ timeout: 8000 });
     await page.click('button:has-text("Cancelar")');
   });
 

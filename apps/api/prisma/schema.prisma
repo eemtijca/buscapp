@@ -130,7 +130,8 @@ model codigos_redefinicao {
   id                                            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   email                                         String
   perfil_id                                     String    @db.Uuid
-  codigo                                        String
+  codigo                                        String?
+  codigo_hash                                   String?
   criado_por                                    String?   @db.Uuid
   usado_em                                      DateTime? @db.Timestamptz(6)
   expira_em                                     DateTime  @default(dbgenerated("(now() + '01:00:00'::interval)")) @db.Timestamptz(6)
@@ -151,6 +152,24 @@ model codigos_redefinicao_tentativas {
   tentativas    Int       @default(0)
   bloqueado_ate DateTime? @db.Timestamptz(6)
   updated_at    DateTime  @default(now()) @db.Timestamptz(6)
+}
+
+/// Sessões próprias de autenticação; o token opaco só existe no cookie do navegador,
+/// o banco guarda apenas o hash SHA-256.
+model sessoes {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  perfil_id     String    @db.Uuid
+  token_hash    String    @unique(map: "uq_sessoes_token_hash")
+  criado_em     DateTime  @default(now()) @db.Timestamptz(6)
+  expira_em     DateTime  @db.Timestamptz(6)
+  ultimo_uso_em DateTime? @db.Timestamptz(6)
+  revogada_em   DateTime? @db.Timestamptz(6)
+  user_agent    String?
+  ip            String?   @db.Inet
+  perfis        perfis    @relation(fields: [perfil_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([perfil_id], map: "idx_sessoes_perfil")
+  @@index([expira_em], map: "idx_sessoes_expira")
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
@@ -541,6 +560,8 @@ model perfis {
   cargo                                                              String?
   notificacoes_ativas                                                Boolean                   @default(true)
   status                                                             status_perfil             @default(ativo)
+  senha_hash                                                         String?
+  senha_alterada_em                                                  DateTime?                 @db.Timestamptz(6)
   ultimo_acesso_em                                                   DateTime?                 @db.Timestamptz(6)
   acesso_modulos                                                     String[]                  @default([])
   permissoes                                                         String[]                  @default([])
@@ -562,6 +583,7 @@ model perfis {
   monitoramento_acoes_monitoramento_acoes_realizado_porToperfis      monitoramento_acoes[]     @relation("monitoramento_acoes_realizado_porToperfis")
   monitoramento_acoes_monitoramento_acoes_responsavel_idToperfis     monitoramento_acoes[]     @relation("monitoramento_acoes_responsavel_idToperfis")
   notificacoes                                                       notificacoes[]
+  sessoes                                                            sessoes[]
   ocorrencias_ocorrencias_coordenador_idToperfis                     ocorrencias[]             @relation("ocorrencias_coordenador_idToperfis")
   ocorrencias_ocorrencias_professor_idToperfis                       ocorrencias[]             @relation("ocorrencias_professor_idToperfis")
   registros_comportamento                                            registros_comportamento[]

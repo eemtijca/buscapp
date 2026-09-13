@@ -1,8 +1,13 @@
 import { test, expect } from '@playwright/test';
-import { login } from './suporte/sessao.js';
-import { SENHA_ADMIN } from './suporte/dados.js';
-import { emailUnico } from './suporte/dados.js';
-import { criarUsuarioApi, deletarUsuario, restApi, contarNotificacoesCodigo } from './suporte/api.js';
+import { login } from '../suporte/sessao.js';
+import { SENHA_ADMIN } from '../suporte/dados.js';
+import { emailUnico } from '../suporte/dados.js';
+import {
+  criarUsuarioApi,
+  deletarUsuario,
+  restApi,
+  contarNotificacoesCodigo,
+} from '../suporte/api.js';
 
 test.describe('Gestão - Códigos', () => {
   test('CT13 - Página de códigos carrega com abas', async ({ page }) => {
@@ -344,6 +349,7 @@ test.describe('Gestão — Configuração de códigos', () => {
     const novoMax = 7;
     await page.fill('#cfg-max-tentativas', String(novoMax));
     await page.click('button:has-text("Salvar alterações")');
+    await page.click('.modal button:has-text("Salvar")');
     await expect(page.locator('.alert-success')).toBeVisible({ timeout: 10000 });
     await expect(page.locator('.alert-success')).toContainText(/salva com sucesso/);
 

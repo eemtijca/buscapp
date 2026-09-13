@@ -1,14 +1,28 @@
 import { test, expect } from '@playwright/test';
-import { login } from './suporte/sessao.js';
-import { SENHA_ADMIN, SENHA_PROF, emailUnico, SERVICE_KEY, URL_SUPABASE } from './suporte/dados.js';
-import { restApi, obterToken, deletarUsuario } from './suporte/api.js';
+import { login } from '../suporte/sessao.js';
+import {
+  SENHA_ADMIN,
+  SENHA_PROF,
+  emailUnico,
+  SERVICE_KEY,
+  URL_SUPABASE,
+} from '../suporte/dados.js';
+import { restApi, obterToken, deletarUsuario } from '../suporte/api.js';
 
 // Cria usuário temporário isolado via edge function.
-async function criarUsuarioTemp(nome: string, email: string, papel: 'professor' | 'responsavel' = 'professor'): Promise<string> {
+async function criarUsuarioTemp(
+  nome: string,
+  email: string,
+  papel: 'professor' | 'responsavel' = 'professor',
+): Promise<string> {
   const token = await obterToken('gestao@escola.edu.br', SENHA_ADMIN);
   const res = await fetch(`${URL_SUPABASE}/functions/v1/criar-usuario`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', apikey: SERVICE_KEY, Authorization: `Bearer ${token}` },
+    headers: {
+      'Content-Type': 'application/json',
+      apikey: SERVICE_KEY,
+      Authorization: `Bearer ${token}`,
+    },
     body: JSON.stringify({ nome, email, papel }),
   });
   if (!res.ok) throw new Error(`criarUsuarioTemp ${res.status}`);
@@ -31,7 +45,9 @@ test.describe('Gestão - Usuários - Salvamento limpa estado de edição', () =>
 
     await page.click('button[type="submit"]:has-text("Salvar alterações")');
     await expect(page.locator('.alert-success')).toBeVisible({ timeout: 10000 });
-    await expect(page.locator('.alert-success')).toContainText(/Usuário "Usuario Dirty 1 Editado" atualizado com sucesso às/);
+    await expect(page.locator('.alert-success')).toContainText(
+      /Usuário "Usuario Dirty 1 Editado" atualizado com sucesso às/,
+    );
 
     let dialogShown = false;
     page.on('dialog', async (d) => {
@@ -88,8 +104,11 @@ test.describe('Gestão - Usuários - Salvamento limpa estado de edição', () =>
     await page.fill('#campoNome', 'Aluno Teste Dirty');
     await page.fill('#campoMatricula', mat);
     await page.click('button[type="submit"]:has-text("Criar aluno")');
+    await page.click('.modal button:has-text("Salvar")');
     await expect(page.locator('.alert-success')).toBeVisible({ timeout: 10000 });
-    await expect(page.locator('.alert-success')).toContainText(/Aluno "Aluno Teste Dirty" criado com sucesso às/);
+    await expect(page.locator('.alert-success')).toContainText(
+      /Aluno "Aluno Teste Dirty" criado com sucesso às/,
+    );
 
     let dialogShown = false;
     page.on('dialog', async (d) => {
@@ -167,7 +186,9 @@ test.describe('Gestão - Mensagens de feedback', () => {
     const alert = page.locator('.alert-success, .alert-danger').first();
     await expect(alert).toBeVisible({ timeout: 8000 });
     const text = await alert.textContent();
-    expect(text).toMatch(/Turma ".*"( criada| atualizada) com sucesso às \d{2}:\d{2}|Turma .* falhou ao criar/);
+    expect(text).toMatch(
+      /Turma ".*"( criada| atualizada) com sucesso às \d{2}:\d{2}|Turma .* falhou ao criar/,
+    );
   });
 
   test('CT-Msg-2: validação de disciplina exibe mensagem explícita', async ({ page }) => {
@@ -181,7 +202,9 @@ test.describe('Gestão - Mensagens de feedback', () => {
     });
     await page.click('.modal-footer button:has-text("Criar")');
     await expect(page.locator('.alert-danger').first()).toBeVisible({ timeout: 5000 });
-    await expect(page.locator('.alert-danger').first()).toContainText(/Disciplina .* falhou ao salvar/);
+    await expect(page.locator('.alert-danger').first()).toContainText(
+      /Disciplina .* falhou ao salvar/,
+    );
   });
 
   test('CT-Msg-3: alerta possui botão de fechar', async ({ page }) => {
@@ -217,7 +240,9 @@ test.describe('Gestão - Bloqueio de ações durante operações', () => {
       await route.continue();
     });
     const clickPromise = page.click('button[type="submit"]:has-text("Criar usuário")');
-    await expect(page.locator('button[type="submit"]:has-text("Criar usuário")')).toBeDisabled({ timeout: 2000 });
+    await expect(page.locator('button[type="submit"]:has-text("Criar usuário")')).toBeDisabled({
+      timeout: 2000,
+    });
     await expect(page.locator('button:has-text("Cancelar")')).toBeDisabled();
     await clickPromise;
     await page.unroute('**/functions/v1/criar-usuario');

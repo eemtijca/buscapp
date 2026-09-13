@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
-import { login } from './suporte/sessao.js';
-import { SENHA_RESP, SENHA_ADMIN, SENHA_PROF } from './suporte/dados.js';
-import { restApi } from './suporte/api.js';
+import { login } from '../suporte/sessao.js';
+import { SENHA_RESP, SENHA_ADMIN, SENHA_PROF } from '../suporte/dados.js';
+import { restApi } from '../suporte/api.js';
 
 test.describe('Notificações — 403 regression', () => {
   const RESP_ID = 'a0000000-0000-0000-0000-000000000005';

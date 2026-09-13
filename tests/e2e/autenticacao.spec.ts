@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
-import { login } from './suporte/sessao.js';
-import { SENHA_ADMIN, SENHA_PROF } from './suporte/dados.js';
-import { garantirFuncoes, encerrarFuncoes, restaurarSenha } from './suporte/sessao.js';
+import { login } from '../suporte/sessao.js';
+import { SENHA_ADMIN, SENHA_PROF } from '../suporte/dados.js';
+import { garantirFuncoes, encerrarFuncoes, restaurarSenha } from '../suporte/sessao.js';
 
 test.beforeAll(async () => {
   await restaurarSenha('a0000000-0000-0000-0000-000000000002', SENHA_PROF);

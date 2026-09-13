@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
-import { login } from './suporte/sessao.js';
-import { SENHA_ADMIN, SENHA_RESP, SENHA_PROF, SERVICE_KEY, URL_SUPABASE } from './suporte/dados.js';
+import { login } from '../suporte/sessao.js';
+import { SENHA_ADMIN, SENHA_RESP, SENHA_PROF, SERVICE_KEY, URL_SUPABASE } from '../suporte/dados.js';
 
 test.describe('Tempo real — Atualizações sem reload', () => {
   const GESTAO_ID = 'a0000000-0000-0000-0000-000000000001';

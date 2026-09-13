@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
-import { login } from './suporte/sessao.js';
-import { SENHA_PROF } from './suporte/dados.js';
+import { login } from '../suporte/sessao.js';
+import { SENHA_PROF } from '../suporte/dados.js';
 
 test.describe('Professor - Funcionalidades básicas', () => {
   test('CT18 - Home do professor mostra cards de navegação', async ({ page }) => {

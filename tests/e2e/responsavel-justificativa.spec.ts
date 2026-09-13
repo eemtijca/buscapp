@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
-import { login, logout } from './suporte/sessao.js';
-import { SENHA_RESP } from './suporte/dados.js';
+import { login, logout } from '../suporte/sessao.js';
+import { SENHA_RESP } from '../suporte/dados.js';
 
 test.describe('Responsável — Anexo da justificativa por arrastar e soltar', () => {
   async function dataTransferComArquivo(page: Page, nome: string, tipo: string) {

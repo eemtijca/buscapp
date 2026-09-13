@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
-import { login } from './suporte/sessao.js';
-import { SENHA_ADMIN, SENHA_PROF } from './suporte/dados.js';
+import { login } from '../suporte/sessao.js';
+import { SENHA_ADMIN, SENHA_PROF } from '../suporte/dados.js';
 
 test.describe('Combobox - todos os dropdowns viraram combobox', () => {
   test('CT-CB01 - Gestao tolera digitação para filtrar turma no novo aluno', async ({ page }) => {

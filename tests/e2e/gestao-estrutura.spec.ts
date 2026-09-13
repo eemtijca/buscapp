@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
-import { login } from './suporte/sessao.js';
-import { SENHA_ADMIN } from './suporte/dados.js';
+import { login } from '../suporte/sessao.js';
+import { SENHA_ADMIN } from '../suporte/dados.js';
 
 test.describe('Gestão - Turmas - Modal', () => {
   test('CT64 - Modal de criar turma abre e tem campos', async ({ page }) => {
@@ -66,13 +66,13 @@ test.describe('Gestão - Anos Letivos', () => {
   const ANO_CORRENTE = new Date().getFullYear();
   const ANO_TESTE = ANO_CORRENTE + 1;
   async function limparAnoTeste() {
-    const { restApi } = await import('./suporte/api.js');
+    const { restApi } = await import('../suporte/api.js');
     await restApi(`/rest/v1/anos_letivos?ano=eq.${ANO_TESTE}`, { method: 'DELETE' });
   }
   test.beforeAll(async () => { await limparAnoTeste(); });
   test.afterAll(async () => {
-    const { restApi } = await import('./suporte/api.js');
-    const { URL_SUPABASE, SERVICE_KEY } = await import('./suporte/dados.js');
+    const { restApi } = await import('../suporte/api.js');
+    const { URL_SUPABASE, SERVICE_KEY } = await import('../suporte/dados.js');
     const res = await restApi(`/rest/v1/anos_letivos?ano=eq.${ANO_TESTE}&select=id,status,ativo`);
     const anos = (await res.json()) as { id: string; status: string; ativo: boolean }[];
     const ano = anos[0];

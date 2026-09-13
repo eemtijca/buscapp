@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
-import { login, logout } from './suporte/sessao.js';
-import { SENHA_ADMIN, SERVICE_KEY, URL_SUPABASE } from './suporte/dados.js';
+import { login, logout } from '../suporte/sessao.js';
+import { SENHA_ADMIN, SERVICE_KEY, URL_SUPABASE } from '../suporte/dados.js';
 
 test.describe('Gestão - Ranking e Ocorrências', () => {
   test('CT20 - Pagina de ranking de risco carrega', async ({ page }) => {

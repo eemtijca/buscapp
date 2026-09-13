@@ -13,6 +13,8 @@ dist
 dist-ssr
 coverage
 *.local
+uploads
+apps/api/generated
 
 # Editor directories and files
 .vscode/*

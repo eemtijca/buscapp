@@ -1,8 +1,8 @@
 import { test, expect } from '@playwright/test';
-import { login } from './suporte/sessao.js';
-import { SENHA_ADMIN } from './suporte/dados.js';
-import { restApi } from './suporte/api.js';
-import { URL_SUPABASE, SERVICE_KEY } from './suporte/dados.js';
+import { login } from '../suporte/sessao.js';
+import { SENHA_ADMIN } from '../suporte/dados.js';
+import { restApi } from '../suporte/api.js';
+import { URL_SUPABASE, SERVICE_KEY } from '../suporte/dados.js';
 
 test.describe('Gestão - Configuração', () => {
   test('CT110 - Pagina hub carrega com categorias', async ({ page }) => {
@@ -134,7 +134,9 @@ test.describe('Gestão - Configuração', () => {
     await expect(page.locator('table')).toBeVisible();
   });
 
-  test('CT124 - Configurações do sistema expõem parâmetros de código e salvam', async ({ page }) => {
+  test('CT124 - Configurações do sistema expõem parâmetros de código e salvam', async ({
+    page,
+  }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/configuracao/sistema');
     await expect(page.locator('#cfg-validade-codigo')).toBeVisible();
@@ -144,11 +146,14 @@ test.describe('Gestão - Configuração', () => {
     const novoMax = 7;
     await page.fill('#cfg-max-tentativas', String(novoMax));
     await page.click('button:has-text("Salvar alterações")');
+    await page.click('.modal button:has-text("Salvar")');
     await expect(page.locator('.alert-success')).toBeVisible({ timeout: 10000 });
     await expect(page.locator('.alert-success')).toContainText(/salva com sucesso/);
     await expect
       .poll(async () => {
-        const res = await restApi('/rest/v1/configuracoes_sistema?id=eq.1&select=max_tentativas_codigo');
+        const res = await restApi(
+          '/rest/v1/configuracoes_sistema?id=eq.1&select=max_tentativas_codigo',
+        );
         const data = (await res.json()) as { max_tentativas_codigo: number }[];
         return data[0]?.max_tentativas_codigo;
       })
@@ -249,17 +254,40 @@ test.describe('Gestão - Integridade de catálogo', () => {
     await card.locator('#campoNovaTurma-lista [role="option"]', { hasText: '3ª C' }).click();
     await card.locator('#campoNovaDataMat').fill('2026-08-01');
     await card.getByRole('button', { name: 'Salvar' }).click();
-    await expect(card.getByRole('button', { name: 'Alterar enturmação' })).toBeVisible({ timeout: 15000 });
+    await expect(card.getByRole('button', { name: 'Alterar enturmação' })).toBeVisible({
+      timeout: 15000,
+    });
     await expect(card).toContainText('3ª C');
     const query = `${URL_SUPABASE}/rest/v1/enturmacoes?select=turma_id,status,ano_letivo_id&aluno_id=eq.e0000000-0000-0000-0000-000000000001&status=eq.matriculado`;
     const fetchEnturmacoes = async () => {
-      const res = await fetch(query, { headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` } });
+      const res = await fetch(query, {
+        headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` },
+      });
       if (!res.ok) return null;
       const data = (await res.json()) as { turma_id: string }[] | null;
       return Array.isArray(data) ? data : null;
     };
-    await expect.poll(fetchEnturmacoes, { timeout: 10000 }).toEqual([{ turma_id: 'd0000000-0000-0000-0000-000000000003', status: 'matriculado', ano_letivo_id: 'b0000000-0000-0000-0000-000000000001' }]);
-    await restApi(`/rest/v1/enturmacoes?aluno_id=eq.e0000000-0000-0000-0000-000000000001&ano_letivo_id=eq.b0000000-0000-0000-0000-000000000001`, { method: 'DELETE' });
-    await restApi('/rest/v1/enturmacoes', { method: 'POST', body: JSON.stringify({ aluno_id: 'e0000000-0000-0000-0000-000000000001', turma_id: 'd0000000-0000-0000-0000-000000000001', ano_letivo_id: 'b0000000-0000-0000-0000-000000000001', status: 'matriculado' }) });
+    await expect
+      .poll(fetchEnturmacoes, { timeout: 10000 })
+      .toEqual([
+        {
+          turma_id: 'd0000000-0000-0000-0000-000000000003',
+          status: 'matriculado',
+          ano_letivo_id: 'b0000000-0000-0000-0000-000000000001',
+        },
+      ]);
+    await restApi(
+      `/rest/v1/enturmacoes?aluno_id=eq.e0000000-0000-0000-0000-000000000001&ano_letivo_id=eq.b0000000-0000-0000-0000-000000000001`,
+      { method: 'DELETE' },
+    );
+    await restApi('/rest/v1/enturmacoes', {
+      method: 'POST',
+      body: JSON.stringify({
+        aluno_id: 'e0000000-0000-0000-0000-000000000001',
+        turma_id: 'd0000000-0000-0000-0000-000000000001',
+        ano_letivo_id: 'b0000000-0000-0000-0000-000000000001',
+        status: 'matriculado',
+      }),
+    });
   });
 });

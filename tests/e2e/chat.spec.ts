@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
-import { login } from './suporte/sessao.js';
-import { SENHA_ADMIN, SENHA_RESP, SENHA_PROF, SERVICE_KEY, URL_SUPABASE } from './suporte/dados.js';
-import { restApi } from './suporte/api.js';
+import { login } from '../suporte/sessao.js';
+import { SENHA_ADMIN, SENHA_RESP, SENHA_PROF, SERVICE_KEY, URL_SUPABASE } from '../suporte/dados.js';
+import { restApi } from '../suporte/api.js';
 
 // Setup global de chat — cria conversas e mensagens idempotentes antes de todos os testes deste arquivo.
 test.beforeAll(async () => {

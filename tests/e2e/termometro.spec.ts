@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
-import { login, logout } from './suporte/sessao.js';
-import { SENHA_RESP, SENHA_ADMIN, ALUNO_JOAO_ID, TURMA_1A_ID, ANO_LETIVO_ID } from './suporte/dados.js';
-import { restApi } from './suporte/api.js';
+import { login, logout } from '../suporte/sessao.js';
+import { SENHA_RESP, SENHA_ADMIN, ALUNO_JOAO_ID, TURMA_1A_ID, ANO_LETIVO_ID } from '../suporte/dados.js';
+import { restApi } from '../suporte/api.js';
 
 const PROF_ID = 'a0000000-0000-0000-0000-000000000002';
 const ALUNO_TERM_ID = ALUNO_JOAO_ID; // João Miguel — filho de resp1

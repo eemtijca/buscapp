@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
-import { login } from './suporte/sessao.js';
-import { SENHA_ADMIN } from './suporte/dados.js';
+import { login } from '../suporte/sessao.js';
+import { SENHA_ADMIN } from '../suporte/dados.js';
 
 test.describe('Gestão - Alunos', () => {
   test('CT11 - Listagem de alunos exibe dados do seed', async ({ page }) => {

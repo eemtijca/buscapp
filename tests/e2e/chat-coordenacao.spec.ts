@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
-import { login, logout } from './suporte/sessao.js';
-import { SENHA_ADMIN, SENHA_RESP } from './suporte/dados.js';
-import { restApi } from './suporte/api.js';
+import { login, logout } from '../suporte/sessao.js';
+import { SENHA_ADMIN, SENHA_RESP } from '../suporte/dados.js';
+import { restApi } from '../suporte/api.js';
 
 test.describe('Chat da coordenação via ranking', () => {
   test.describe.configure({ mode: 'serial' });

@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
-import { login } from './suporte/sessao.js';
-import { SENHA_ADMIN } from './suporte/dados.js';
-import { RESP1_ID } from './suporte/dados.js';
+import { login } from '../suporte/sessao.js';
+import { SENHA_ADMIN } from '../suporte/dados.js';
+import { RESP1_ID } from '../suporte/dados.js';
 
 test.describe('Gestão - Usuários', () => {
   test('CT08 - Listagem de usuários exibe dados do seed', async ({ page }) => {

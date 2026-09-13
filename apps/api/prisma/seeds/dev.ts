@@ -503,7 +503,7 @@ function usuarios(): UsuarioSeed[] {
       email: 'prof2@escola.edu.br',
       papel: 'professor',
       senha: senhaProf,
-      acesso_modulos: MODULOS_PROFESSOR,
+      acesso_modulos: ['frequencia'],
     },
     {
       id: 'a0000000-0000-0000-0000-000000000004',

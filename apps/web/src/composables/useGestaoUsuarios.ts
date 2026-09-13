@@ -53,17 +53,6 @@ interface EnturmacaoDto {
   ano_letivo: { id: string; ano: number };
 }
 
-interface VinculoDto {
-  id: string;
-  responsavel_id: string;
-  aluno_id: string;
-  tipo_relacao: string;
-  contato_prioritario: boolean;
-  ativo: boolean;
-  created_at: string;
-  responsavel_nome?: string | null;
-}
-
 interface CodigoDto {
   id: string;
   email: string;

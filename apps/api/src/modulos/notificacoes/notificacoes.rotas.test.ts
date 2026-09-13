@@ -17,7 +17,6 @@ const emails = {
 
 let app: FastifyInstance;
 let cookieGestao: string;
-let cookieProfessor: string;
 
 function extrairCookie(cabecalho: string | string[] | undefined): string {
   const valor = Array.isArray(cabecalho) ? cabecalho[0] : cabecalho;
@@ -94,7 +93,6 @@ beforeAll(async () => {
   await criarPerfil(professorId, emails.professor, 'professor');
 
   cookieGestao = await login(emails.gestao);
-  cookieProfessor = await login(emails.professor);
 });
 
 beforeEach(async () => {

@@ -12,7 +12,9 @@ COPY package.json package-lock.json ./
 COPY apps/web/package.json apps/web/package.json
 COPY apps/api/package.json apps/api/package.json
 COPY packages/contratos/package.json packages/contratos/package.json
-RUN npm ci
+# O estágio de build executa os builds necessários explicitamente; scripts de instalação
+# não têm as fontes disponíveis nesta camada.
+RUN npm ci --ignore-scripts
 
 FROM deps AS build
 COPY . .

@@ -5,10 +5,13 @@ set -e
 cd /app/apps/api
 
 echo "Aguardando o PostgreSQL ficar disponível..."
+# A espera usa a conexão administrativa: o papel de runtime (DATABASE_URL) só existe
+# depois que as migrações criam e configuram `buscapp_api`.
 until node -e "
 import('pg')
   .then(({ Client }) => {
-    const cliente = new Client({ connectionString: process.env.DATABASE_URL });
+    const url = process.env.MIGRATE_DATABASE_URL ?? process.env.DATABASE_URL;
+    const cliente = new Client({ connectionString: url });
     return cliente.connect().then(() => cliente.end());
   })
   .then(() => process.exit(0))

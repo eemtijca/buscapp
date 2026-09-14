@@ -5,9 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/principal.ts",
-    "build": "prisma generate && tsc -p tsconfig.build.json",
+    "build": "npm run build -w @buscapp/contratos && prisma generate && tsc -p tsconfig.build.json",
     "start": "node dist/src/principal.js",
-    "type-check": "prisma generate && tsc --noEmit",
+    "type-check": "npm run build -w @buscapp/contratos && prisma generate && tsc --noEmit",
     "generate": "prisma generate",
     "migrate:deploy": "prisma migrate deploy",
     "test": "vitest run",
@@ -37,7 +37,5 @@
     "@types/pg": "^8.23.1",
     "tsx": "^4.23.13",
     "vitest": "^5.0.0"
-  },
-  "dependencies/fastify": "^5.12.4",
-  "fastify-type-provider-zod": "^7.0.0"
+  }
 }

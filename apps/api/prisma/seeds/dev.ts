@@ -1,5 +1,5 @@
 import { Prisma } from '../../generated/prisma/client.js';
-import { prisma } from '../../src/nucleo/banco/cliente.js';
+import { prismaAdmin } from '../../src/nucleo/banco/cliente.js';
 import { gerarHashSenha } from '../../src/nucleo/autenticacao/senhas.js';
 
 interface UsuarioSeed {
@@ -542,7 +542,7 @@ function usuarios(): UsuarioSeed[] {
 
 /** Ano letivo canônico já criado pela migration; o upsert por `ano` preserva o ID. */
 async function criarAnoLetivo(): Promise<void> {
-  await prisma.anos_letivos.upsert({
+  await prismaAdmin.anos_letivos.upsert({
     where: { ano: ANO_VIGENTE },
     create: {
       id: ANO_LETIVO_ID,
@@ -565,7 +565,7 @@ async function criarTurmas(): Promise<void> {
 
   for (const turma of turmas) {
     const nome_completo = `${turma.serie} ${turma.letra}`;
-    await prisma.turmas.upsert({
+    await prismaAdmin.turmas.upsert({
       where: {
         ano_letivo_id_serie_letra: {
           ano_letivo_id: ANO_LETIVO_ID,
@@ -581,7 +581,7 @@ async function criarTurmas(): Promise<void> {
 
 async function criarAlunos(): Promise<void> {
   for (const aluno of ALUNOS) {
-    await prisma.alunos.upsert({
+    await prismaAdmin.alunos.upsert({
       where: { matricula: aluno.matricula },
       create: {
         id: aluno.id,
@@ -607,7 +607,7 @@ async function criarAlunos(): Promise<void> {
 
 async function criarEnturmacoes(): Promise<void> {
   for (const enturmacao of ENTURMACOES) {
-    await prisma.enturmacoes.upsert({
+    await prismaAdmin.enturmacoes.upsert({
       where: {
         aluno_id_ano_letivo_id: {
           aluno_id: enturmacao.aluno_id,
@@ -634,7 +634,7 @@ async function criarEnturmacoes(): Promise<void> {
 
 async function criarAtribuicoes(): Promise<void> {
   for (const atribuicao of ATRIBUICOES) {
-    await prisma.atribuicoes_professores.upsert({
+    await prismaAdmin.atribuicoes_professores.upsert({
       where: { id: atribuicao.id },
       create: { ...atribuicao, papel: 'titular', ativo: true },
       update: {
@@ -650,7 +650,7 @@ async function criarAtribuicoes(): Promise<void> {
 
 async function criarVinculos(): Promise<void> {
   for (const vinculo of VINCULOS) {
-    await prisma.vinculos_responsaveis.upsert({
+    await prismaAdmin.vinculos_responsaveis.upsert({
       where: {
         responsavel_id_aluno_id: {
           responsavel_id: vinculo.responsavel_id,
@@ -692,12 +692,12 @@ async function criarFrequencias(): Promise<void> {
   }
 
   // IDs determinísticos: a segunda execução apenas ignora as linhas existentes.
-  await prisma.frequencias.createMany({ data: frequencias, skipDuplicates: true });
+  await prismaAdmin.frequencias.createMany({ data: frequencias, skipDuplicates: true });
 }
 
 async function criarOcorrencias(): Promise<void> {
   for (const ocorrencia of OCORRENCIAS) {
-    await prisma.ocorrencias.upsert({
+    await prismaAdmin.ocorrencias.upsert({
       where: { id: ocorrencia.id },
       create: { ...ocorrencia, ano_letivo_id: ANO_LETIVO_ID },
       update: {
@@ -716,7 +716,7 @@ async function criarOcorrencias(): Promise<void> {
 
 async function criarNotificacoes(): Promise<void> {
   for (const notificacao of NOTIFICACOES) {
-    await prisma.notificacoes.upsert({
+    await prismaAdmin.notificacoes.upsert({
       where: { id: notificacao.id },
       create: {
         id: notificacao.id,
@@ -771,7 +771,7 @@ async function criarCodigosRedefinicao(): Promise<void> {
   ];
 
   for (const codigo of codigos) {
-    await prisma.codigos_redefinicao.upsert({
+    await prismaAdmin.codigos_redefinicao.upsert({
       where: { id: codigo.id },
       create: codigo,
       update: {
@@ -788,7 +788,7 @@ async function criarCodigosRedefinicao(): Promise<void> {
 
 async function criarMonitoramento(): Promise<void> {
   for (const acao of MONITORAMENTO) {
-    await prisma.monitoramento_acoes.upsert({
+    await prismaAdmin.monitoramento_acoes.upsert({
       where: { id: acao.id },
       create: acao,
       update: {
@@ -809,7 +809,7 @@ async function criarMonitoramento(): Promise<void> {
 export async function executarSeed(): Promise<void> {
   for (const usuario of usuarios()) {
     const senhaHash = await gerarHashSenha(usuario.senha);
-    await prisma.perfis.upsert({
+    await prismaAdmin.perfis.upsert({
       where: { id: usuario.id },
       create: {
         id: usuario.id,
@@ -849,9 +849,9 @@ export async function executarSeed(): Promise<void> {
 }
 
 await executarSeed()
-  .then(() => prisma.$disconnect())
+  .then(() => prismaAdmin.$disconnect())
   .catch(async (erro) => {
     console.error('Falha ao aplicar o seed:', erro);
-    await prisma.$disconnect();
+    await prismaAdmin.$disconnect();
     process.exit(1);
   });

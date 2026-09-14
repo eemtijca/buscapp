@@ -1,5 +1,5 @@
 import type { CodigoRedefinicao } from '@buscapp/contratos';
-import { prisma } from '../../nucleo/banco/cliente.js';
+import { comEscopo, prisma } from '../../nucleo/banco/cliente.js';
 
 interface CodigoBruto {
   id: string;
@@ -54,20 +54,20 @@ export async function buscarCodigo(id: string) {
 
 export async function revogarCodigo(id: string, usuarioId: string) {
   const agora = new Date();
-  await prisma.$transaction([
-    prisma.codigos_redefinicao.update({
+  await comEscopo(async (tx) => {
+    await tx.codigos_redefinicao.update({
       where: { id },
       data: { expira_em: agora, revogado_em: agora },
-    }),
-    prisma.auditoria.create({
+    });
+    await tx.auditoria.create({
       data: {
         usuario_id: usuarioId,
         acao: 'REVOGAR_CODIGO',
         entidade: 'codigos_redefinicao',
         entidade_id: id,
       },
-    }),
-  ]);
+    });
+  });
 }
 
 export async function limparCodigosNaoAtivos(usuarioId: string) {

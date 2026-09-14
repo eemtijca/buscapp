@@ -31,6 +31,7 @@ COPY --from=build /app/apps/web/dist apps/web/dist
 COPY --from=build /app/packages/contratos/dist packages/contratos/dist
 COPY apps/api/prisma apps/api/prisma
 COPY apps/api/prisma.config.ts apps/api/prisma.config.ts
+COPY infra/docker/role.mjs apps/api/role.mjs
 COPY infra/docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 

@@ -11,6 +11,7 @@ import {
   type ZodTypeProvider,
 } from 'fastify-type-provider-zod';
 import { ambiente, origensPermitidas } from './ambiente.js';
+import { contextoBanco } from './nucleo/banco/contexto.js';
 import { ErroHttp } from './nucleo/http/erros.js';
 import { rotasEventos } from './nucleo/http/rotas-eventos.js';
 import { rotasSaude } from './nucleo/http/rotas-saude.js';
@@ -42,6 +43,11 @@ export async function construirApp(): Promise<FastifyInstance> {
 
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);
+
+  // Contexto por requisição: o middleware de autenticação preenche `usuarioId`.
+  app.addHook('onRequest', (_pedido, _resposta, concluir) => {
+    contextoBanco.run({ usuarioId: null, emTransacao: false }, concluir);
+  });
 
   app.setErrorHandler((erro: FastifyError, _pedido, resposta) => {
     if (erro instanceof ErroHttp) {

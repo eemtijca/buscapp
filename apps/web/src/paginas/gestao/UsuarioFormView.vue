@@ -245,6 +245,11 @@ onMounted(async () => {
     const salvas = filtrarModulosValidos(usuario.acesso_modulos);
     acessoModulos.value = salvas.length ? salvas : moduloPadrao();
 
+    // Base pronta: o snapshot é tirado antes dos awaits auxiliares para que um
+    // preenchimento imediato do usuário não vire a linha de base.
+    resetSnapshot();
+    pausarSnapshot(false);
+
     if (usuario.papel === 'professor') {
       try {
         const { atribuicoes: atribuicoesApi } = await api<{ atribuicoes: AtribuicaoApi[] }>(
@@ -313,9 +318,12 @@ onMounted(async () => {
   } catch {
     /* ignorar dados corrompidos */
   }
+  // No cadastro, a linha de base considera o rascunho restaurado.
+  if (!id) {
+    resetSnapshot();
+    pausarSnapshot(false);
+  }
   await nextTick();
-  resetSnapshot();
-  pausarSnapshot(false);
 });
 
 async function salvar() {

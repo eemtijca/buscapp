@@ -10,6 +10,9 @@ if (!databaseUrl) {
 }
 export const DATABASE_URL = databaseUrl;
 
+/** Conexão dona do schema, usada apenas para fixtures/limpeza dos testes (bypassa RLS). */
+export const DATABASE_URL_ADMIN = process.env.DATABASE_URL_ADMIN ?? databaseUrl;
+
 export const SENHA_ADMIN = process.env.SEED_SENHA_ADMIN!;
 export const SENHA_PROF = process.env.SEED_SENHA_PROF!;
 export const SENHA_RESP = process.env.SEED_SENHA_RESP!;

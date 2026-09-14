@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { construirApp } from '../../app.js';
-import { prisma } from '../../nucleo/banco/cliente.js';
+import { prismaAdmin as prisma } from '../../nucleo/banco/cliente.js';
 import { gerarHashSenha } from '../../nucleo/autenticacao/senhas.js';
 
 const DISCIPLINA_MATEMATICA = 'c0000000-0000-0000-0000-000000000004';

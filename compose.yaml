@@ -21,7 +21,9 @@ services:
       dockerfile: infra/docker/Dockerfile
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgresql://buscapp:buscapp@postgres:5432/buscapp
+      DATABASE_URL: postgresql://buscapp_api:${APP_DB_PASSWORD:-buscapp_api}@postgres:5432/buscapp
+      MIGRATE_DATABASE_URL: postgresql://buscapp:buscapp@postgres:5432/buscapp
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:-buscapp_api}
       PORT: '3000'
       HOST: 0.0.0.0
       AUTH_PEPPER: ${AUTH_PEPPER:-dev-pepper-local-com-mais-de-16-caracteres}

@@ -7,7 +7,7 @@ import type {
   ListarOpcoesConfiguracao,
   ListarTagsComportamento,
 } from '@buscapp/contratos';
-import { prisma } from '../../nucleo/banco/cliente.js';
+import { comEscopo, prisma } from '../../nucleo/banco/cliente.js';
 
 export async function garantirConfiguracao() {
   return prisma.configuracoes_sistema.upsert({
@@ -134,14 +134,18 @@ export async function atualizarOpcao(id: string, dados: AtualizarOpcaoConfigurac
 }
 
 export async function reordenarOpcoes(itens: Array<{ id: string; ordem: number }>) {
-  return prisma.$transaction(
-    itens.map((item) =>
-      prisma.opcoes_configuracao.update({
-        where: { id: item.id },
-        data: { ordem: item.ordem, updated_at: new Date() },
-      }),
-    ),
-  );
+  return comEscopo(async (tx) => {
+    const atualizadas = [];
+    for (const item of itens) {
+      atualizadas.push(
+        await tx.opcoes_configuracao.update({
+          where: { id: item.id },
+          data: { ordem: item.ordem, updated_at: new Date() },
+        }),
+      );
+    }
+    return atualizadas;
+  });
 }
 
 export async function excluirOpcao(id: string) {

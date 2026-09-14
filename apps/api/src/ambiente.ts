@@ -11,6 +11,7 @@ const esquema = z
     PORT: z.coerce.number().int().positive().default(3001),
     HOST: z.string().default('0.0.0.0'),
     DATABASE_URL: z.string().min(1, 'DATABASE_URL é obrigatória'),
+    MIGRATE_DATABASE_URL: z.string().optional(),
     APP_URL: z.string().url().default('http://localhost:5173'),
     APP_ORIGINS: z.string().default(''),
     WEB_DIST: z.string().default('../web/dist'),

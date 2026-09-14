@@ -20,6 +20,9 @@ done
 echo "Aplicando migrações..."
 npx prisma migrate deploy
 
+echo "Preparando o papel de runtime..."
+node role.mjs
+
 if [ "$SEED" = "true" ]; then
   echo "Populando o banco com dados de desenvolvimento..."
   node dist/prisma/seeds/dev.js

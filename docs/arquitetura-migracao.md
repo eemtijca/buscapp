@@ -6,18 +6,18 @@ armazenamento abstraído e tempo real por SSE.
 
 ## Decisões de arquitetura
 
-| Tema                   | Decisão                                                                                                                         | Motivo                                                                                    |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| ORM                    | Prisma 7.10 (estável)                                                                                                           | Evita o RC da v8; mesmo caminho do projeto de referência `caderno-aberto`                 |
-| DDL                    | RLS, triggers, views, CHECKs e funções permanecem em SQL dentro das migrações do Prisma                                         | O Prisma não representa esses objetos; SQL de migração não é "SQL de aplicação"           |
-| API                    | Fastify 5 + Zod + `fastify-type-provider-zod`                                                                                   | Streaming/SSE, `inject` para testes, validação no limite                                  |
-| Autenticação           | Sessão opaca própria (`sessoes`, token só em cookie HttpOnly; banco guarda SHA-256), senha scrypt com verificação bcrypt legada | Revogação e desativação imediatas; permite verificar hashes do GoTrue e regravar no login |
-| Códigos de redefinição | HMAC-SHA256 com `AUTH_PEPPER`, 6 dígitos via CSPRNG, expiração/revogação/limite no banco                                        | Corrige armazenamento em texto puro e gerador não criptográfico do legado                 |
-| Autorização            | Serviço como fonte da verdade + escopo por papel; RLS vira backstop na Fase 7                                                   | A API é o único cliente; funções de escopo replicam cada política RLS                     |
-| Armazenamento          | Interface `Armazenamento` com drivers disco e S3 (MinIO/R2/AWS), disco como padrão no Compose                                   | Portabilidade e dois containers obrigatórios apenas                                       |
-| Tempo real             | SSE `/api/eventos` com roteamento por usuário e reconexão automática                                                            | O tráfego é servidor → cliente; sem dependência de WebSocket                              |
-| Topologia              | Mesma origem por padrão (API serve o `dist/`), com `VITE_API_URL` + CORS quando o front estiver em outro host                   | Cookies first-party por padrão; deploy flexível                                           |
-| Estrutura              | npm workspaces: `apps/web`, `apps/api`, `packages/contratos`                                                                    | Impede importar Prisma no navegador; contratos Zod compartilhados                         |
+| Tema                   | Decisão                                                                                                                           | Motivo                                                                                              |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| ORM                    | Prisma 7.10 (estável)                                                                                                             | Evita o RC da v8; mesmo caminho do projeto de referência `caderno-aberto`                           |
+| DDL                    | RLS, triggers, views, CHECKs e funções permanecem em SQL dentro das migrações do Prisma                                           | O Prisma não representa esses objetos; SQL de migração não é "SQL de aplicação"                     |
+| API                    | Fastify 5 + Zod + `fastify-type-provider-zod`                                                                                     | Streaming/SSE, `inject` para testes, validação no limite                                            |
+| Autenticação           | Sessão opaca própria (`sessoes`, token só em cookie HttpOnly; banco guarda SHA-256), senha scrypt com verificação bcrypt legada   | Revogação e desativação imediatas; permite verificar hashes do GoTrue e regravar no login           |
+| Códigos de redefinição | HMAC-SHA256 com `AUTH_PEPPER`, 6 dígitos via CSPRNG, expiração/revogação/limite no banco                                          | Corrige armazenamento em texto puro e gerador não criptográfico do legado                           |
+| Autorização            | Serviço como fonte da verdade + escopo por papel; RLS como backstop com papel de banco restrito e `app.usuario_id` por requisição | A API é o único cliente; as políticas replicam cada regra de visibilidade e barram falhas de escopo |
+| Armazenamento          | Interface `Armazenamento` com drivers disco e S3 (MinIO/R2/AWS), disco como padrão no Compose                                     | Portabilidade e dois containers obrigatórios apenas                                                 |
+| Tempo real             | SSE `/api/eventos` com roteamento por usuário e reconexão automática                                                              | O tráfego é servidor → cliente; sem dependência de WebSocket                                        |
+| Topologia              | Mesma origem por padrão (API serve o `dist/`), com `VITE_API_URL` + CORS quando o front estiver em outro host                     | Cookies first-party por padrão; deploy flexível                                                     |
+| Estrutura              | npm workspaces: `apps/web`, `apps/api`, `packages/contratos`                                                                      | Impede importar Prisma no navegador; contratos Zod compartilhados                                   |
 
 ## Estrutura do repositório
 
@@ -52,8 +52,8 @@ npm install
 npm run compose:up           # sobe app + PostgreSQL e aplica as migrações
 npm run seed -w @buscapp/api # usuários e fixtures de desenvolvimento
 npm run dev:web              # SPA em http://localhost:5173
-npm run dev:api              # API em http://localhost:3001 (usa DATABASE_URL do .env)
-npm run db:migrate           # aplica migrações no DATABASE_URL
+npm run dev:api              # API em http://localhost:3001 (usa DATABASE_URL, papel restrito, do .env)
+npm run db:migrate           # aplica migrações no MIGRATE_DATABASE_URL (dono do schema)
 npm run test:unit            # testes de integração da API (vitest)
 npm run test:db              # valida o schema no PostgreSQL do Compose
 npm run test:e2e             # Playwright (sobe API e web automaticamente)
@@ -74,10 +74,11 @@ Usuários de desenvolvimento: `gestao@escola.edu.br` / `Admin123!`,
 - [x] Fase 4 — cutover do frontend para cookies de sessão
 - [x] Fase 5 — armazenamento (disco/S3) e tempo real por SSE
 - [x] Fase 6 — Supabase removido (SDK, CLI, edge functions, workflows, skills e testes redirecionados)
-- [ ] Fase 7 — RLS como backstop com `app.usuario_id` e papel de banco restrito
+- [x] Fase 7 — RLS como backstop: papel `buscapp_api` sem bypass, políticas com `app.usuario_id` e transação por operação
 
-A autorização efetiva hoje é a camada de serviços da API (com testes de isolamento por papel);
-a Fase 7 adiciona a segunda barreira no banco, com papel sem bypass e `set_config` por transação.
+A autorização efetiva é a camada de serviços da API; o banco aplica a segunda barreira. O runtime
+usa o papel restrito `buscapp_api`; migrações, seed, fluxos de autenticação e fixtures usam a conexão
+dona do schema (`MIGRATE_DATABASE_URL`/`DATABASE_URL_ADMIN`), nunca exposta ao navegador.
 
 ## Template de um novo domínio
 

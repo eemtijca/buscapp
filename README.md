@@ -284,7 +284,7 @@ PostgreSQL 17
 - **Auditoria**: operações administrativas (geração e revogação de códigos, virada de ano letivo, alterações de alunos) são registradas na tabela `auditoria`.
 - **Anexos**: validação de tipo e tamanho no upload (JPG, PNG, WEBP ou PDF; até 10 MB), autorização por criador ou aluno visível e download autenticado. Nenhum token ou caminho de arquivo é exposto na URL.
 - **Erros padronizados**: todas as respostas de erro usam o envelope `{ erro: { codigo, mensagem } }`, em português.
-- **Próxima fase**: a autorização efetiva hoje é a camada de serviços da API (com testes de isolamento por papel). A Fase 7 adiciona RLS como segunda barreira no banco, com `app.usuario_id` e papel de banco restrito.
+- **Defesa em profundidade**: além do escopo na camada de serviços, o banco aplica Row-Level Security com o papel restrito `buscapp_api` e `app.usuario_id` definido por transação; tentativas fora do escopo são barradas mesmo se uma consulta esquecer o filtro.
 
 ## API
 
@@ -396,7 +396,7 @@ O banco é um PostgreSQL 17 versionado por quatro migrações Prisma (`baseline`
 
 ### Segurança
 
-- Autorização por papel, módulo e escopo na camada de serviços da API, replicando cada política de visibilidade do projeto original (a Fase 7 adiciona RLS como backstop no banco).
+- Autorização por papel, módulo e escopo na camada de serviços da API, com RLS como backstop no banco (papel restrito + `app.usuario_id` por requisição).
 - Módulos de acesso com semântica fail-closed: professor em `frequencias` e `ocorrencias` e responsável nas telas de alertas, termômetro, justificativa e chat exigem o módulo correspondente; lista vazia significa nenhum acesso. Aplicação simultânea na API, nas guardas de rota e nos cartões da home.
 - **Integridade referencial do catálogo**: restrições `CHECK` validam toda escrita de chaves de `opcoes_configuracao` e nomes de `tags_comportamento` nas tabelas que as referenciam (turmas, vínculos, atribuições, frequências, perfis, alunos, ocorrências), impedindo referências órfãs.
 - **Exclusão protegida na interface**: opções de catálogo e tags ainda referenciadas não podem ser excluídas (ou renomeadas, no caso de tags); a interface orienta a desativação.
@@ -428,23 +428,26 @@ A atualização automática usa o stream autenticado `GET /api/eventos` (Server-
 
 Variáveis definidas em `.env` (local) ou no painel do provedor de deploy (produção). Consulte `.env.example`.
 
-| Variável                                                                            | Onde é usada         | Descrição                                                                                                               |
-| ----------------------------------------------------------------------------------- | -------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `DATABASE_URL`                                                                      | API e migrações      | Conexão com o PostgreSQL (no container: `postgresql://buscapp:buscapp@postgres:5432/buscapp`; local: `127.0.0.1:5433`). |
-| `DIRECT_URL`                                                                        | Migrações (opcional) | Conexão direta para aplicar migrações em bancos gerenciados atrás de pooler.                                            |
-| `PORT` / `HOST`                                                                     | API                  | Porta e interface de escuta (padrão `3001` e `0.0.0.0`).                                                                |
-| `APP_URL`                                                                           | API                  | Origem do frontend liberada no CORS com credenciais (padrão `http://localhost:5173`).                                   |
-| `APP_ORIGINS`                                                                       | API                  | Origens adicionais para CORS, separadas por vírgula.                                                                    |
-| `WEB_DIST`                                                                          | API                  | Caminho do build da SPA servido na mesma origem (padrão `../web/dist`).                                                 |
-| `AUTH_PEPPER`                                                                       | API                  | Segredo do HMAC dos códigos de redefinição; mínimo de 32 caracteres em produção.                                        |
-| `SESSAO_COOKIE`                                                                     | API                  | Nome do cookie de sessão (padrão `buscapp_sessao`).                                                                     |
-| `COOKIE_SAMESITE`                                                                   | API                  | Atributo `SameSite` do cookie (`lax`, `strict` ou `none`).                                                              |
-| `COOKIE_SECURE`                                                                     | API                  | Força `Secure` no cookie; por padrão ativo quando `NODE_ENV=production`.                                                |
-| `STORAGE_DRIVER`                                                                    | API                  | Driver de anexos: `disco` (padrão) ou `s3`.                                                                             |
-| `UPLOAD_DIR`                                                                        | API (disco)          | Diretório dos uploads (padrão `uploads`).                                                                               |
-| `S3_BUCKET`, `S3_REGION`, `S3_ENDPOINT`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | API (S3)             | Credenciais e endpoint do bucket (MinIO, R2 ou AWS).                                                                    |
-| `SEED_SENHA_ADMIN`, `SEED_SENHA_PROF`, `SEED_SENHA_RESP`                            | Seed                 | Senhas dos usuários de teste criados pelo seed de desenvolvimento.                                                      |
-| `VITE_API_URL`                                                                      | Frontend             | URL base da API. Vazio (padrão) usa a mesma origem; defina ao hospedar a SPA separada da API.                           |
+| Variável                                                                            | Onde é usada         | Descrição                                                                                     |
+| ----------------------------------------------------------------------------------- | -------------------- | --------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`                                                                      | API (runtime)        | Conexão com o papel restrito `buscapp_api` (sujeito ao RLS).                                  |
+| `MIGRATE_DATABASE_URL`                                                              | Migrações e seed     | Conexão dona do schema, usada por `prisma migrate` e pelo seed.                               |
+| `DATABASE_URL_ADMIN`                                                                | Fixtures de teste    | Conexão dona do schema usada apenas nos testes de integração/E2E.                             |
+| `APP_DB_PASSWORD`                                                                   | Container            | Senha aplicada ao papel `buscapp_api` pelo entrypoint do Compose.                             |
+| `DIRECT_URL`                                                                        | Migrações (opcional) | Conexão direta para aplicar migrações em bancos gerenciados atrás de pooler.                  |
+| `PORT` / `HOST`                                                                     | API                  | Porta e interface de escuta (padrão `3001` e `0.0.0.0`).                                      |
+| `APP_URL`                                                                           | API                  | Origem do frontend liberada no CORS com credenciais (padrão `http://localhost:5173`).         |
+| `APP_ORIGINS`                                                                       | API                  | Origens adicionais para CORS, separadas por vírgula.                                          |
+| `WEB_DIST`                                                                          | API                  | Caminho do build da SPA servido na mesma origem (padrão `../web/dist`).                       |
+| `AUTH_PEPPER`                                                                       | API                  | Segredo do HMAC dos códigos de redefinição; mínimo de 32 caracteres em produção.              |
+| `SESSAO_COOKIE`                                                                     | API                  | Nome do cookie de sessão (padrão `buscapp_sessao`).                                           |
+| `COOKIE_SAMESITE`                                                                   | API                  | Atributo `SameSite` do cookie (`lax`, `strict` ou `none`).                                    |
+| `COOKIE_SECURE`                                                                     | API                  | Força `Secure` no cookie; por padrão ativo quando `NODE_ENV=production`.                      |
+| `STORAGE_DRIVER`                                                                    | API                  | Driver de anexos: `disco` (padrão) ou `s3`.                                                   |
+| `UPLOAD_DIR`                                                                        | API (disco)          | Diretório dos uploads (padrão `uploads`).                                                     |
+| `S3_BUCKET`, `S3_REGION`, `S3_ENDPOINT`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | API (S3)             | Credenciais e endpoint do bucket (MinIO, R2 ou AWS).                                          |
+| `SEED_SENHA_ADMIN`, `SEED_SENHA_PROF`, `SEED_SENHA_RESP`                            | Seed                 | Senhas dos usuários de teste criados pelo seed de desenvolvimento.                            |
+| `VITE_API_URL`                                                                      | Frontend             | URL base da API. Vazio (padrão) usa a mesma origem; defina ao hospedar a SPA separada da API. |
 
 ## Como Executar
 

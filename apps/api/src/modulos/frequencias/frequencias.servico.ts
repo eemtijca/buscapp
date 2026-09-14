@@ -19,6 +19,7 @@ import { publicarEvento } from '../../nucleo/eventos/barramento.js';
 import { erroNaoAutorizado, erroNaoEncontrado, erroValidacao } from '../../nucleo/http/erros.js';
 import {
   buscarEnturmacoesAtivasPorAlunos,
+  buscarEnturmacoesParaAutorizacao,
   buscarFrequenciaPorClientRequestId,
   buscarFrequenciaPorId,
   buscarFrequenciaPorContexto,
@@ -217,7 +218,7 @@ export async function registrar(
   }
 
   const dataAula = paraData(dados.data_aula);
-  const enturmacoes = await buscarEnturmacoesAtivasPorAlunos([dados.aluno_id]);
+  const enturmacoes = await buscarEnturmacoesParaAutorizacao([dados.aluno_id]);
   const enturmacao = enturmacoes[0];
   if (!enturmacao) throw erroValidacao('Aluno não está matriculado em nenhuma turma ativa.');
 

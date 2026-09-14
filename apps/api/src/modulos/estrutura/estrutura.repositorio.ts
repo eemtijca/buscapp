@@ -11,7 +11,7 @@ import type {
   ListarEnturmacoes,
   ListarTurmas,
 } from '@buscapp/contratos';
-import { prisma } from '../../nucleo/banco/cliente.js';
+import { comEscopo, prisma } from '../../nucleo/banco/cliente.js';
 
 interface FiltroTurmas {
   id?: { in: string[] };
@@ -265,7 +265,7 @@ export async function executarAtivacaoAnoLetivo(
   anoId: string,
   usuarioId: string,
 ): Promise<ResultadoAtivacaoAnoLetivo> {
-  return prisma.$transaction(async (tx) => {
+  return comEscopo(async (tx) => {
     const alvo = await tx.anos_letivos.findUnique({ where: { id: anoId } });
     if (!alvo) return { tipo: 'nao_encontrado' };
     if (alvo.ativo) return { tipo: 'ja_ativo' };
@@ -364,7 +364,7 @@ export interface DadosEnturmacao {
  * enturmação ativa, reaproveita a linha quando for do mesmo ano ou cria uma nova.
  */
 export async function enturmarAluno(dados: DadosEnturmacao): Promise<EnturmacaoComRelacoes> {
-  return prisma.$transaction(async (tx) => {
+  return comEscopo(async (tx) => {
     const existenteNoAno = await tx.enturmacoes.findUnique({
       where: {
         aluno_id_ano_letivo_id: {

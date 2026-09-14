@@ -1,5 +1,5 @@
 import type { Prisma } from '../../../generated/prisma/client.js';
-import { prisma } from '../../nucleo/banco/cliente.js';
+import { prisma, prismaAdmin } from '../../nucleo/banco/cliente.js';
 
 export interface FiltroFrequencias {
   alunoIds?: string[];
@@ -83,6 +83,18 @@ export async function buscarEnturmacoesAtivasPorAlunos(alunoIds: string[], turma
       status: 'matriculado',
       ...(turmaId ? { turma_id: turmaId } : {}),
     },
+    orderBy: { data_matricula: 'desc' },
+  });
+}
+
+/**
+ * Deriva a turma/ano do aluno para a checagem explícita de autorização do professor.
+ * Usa a conexão administrativa porque o RLS esconderia enturmações fora do escopo,
+ * impedindo distinguir "aluno inexistente" de "sem permissão" (403).
+ */
+export async function buscarEnturmacoesParaAutorizacao(alunoIds: string[]) {
+  return prismaAdmin.enturmacoes.findMany({
+    where: { aluno_id: { in: alunoIds }, status: 'matriculado' },
     orderBy: { data_matricula: 'desc' },
   });
 }

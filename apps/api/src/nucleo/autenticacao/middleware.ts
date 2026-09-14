@@ -1,5 +1,6 @@
 import type { FastifyRequest } from 'fastify';
 import { ambiente } from '../../ambiente.js';
+import { contextoBanco } from '../banco/contexto.js';
 import { erroNaoAutenticado, erroNaoAutorizado } from '../http/erros.js';
 import { perfilDaSessao } from './sessoes.js';
 import type { PerfilAutenticado } from './tipos.js';
@@ -17,6 +18,9 @@ export async function autenticar(pedido: FastifyRequest): Promise<void> {
 
   const perfil = await perfilDaSessao(token);
   if (!perfil) throw erroNaoAutenticado();
+
+  const contexto = contextoBanco.getStore();
+  if (contexto) contexto.usuarioId = perfil.id;
 
   pedido.usuario = perfil;
 }

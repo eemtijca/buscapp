@@ -1,12 +1,14 @@
 // Acesso direto ao Postgres (pg) para preparo e limpeza de dados de teste.
 
 import { Pool, type QueryResultRow } from 'pg';
-import { DATABASE_URL } from './dados.js';
+import { DATABASE_URL, DATABASE_URL_ADMIN } from './dados.js';
+
+const URL_FIXTURES = DATABASE_URL_ADMIN ?? DATABASE_URL;
 
 let pool: Pool | null = null;
 
 function obterPool(): Pool {
-  pool ??= new Pool({ connectionString: DATABASE_URL, application_name: 'buscapp-e2e', max: 4 });
+  pool ??= new Pool({ connectionString: URL_FIXTURES, application_name: 'buscapp-e2e', max: 4 });
   return pool;
 }
 

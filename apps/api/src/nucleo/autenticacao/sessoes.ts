@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import type { FastifyReply } from 'fastify';
 import { ambiente, cookieSeguro } from '../../ambiente.js';
-import { prisma } from '../banco/cliente.js';
+import { prismaAdmin as prisma } from '../banco/cliente.js';
 import type { PerfilAutenticado } from './tipos.js';
 
 const DURACAO_PADRAO_MS = 12 * 60 * 60 * 1000;

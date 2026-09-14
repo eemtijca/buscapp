@@ -1,6 +1,6 @@
 import { createHmac, randomInt, timingSafeEqual } from 'node:crypto';
 import { ambiente } from '../../ambiente.js';
-import { prisma } from '../banco/cliente.js';
+import { prismaAdmin } from '../banco/cliente.js';
 import { gerarHashSenha } from './senhas.js';
 
 export class ErroCodigoInvalido extends Error {
@@ -36,16 +36,16 @@ function hashesIguais(a: string, b: string): boolean {
 /** Notifica a gestão ativa sobre uma solicitação, sem revelar se o email existe. */
 export async function solicitarCodigoRedefinicao(email: string): Promise<void> {
   const emailNormalizado = email.toLowerCase();
-  const perfil = await prisma.perfis.findUnique({ where: { email: emailNormalizado } });
+  const perfil = await prismaAdmin.perfis.findUnique({ where: { email: emailNormalizado } });
   if (!perfil || perfil.status === 'inativo') return;
 
-  const gestores = await prisma.perfis.findMany({
+  const gestores = await prismaAdmin.perfis.findMany({
     where: { papel: 'gestao', status: 'ativo' },
     select: { id: true },
   });
 
   for (const gestor of gestores) {
-    const pendente = await prisma.notificacoes.findFirst({
+    const pendente = await prismaAdmin.notificacoes.findFirst({
       where: {
         destinatario_id: gestor.id,
         tipo: 'codigo_redefinicao',
@@ -56,7 +56,7 @@ export async function solicitarCodigoRedefinicao(email: string): Promise<void> {
     });
     if (pendente) continue;
 
-    await prisma.notificacoes.create({
+    await prismaAdmin.notificacoes.create({
       data: {
         destinatario_id: gestor.id,
         tipo: 'codigo_redefinicao',
@@ -69,7 +69,7 @@ export async function solicitarCodigoRedefinicao(email: string): Promise<void> {
 }
 
 export async function bloqueadoPorTentativas(email: string): Promise<boolean> {
-  const registro = await prisma.codigos_redefinicao_tentativas.findUnique({
+  const registro = await prismaAdmin.codigos_redefinicao_tentativas.findUnique({
     where: { email: email.toLowerCase() },
   });
   return Boolean(registro?.bloqueado_ate && registro.bloqueado_ate > new Date());
@@ -78,11 +78,11 @@ export async function bloqueadoPorTentativas(email: string): Promise<boolean> {
 /** Registra uma tentativa falha; retorna `true` quando o email passou a ficar bloqueado. */
 export async function registrarTentativa(email: string): Promise<boolean> {
   const emailNormalizado = email.toLowerCase();
-  const config = await prisma.configuracoes_sistema.findUnique({ where: { id: 1 } });
+  const config = await prismaAdmin.configuracoes_sistema.findUnique({ where: { id: 1 } });
   const maximo = config?.max_tentativas_codigo ?? 5;
   const minutos = config?.minutos_bloqueio_codigo ?? 15;
 
-  return prisma.$transaction(async (tx) => {
+  return prismaAdmin.$transaction(async (tx) => {
     const registro = await tx.codigos_redefinicao_tentativas.upsert({
       where: { email: emailNormalizado },
       create: { email: emailNormalizado, tentativas: 1 },
@@ -108,7 +108,7 @@ export async function registrarTentativa(email: string): Promise<boolean> {
 }
 
 export async function limparTentativas(email: string): Promise<void> {
-  await prisma.codigos_redefinicao_tentativas.deleteMany({
+  await prismaAdmin.codigos_redefinicao_tentativas.deleteMany({
     where: { email: email.toLowerCase() },
   });
 }
@@ -118,21 +118,21 @@ export async function gerarCodigoRedefinicao(
   perfilId: string,
   criadoPor?: string,
 ): Promise<string> {
-  const perfil = await prisma.perfis.findUnique({ where: { id: perfilId } });
+  const perfil = await prismaAdmin.perfis.findUnique({ where: { id: perfilId } });
   if (!perfil?.email) throw new Error('Perfil sem email não pode receber código de redefinição.');
 
   const email = perfil.email.toLowerCase();
-  const config = await prisma.configuracoes_sistema.findUnique({ where: { id: 1 } });
+  const config = await prismaAdmin.configuracoes_sistema.findUnique({ where: { id: 1 } });
   const validadeMinutos = config?.minutos_validade_codigo ?? 60;
   const agora = new Date();
 
-  await prisma.codigos_redefinicao.updateMany({
+  await prismaAdmin.codigos_redefinicao.updateMany({
     where: { email, usado_em: null, revogado_em: null, expira_em: { gt: agora } },
     data: { revogado_em: agora, expira_em: agora },
   });
 
   const codigo = gerarCodigo();
-  await prisma.codigos_redefinicao.create({
+  await prismaAdmin.codigos_redefinicao.create({
     data: {
       email,
       perfil_id: perfil.id,
@@ -157,8 +157,8 @@ export async function redefinirSenhaComCodigo(dados: DadosRedefinicao): Promise<
 
   if (await bloqueadoPorTentativas(email)) throw new ErroMuitasTentativas();
 
-  const perfil = await prisma.perfis.findUnique({ where: { email } });
-  const registro = await prisma.codigos_redefinicao.findFirst({
+  const perfil = await prismaAdmin.perfis.findUnique({ where: { email } });
+  const registro = await prismaAdmin.codigos_redefinicao.findFirst({
     where: {
       email,
       usado_em: null,
@@ -175,7 +175,7 @@ export async function redefinirSenhaComCodigo(dados: DadosRedefinicao): Promise<
     throw new ErroCodigoInvalido();
   }
 
-  const consumido = await prisma.codigos_redefinicao.updateMany({
+  const consumido = await prismaAdmin.codigos_redefinicao.updateMany({
     where: { id: registro.id, usado_em: null },
     data: { usado_em: new Date() },
   });
@@ -184,21 +184,21 @@ export async function redefinirSenhaComCodigo(dados: DadosRedefinicao): Promise<
   const senhaHash = await gerarHashSenha(dados.novaSenha);
   const agora = new Date();
 
-  await prisma.$transaction([
-    prisma.perfis.update({
+  await prismaAdmin.$transaction(async (tx) => {
+    await tx.perfis.update({
       where: { id: perfil.id },
       data: {
         senha_hash: senhaHash,
         senha_alterada_em: agora,
         status: perfil.status === 'pendente' ? 'ativo' : perfil.status,
       },
-    }),
-    prisma.sessoes.updateMany({
+    });
+    await tx.sessoes.updateMany({
       where: { perfil_id: perfil.id, revogada_em: null },
       data: { revogada_em: agora },
-    }),
-    prisma.codigos_redefinicao_tentativas.deleteMany({ where: { email } }),
-    prisma.auditoria.create({
+    });
+    await tx.codigos_redefinicao_tentativas.deleteMany({ where: { email } });
+    await tx.auditoria.create({
       data: {
         usuario_id: perfil.id,
         acao: 'USAR_CODIGO',
@@ -207,6 +207,6 @@ export async function redefinirSenhaComCodigo(dados: DadosRedefinicao): Promise<
         ip_origem: dados.ip ?? null,
         dados_novos: { via: 'api' },
       },
-    }),
-  ]);
+    });
+  });
 }

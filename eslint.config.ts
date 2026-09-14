@@ -20,7 +20,6 @@ export default defineConfigWithVueTs(
     '**/dist-ssr/**',
     '**/coverage/**',
     '**/examples/**',
-    'supabase/.temp/**',
     'apps/api/generated/**',
   ]),
 

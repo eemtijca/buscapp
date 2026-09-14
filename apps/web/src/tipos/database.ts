@@ -1,4 +1,4 @@
-// Tipos TypeScript gerados a partir de supabase/migrations/0001_schema_completo.sql.
+// Tipos TypeScript do banco, alinhados às migrações do Prisma (apps/api/prisma).
 
 // Enums
 export type PapelPerfil = 'professor' | 'gestao' | 'responsavel';

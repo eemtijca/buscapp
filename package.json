@@ -19,9 +19,7 @@
     "lint:eslint": "eslint . --fix --cache",
     "format": "prettier --write --experimental-cli apps/web/src apps/api/src packages/contratos/src",
     "test": "run-s test:typecheck test:lint test:build test:unit",
-    "test:api": "bash scripts/test-api.sh",
     "test:e2e": "npx playwright test",
-    "test:pwa": "VITE_SUPABASE_URL=http://localhost:54321 VITE_SUPABASE_PUBLISHABLE_KEY=test-anon-key run-s build-only test:pwa:run",
     "test:pwa:run": "playwright test --config=playwright.pwa.config.ts",
     "test:db": "bash scripts/test-db.sh",
     "test:typecheck": "run-s type-check",
@@ -32,7 +30,9 @@
     "db:migrate": "npm run migrate:deploy -w @buscapp/api",
     "compose:up": "docker compose up -d --build",
     "compose:down": "docker compose down",
-    "test:unit": "npm run test -w @buscapp/api"
+    "test:unit": "npm run test -w @buscapp/api",
+    "test:api": "npm run test -w @buscapp/api",
+    "test:pwa": "run-s build-only test:pwa:run"
   },
   "devDependencies": {
     "@playwright/test": "^1.61.1",
@@ -50,7 +50,6 @@
     "oxlint": "~1.60.0",
     "pg": "^8.23.0",
     "prettier": "3.8.3",
-    "supabase": "^2.115.0",
     "typescript": "~6.0.0",
     "vue-tsc": "^3.2.6"
   },

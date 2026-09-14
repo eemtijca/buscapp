@@ -10,7 +10,6 @@ node_modules
 .env.*
 !.env.example
 uploads
-supabase/.temp
 test-results
 playwright-report
 blob-report

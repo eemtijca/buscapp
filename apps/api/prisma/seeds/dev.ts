@@ -805,7 +805,7 @@ async function criarMonitoramento(): Promise<void> {
   }
 }
 
-/** Cria/atualiza usuários e fixtures de desenvolvimento, espelhando `supabase/seed.sql`. */
+/** Cria/atualiza usuários e fixtures de desenvolvimento com os IDs determinísticos usados nos testes. */
 export async function executarSeed(): Promise<void> {
   for (const usuario of usuarios()) {
     const senhaHash = await gerarHashSenha(usuario.senha);

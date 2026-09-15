@@ -13,7 +13,7 @@ import {
   redefinirSenhaComCodigo,
   solicitarCodigoRedefinicao,
 } from '../../nucleo/autenticacao/codigos.js';
-import { autenticar, usuarioAtual } from '../../nucleo/autenticacao/middleware.js';
+import { autenticarOpcional } from '../../nucleo/autenticacao/middleware.js';
 import {
   definirCookieSessao,
   limparCookieSessao,
@@ -84,15 +84,14 @@ export const rotasAuth: FastifyPluginAsyncZod = async (app) => {
   app.get(
     '/api/auth/me',
     {
-      preHandler: autenticar,
       schema: {
         tags: ['auth'],
-        summary: 'Retorna o perfil da sessão atual',
-        response: { 200: z.object({ perfil: perfilAutenticadoSchema }) },
+        summary: 'Sonda a sessão atual; perfil é null quando não autenticado',
+        response: { 200: z.object({ perfil: perfilAutenticadoSchema.nullable() }) },
       },
     },
     async (pedido) => {
-      return { perfil: usuarioAtual(pedido) };
+      return { perfil: await autenticarOpcional(pedido) };
     },
   );
 

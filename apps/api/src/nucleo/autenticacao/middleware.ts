@@ -11,18 +11,30 @@ declare module 'fastify' {
   }
 }
 
-/** PreHandler de rotas autenticadas: valida a sessão e carrega o perfil. */
-export async function autenticar(pedido: FastifyRequest): Promise<void> {
+/**
+ * Resolve a sessão sem exigir autenticação: devolve `null` quando não há cookie válido.
+ * Usado pela sonda `GET /api/auth/me`, que não deve falhar para usuários anônimos.
+ */
+export async function autenticarOpcional(
+  pedido: FastifyRequest,
+): Promise<PerfilAutenticado | null> {
   const token = pedido.cookies[ambiente.SESSAO_COOKIE];
-  if (!token) throw erroNaoAutenticado();
+  if (!token) return null;
 
   const perfil = await perfilDaSessao(token);
-  if (!perfil) throw erroNaoAutenticado();
+  if (!perfil) return null;
 
   const contexto = contextoBanco.getStore();
   if (contexto) contexto.usuarioId = perfil.id;
 
   pedido.usuario = perfil;
+  return perfil;
+}
+
+/** PreHandler de rotas autenticadas: valida a sessão e carrega o perfil. */
+export async function autenticar(pedido: FastifyRequest): Promise<void> {
+  const perfil = await autenticarOpcional(pedido);
+  if (!perfil) throw erroNaoAutenticado();
 }
 
 export function usuarioAtual(pedido: FastifyRequest): PerfilAutenticado {

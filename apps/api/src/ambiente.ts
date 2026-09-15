@@ -25,10 +25,21 @@ const esquema = z
     S3_ENDPOINT: z.string().optional(),
     S3_ACCESS_KEY_ID: z.string().optional(),
     S3_SECRET_ACCESS_KEY: z.string().optional(),
+    S3_UPLOAD_URL_EXPIRA_S: z.coerce.number().int().positive().default(300),
+    UPLOAD_DIRETO_MAX_BYTES: z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(20 * 1024 * 1024),
+    DB_POOL_MAX: z.coerce.number().int().positive().default(10),
     COOKIE_SECURE: z
       .enum(['true', 'false'])
       .optional()
       .transform((valor) => (valor === undefined ? undefined : valor === 'true')),
+    TRUST_PROXY: z
+      .enum(['true', 'false'])
+      .default('false')
+      .transform((valor) => valor === 'true'),
   })
   .superRefine((valores, contexto) => {
     if (valores.NODE_ENV === 'production' && valores.AUTH_PEPPER.length < 32) {

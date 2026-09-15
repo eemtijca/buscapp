@@ -1,5 +1,5 @@
 import { ref, type Ref } from 'vue';
-import { api, enviarArquivo } from '@/servicos/api';
+import { api, enviarAnexo } from '@/servicos/api';
 import { useOpcoesConfiguracao } from '@/composables/useOpcoesConfiguracao';
 import { comprimirImagem } from '@/utils/comprimirImagem';
 import { safeDate } from '@/utils/chatUtils';
@@ -1162,7 +1162,7 @@ export function useMonitoramento() {
           mimeType === 'image/jpeg' && arquivo.type !== 'image/jpeg'
             ? arquivo.name.replace(/\.[^.]+$/, '.jpg')
             : arquivo.name;
-        const { anexo } = await enviarArquivo<{ anexo: { id: string } }>('/api/anexos', blob, nome);
+        const { anexo } = await enviarAnexo<{ anexo: { id: string } }>(blob, nome, mimeType);
         anexoId = anexo.id;
       }
 

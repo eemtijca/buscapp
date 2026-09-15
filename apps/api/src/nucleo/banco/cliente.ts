@@ -1,10 +1,21 @@
+import { attachDatabasePool } from '@vercel/functions';
 import { PrismaPg } from '@prisma/adapter-pg';
+import { Pool } from 'pg';
 import { PrismaClient, type Prisma } from '../../../generated/prisma/client.js';
 import { ambiente } from '../../ambiente.js';
 import { contextoBanco } from './contexto.js';
 
 function criarCliente(url: string) {
-  return new PrismaClient({ adapter: new PrismaPg({ connectionString: url }) });
+  const pool = new Pool({
+    connectionString: url,
+    max: ambiente.DB_POOL_MAX,
+    idleTimeoutMillis: 10_000,
+  });
+
+  // Na Vercel/Fluid, libera as conexões ociosas antes de a instância ser suspensa.
+  if (process.env.VERCEL) attachDatabasePool(pool);
+
+  return new PrismaClient({ adapter: new PrismaPg(pool) });
 }
 
 /** Conexão administrativa (dona do schema): migrações, seed e rotinas de sistema. */

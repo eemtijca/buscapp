@@ -91,3 +91,59 @@ export async function enviarArquivo<T>(caminho: string, arquivo: Blob, nome: str
   formData.append('arquivo', arquivo, nome);
   return api<T>(caminho, { metodo: 'POST', formData });
 }
+
+interface UploadDiretoAnexo {
+  chave: string;
+  url: string;
+  expira_em: string;
+}
+
+/**
+ * Envia um anexo pelo caminho mais eficiente: tenta a URL pré-assinada
+ * (upload direto ao provedor, sem passar pela API) e recorre ao multipart
+ * quando o ambiente não oferece envio direto.
+ */
+export async function enviarAnexo<T = { anexo: { id: string } }>(
+  arquivo: Blob,
+  nome: string,
+  mimeType = arquivo.type || 'application/octet-stream',
+): Promise<T> {
+  try {
+    const { upload } = await api<{ upload: UploadDiretoAnexo }>('/api/anexos/upload', {
+      metodo: 'POST',
+      corpo: { nome_arquivo: nome, mime_type: mimeType, tamanho_bytes: arquivo.size },
+    });
+
+    const envio = await fetch(upload.url, {
+      method: 'PUT',
+      headers: { 'Content-Type': mimeType },
+      body: arquivo,
+    });
+    if (!envio.ok) {
+      throw new ErroApi(
+        envio.status,
+        'upload_falhou',
+        `Falha ao enviar o arquivo (${envio.status}).`,
+      );
+    }
+
+    return await api<T>('/api/anexos/confirmar', {
+      metodo: 'POST',
+      corpo: {
+        chave: upload.chave,
+        nome_arquivo: nome,
+        mime_type: mimeType,
+        tamanho_bytes: arquivo.size,
+      },
+    });
+  } catch (erro) {
+    if (erro instanceof ErroApi && erro.codigo === 'upload_direto_indisponivel') {
+      return enviarArquivo<T>('/api/anexos', arquivo, nome);
+    }
+    // Falha de rede/CORS no PUT também recorre ao multipart.
+    if (erro instanceof TypeError) {
+      return enviarArquivo<T>('/api/anexos', arquivo, nome);
+    }
+    throw erro;
+  }
+}

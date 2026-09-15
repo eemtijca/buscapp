@@ -9,7 +9,8 @@
     },
     "api": {
       "root": "apps/api/",
-      "entrypoint": "src/principal.ts",
+      "framework": "fastify",
+      "entrypoint": "src/server.ts",
       "buildCommand": "npm run build"
     }
   },

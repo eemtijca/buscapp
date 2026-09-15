@@ -1,8 +1,11 @@
-import { construirApp } from './app.js';
+import type { FastifyInstance } from 'fastify';
 import { ambiente } from './ambiente.js';
+import { construirApp } from './aplicacao.js';
 import { prisma } from './nucleo/banco/cliente.js';
 
-const app = await construirApp();
+// A importação de `fastify` acima é exigida pela detecção de entrada do framework na Vercel:
+// o arquivo de entrada do servidor precisa importar `fastify` e chamar `listen`.
+const app: FastifyInstance = await construirApp();
 
 async function encerrar(sinal: string) {
   app.log.info({ sinal }, 'Encerrando a API');

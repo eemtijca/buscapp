@@ -19,7 +19,8 @@ flowchart LR
 
 - `apps/web/src/servicos/api.ts`: cliente HTTP tipado único, com `credentials: 'include'`, envelope de erro `ErroApi` e suporte a FormData.
 - `apps/web/src/servicos/eventos.ts`: conexão SSE única por aba, com assinatura por tabela e status da conexão.
-- `apps/api/src/app.ts`: fábrica Fastify, testável com `inject`. Registra cookie, CORS, multipart, rotas e, quando existe `WEB_DIST`, o `@fastify/static` com fallback da SPA.
+- `apps/api/src/aplicacao.ts`: fábrica Fastify, testável com `inject`. Registra cookie, CORS, multipart, rotas e, quando existe `WEB_DIST`, o `@fastify/static` com fallback da SPA.
+- `apps/api/src/server.ts`: entrada do processo. Instancia a aplicação com `construirApp()` e chama `listen()`.
 - `apps/api/src/ambiente.ts`: validação Zod das variáveis, com falha antecipada.
 - `apps/api/src/nucleo/`: infraestrutura transversal (`banco`, `autenticacao`, `autorizacao`, `armazenamento`, `eventos`, `http`).
 - `apps/api/src/modulos/<dominio>/`: padrão `.rotas.ts`, `.servico.ts` e `.repositorio.ts`.
@@ -93,8 +94,8 @@ apps/
       seeds/dev.ts       fixtures de desenvolvimento
     src/
       ambiente.ts        validação das variáveis
-      app.ts             fábrica Fastify
-      principal.ts       entrada do processo
+      aplicacao.ts       fábrica Fastify
+      server.ts          entrada do processo
       nucleo/            banco, autenticação, autorização, armazenamento, eventos e http
       modulos/<dominio>/ rotas, serviço e repositório por domínio
 packages/contratos       schemas Zod compartilhados

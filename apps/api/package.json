@@ -4,9 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/principal.ts",
+    "dev": "tsx watch src/server.ts",
     "build": "npm run build -w @buscapp/contratos && prisma generate && tsc -p tsconfig.build.json",
-    "start": "node dist/src/principal.js",
+    "start": "node dist/src/server.js",
     "type-check": "npm run build -w @buscapp/contratos && prisma generate && tsc --noEmit",
     "generate": "prisma generate",
     "migrate:deploy": "prisma migrate deploy",

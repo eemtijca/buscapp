@@ -65,7 +65,7 @@ Para subir tudo em um processo único, que serve a SPA e a API na mesma origem:
 ```bash
 npm run build-only
 npm run build -w @buscapp/api
-node apps/api/dist/src/principal.js
+node apps/api/dist/src/server.js
 ```
 
 ### Vercel

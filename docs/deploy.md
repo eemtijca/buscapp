@@ -36,7 +36,8 @@ O `vercel.json` da raiz define dois serviços no mesmo projeto:
     },
     "api": {
       "root": "apps/api/",
-      "entrypoint": "src/principal.ts",
+      "framework": "fastify",
+      "entrypoint": "src/server.ts",
       "buildCommand": "npm run build"
     }
   },
@@ -62,6 +63,7 @@ Build no monorepo:
 - A Vercel instala dependências por serviço. Por isso o `prepare` do root é ignorado no ambiente da Vercel e cada workspace declara as ferramentas que os próprios scripts usam (`typescript`, `@types/node`, `vue-tsc` e `@tsconfig/node24` onde se aplica). No desenvolvimento local, o `prepare` continua compilando os contratos.
 - O `buildCommand` do serviço `api` roda `npm run build`, que compila `@buscapp/contratos`, gera o Prisma Client e transpila a API. O serviço `web` roda `npm run build-only`, que não depende dos contratos.
 - Não defina `NODE_ENV` manualmente no projeto da Vercel, para não omitir as devDependencies no install.
+- O preset `fastify` da Vercel ignora o `entrypoint` do `vercel.json` e detecta o servidor pelo nome do arquivo: `app`, `index` ou `server`, na raiz do serviço ou em `src/`, desde que o arquivo importe `fastify` e chame `listen()`. Por isso a API separa `src/aplicacao.ts` (fábrica Fastify, usada pelos testes) de `src/server.ts` (entrada do processo). Renomear esses arquivos ou mover a chamada de `listen()` para fora de `server.ts` faz a função subir sem handler e as requisições expirarem.
 
 Limites do perfil serverless:
 
@@ -106,7 +108,7 @@ Para um processo único que serve a SPA e a API na mesma origem:
 ```bash
 npm run build-only
 npm run build -w @buscapp/api
-node apps/api/dist/src/principal.js
+node apps/api/dist/src/server.js
 ```
 
 ## Migrações e papel

@@ -1,0 +1,12 @@
+node_modules
+dist
+coverage
+uploads
+apps/api/generated
+.playwright
+playwright-report
+test-results
+package-lock.json
+*.tsbuildinfo
+.eslintcache
+.env

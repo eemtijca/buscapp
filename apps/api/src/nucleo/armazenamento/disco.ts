@@ -1,3 +1,4 @@
+import { createReadStream } from 'node:fs';
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { ambiente } from '../../ambiente.js';
@@ -22,6 +23,9 @@ export function criarArmazenamentoDisco(diretorio = ambiente.UPLOAD_DIR): Armaze
     },
     async ler(chave) {
       return readFile(caminhoAbsoluto(chave));
+    },
+    async lerFluxo(chave) {
+      return createReadStream(caminhoAbsoluto(chave));
     },
     async remover(chave) {
       await rm(caminhoAbsoluto(chave), { force: true });

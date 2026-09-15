@@ -33,6 +33,7 @@ import { rotasVinculos } from './modulos/vinculos/vinculos.rotas.js';
 /** Monta a aplicação Fastify; exposta separadamente para testes com `inject`. */
 export async function construirApp(): Promise<FastifyInstance> {
   const app = Fastify({
+    trustProxy: ambiente.TRUST_PROXY,
     logger:
       ambiente.NODE_ENV === 'test'
         ? false

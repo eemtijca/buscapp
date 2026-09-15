@@ -1,5 +1,6 @@
 import { Prisma } from '../../generated/prisma/client.js';
 import { prismaAdmin } from '../../src/nucleo/banco/cliente.js';
+import { hashCodigo } from '../../src/nucleo/autenticacao/codigos.js';
 import { gerarHashSenha } from '../../src/nucleo/autenticacao/senhas.js';
 
 interface UsuarioSeed {
@@ -771,17 +772,19 @@ async function criarCodigosRedefinicao(): Promise<void> {
   ];
 
   for (const codigo of codigos) {
+    const dados = {
+      email: codigo.email,
+      perfil_id: codigo.perfil_id,
+      codigo: null,
+      codigo_hash: hashCodigo(codigo.email, codigo.codigo),
+      criado_por: codigo.criado_por,
+      usado_em: codigo.usado_em,
+      expira_em: codigo.expira_em,
+    };
     await prismaAdmin.codigos_redefinicao.upsert({
       where: { id: codigo.id },
-      create: codigo,
-      update: {
-        email: codigo.email,
-        perfil_id: codigo.perfil_id,
-        codigo: codigo.codigo,
-        criado_por: codigo.criado_por,
-        usado_em: codigo.usado_em,
-        expira_em: codigo.expira_em,
-      },
+      create: { id: codigo.id, ...dados },
+      update: dados,
     });
   }
 }

@@ -30,6 +30,7 @@ As decisões estruturais ficam registradas como ADRs (Architecture Decision Reco
 - [ADR-004: anexos atrás de interface, com upload direto](adr/004-anexos-armazenamento.md)
 - [ADR-005: tempo real por Server-Sent Events](adr/005-tempo-real-sse.md)
 - [ADR-006: mesma origem e perfis de implantação](adr/006-same-origin-e-perfis.md)
+- [ADR-007: sonda de sessão sem 401 em GET /api/auth/me](adr/007-sonda-de-sessao-sem-401.md)
 
 Novas decisões seguem o formato descrito em [../CONTRIBUTING.md](../CONTRIBUTING.md).
 

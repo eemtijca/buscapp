@@ -27,7 +27,7 @@ Organização da SPA Vue 3, design system e padrões de interação. Os tokens f
 
 As rotas usam `createWebHistory` com fallback para `index.html`, servido pela API ou pelo `vite preview`. A guarda global executa:
 
-1. `iniciarNavegacao` carrega o usuário uma única vez por navegação, a partir de `/api/auth/me`.
+1. `iniciarNavegacao` carrega o usuário uma única vez por navegação, a partir de `/api/auth/me`; a sonda responde `perfil: null` para anônimos, sem `401`.
 2. Perfil `inativo` é redirecionado para `/conta-desativada`, sem saída.
 3. Usuário autenticado na raiz vai para a home do próprio papel.
 4. Rota protegida sem sessão redireciona para o login.

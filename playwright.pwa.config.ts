@@ -6,7 +6,7 @@ import { defineConfig, devices } from '@playwright/test';
  * Uso: npm run test:pwa
  */
 export default defineConfig({
-  testDir: './tests',
+  testDir: './tests/e2e',
   testMatch: /pwa\.spec\.ts/,
   fullyParallel: false,
   workers: 1,
@@ -28,7 +28,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'npm run preview -- --port 4173 --strictPort',
+    command: 'npm run preview -w @buscapp/web -- --port 4173 --strictPort',
     url: 'http://localhost:4173',
     reuseExistingServer: !process.env.CI,
     timeout: 30_000,

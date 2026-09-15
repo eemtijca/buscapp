@@ -1,0 +1,41 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: buscapp
+      POSTGRES_PASSWORD: buscapp
+      POSTGRES_DB: buscapp
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U buscapp -d buscapp']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - '5433:5432'
+
+  app:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://buscapp_api:${APP_DB_PASSWORD:-buscapp_api}@postgres:5432/buscapp
+      MIGRATE_DATABASE_URL: postgresql://buscapp:buscapp@postgres:5432/buscapp
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:-buscapp_api}
+      PORT: '3000'
+      HOST: 0.0.0.0
+      AUTH_PEPPER: ${AUTH_PEPPER:-dev-pepper-local-com-mais-de-16-caracteres}
+      COOKIE_SECURE: 'false'
+    ports:
+      - '3000:3000'
+    volumes:
+      - uploads:/app/apps/api/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  uploads:

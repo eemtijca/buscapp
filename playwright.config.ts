@@ -7,9 +7,9 @@ dotenv.config();
  * See https://playwright.dev/docs/test-configuration.
  */
 export default defineConfig({
-  testDir: './tests',
-  /* PWA roda apenas no preview (playwright.pwa.config.ts); suporte não é spec */
-  testIgnore: [/pwa\.spec\.ts/, /suporte\//],
+  testDir: './tests/e2e',
+  /* PWA roda apenas no preview (playwright.pwa.config.ts) */
+  testIgnore: [/pwa\.spec\.ts/],
   /* Run tests in files in parallel */
   fullyParallel: true,
   /* Fail the build on CI if you accidentally left test.only in the source code. */
@@ -64,10 +64,18 @@ export default defineConfig({
     },
   ],
 
-  /* Run your local dev server before starting the tests */
-  webServer: {
-    command: 'npm run dev',
-    url: 'http://localhost:5173',
-    reuseExistingServer: !process.env.CI,
-  },
+  /* Sobe API e web antes dos testes; Playwright aceita uma lista de webServers. */
+  webServer: [
+    {
+      command: 'npm run dev:api',
+      url: 'http://localhost:3001/api/saude',
+      reuseExistingServer: !process.env.CI,
+      timeout: 120_000,
+    },
+    {
+      command: 'VITE_API_URL=http://localhost:3001 npm run dev:web',
+      url: 'http://localhost:5173',
+      reuseExistingServer: !process.env.CI,
+    },
+  ],
 });

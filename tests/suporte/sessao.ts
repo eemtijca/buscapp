@@ -1,65 +1,16 @@
-// Helpers de sessão UI — login/logout e infra de edge functions.
+// Helpers de sessão UI — login/logout e restauração de senha via banco.
 
 import { expect, type Page } from '@playwright/test';
-import { spawn } from 'child_process';
-import { SERVICE_KEY, URL_SUPABASE } from './dados.js';
+import { executar } from './banco.js';
+import { gerarHashSenha } from './senhas.js';
 
-let funcoesProcess: ReturnType<typeof spawn> | null = null;
-
-/** Restaura senha de um usuário de seed via Admin API. */
-export async function restaurarSenha(uid: string, senha: string): Promise<void> {
-  try {
-    await fetch(`${URL_SUPABASE}/auth/v1/admin/users/${uid}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        apikey: SERVICE_KEY,
-        Authorization: `Bearer ${SERVICE_KEY}`,
-      },
-      body: JSON.stringify({ password: senha, email_confirm: true }),
-    });
-  } catch {
-    /* ignorar */
-  }
-}
-
-/** Garante que as edge functions estejam respondendo; sobe `supabase functions serve` se necessário. */
-export async function garantirFuncoes(): Promise<void> {
-  try {
-    const res = await fetch(`${URL_SUPABASE}/functions/v1/solicitar-codigo`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'health@check.com' }),
-    });
-    if (res.ok) return;
-  } catch {
-    /* not running */
-  }
-
-  funcoesProcess = spawn('npx', ['supabase', 'functions', 'serve'], {
-    stdio: 'pipe',
-    shell: true,
-  });
-
-  for (let i = 0; i < 30; i++) {
-    await new Promise((r) => setTimeout(r, 2000));
-    try {
-      const res = await fetch(`${URL_SUPABASE}/functions/v1/solicitar-codigo`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: 'health@check.com' }),
-      });
-      if (res.ok) return;
-    } catch {
-      /* still starting */
-    }
-  }
-  throw new Error('Edge functions não iniciaram após 60s');
-}
-
-/** Finaliza o processo de funções se foi iniciado por este helper. */
-export function encerrarFuncoes(): void {
-  if (funcoesProcess) funcoesProcess.kill();
+/** Restaura a senha de um usuário de seed direto em `perfis` (sem Auth externo). */
+export async function restaurarSenha(perfilId: string, senha: string): Promise<void> {
+  const hash = await gerarHashSenha(senha);
+  await executar(
+    'update public.perfis set senha_hash = $1, senha_alterada_em = now() where id = $2',
+    [hash, perfilId],
+  );
 }
 
 /** Login via UI e aguarda redirecionamento por papel. */

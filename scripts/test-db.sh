@@ -1,45 +1,59 @@
-#!/bin/bash
-# ============================================================================
-# Suíte de Testes do Banco de Dados — BuscApp
-# Executa os testes SQL via Docker (contorno para limitação do CLI)
-# ----------------------------------------------------------------------------
-# Fronteira: cobre constraints, triggers, RLS, views e catálogo via SQL com
-# ROLLBACK. Regras de cálculo do termômetro (pesos, janelas, Dia completo)
-# têm asserts em Fase 9; UI (barra, modais) é validada via Playwright.
-# ============================================================================
+#!/usr/bin/env bash
+# Valida o schema do PostgreSQL do Docker Compose: migrações aplicadas e objetos essenciais.
+set -euo pipefail
 
-set -o pipefail
+cd "$(dirname "$0")/.."
 
-echo "=== Suíte de Testes do Banco de Dados ==="
-echo ""
-
-CONTAINER=$(docker ps --filter "name=supabase_db" --format "{{.Names}}" 2>/dev/null | head -1)
-if [ -z "$CONTAINER" ]; then
-  echo "ERRO: Container do Supabase não encontrado. Execute 'npx supabase start' primeiro."
+if ! docker compose ps --status running --format '{{.Name}}' | grep -q buscapp-postgres; then
+  echo "ERRO: o PostgreSQL do Compose não está em execução. Rode 'npm run compose:up'."
   exit 1
 fi
 
-echo "Container: $CONTAINER"
-echo ""
+URL_BANCO="${DATABASE_URL_TESTE:-postgresql://buscapp:buscapp@127.0.0.1:5433/buscapp}"
 
-# Executa cada arquivo de teste dentro de uma transação que sempre faz ROLLBACK
-# Filtra apenas as linhas com NOTICE e ERROR para saída limpa
-FALHAS=0
-for ARQUIVO in supabase/tests/*.sql; do
-  echo "--- $ARQUIVO ---"
-  SAIDA=$(docker exec -i "$CONTAINER" psql -U postgres -f - 2>&1 < "$ARQUIVO" | \
-    grep -E "(NOTICE:|ERROR:)" | \
-    sed 's/psql:<stdin>:[0-9]*: //')
-  echo "$SAIDA"
-  if echo "$SAIDA" | grep -qE "\[FAIL\]|ERROR:"; then
-    FALHAS=$((FALHAS + 1))
-  fi
-  echo ""
-done
+echo "==> Aplicando migrações pendentes"
+DATABASE_URL="$URL_BANCO" npx -w @buscapp/api prisma migrate deploy
 
-echo "=== Testes concluídos ==="
-if [ "$FALHAS" -gt 0 ]; then
-  echo "$FALHAS arquivo(s) de teste com falhas."
-  exit 1
-fi
-echo "(Todos os dados de teste foram descartados pelo ROLLBACK)"
+echo "==> Conferindo objetos essenciais"
+docker compose exec -T postgres psql -U buscapp -d buscapp -v ON_ERROR_STOP=1 <<'SQL'
+do $$
+declare
+  v_tabelas int;
+  v_checks int;
+  v_triggers int;
+  v_indice int;
+begin
+  select count(*) into v_tabelas
+  from information_schema.tables
+  where table_schema = 'public' and table_type = 'BASE TABLE';
+  -- 31 tabelas de domínio + sessoes + _prisma_migrations
+  if v_tabelas <> 33 then
+    raise exception 'Esperadas 33 tabelas em public, encontradas %', v_tabelas;
+  end if;
+
+  select count(*) into v_checks
+  from pg_constraint
+  where contype = 'c' and connamespace = 'public'::regnamespace;
+  if v_checks < 40 then
+    raise exception 'Esperadas ao menos 40 CHECKs, encontradas %', v_checks;
+  end if;
+
+  select count(*) into v_triggers
+  from pg_trigger t
+  join pg_class c on c.oid = t.tgrelid
+  join pg_namespace n on n.oid = c.relnamespace
+  where n.nspname = 'public' and not t.tgisinternal;
+  if v_triggers < 29 then
+    raise exception 'Esperados ao menos 29 triggers de domínio, encontrados %', v_triggers;
+  end if;
+
+  select count(*) into v_indice
+  from pg_indexes
+  where schemaname = 'public' and indexname = 'idx_frequencias_unicidade';
+  if v_indice <> 1 then
+    raise exception 'Índice parcial idx_frequencias_unicidade ausente';
+  end if;
+end
+$$;
+select 'Schema validado com sucesso.' as resultado;
+SQL

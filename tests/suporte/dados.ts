@@ -1,13 +1,17 @@
 // Dados de ambiente e IDs de seed — fonte única para todos os specs.
 
-export const URL_SUPABASE = process.env.VITE_SUPABASE_URL!;
-if (!URL_SUPABASE) throw new Error('VITE_SUPABASE_URL não definida');
+export const API_URL = process.env.API_URL ?? 'http://localhost:3001';
 
-export const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-if (!SERVICE_KEY) throw new Error('SUPABASE_SERVICE_ROLE_KEY não definida');
+const databaseUrl = process.env.DATABASE_URL;
+if (!databaseUrl) {
+  throw new Error(
+    'DATABASE_URL não definida: configure o .env da raiz (postgresql://buscapp:buscapp@127.0.0.1:5433/buscapp) ou exporte a variável.',
+  );
+}
+export const DATABASE_URL = databaseUrl;
 
-export const PUBLISHABLE_KEY = process.env.VITE_SUPABASE_PUBLISHABLE_KEY!;
-if (!PUBLISHABLE_KEY) throw new Error('VITE_SUPABASE_PUBLISHABLE_KEY não definida');
+/** Conexão dona do schema, usada apenas para fixtures/limpeza dos testes (bypassa RLS). */
+export const DATABASE_URL_ADMIN = process.env.DATABASE_URL_ADMIN ?? databaseUrl;
 
 export const SENHA_ADMIN = process.env.SEED_SENHA_ADMIN!;
 export const SENHA_PROF = process.env.SEED_SENHA_PROF!;

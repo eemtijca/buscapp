@@ -1,89 +1,168 @@
-// Helpers de API REST / Auth — uso em beforeAll e em testes de RLS.
+// Helpers da API própria — login de setup, fetch autenticado e limpeza de dados.
 
-import { SERVICE_KEY, URL_SUPABASE } from './dados.js';
-import { SENHA_ADMIN } from './dados.js';
+import { consultar, executar } from './banco.js';
+import { API_URL, SENHA_ADMIN } from './dados.js';
 
-/** Obtém access_token via GoTrue (grant_type=password). */
-export async function obterToken(email: string, senha: string): Promise<string> {
-  const res = await fetch(`${URL_SUPABASE}/auth/v1/token?grant_type=password`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', apikey: SERVICE_KEY },
-    body: JSON.stringify({ email, password: senha }),
-  });
-  if (!res.ok) throw new Error(`Setup login ${email}: ${res.status}`);
-  const { access_token } = (await res.json()) as { access_token: string };
-  return access_token;
+export { excluirLinhas, inserirLinhas } from './banco.js';
+
+/** Perfil retornado por `/api/auth/login` e `/api/auth/me`. */
+export interface PerfilApi {
+  id: string;
+  nome: string;
+  email: string | null;
+  papel: 'professor' | 'gestao' | 'responsavel';
+  status: 'ativo' | 'pendente' | 'inativo';
+  telefone: string | null;
+  cargo: string | null;
+  notificacoes_ativas: boolean;
+  acesso_modulos: string[];
 }
 
-/** Chamada REST autenticada como service_role. */
-export async function restApi(url: string, options: RequestInit = {}): Promise<Response> {
-  const res = await fetch(`${URL_SUPABASE}${url}`, {
-    headers: {
-      'Content-Type': 'application/json',
-      apikey: SERVICE_KEY,
-      Authorization: `Bearer ${SERVICE_KEY}`,
-    },
-    ...options,
-  });
-  if (!res.ok) throw new Error(`Setup ${options.method ?? 'GET'} ${url}: ${res.status}`);
-  return res;
+/** Corpo aceito por `POST /api/usuarios`. */
+export interface DadosUsuarioApi {
+  nome: string;
+  email: string;
+  papel: 'professor' | 'gestao' | 'responsavel';
+  telefone?: string | null;
+  cargo?: string | null;
+  acesso_modulos?: string[];
 }
 
-/** Cria usuário via edge function criar-usuario (requer token de gestão). */
-export async function criarUsuarioApi(
-  nome: string,
+export interface OpcoesApiFetch {
+  metodo?: string;
+  corpo?: unknown;
+  cookie?: string;
+  formData?: FormData;
+}
+
+const COOKIE_SESSAO = 'buscapp_sessao';
+
+/** Fetch contra a API dedicada, com cookie de sessão opcional. */
+export async function apiFetch(caminho: string, opcoes: OpcoesApiFetch = {}): Promise<Response> {
+  const cabecalhos: Record<string, string> = {};
+  if (opcoes.cookie) cabecalhos.Cookie = opcoes.cookie;
+
+  let corpo: RequestInit['body'];
+  if (opcoes.formData) {
+    corpo = opcoes.formData;
+  } else if (opcoes.corpo !== undefined) {
+    cabecalhos['Content-Type'] = 'application/json';
+    corpo = JSON.stringify(opcoes.corpo);
+  }
+
+  return fetch(`${API_URL}${caminho}`, {
+    method: opcoes.metodo ?? 'GET',
+    headers: cabecalhos,
+    body: corpo,
+    credentials: 'include',
+  });
+}
+
+/** Autentica via `POST /api/auth/login` e devolve o cookie de sessão. */
+export async function loginApi(
   email: string,
-): Promise<{ id: string; codigo: string }> {
-  const token = await obterToken('gestao@escola.edu.br', SENHA_ADMIN);
-  const res = await fetch(`${URL_SUPABASE}/functions/v1/criar-usuario`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      apikey: SERVICE_KEY,
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({ nome, email, papel: 'responsavel' }),
-  });
-  if (!res.ok) throw new Error(`Setup criar-usuario: ${res.status}`);
-  return (await res.json()) as { id: string; codigo: string };
+  senha: string,
+): Promise<{ cookie: string; perfil: PerfilApi }> {
+  const res = await apiFetch('/api/auth/login', { metodo: 'POST', corpo: { email, senha } });
+  if (!res.ok) throw new Error(`Login ${email} falhou: ${res.status} ${await res.text()}`);
+
+  const corpo = (await res.json()) as { perfil: PerfilApi };
+  const setCookies = res.headers.getSetCookie();
+  const parSessao = setCookies.find((item) => item.startsWith(`${COOKIE_SESSAO}=`));
+  if (!parSessao) throw new Error(`Login ${email}: cookie ${COOKIE_SESSAO} ausente`);
+
+  return { cookie: parSessao.split(';')[0] ?? '', perfil: corpo.perfil };
 }
 
-/** Remove usuário do Auth (best-effort). */
-export async function deletarUsuario(id: string): Promise<void> {
-  await fetch(`${URL_SUPABASE}/auth/v1/admin/users/${id}`, {
-    method: 'DELETE',
-    headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` },
-  }).catch(() => {});
+/** Cria usuário de teste: login de gestão + `POST /api/usuarios`. */
+export async function criarUsuarioApi(
+  dados: DadosUsuarioApi,
+): Promise<{ id: string; codigo: string | null }> {
+  const { cookie } = await loginApi('gestao@escola.edu.br', SENHA_ADMIN);
+  const res = await apiFetch('/api/usuarios', { metodo: 'POST', corpo: dados, cookie });
+  if (!res.ok) {
+    throw new Error(`Setup criar usuário ${dados.email}: ${res.status} ${await res.text()}`);
+  }
+
+  const json = (await res.json()) as { usuario: { id: string }; codigo?: string | null };
+  return { id: json.usuario.id, codigo: json.codigo ?? null };
 }
 
-/** Conta notificações de código não lidas para um perfil. */
-export async function contarNotificacoesCodigo(perfilId: string): Promise<number> {
-  const res = await restApi(
-    `/rest/v1/notificacoes?select=id&tipo=eq.codigo_redefinicao&lida=eq.false&metadados->>perfil_id=eq.${perfilId}`,
+/** Remove um usuário de teste e suas dependências diretas no banco (ordem de FK). */
+export async function deletarUsuario(perfilId: string): Promise<void> {
+  const perfis = await consultar<{ email: string | null }>(
+    'select email from public.perfis where id = $1',
+    [perfilId],
   );
-  const data = (await res.json()) as { id: string }[];
-  return data.length;
+  const email = perfis[0]?.email ?? null;
+
+  // Justificativas que apontam para frequências do professor antes de removê-las.
+  await executar(
+    `delete from public.justificativas_faltas
+      where frequencia_id in (select id from public.frequencias where professor_id = $1)`,
+    [perfilId],
+  );
+  await executar('delete from public.justificativas_faltas where responsavel_id = $1', [perfilId]);
+  await executar(
+    'update public.justificativas_faltas set avaliado_por = null where avaliado_por = $1',
+    [perfilId],
+  );
+
+  await executar('delete from public.mensagens where remetente_id = $1', [perfilId]);
+  await executar('delete from public.conversas where responsavel_id = $1', [perfilId]);
+  await executar('delete from public.vinculos_responsaveis where responsavel_id = $1', [perfilId]);
+  await executar('delete from public.notificacoes where destinatario_id = $1', [perfilId]);
+  await executar('delete from public.sessoes where perfil_id = $1', [perfilId]);
+  await executar('delete from public.codigos_redefinicao where perfil_id = $1 or criado_por = $1', [
+    perfilId,
+  ]);
+  if (email) {
+    await executar('delete from public.codigos_redefinicao_tentativas where email = $1', [email]);
+  }
+
+  await executar('update public.anexos set criado_por = null where criado_por = $1', [perfilId]);
+  await executar('delete from public.auditoria where usuario_id = $1', [perfilId]);
+  await executar('delete from public.atribuicoes_professores where professor_id = $1', [perfilId]);
+  await executar('delete from public.frequencias where professor_id = $1', [perfilId]);
+  await executar('delete from public.registros_comportamento where professor_id = $1', [perfilId]);
+  await executar('delete from public.ocorrencias where professor_id = $1 or coordenador_id = $1', [
+    perfilId,
+  ]);
+  await executar(
+    'delete from public.monitoramento_acoes where responsavel_id = $1 or realizado_por = $1',
+    [perfilId],
+  );
+  await executar('delete from public.exportacoes where coordenador_id = $1', [perfilId]);
+  await executar('delete from public.importacoes_log where coordenador_id = $1', [perfilId]);
+  await executar('delete from public.convites where enviado_por = $1', [perfilId]);
+
+  await executar('delete from public.perfis where id = $1', [perfilId]);
 }
 
-/** Seed helper para anexos/justificativas (merge-duplicates). */
-export async function seedApi(url: string, options: RequestInit = {}): Promise<Response> {
-  const res = await fetch(`${URL_SUPABASE}${url}`, {
-    headers: {
-      'Content-Type': 'application/json',
-      apikey: SERVICE_KEY,
-      Authorization: `Bearer ${SERVICE_KEY}`,
-      Prefer: 'resolution=merge-duplicates,return=representation',
-    },
-    ...options,
-  });
-  if (!res.ok) throw new Error(`Setup ${options.method ?? 'GET'} ${url}: ${res.status}`);
-  return res;
+/** Conta notificações de código de redefinição para um perfil. */
+export async function contarNotificacoesCodigo(perfilId: string): Promise<number> {
+  const linhas = await consultar<{ total: number }>(
+    `select count(*)::int as total from public.notificacoes
+     where tipo = 'codigo_redefinicao' and metadados->>'perfil_id' = $1`,
+    [perfilId],
+  );
+  return linhas[0]?.total ?? 0;
 }
 
-/** Limpa frequências de teste por client_request_id. */
-export async function limparFrequenciasTeste(clientRequestId: string): Promise<void> {
-  await fetch(`${URL_SUPABASE}/rest/v1/frequencias?client_request_id=eq.${clientRequestId}`, {
-    method: 'DELETE',
-    headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` },
-  });
+/**
+ * Limpa frequências de teste. Com `alunoIds`, remove apenas as desses alunos;
+ * sem ids, remove as frequências criadas por specs (`client_request_id` preenchido).
+ */
+export async function limparFrequenciasTeste(alunoIds?: string[]): Promise<void> {
+  const filtro =
+    alunoIds && alunoIds.length > 0
+      ? { sql: 'aluno_id = any($1::uuid[])', params: [alunoIds] as unknown[] }
+      : { sql: 'client_request_id is not null', params: [] as unknown[] };
+
+  await executar(
+    `delete from public.justificativas_faltas
+     where frequencia_id in (select id from public.frequencias where ${filtro.sql})`,
+    filtro.params,
+  );
+  await executar(`delete from public.frequencias where ${filtro.sql}`, filtro.params);
 }

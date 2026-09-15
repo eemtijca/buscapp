@@ -5,7 +5,9 @@ Plataforma de comunicação em tempo real entre escola e família para o Ensino 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Vue 3](https://img.shields.io/badge/Vue-3.5-4FC08D)](https://vuejs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6.0-3178C6)](https://www.typescriptlang.org/)
-[![Supabase](https://img.shields.io/badge/Supabase-BaaS-3ECF8E)](https://supabase.com/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-4169E1)](https://www.postgresql.org/)
+[![Prisma](https://img.shields.io/badge/Prisma-7.10-2D3748)](https://www.prisma.io/)
+[![Fastify](https://img.shields.io/badge/Fastify-5-000000)](https://fastify.dev/)
 [![Vite](https://img.shields.io/badge/Vite-8.0-646CFF)](https://vitejs.dev/)
 [![Playwright](https://img.shields.io/badge/Playwright-1.61-45BA4B)](https://playwright.dev/)
 
@@ -16,8 +18,9 @@ Plataforma de comunicação em tempo real entre escola e família para o Ensino 
 - [Em Desenvolvimento](#em-desenvolvimento)
 - [Tecnologias](#tecnologias)
 - [Arquitetura](#arquitetura)
+- [Autenticação e Segurança](#autenticação-e-segurança)
+- [API](#api)
 - [Banco de Dados](#banco-de-dados)
-- [Edge Functions](#edge-functions)
 - [Tempo Real](#tempo-real)
 - [Configuração](#configuração)
 - [Como Executar](#como-executar)
@@ -33,11 +36,11 @@ O BuscApp é uma plataforma web que moderniza a comunicação entre escola e fam
 
 O acesso é organizado em três papéis:
 
-| Papel | Atribuições principais |
-|-------|------------------------|
-| Professor | Registro de frequência por exceção, ausências por período e ocorrências graves. |
-| Gestão | Painel de monitoramento com ranking de risco, central de ocorrências com registro próprio, validação de justificativas e gestão completa de cadastros. |
-| Responsável | Alertas de ausência e ocorrências, termômetro de atenção, envio de justificativas com anexo e chat com a equipe da gestão escolar. |
+| Papel       | Atribuições principais                                                                                                                                 |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Professor   | Registro de frequência por exceção, ausências por período e ocorrências graves.                                                                        |
+| Gestão      | Painel de monitoramento com ranking de risco, central de ocorrências com registro próprio, validação de justificativas e gestão completa de cadastros. |
+| Responsável | Alertas de ausência e ocorrências, termômetro de atenção, envio de justificativas com anexo e chat com a equipe da gestão escolar.                     |
 
 A interface do módulo do responsável foi projetada para usuários com pouca familiaridade com tecnologia: vocabulário acessível, mensagens curtas e indicadores visuais de leitura imediata. O termômetro de atenção traduz dados de frequência e ocorrências em três cores, e o upload de documentos aceita formatos universais disponíveis em qualquer dispositivo.
 
@@ -47,299 +50,196 @@ Três decisões de design orientam o sistema:
 - **Código de redefinição de senha**: elimina a dependência de email; responsáveis sem endereço eletrônico recuperam o acesso com um código fornecido pela gestão.
 - **Horário protegido no chat**: o envio de mensagens fica indisponível fora das janelas letivas configuradas, com instruções de contato alternativo exibidas ao usuário.
 
-Privacidade e resiliência completam os princípios do projeto. Cada perfil enxerga apenas os dados que lhe competem (Row-Level Security por papel), alterações em informações de alunos geram trilha de auditoria visível somente à gestão, nenhum registro é apagado fisicamente e os alunos são identificados apenas por nome e matrícula, sem dados sensíveis. Em conexões instáveis, mensagens de erro são apresentadas em português com instruções claras, um indicador mostra o status da conexão e a recuperação após quedas de rede é automática.
+Privacidade e resiliência completam os princípios do projeto. Cada perfil enxerga apenas os dados que lhe competem (escopo de visibilidade por papel aplicado nos serviços da API), alterações em informações de alunos geram trilha de auditoria visível somente à gestão, nenhum registro é apagado fisicamente e os alunos são identificados apenas por nome e matrícula, sem dados sensíveis. Em conexões instáveis, mensagens de erro são apresentadas em português com instruções claras, um indicador mostra o status da conexão com a API e a recuperação após quedas de rede é automática.
 
 ## Funcionalidades
 
 ### Gerenciamento de Acesso
 
-| Funcionalidade | Descrição |
-|----------------|-----------|
-| Autenticação | Login e logout com email e senha via Supabase Auth. |
-| Sessão persistente | Opção "lembrar-me" que alterna entre localStorage (permanente) e sessionStorage (temporária). |
-| Recuperação de senha | Fluxo unificado com o primeiro acesso: código de 6 dígitos para redefinir a senha sem depender de email (gerado pela gestão, solicitado pelo usuário). Expiração em 1 hora. |
-| JWT com custom claims | Token JWT contém nome e papel do usuário, injetados via Custom Access Token Hook do Supabase. |
-| RBAC | Guardas de rota no Vue Router que redirecionam usuários não autenticados e bloqueiam rotas não autorizadas. |
-| Módulos de acesso | Catálogo em `perfis.acesso_modulos` gerenciado pela gestão na criação e edição de qualquer usuário (professor: frequência e ocorrências; responsável: alertas, termômetro, justificativa e chat), com aplicação fail-closed em políticas RLS, guardas de rota por papel e filtragem dos cartões da home. |
-| Redirecionamento pós-login | Redirecionamento automático para a página inicial do perfil após login bem-sucedido. |
-| Força e visibilidade de senha | Validação de requisitos mínimos no frontend e checkbox "Mostrar senha" nas telas de login e redefinição. |
+| Funcionalidade                | Descrição                                                                                                                                                                                                                                                                                                       |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Autenticação                  | Login e logout com email e senha na API própria; a sessão vira um cookie `HttpOnly` de mesma origem.                                                                                                                                                                                                            |
+| Sessão persistente            | Opção "lembrar-me" que mantém a sessão por 30 dias; sem ela, a validade é de 12 horas. O token fica apenas no cookie e o banco guarda o hash SHA-256.                                                                                                                                                           |
+| Recuperação de senha          | Fluxo unificado com o primeiro acesso: código de 6 dígitos gerado pela gestão (HMAC-SHA256 com `AUTH_PEPPER`), solicitado pelo usuário, com expiração em 1 hora, revogação e limite de tentativas.                                                                                                              |
+| Perfil autenticado            | `GET /api/auth/me` devolve nome, papel, status e módulos de acesso. As guardas do Vue Router usam essa resposta antes de montar as views.                                                                                                                                                                       |
+| RBAC                          | Guardas de rota no Vue Router e hooks `exigirPapel` na API redirecionam usuários não autenticados e bloqueiam operações não autorizadas.                                                                                                                                                                        |
+| Módulos de acesso             | Catálogo em `perfis.acesso_modulos` gerenciado pela gestão na criação e edição de qualquer usuário (professor: frequência e ocorrências; responsável: alertas, termômetro, justificativa e chat), com semântica fail-closed no hook `exigirModulo`, guardas de rota por módulo e filtragem dos cartões da home. |
+| Redirecionamento pós-login    | Redirecionamento automático para a página inicial do perfil após login bem-sucedido.                                                                                                                                                                                                                            |
+| Força e visibilidade de senha | Validação de requisitos mínimos no frontend e checkbox "Mostrar senha" nas telas de login e redefinição. As senhas são armazenadas com scrypt, com verificação de hashes bcrypt legados e regravação no próximo login.                                                                                          |
 
 ### Plataforma
 
-| Funcionalidade | Descrição |
-|----------------|-----------|
-| Atualização em tempo real | Todas as telas operacionais dos três papéis assinam canais do Supabase Realtime e se atualizam sem recarregar (detalhes na seção [Tempo Real](#tempo-real)). O guard de rotas garante o usuário carregado antes das views montarem, evitando telas sem carga ou sem inscrição após reload direto. |
-| Indicador de conexão | Indicador visual verde/amarelo/vermelho do status da conexão com o Supabase, atualizado a cada 30s. |
-| Combobox pesquisável | `Combobox.vue` com `useDebounce` substitui `select`; busca com filtragem insensível a acentos, navegação por teclado e `aria`. |
-| Indicador de carregamento | Overlay global `TelaCarregamento` com título dinâmico da rota de destino e `lazy` de rotas via `meta.titulo`. |
-| Tratamento de erros | Tradução dos erros do Supabase Auth para mensagens explícitas com entidade e horário (ex.: `Usuário "Ana" atualizado com sucesso às 14:32` / `falhou ao salvar: ...`) e `auto-dismiss` em 6s com `btn-close` centralizado (`pe-5` + `top-50`). |
-| Proteção contra saída | Detecção de alterações por snapshot JSON (`useFormSnapshot`) com pausa na hidratação; `onBeforeRouteLeave` com `Há alterações não salvas` e limpeza de `draft` em `sessionStorage`. |
-| Bloqueio de ações | Botões desabilitados durante operações de BD (`carregando`/`salvando`) para evitar duplo envio. |
-| Páginas de erro | Páginas dedicadas para 403, 404 e 500, além de tela própria para conta desativada. |
-| Auditoria | Tabela `auditoria` no banco para rastreabilidade das operações administrativas. |
-| Modal de confirmação | Confirmação genérica para ações destrutivas (ativar/inativar usuário, salvar chamada, limpar notificações). |
+| Funcionalidade            | Descrição                                                                                                                                                                                                                                                                                         |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Atualização em tempo real | Todas as telas operacionais dos três papéis assinam o stream SSE `/api/eventos` e se atualizam sem recarregar (detalhes na seção [Tempo Real](#tempo-real)). O guard de rotas garante o usuário carregado antes das views montarem, evitando telas sem carga ou sem inscrição após reload direto. |
+| Indicador de conexão      | Indicador visual verde/amarelo/vermelho do status do stream SSE, combinado à verificação de `/api/saude` a cada 30s.                                                                                                                                                                              |
+| Combobox pesquisável      | `Combobox.vue` com `useDebounce` substitui `select`; busca com filtragem insensível a acentos, navegação por teclado e `aria`.                                                                                                                                                                    |
+| Indicador de carregamento | Overlay global `TelaCarregamento` com título dinâmico da rota de destino e `lazy` de rotas via `meta.titulo`.                                                                                                                                                                                     |
+| Tratamento de erros       | Tradução dos erros da API (envelope `{ erro: { codigo, mensagem } }`) para mensagens explícitas com entidade e horário (ex.: `Usuário "Ana" atualizado com sucesso às 14:32` / `falhou ao salvar: ...`) e `auto-dismiss` em 6s com `btn-close` centralizado (`pe-5` + `top-50`).                  |
+| Proteção contra saída     | Detecção de alterações por snapshot JSON (`useFormSnapshot`) com pausa na hidratação; `onBeforeRouteLeave` com `Há alterações não salvas` e limpeza de `draft` em `sessionStorage`.                                                                                                               |
+| Bloqueio de ações         | Botões desabilitados durante operações de banco (`carregando`/`salvando`) para evitar duplo envio.                                                                                                                                                                                                |
+| Páginas de erro           | Páginas dedicadas para 403, 404 e 500, além de tela própria para conta desativada.                                                                                                                                                                                                                |
+| Auditoria                 | Tabela `auditoria` no banco para rastreabilidade das operações administrativas.                                                                                                                                                                                                                   |
+| Modal de confirmação      | Confirmação genérica para ações destrutivas (ativar/inativar usuário, salvar chamada, limpar notificações).                                                                                                                                                                                       |
 
 ### Módulo Professor
 
-| Funcionalidade | Descrição |
-|----------------|-----------|
-| Frequência por exceção | Todos os alunos considerados presentes por padrão; o professor marca apenas quem faltou. Seleção por período e busca por nome. Atualização em tempo real. |
-| Ausência em período | Registro de aluno presente na escola que faltou a um período específico, com seleção de período e observação opcional. |
-| Ocorrências graves | Registro de comportamento que ameace a permanência do aluno, classificado como grave ou suspensão, com descrição, tags de comportamento e opção de exigir presença do responsável. |
-| Módulos de acesso | Home exibe apenas os cartões habilitados em `perfis.acesso_modulos`; rotas sem o módulo redirecionam para a home com aviso e a escrita no banco é negada por RLS. |
+| Funcionalidade         | Descrição                                                                                                                                                                          |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Frequência por exceção | Todos os alunos considerados presentes por padrão; o professor marca apenas quem faltou. Seleção por período e busca por nome. Atualização em tempo real.                          |
+| Ausência em período    | Registro de aluno presente na escola que faltou a um período específico, com seleção de período e observação opcional.                                                             |
+| Ocorrências graves     | Registro de comportamento que ameace a permanência do aluno, classificado como grave ou suspensão, com descrição, tags de comportamento e opção de exigir presença do responsável. |
+| Módulos de acesso      | Home exibe apenas os cartões habilitados em `perfis.acesso_modulos`; rotas sem o módulo redirecionam para a home com aviso e a API nega a operação com 403.                        |
 
 ### Módulo Gestão
 
-| Funcionalidade | Descrição |
-|----------------|-----------|
-| Painel de monitoramento | Página central com cartões de navegação para todos os módulos administrativos. |
-| Ranking de risco | Lista priorizada de alunos do caso mais crítico ao mais leve, com filtros por nível (crítico, atenção, estável), busca por nome e atualização em tempo real. Botão "Chat" em cada aluno abre conversa com o responsável. |
-| Central de ocorrências | Lista de ocorrências graves e suspensões com indicadores de tipo, status e bloqueio. Alternância de bloqueio/desbloqueio de retorno em tempo real. Registro de novas ocorrências pela própria gestão (aluno, tipo, tags, descrição, exigência de presença e notificações). |
-| Registro de infrequências | Chamada por exceção para qualquer turma e registro individual de ausências por período, com motivo e observação. Confirmação em modal antes de salvar. Acessível pelo cartão próprio e pelo botão "Falta" no ranking, que pré-seleciona o aluno. |
-| Validação de justificativas | Fila de pendentes com anexos em modal (imagem ou PDF via blob), intervalo de datas e opção de aceitar ou recusar. Ao aceitar, as frequências do período são auto-justificadas via trigger no banco. Atualização em tempo real. |
-| CRUD de usuários | Cadastro, edição, ativação e inativação com confirmação em modal nas mudanças de status. Geração automática de código de redefinição ao criar usuário, criação sincronizada em `auth.users` e perfil, módulos de acesso editáveis para todos os papéis. |
-| CRUD de alunos | Cadastro e edição com dados pseudonimizados. Criação simultânea de vínculo com responsável existente ou novo. Transferência de enturmação mantendo uma matrícula ativa por ano. |
-| CRUD de turmas | Cadastro, edição, ativação e inativação com série e letra do catálogo. |
-| Anos letivos | CRUD com período e status (planejado, ativo, arquivado). A "virada de ano" arquiva atomicamente o ano vigente e ativa o novo via RPC `ativar_ano_letivo`, com trilha de auditoria. |
-| CRUD de disciplinas | Cadastro e edição com código SIGE para integração com a SEDUC. |
-| Atribuições | Vínculo professor-turma-disciplina com titular/substituto e período de vigência. |
-| Gestão de códigos | Fila de solicitações, lista de códigos com status, revogação e expiração automática após 1 hora. Limpeza de códigos não ativos com auditoria. |
-| Notificações | Badge não lidas em tempo real. Clique leva ao destino correto por papel (responsável: alertas/justificativa/chat; gestão: ranking/ocorrências/justificativas; professor: frequência/ocorrência) com deep-link `?aluno=`/`?conversa=` e nunca 403. Mensagens são limpas ao ler a conversa (trigger + cliente). |
-| Catálogos genéricos | CRUD completo para módulos, documentos, períodos, motivos de ausência, tipos de ocorrência, vínculos, papéis de atribuição, séries e letras de turma sobre a tabela `opcoes_configuracao`. Chave interna gerada pelo nome, validações por tipo, bloqueio de duplicatas e exclusão de opções referenciadas. Reordenação por arrastar com modo protegido e seletor visual de ícones. |
-| Tags de comportamento | Catálogo com nome, categoria, ícone, descrição e peso de pontuação. Exclusão e renomeação de tags referenciadas em ocorrências são bloqueadas. |
-| Parâmetros do sistema | Limites crítico/preventivo de faltas, pesos de faltas/ocorrências/recência, janela de recência, limites de score médio/alto, dias de expurgo e nome da escola. Barra do termômetro com prévia em tempo real. |
-| Horários letivos | Janelas de atendimento do chat por dia da semana e horário, com todas desativadas o canal permanece fechado. |
+| Funcionalidade              | Descrição                                                                                                                                                                                                                                                                                                                                                                          |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Painel de monitoramento     | Página central com cartões de navegação para todos os módulos administrativos.                                                                                                                                                                                                                                                                                                     |
+| Ranking de risco            | Lista priorizada de alunos do caso mais crítico ao mais leve, com filtros por nível (crítico, atenção, estável), busca por nome e atualização em tempo real. Botão "Chat" em cada aluno abre conversa com o responsável.                                                                                                                                                           |
+| Central de ocorrências      | Lista de ocorrências graves e suspensões com indicadores de tipo, status e bloqueio. Alternância de bloqueio/desbloqueio de retorno em tempo real. Registro de novas ocorrências pela própria gestão (aluno, tipo, tags, descrição, exigência de presença e notificações).                                                                                                         |
+| Registro de infrequências   | Chamada por exceção para qualquer turma e registro individual de ausências por período, com motivo e observação. Confirmação em modal antes de salvar. Acessível pelo cartão próprio e pelo botão "Falta" no ranking, que pré-seleciona o aluno.                                                                                                                                   |
+| Validação de justificativas | Fila de pendentes com anexos em modal (imagem ou PDF baixado como blob), intervalo de datas e opção de aceitar ou recusar. Ao aceitar, as frequências do período são auto-justificadas via trigger no banco. Atualização em tempo real.                                                                                                                                            |
+| CRUD de usuários            | Cadastro, edição, ativação e inativação com confirmação em modal nas mudanças de status. Geração automática de código de primeiro acesso ao criar usuário, senha temporária com scrypt e módulos de acesso editáveis para todos os papéis. A inativação revoga as sessões abertas.                                                                                                 |
+| CRUD de alunos              | Cadastro e edição com dados pseudonimizados. Criação simultânea de vínculo com responsável existente ou novo. Transferência de enturmação mantendo uma matrícula ativa por ano.                                                                                                                                                                                                    |
+| CRUD de turmas              | Cadastro, edição, ativação e inativação com série e letra do catálogo.                                                                                                                                                                                                                                                                                                             |
+| Anos letivos                | CRUD com período e status (planejado, ativo, arquivado). A "virada de ano" arquiva atomicamente o ano vigente e ativa o novo via `POST /api/anos-letivos/:id/ativar`, com trilha de auditoria.                                                                                                                                                                                     |
+| CRUD de disciplinas         | Cadastro e edição com código SIGE para integração com a SEDUC.                                                                                                                                                                                                                                                                                                                     |
+| Atribuições                 | Vínculo professor-turma-disciplina com titular/substituto e período de vigência.                                                                                                                                                                                                                                                                                                   |
+| Gestão de códigos           | Fila de solicitações, lista de códigos com status, revogação e expiração automática após 1 hora. Limpeza de códigos não ativos com auditoria.                                                                                                                                                                                                                                      |
+| Notificações                | Badge não lidas em tempo real. Clique leva ao destino correto por papel (responsável: alertas/justificativa/chat; gestão: ranking/ocorrências/justificativas; professor: frequência/ocorrência) com deep-link `?aluno=`/`?conversa=` e nunca 403. Mensagens são limpas ao ler a conversa (trigger + serviço).                                                                      |
+| Catálogos genéricos         | CRUD completo para módulos, documentos, períodos, motivos de ausência, tipos de ocorrência, vínculos, papéis de atribuição, séries e letras de turma sobre a tabela `opcoes_configuracao`. Chave interna gerada pelo nome, validações por tipo, bloqueio de duplicatas e exclusão de opções referenciadas. Reordenação por arrastar com modo protegido e seletor visual de ícones. |
+| Tags de comportamento       | Catálogo com nome, categoria, ícone, descrição e peso de pontuação. Exclusão e renomeação de tags referenciadas em ocorrências são bloqueadas.                                                                                                                                                                                                                                     |
+| Parâmetros do sistema       | Limites crítico/preventivo de faltas, pesos de faltas/ocorrências/recência, janela de recência, limites de score médio/alto, dias de expurgo e nome da escola. Barra do termômetro com prévia em tempo real.                                                                                                                                                                       |
+| Horários letivos            | Janelas de atendimento do chat por dia da semana e horário; com todas desativadas, o canal permanece fechado.                                                                                                                                                                                                                                                                      |
 
 ### Módulo Responsável
 
-| Funcionalidade | Descrição |
-|----------------|-----------|
-| Alertas | Ausências (escola e aula) e ocorrências (grave e suspensão) com distinção visual e badge de urgência. Botão para enviar justificativa direto do alerta. Modal de detalhes com status da justificativa, motivo, anexo via blob e tags de comportamento. Indicadores "Aguardando validação", "Aceita" ou "Recusada". |
-| Termômetro de atenção | Barra segmentada fixa verde/amarelo/vermelho com marcador de score 0–100. Score ponderado por faltas injustificadas, peso de tags de ocorrências e recência (janela configurável), com faltas justificadas abatidas e tendência 30 dias. Fatores explicativos e limites configuráveis pela gestão. Suporte a múltiplos filhos com seletor. |
-| Justificativas | Envio com suporte a múltiplos dias. Anexo por seleção ou arrastar e soltar, com validação de tipo e tamanho, compressão automática via Canvas API (máximo 1600px, JPEG 0.6) e otimização serverless via Edge Function em segundo plano. Formulário permanece na tela após o envio. |
-| Aviso de presença obrigatória | Badge urgente quando uma ocorrência exige a presença física do responsável na escola para liberar o retorno do aluno. |
-| Chat com horário protegido | Conversa com a equipe da gestão escolar, com indicador online/offline baseado nos horários letivos cadastrados. Auto-scroll para novas mensagens e leitura de mensagens limpa as notificações correspondentes. |
-| Acessibilidade e simplicidade | Telas limpas com Bootstrap 5, linguagem clara sem jargão, indicadores visuais de leitura imediata e instruções passo a passo. Compressão automática de imagens no cliente suporta fotos de qualquer dispositivo. |
+| Funcionalidade                | Descrição                                                                                                                                                                                                                                                                                                                                           |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Alertas                       | Ausências (escola e aula) e ocorrências (grave e suspensão) com distinção visual e badge de urgência. Botão para enviar justificativa direto do alerta. Modal de detalhes com status da justificativa, motivo, anexo via blob e tags de comportamento. Indicadores "Aguardando validação", "Aceita" ou "Recusada".                                  |
+| Termômetro de atenção         | Barra segmentada fixa verde/amarelo/vermelho com marcador de score 0–100. Score ponderado por faltas injustificadas, peso de tags de ocorrências e recência (janela configurável), com faltas justificadas abatidas e tendência 30 dias. Fatores explicativos e limites configuráveis pela gestão. Suporte a múltiplos filhos com seletor.          |
+| Justificativas                | Envio com suporte a múltiplos dias. Anexo por seleção ou arrastar e soltar, com validação de tipo e tamanho e compressão automática via Canvas API (máximo 1600px, JPEG 0.6) antes do envio. O servidor revalida o formato (JPG, PNG, WEBP ou PDF) e o limite de 10 MB antes de gravar no armazenamento. Formulário permanece na tela após o envio. |
+| Aviso de presença obrigatória | Badge urgente quando uma ocorrência exige a presença física do responsável na escola para liberar o retorno do aluno.                                                                                                                                                                                                                               |
+| Chat com horário protegido    | Conversa com a equipe da gestão escolar, com indicador online/offline baseado nos horários letivos cadastrados. Auto-scroll para novas mensagens e leitura de mensagens limpa as notificações correspondentes.                                                                                                                                      |
+| Acessibilidade e simplicidade | Telas limpas com Bootstrap 5, linguagem clara sem jargão, indicadores visuais de leitura imediata e instruções passo a passo. Compressão automática de imagens no cliente suporta fotos de qualquer dispositivo.                                                                                                                                    |
 
 ## Em Desenvolvimento
 
-- Gamificação entre turmas (estrutura de dados e views prontas, frontend não conectado).
+- Gamificação entre turmas (tabelas de pontuação prontas, frontend não conectado).
 - Notificações push.
 
 ## Tecnologias
 
 ### Frontend
 
-| Tecnologia | Versão | Uso |
-|------------|--------|-----|
-| Vue 3 | ^3.5.32 | Framework reativo com Composition API e `<script setup lang="ts">` |
-| TypeScript | ~6.0.0 | Tipagem estática e verificação em tempo de compilação |
-| Vite | ^8.0.8 | Build tool e dev server com hot-module replacement |
-| Vue Router | ^5.0.4 | Roteamento SPA com guardas de navegação RBAC |
-| Bootstrap | ^5.3.8 | Framework CSS responsivo com grid e componentes |
-| Bootstrap Icons | ^1.13.1 | Biblioteca de ícones |
-| Geist Sans / Geist Mono | ^5.x | Fontes tipográficas via @fontsource |
-| jwt-decode | ^4.0.0 | Decodificação do JWT no cliente, sem requisição extra ao servidor |
-| sortablejs | ^1.15.7 | Arrastar e soltar com suporte a toque, usado na reordenação de catálogos |
-| @popperjs/core | ^2.11.8 | Dependência do Bootstrap JS para tooltips e popovers |
-| vite-plugin-pwa | ^1.3.0 | Suporte a Progressive Web App com service worker |
+| Tecnologia              | Versão  | Uso                                                                      |
+| ----------------------- | ------- | ------------------------------------------------------------------------ |
+| Vue 3                   | ^3.5.32 | Framework reativo com Composition API e `<script setup lang="ts">`       |
+| TypeScript              | ~6.0.0  | Tipagem estática e verificação em tempo de compilação                    |
+| Vite                    | ^8.0.8  | Build tool e dev server com hot-module replacement                       |
+| Vue Router              | ^5.0.4  | Roteamento SPA com guardas de navegação RBAC e de módulos                |
+| Bootstrap               | ^5.3.8  | Framework CSS responsivo com grid e componentes                          |
+| Bootstrap Icons         | ^1.13.1 | Biblioteca de ícones                                                     |
+| Geist Sans / Geist Mono | ^5.x    | Fontes tipográficas via @fontsource                                      |
+| reka-ui                 | ^2.10.4 | Primitivos acessíveis sem estilo para componentes interativos            |
+| sortablejs              | ^1.15.7 | Arrastar e soltar com suporte a toque, usado na reordenação de catálogos |
+| @popperjs/core          | ^2.11.8 | Dependência do Bootstrap JS para tooltips e popovers                     |
+| vite-plugin-pwa         | ^1.3.0  | Suporte a Progressive Web App com service worker                         |
 
 ### Backend e Infraestrutura
 
-| Tecnologia | Versão | Uso |
-|------------|--------|-----|
-| Supabase | - | Backend-as-a-Service: banco PostgreSQL, autenticação, realtime e storage |
-| PostgreSQL | 17 | Banco relacional com extensões pgcrypto e pg_trgm |
-| Supabase Auth | - | Autenticação por email/senha com Custom Access Token Hook |
-| Supabase Realtime | - | Subscrições PostgreSQL via logical replication |
-| Supabase Edge Functions | - | Funções serverless em Deno para operações administrativas |
-| Deno | - | Runtime das Edge Functions |
+| Tecnologia                                | Versão                                   | Uso                                                                   |
+| ----------------------------------------- | ---------------------------------------- | --------------------------------------------------------------------- |
+| Node.js                                   | 24 no container (20.19+ ou 22.12+ local) | Runtime da API e das ferramentas                                      |
+| Fastify                                   | ^5.12.4                                  | Framework HTTP com validação Zod no limite e suporte a streaming/SSE  |
+| Prisma                                    | 7.10.0                                   | ORM e migrações SQL versionadas                                       |
+| PostgreSQL                                | 17                                       | Banco relacional com extensões pgcrypto e pg_trgm                     |
+| Zod                                       | ^4.6.4                                   | Schemas de validação compartilhados (`@buscapp/contratos`)            |
+| @fastify/cookie, cors, multipart e static | ^11.x / ^10.x                            | Sessão em cookie, CORS com credenciais, upload e SPA na mesma origem  |
+| Armazenamento                             | disco (padrão) ou S3                     | Drivers próprios de anexos, com MinIO/R2/AWS via `@aws-sdk/client-s3` |
+| Server-Sent Events                        | nativo                                   | Tempo real em `/api/eventos`, sem WebSocket                           |
+| scrypt / bcryptjs                         | node:crypto / ^3.0.3                     | Hash de senhas próprio e verificação de hashes legados                |
+| Docker Compose                            | -                                        | Sobe a aplicação e o PostgreSQL 17 com migrações no start             |
+| npm workspaces                            | -                                        | Monorepo com `apps/web`, `apps/api` e `packages/contratos`            |
 
 ### Qualidade e DevOps
 
-| Tecnologia | Versão | Uso |
-|------------|--------|-----|
-| Playwright | ^1.61.1 | Testes E2E multiplataforma (Chromium, Firefox, WebKit, Mobile Chrome, Mobile Safari) |
-| oxlint | ~1.60.0 | Linter de alta performance escrito em Rust |
-| ESLint | ^10.2.1 | Linter com configuração flat para Vue + TypeScript |
-| Prettier | 3.8.3 | Formatador de código |
-| GitHub Actions | - | Integração contínua: CodeQL, deploy de funções, reset de banco |
-| Dependabot | - | Atualização automática de dependências do devcontainer |
-| Vercel | - | Deploy contínuo com rewrites de SPA |
-| GitHub Codespaces / Dev Containers | - | Ambiente de desenvolvimento em nuvem e containerizado |
+| Tecnologia                         | Versão  | Uso                                                                                  |
+| ---------------------------------- | ------- | ------------------------------------------------------------------------------------ |
+| Vitest                             | ^5.0.0  | Testes de integração da API contra o PostgreSQL do Compose                           |
+| Playwright                         | ^1.61.1 | Testes E2E multiplataforma (Chromium, Firefox, WebKit, Mobile Chrome, Mobile Safari) |
+| oxlint                             | ~1.60.0 | Linter de alta performance escrito em Rust                                           |
+| ESLint                             | ^10.2.1 | Linter com configuração flat para Vue + TypeScript                                   |
+| Prettier                           | 3.8.3   | Formatador de código                                                                 |
+| GitHub Actions                     | -       | CI: qualidade, testes, migrações, publicação no GHCR e CodeQL                        |
+| Dependabot                         | -       | Atualização automática de dependências do devcontainer                               |
+| Vercel                             | -       | Deploy contínuo da SPA                                                               |
+| GitHub Codespaces / Dev Containers | -       | Ambiente de desenvolvimento em nuvem e containerizado                                |
 
 ## Arquitetura
+
+O sistema é um monorepo com três workspaces npm. A SPA e a API compartilham os contratos Zod em `packages/contratos`, e a topologia padrão é de mesma origem: em produção a API Fastify serve o `dist/` da SPA, o que mantém o cookie de sessão first-party. Quando o frontend é hospedado em outro host, basta definir `VITE_API_URL` e liberar a origem em `APP_ORIGINS`.
 
 ### Estrutura de Diretórios
 
 ```
 buscapp/
-├── src/
-│   ├── App.vue                          # Componente raiz
-│   ├── main.ts                          # Ponto de entrada (fontes, Bootstrap, ícones, CSS customizado)
-│   ├── assets/
-│   │   └── cores.css                    # Variáveis CSS (primária verde #008241, fontes Geist)
-│   ├── componentes/                     # Componentes reutilizáveis
-│   │   ├── CabecalhoNavegacao.vue       # Cabeçalho de navegação com 6 variantes
-│   │   ├── CampoFormulario.vue          # Campo de formulário com label, erro e dica
-│   │   ├── Combobox.vue                 # Combobox pesquisável com debounce e aria
-│   │   ├── CartaoAlertaResponsavel.vue  # Cartão de alerta para o responsável
-│   │   ├── CartaoAlunoFrequencia.vue    # Cartão de aluno para registro de frequência
-│   │   ├── CartaoAlunoRisco.vue         # Cartão de aluno no ranking de risco (com botão de chat)
-│   │   ├── CartaoNavegacao.vue          # Cartão de navegação para módulos
-│   │   ├── CartaoSelecao.vue            # Cartão selecionável (altura uniforme, hover legível)
-│   │   ├── ChatContatos.vue             # Sidebar de contatos do chat
-│   │   ├── ChatHorarioProtegido.vue     # Componente de chat com controle de horário
-│   │   ├── ChatPainelDuplo.vue          # Layout de chat com sidebar e painel de mensagens
-│   │   ├── FilaJustificativas.vue       # Fila de justificativas para validação com exibição de anexos
-│   │   ├── FormularioJustificativa.vue  # Formulário de justificativa com múltiplos dias e anexo por seleção ou arraste
-│   │   ├── GrupoCheckbox.vue            # Grupo de checkboxes reutilizável
-│   │   ├── IndicadorConexao.vue         # Indicador de status da conexão (verde/amarelo/vermelho)
-│   │   ├── ListaOcorrencias.vue         # Lista de ocorrências graves
-│   │   ├── ModalConfirmacao.vue         # Modal genérico de confirmação
-│   │   ├── NotificacoesPopover.vue      # Popover de notificações (sino)
-│   │   ├── SeletorIcone.vue             # Seletor visual de ícones Bootstrap com busca e categorias
-│   │   ├── TelaCarregamento.vue         # Overlay global com título dinâmico
-│   │   ├── TermometroRisco.vue          # Termômetro visual de risco
-│   │   └── VisualizadorAnexo.vue        # Modal de anexos (imagem/PDF) via blob, sem tokens na URL
-│   ├── composables/                     # Lógica de apresentação reutilizável
-│   │   ├── useAlturaUniformeCards.ts    # Mede e uniformiza a altura de cartões de seleção (CSS var)
-│   │   ├── useAnoLetivo.ts              # Busca padronizada do ano letivo ativo (status + flag)
-│   │   ├── useDebounce.ts               # Debounce para busca em combobox
-│   │   ├── useFormSnapshot.ts           # Snapshot JSON para detecção de alterações
-│   │   ├── useNavegacao.ts              # Estado isNavigating/destinoTitulo para overlay
-│   │   ├── useAutenticacao.ts           # Login, logout, sessão e redefinição de senha por código
-│   │   ├── useGestaoUsuarios.ts         # CRUD de usuários, alunos, turmas, disciplinas, atribuições, códigos
-│   │   ├── useMonitoramento.ts          # Frequência, comportamento, ocorrências, ranking, risco, termômetro, chat. Limites e horários lidos do banco com cache em memória
-│   │   ├── useNotificacoes.ts           # Notificações por papel com deep-link ?aluno/?conversa e roteamento sem 403
-│   │   ├── useOpcoesConfiguracao.ts     # Busca em cache de opções configuráveis por tipo
-│   │   ├── useRealtimeRefresh.ts        # Canal de conexão Realtime e auto-refresh
-│   │   ├── useStatusConexao.ts          # Health check periódico no Supabase Auth
-│   │   └── useStatusConta.ts            # Estado da conta do usuário autenticado
-│   ├── layouts/
-│   │   └── LayoutPrincipal.vue          # Layout padrão após autenticação (navbar, dropdown, sino, footer)
-│   ├── paginas/
-│   │   ├── auth/                        # Páginas de autenticação
-│   │   │   ├── LoginView.vue
-│   │   │   ├── RedefinirSenhaCodigoView.vue
-│   │   │   └── SolicitarCodigoView.vue
-│   │   ├── professor/                   # Páginas do professor
-│   │   │   ├── HomeView.vue
-│   │   │   ├── FrequenciaView.vue
-│   │   │   ├── AusenciaView.vue
-│   │   │   └── OcorrenciaView.vue
-│   │   ├── gestao/                      # Páginas da gestão
-│   │   │   ├── GestaoHomeView.vue
-│   │   │   ├── GestaoRankingView.vue
-│   │   │   ├── GestaoOcorrenciasView.vue                # Central com lista em tempo real e registro de ocorrências
-│   │   │   ├── GestaoInfrequenciasView.vue              # Chamada por turma e registro individual de faltas
-│   │   │   ├── GestaoJustificativasView.vue
-│   │   │   ├── UsuariosView.vue
-│   │   │   ├── UsuarioFormView.vue
-│   │   │   ├── AlunosView.vue
-│   │   │   ├── AlunoFormView.vue
-│   │   │   ├── CodigosView.vue
-│   │   │   ├── TurmasView.vue
-│   │   │   ├── AnosLetivosView.vue                      # Gestão de anos letivos e virada de ano
-│   │   │   ├── DisciplinasView.vue
-│   │   │   ├── AtribuicoesView.vue
-│   │   │   ├── GestaoChatView.vue                       # Chat da gestão com responsáveis
-│   │   │   ├── GestaoConfiguracaoView.vue               # Hub central com cartões de navegação
-│   │   │   ├── GestaoConfiguracaoOpcoesView.vue         # CRUD genérico com arrastar e soltar
-│   │   │   ├── GestaoConfiguracaoTagsView.vue           # Gerenciamento de tags de comportamento
-│   │   │   ├── GestaoConfiguracaoSistemaView.vue        # Parâmetros globais do sistema
-│   │   │   └── GestaoConfiguracaoHorariosView.vue       # Janelas de atendimento do chat
-│   │   ├── responsavel/                 # Páginas do responsável
-│   │   │   ├── HomeView.vue
-│   │   │   ├── AlertasView.vue
-│   │   │   ├── TermometroView.vue
-│   │   │   ├── JustificativaView.vue
-│   │   │   └── ChatView.vue
-│   │   └── error/                       # Páginas de erro e estado de conta
-│   │       ├── ErrorView.vue
-│   │       ├── Status403View.vue
-│   │       ├── Status404View.vue
-│   │       ├── Status500View.vue
-│   │       └── StatusContaDesativadaView.vue
-│   ├── rotas/
-│   │   └── index.ts                     # Vue Router com guardas RBAC e módulos de acesso
-│   ├── servicos/
-│   │   ├── supabase.ts                  # Cliente Supabase, decodificação JWT, extração de claims
-│   │   ├── termometro.ts                # Cálculo puro do score/nivel/fatores do termômetro (pesos e recência)
-│   │   └── armazenamentoAdaptavel.ts    # Storage adaptativo (localStorage/sessionStorage)
-│   ├── tipos/
-│   │   ├── database.ts                  # Tipos do schema do banco de dados
-│   │   ├── componentes.ts               # Tipos de props dos componentes
-│   │   ├── bootstrap.d.ts               # Declarações de tipos do Bootstrap JS
-│   │   └── index.ts                     # Reexportações
-│   └── utils/
-│       ├── chatUtils.ts                 # Utilitários do chat (cor do avatar, horário protegido)
-│       ├── comprimirImagem.ts           # Compressão de imagens via Canvas API (1600px, JPEG q0.6)
-│       ├── mensagemExplicita.ts         # Mensagens de sucesso/erro com horário e contexto
-│       ├── opcoesConfiguracao.ts        # Regras por tipo de opção de configuração (label, placeholder, validação)
-│       └── traduzirErro.ts              # Tradução de erros do Supabase Auth para português
-├── supabase/
-│   ├── config.toml                      # Configuração local do Supabase (portas, auth, storage, edge)
-│   ├── seed.sql                         # Dados de teste de desenvolvimento (7 usuários, 3 turmas, 9 alunos, frequências e ocorrências de exemplo)
-│   ├── migrations/
-│   │   └── 0001_schema_completo.sql     # Migration única: schema completo + dados canônicos (squash das migrations antigas)
-│   ├── functions/                       # Edge Functions (Deno)
-│   │   ├── solicitar-codigo/            # Notifica a gestão sobre solicitação de código
-│   │   ├── redefinir-senha-codigo/      # Valida o código e atualiza a senha
-│   │   ├── criar-usuario/               # Cria usuário com senha temporária e código automático
-│   │   ├── processar-anexo/             # Otimiza anexos de justificativas (ImageMagick WASM + pdf-lib)
-│   │   ├── limpar-anexos/               # Expurga anexos expirados e objetos de storage órfãos
-│   │   └── limpar-codigos/              # Remove códigos de redefinição fora da janela de retenção
-│   ├── templates/                       # Templates de email
-│   │   └── senha_alterada_notificacao.html
-│   └── tests/
-│       ├── 0001_validacao_completa.sql  # Testes PL/pgSQL transacionais do schema completo
-│       └── 0002_anos_letivos.sql        # Testes da virada de ano letivo (RPC, RLS por papel, auditoria)
-├── scripts/
-│   ├── gerar-icones.sh                  # Gera ícones PWA a partir da imagem fonte
-│   ├── seed-users.sh                    # Cria usuários de teste via Auth Admin API
-│   ├── test-api.sh                      # Testes de API com bash/curl
-│   └── test-db.sh                       # Executa testes SQL no container Docker do Supabase
+├── apps/
+│   ├── web/                             # SPA Vue 3 + TypeScript + Vite
+│   │   ├── public/                      # favicon e ícones do PWA
+│   │   ├── src/
+│   │   │   ├── assets/cores.css         # Variáveis CSS (primária verde #008241, fontes Geist)
+│   │   │   ├── componentes/             # 22 componentes reutilizáveis
+│   │   │   ├── composables/             # 13 composables (autenticação, monitoramento, SSE, notificações)
+│   │   │   ├── layouts/LayoutPrincipal.vue
+│   │   │   ├── paginas/                 # auth, professor, gestao, responsavel e error
+│   │   │   ├── rotas/index.ts           # Vue Router com guardas de papel e de módulo
+│   │   │   ├── servicos/                # cliente da API, EventSource e cálculo do termômetro
+│   │   │   ├── tipos/                   # tipos de banco, componentes e Bootstrap
+│   │   │   ├── utils/                   # compressão de imagem, chat, erros e opções
+│   │   │   ├── App.vue
+│   │   │   └── main.ts                  # Fontes, Bootstrap, PWA e montagem
+│   │   └── vite.config.ts               # Vue, PWA e envDir apontando para a raiz
+│   └── api/                             # API Fastify 5 + Prisma
+│       ├── prisma/
+│       │   ├── schema.prisma            # Contrato das tabelas e enums
+│       │   ├── migrations/              # baseline, autenticação, dados canônicos e rotinas
+│       │   └── seeds/dev.ts             # Usuários e fixtures de desenvolvimento
+│       └── src/
+│           ├── ambiente.ts              # Validação fail-fast das variáveis de ambiente
+│           ├── app.ts                   # Fábrica Fastify (testável com inject)
+│           ├── principal.ts             # Bootstrap do servidor
+│           ├── modulos/                 # auth, usuarios, alunos, anexos, codigos, vinculos,
+│           │                            # estrutura, frequencias, ocorrencias, justificativas,
+│           │                            # chat, notificacoes, configuracoes, monitoramento
+│           │                            # (cada domínio em .rotas → .servico → .repositorio)
+│           └── nucleo/
+│               ├── autenticacao/        # scrypt, sessões opacas, códigos HMAC e middleware
+│               ├── autorizacao/         # escopo de alunos visíveis por papel
+│               ├── armazenamento/       # drivers disco e S3
+│               ├── banco/               # PrismaClient com adapter-pg
+│               ├── eventos/             # barramento e roteamento SSE
+│               └── http/                # envelope de erros, saúde e eventos
+├── packages/
+│   └── contratos/                       # Schemas Zod e tipos compartilhados entre web e API
+├── infra/docker/
+│   ├── Dockerfile                       # Build multi-stage em Node 24
+│   └── entrypoint.sh                    # Aguarda o banco, aplica migrações e inicia a API
 ├── tests/
-│   ├── suporte/                         # Helpers compartilhados (dados, api, sessao, fixtures)
-│   │   ├── dados.ts
-│   │   ├── api.ts
-│   │   ├── sessao.ts
-│   │   └── fixtures.ts
-│   ├── autenticacao.spec.ts             # Auth e recuperação de senha
-│   ├── gestao-navegacao.spec.ts         # Home da gestão
-│   ├── gestao-usuarios.spec.ts          # Usuários, códigos no cadastro e módulos
-│   ├── gestao-alunos.spec.ts            # Alunos e documentos
-│   ├── gestao-codigos.spec.ts           # Códigos (workflow completo, dedup, bloqueio, copiar)
-│   ├── gestao-catalogo.spec.ts          # Catálogos e integridade
-│   ├── gestao-estrutura.spec.ts         # Turmas, disciplinas, atribuições e anos letivos
-│   ├── gestao-formularios-navegacao.spec.ts # Formulários com estado limpo e navegação
-│   ├── combobox.spec.ts                 # Combobox pesquisável com debounce e aria
-│   ├── professor.spec.ts                # Professor (frequência, ausência, ocorrências, gating)
-│   ├── ranking-ocorrencias.spec.ts      # Ranking e registro de infrequências
-│   ├── anexos.spec.ts                   # Visualizador blob
-│   ├── chat.spec.ts                     # Chat responsável/gestão + notificações
-│   ├── chat-coordenacao.spec.ts         # Chat iniciado pela coordenação via ranking
-│   ├── tempo-real.spec.ts               # Realtime sem reload
-│   ├── responsavel-justificativa.spec.ts # Anexo por arrastar e soltar
-│   ├── termometro.spec.ts               # Termômetro (barra segmentada, limiares, justificativa, pesos) — CT-T1..T5
-│   ├── notificacoes.spec.ts             # Notificações por papel sem 403 com deep-link
-│   └── pwa.spec.ts                      # Testes do build PWA (config dedicada, roda contra preview)
-├── .github/workflows/
-│   ├── codeql.yml                       # Análise de segurança CodeQL
-│   ├── deploy-functions.yml             # Deploy das Edge Functions para o projeto vinculado
-│   ├── reset-database.yml               # Reset manual do banco de produção (destrutivo)
-│   └── dependabot.yml                   # Atualizações automáticas do devcontainer
-├── .devcontainer/                       # Configuração do ambiente de desenvolvimento
-├── .env.example                         # Template de variáveis de ambiente
-├── vite.config.ts                       # Configuração do Vite (plugin Vue, alias @, plugin PWA)
-├── playwright.config.ts                 # Configuração do Playwright (5 projetos)
+│   ├── e2e/                             # 19 arquivos de especificação Playwright
+│   └── suporte/                         # Helpers de API, banco, sessão, fixtures e senhas
+├── scripts/
+│   ├── gerar-icones.sh                  # Gera os ícones do PWA
+│   └── test-db.sh                       # Smoke test do schema no PostgreSQL do Compose
+├── .github/workflows/                   # qualidade, testes, migracoes, publicacao e codeql
+├── .devcontainer/                       # Ambiente de desenvolvimento
+├── compose.yaml                         # app + PostgreSQL 17
+├── playwright.config.ts                 # E2E com API e web iniciados automaticamente
 ├── playwright.pwa.config.ts             # Configuração dedicada aos testes de PWA
-├── vercel.json                          # Rewrites SPA para deploy no Vercel
-├── tsconfig.json                        # Referências para tsconfig.app.json e tsconfig.node.json
-├── eslint.config.ts                     # Configuração flat do ESLint com Vue + TypeScript + oxlint
-├── .oxlintrc.json                       # Regras do oxlint (correctness, plugins)
-└── .prettierrc.json                     # Configuração do Prettier (semi, singleQuote, printWidth 100)
+├── .env.example                         # Template de variáveis de ambiente
+├── tsconfig.base.json                   # Opções TypeScript compartilhadas
+└── package.json                         # Workspaces npm e scripts da raiz
 ```
 
 ### Fluxo de Dados
@@ -347,246 +247,214 @@ buscapp/
 ```
 Navegador (SPA Vue 3 + TypeScript + Vite)
        |
-       | Vue Router (createWebHistory)
-       | Guardas RBAC via JWT claims (nome, papel)
+       |  fetch para a mesma origem com cookies HttpOnly (credentials: include)
+       |  Vue Router com guardas de papel e de módulo
        |
        +--> Componentes Vue 3 (Composition API, <script setup>)
        |       |
-       |       +--> Composables (useAutenticacao, useMonitoramento, useGestaoUsuarios, ...)
+       |       +--> Composables (useAutenticacao, useMonitoramento, useNotificacoes, ...)
        |       |
-       |       +--> @supabase/supabase-js
-       |               |
-       |               +--> Supabase Auth
-       |               |       +--> POST /auth/v1/token?grant_type=password (login)
-       |               |       +--> Custom Access Token Hook (injeta nome + papel no JWT)
-       |               |       +--> Admin API (criação/atualização de usuários)
-       |               |
-       |               +--> Supabase Data API (PostgREST)
-       |               |       +--> REST /rest/v1/* (CRUD com RLS)
-       |               |       +--> RPC /rest/v1/rpc/* (funções customizadas)
-       |               |
-       |               +--> Supabase Realtime
-       |               |       +--> postgres_changes (notificações, telas operacionais)
-       |               |
-       |               +--> Supabase Edge Functions
-       |                       +--> /functions/v1/solicitar-codigo
-       |                       +--> /functions/v1/redefinir-senha-codigo
-       |                       +--> /functions/v1/criar-usuario
-       |                       +--> /functions/v1/processar-anexo
-       |                       +--> /functions/v1/limpar-anexos
-       |                       +--> /functions/v1/limpar-codigos
+       |       +--> servicos/api.ts  --->  API Fastify 5 (apps/api)
+       |       +--> servicos/eventos.ts -> EventSource /api/eventos (SSE)
        |
        v
-PostgreSQL 17 (gerenciado pelo Supabase)
-       +--> auth schema (GoTrue: usuários, sessões)
-       +--> public schema (30 tabelas, 5 views, 14 enums, 40+ índices)
-       +--> RLS: políticas por linha para cada papel
+API Fastify 5 (mesma origem em produção; CORS com credenciais quando separada)
+       |
+       +--> Autenticação: sessão opaca no cookie, scrypt, códigos HMAC
+       +--> Autorização: papel + acesso_modulos + escopo de alunos visíveis
+       +--> Módulos (.rotas → .servico → .repositorio)
+       +--> SSE /api/eventos: invalidação por tabela e escopo, com heartbeat
+       +--> Armazenamento: driver disco (UPLOAD_DIR) ou S3 (MinIO/R2/AWS)
+       |
+       |  Prisma 7.10 com @prisma/adapter-pg
+       v
+PostgreSQL 17
+       +--> 31 tabelas, 14 enums, índices parciais e unicidade
+       +--> Triggers de domínio, CHECKs de integridade e funções de validação
        +--> Extensões: pgcrypto, pg_trgm
-       +--> Realtime: publicação de tabelas via logical replication
 ```
 
-### Funcionamento do JWT com Custom Claims
+## Autenticação e Segurança
 
-1. O usuário faz login via Supabase Auth.
-2. O Supabase Auth dispara o Custom Access Token Hook (função PL/pgSQL `custom_access_token_hook`).
-3. O hook consulta a view `v_perfil_com_credenciais` para obter nome e papel do usuário.
-4. O hook injeta `{"nome": "...", "papel": "..."}` no JWT como claims customizados.
-5. O frontend decodifica o JWT utilizando `jwt-decode`, sem requisição extra ao servidor.
-6. O Vue Router utiliza as claims para aplicar as guardas RBAC.
-7. Toda requisição ao banco inclui o JWT no header `Authorization` e as políticas RLS utilizam `auth.jwt()` para determinar o acesso.
+- **Login sem cadastro público**: usuários são criados pela gestão em `POST /api/usuarios`. O login equaliza o tempo de resposta com um hash falso quando o email não existe e devolve mensagem genérica; perfis inativos respondem 403.
+- **Sessão opaca**: o token é gerado com CSPRNG, trafega somente no cookie `HttpOnly` (`SESSAO_COOKIE`) e o banco guarda apenas o hash SHA-256. A validade é de 12 horas ou 30 dias com "lembrar-me". Logout e inativação revogam a sessão imediatamente.
+- **Redefinição por código**: o usuário solicita e a gestão gera um código de 6 dígitos (CSPRNG) com HMAC-SHA256 sobre `email:código` usando `AUTH_PEPPER`; o código expira em 1 hora, pode ser revogado e o excesso de tentativas bloqueia temporariamente o email. A solicitação notifica a gestão sem revelar se o email existe; a redefinição revoga todas as sessões e ativa perfis pendentes.
+- **RBAC e módulos**: `exigirPapel` valida o papel e `exigirModulo` aplica `acesso_modulos` com semântica fail-closed (lista vazia nega). As guardas de rota do Vue Router espelham a mesma regra no cliente.
+- **Escopo de dados**: gestão acessa todos os alunos; professor acessa os alunos das turmas em que leciona; responsável acessa apenas os alunos vinculados. Recurso fora do escopo de leitura responde 404, para não revelar a existência do registro.
+- **Auditoria**: operações administrativas (geração e revogação de códigos, virada de ano letivo, alterações de alunos) são registradas na tabela `auditoria`.
+- **Anexos**: validação de tipo e tamanho no upload (JPG, PNG, WEBP ou PDF; até 10 MB), autorização por criador ou aluno visível e download autenticado. Nenhum token ou caminho de arquivo é exposto na URL.
+- **Erros padronizados**: todas as respostas de erro usam o envelope `{ erro: { codigo, mensagem } }`, em português.
+- **Defesa em profundidade**: além do escopo na camada de serviços, o banco aplica Row-Level Security com o papel restrito `buscapp_api` e `app.usuario_id` definido por transação; tentativas fora do escopo são barradas mesmo se uma consulta esquecer o filtro.
+
+## API
+
+A API segue o padrão `.rotas → .servico → .repositorio` em cada módulo, com validação Zod no limite e autorização por papel, módulo e escopo. Todos os grupos usam cookie de sessão.
+
+| Grupo          | Rotas principais                                                                                             | Finalidade                                                                          |
+| -------------- | ------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------- |
+| auth           | `/api/auth/login`, `/logout`, `/me`, `/solicitar-codigo`, `/redefinir-senha`                                 | Sessão, perfil autenticado e redefinição de senha por código.                       |
+| usuarios       | `/api/usuarios`, `/api/usuarios/:id/status`                                                                  | CRUD de usuários, módulos de acesso e ativação/inativação.                          |
+| alunos         | `/api/alunos`                                                                                                | Cadastro e manutenção de alunos pseudonimizados.                                    |
+| estrutura      | `/api/turmas`, `/api/disciplinas`, `/api/atribuicoes`, `/api/anos-letivos` (+ `/ativar`), `/api/enturmacoes` | Turmas, disciplinas, atribuições professor-turma, anos letivos e enturmações.       |
+| vinculos       | `/api/vinculos`                                                                                              | Vínculo N:N entre responsáveis e alunos.                                            |
+| frequencias    | `/api/frequencias`, `/api/frequencias/lote`, `/api/frequencias/resumo`                                       | Registro por exceção, ausências por período e resumos de frequência.                |
+| ocorrencias    | `/api/ocorrencias`, `/api/registros-comportamento`, `/api/tags-comportamento`                                | Ocorrências graves/suspensões, registros de comportamento e tags.                   |
+| justificativas | `/api/justificativas`                                                                                        | Envio, listagem e validação de justificativas (com auto-justificativa por trigger). |
+| anexos         | `/api/anexos`, `/api/anexos/:id/arquivo`                                                                     | Upload validado, metadados e download autenticado de anexos.                        |
+| chat           | `/api/conversas`, `/api/conversas/:id/mensagens`, `/api/conversas/:id/lidas`                                 | Conversas e mensagens com horário protegido.                                        |
+| notificacoes   | `/api/notificacoes`, `/lidas`, `/:id/lida`, `/conversa/:id/lidas`                                            | Fila de notificações in-app por destinatário.                                       |
+| configuracoes  | `/api/configuracoes`, `/api/opcoes` (+ `/reordenar`), `/api/horarios`                                        | Parâmetros do sistema, catálogos genéricos e janelas de atendimento.                |
+| codigos        | `/api/codigos`, `/:id/revogar`, `/limpar`, `/perfil/:perfilId`                                               | Códigos de redefinição e primeiro acesso, com revogação e limpeza.                  |
+| monitoramento  | agregações de frequências, ocorrências e configurações                                                       | Ranking de risco e termômetro de atenção consumidos pela gestão e pelo responsável. |
+| eventos        | `GET /api/eventos`                                                                                           | Stream SSE de invalidação em tempo real.                                            |
+| saúde          | `GET /api/saude`                                                                                             | Disponibilidade da API, usada pelo indicador de conexão.                            |
 
 ## Banco de Dados
 
-O banco é gerenciado pelo Supabase (PostgreSQL 17) com 30 tabelas, 5 views analíticas, 14 enums e mais de 40 índices. Todas as tabelas possuem Row-Level Security habilitado, com políticas específicas para cada papel (professor, gestão, responsável).
+O banco é um PostgreSQL 17 versionado por quatro migrações Prisma (`baseline`, `autenticacao`, `dados_canonicos` e `rotinas_dominio`), com 31 tabelas de domínio, 14 enums, mais de 40 CHECKs e 29 triggers. As migrações mantêm em SQL os objetos que o Prisma não representa (triggers, CHECKs, funções de validação e índices parciais), e o seed `apps/api/prisma/seeds/dev.ts` cria usuários e fixtures de desenvolvimento.
+
+**Objetos e integridade**
+
+- **Triggers de domínio**: `fn_auto_justificar_frequencias` (marca as frequências como justificadas quando uma justificativa é aceita), `fn_notificar_nova_mensagem`, `fn_notificar_ocorrencia`, `fn_set_turma_nome` e `fn_set_updated_at`.
+- **CHECKs de integridade**: chaves de `opcoes_configuracao` e nomes de `tags_comportamento` validados por funções `SECURITY DEFINER`, limites de score e pesos, ordem de datas, anexos de até 10 MB, mensagens não vazias, série/letra de turma e capacidade, entre outros.
+- **Índices**: parciais e compostos para consultas ativas, incluindo a unicidade de frequência (`idx_frequencias_unicidade`) e a idempotência por `client_request_id`.
+- **Views e agregações**: as views analíticas do projeto original não foram portadas para as migrações; ranking de risco, termômetro e feed do aluno são calculados na aplicação a partir das tabelas base e dos parâmetros de `configuracoes_sistema`.
+- **Soft delete**: frequências preservam histórico com `deleted_at`; registros administrativos não são apagados fisicamente.
 
 ### Principais Tabelas
 
 **Entidades**
 
-| Tabela | Descrição |
-|--------|-----------|
-| `perfis` | Perfis de usuário (1:1 com `auth.users`). Status: ativo, pendente, inativo. Papéis: professor, gestão, responsável. |
-| `alunos` | Alunos com dados pseudonimizados (sem CPF ou endereço). |
-| `turmas` | Turmas escolares. Série + letra do catálogo. |
-| `anos_letivos` | Anos letivos. Status: planejado, ativo, arquivado. |
-| `enturmacoes` | Vínculo aluno-turma temporal (único por aluno por ano). |
-| `disciplinas` | Disciplinas com código SIGE para integração com a SEDUC. |
+| Tabela         | Descrição                                                                                                                                                |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `perfis`       | Perfis de usuário com credenciais (`senha_hash` scrypt), módulos de acesso e status: ativo, pendente ou inativo. Papéis: professor, gestão, responsável. |
+| `alunos`       | Alunos com dados pseudonimizados (sem CPF ou endereço).                                                                                                  |
+| `turmas`       | Turmas escolares. Série + letra do catálogo.                                                                                                             |
+| `anos_letivos` | Anos letivos. Status: planejado, ativo, arquivado.                                                                                                       |
+| `enturmacoes`  | Vínculo aluno-turma temporal (único por aluno por ano).                                                                                                  |
+| `disciplinas`  | Disciplinas com código SIGE para integração com a SEDUC.                                                                                                 |
+
+**Autenticação**
+
+| Tabela                           | Descrição                                                                                                                         |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `sessoes`                        | Sessões opacas: hash SHA-256 do token, expiração, revogação, último uso, user agent e IP.                                         |
+| `codigos_redefinicao`            | Códigos de 6 dígitos para redefinição de senha e primeiro acesso, armazenados apenas como HMAC (expiração em 1 hora, revogáveis). |
+| `codigos_redefinicao_tentativas` | Proteção contra força bruta: tentativas erradas por email e bloqueio temporário.                                                  |
 
 **Relacionamentos**
 
-| Tabela | Descrição |
-|--------|-----------|
-| `vinculos_responsaveis` | Relação responsável-aluno N:N com tipo de vínculo do catálogo. |
+| Tabela                    | Descrição                                                                       |
+| ------------------------- | ------------------------------------------------------------------------------- |
+| `vinculos_responsaveis`   | Relação responsável-aluno N:N com tipo de vínculo do catálogo.                  |
 | `atribuicoes_professores` | Atribuição professor-turma-disciplina temporal. Suporte a titular e substituto. |
 
 **Operacionais**
 
-| Tabela | Descrição |
-|--------|-----------|
-| `frequencias` | Registro unificado de frequência (portão, chamada, saída). Soft delete via `deleted_at`. Idempotência via `client_request_id`. |
-| `registros_comportamento` | Registros de comportamento com vínculo N:N a tags. |
-| `ocorrencias` | Ocorrências graves e suspensões. Workflow de status, opção `exige_presenca_responsavel` e flags de notificação. |
-| `justificativas_faltas` | Justificativas de falta. Status: pendente, aceita, recusada. Suporte a múltiplos dias via `data_fim`. Auto-justify de frequências via trigger `fn_auto_justificar_frequencias`. |
-| `monitoramento_acoes` | Log de ações de monitoramento. |
-| `notificacoes` | Fila de notificações in-app por destinatário. |
+| Tabela                    | Descrição                                                                                                                                                                             |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `frequencias`             | Registro unificado de frequência (portão, chamada, saída). Soft delete via `deleted_at`. Idempotência via `client_request_id`.                                                        |
+| `registros_comportamento` | Registros de comportamento com vínculo N:N a tags.                                                                                                                                    |
+| `ocorrencias`             | Ocorrências graves e suspensões. Workflow de status, opção `exige_presenca_responsavel` e flags de notificação.                                                                       |
+| `justificativas_faltas`   | Justificativas de falta. Status: pendente, aceita, recusada. Suporte a múltiplos dias via `data_fim`. Auto-justificativa de frequências via trigger `fn_auto_justificar_frequencias`. |
+| `monitoramento_acoes`     | Log de ações de monitoramento.                                                                                                                                                        |
+| `notificacoes`            | Fila de notificações in-app por destinatário.                                                                                                                                         |
 
 **Chat**
 
-| Tabela | Descrição |
-|--------|-----------|
-| `conversas` | Conversas (única por par responsável-aluno). |
+| Tabela      | Descrição                                                                                      |
+| ----------- | ---------------------------------------------------------------------------------------------- |
+| `conversas` | Conversas (única por par responsável-aluno).                                                   |
 | `mensagens` | Mensagens com proteção contra excesso de envio fora do horário letivo e chave de idempotência. |
 
 **Apoio**
 
-| Tabela | Descrição |
-|--------|-----------|
-| `tags_comportamento` | Catálogo de tags de comportamento com peso para gamificação. |
-| `pontuacao_turmas` | Pontuação mensal de turmas. Coluna gerada para o total. |
-| `anexos` | Metadados de anexos (limite de 10 MB, expiração de 30 dias, coluna `processado_em` para rastrear a otimização serverless). Expurgo via Edge Function `limpar-anexos`. |
-| `ocorrencia_anexos` | Join N:N ocorrência-anexo. |
-| `justificativa_anexos` | Join N:N justificativa-anexo. |
-| `codigos_redefinicao` | Códigos de 6 dígitos para redefinição de senha (expiração em 1 hora, revogáveis). |
-| `codigos_redefinicao_tentativas` | Proteção contra força bruta: tentativas erradas por email e bloqueio temporário. Escrita apenas via funções `SECURITY DEFINER`; leitura pela gestão. |
-| `horarios_letivos` | Janelas de atendimento do chat por dia da semana e horário. |
+| Tabela                 | Descrição                                                                              |
+| ---------------------- | -------------------------------------------------------------------------------------- |
+| `tags_comportamento`   | Catálogo de tags de comportamento com peso para gamificação.                           |
+| `pontuacao_turmas`     | Pontuação mensal de turmas. Coluna gerada para o total.                                |
+| `anexos`               | Metadados de anexos (limite de 10 MB, expiração e caminho no driver de armazenamento). |
+| `ocorrencia_anexos`    | Join N:N ocorrência-anexo.                                                             |
+| `justificativa_anexos` | Join N:N justificativa-anexo.                                                          |
+| `horarios_letivos`     | Janelas de atendimento do chat por dia da semana e horário.                            |
 
 **Administrativas e Auditoria**
 
-| Tabela | Descrição |
-|--------|-----------|
-| `importacoes_log` | Auditoria de importação de planilhas SIGE. |
-| `exportacoes` | Registro de exportação do diário de classe. |
-| `auditoria` | Trilha de auditoria geral. |
-| `convites` | Registro de convites de usuário. |
+| Tabela            | Descrição                                   |
+| ----------------- | ------------------------------------------- |
+| `importacoes_log` | Auditoria de importação de planilhas SIGE.  |
+| `exportacoes`     | Registro de exportação do diário de classe. |
+| `auditoria`       | Trilha de auditoria geral.                  |
+| `convites`        | Registro de convites de usuário.            |
 
 **Configuração**
 
-| Tabela | Descrição |
-|--------|-----------|
-| `configuracoes_sistema` | Parâmetros globais (limites de faltas, pesos e janela de recência do termômetro, limites de score médio/alto, dias de expurgo, nome da escola e parâmetros de códigos). |
-| `opcoes_configuracao` | Catálogo genérico de opções configuráveis pela gestão (módulos, documentos, períodos, motivos de ausência, tipos de ocorrência, vínculos, papéis de atribuição, séries e letras de turma). Chaves validadas por restrições `CHECK` nas tabelas que as referenciam. |
-
-### Views Analíticas
-
-Todas as views utilizam `security_invoker = true` para respeitar as políticas RLS do usuário que as consulta.
-
-| View | Descrição |
-|------|-----------|
-| `v_ranking_monitoramento` | Ranking de priorização de risco com dados de contato dos responsáveis. |
-| `v_termometro_aluno` | Termômetro de atenção por aluno com classificação por cor. |
-| `v_feed_aluno` | Linha do tempo unificada do aluno (frequência, comportamento, ocorrências). |
-| `v_gamificacao_ranking` | Ranking de gamificação entre turmas. |
-| `v_pontuacao_diaria_turmas` | Pontuação diária das turmas para gamificação. |
+| Tabela                  | Descrição                                                                                                                                                                                                                                                          |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `configuracoes_sistema` | Parâmetros globais (limites de faltas, pesos e janela de recência do termômetro, limites de score médio/alto, dias de expurgo, nome da escola e parâmetros de códigos).                                                                                            |
+| `opcoes_configuracao`   | Catálogo genérico de opções configuráveis pela gestão (módulos, documentos, períodos, motivos de ausência, tipos de ocorrência, vínculos, papéis de atribuição, séries e letras de turma). Chaves validadas por restrições `CHECK` nas tabelas que as referenciam. |
 
 ### Segurança
 
-- RLS habilitado em todas as tabelas, com políticas específicas por papel.
-- Funções auxiliares para políticas: `get_user_papel()`, `get_user_acesso_modulos()`, `is_professor_da_turma()`, `is_responsavel_do_aluno()`.
-- Módulos de acesso (`perfis.acesso_modulos`) com semântica fail-closed: as políticas de professor em `frequencias` e `ocorrencias` e as telas do responsável (alertas, termômetro, justificativa e chat) exigem o módulo correspondente; lista vazia significa nenhum acesso. Aplicação simultânea em RLS, guardas de rota e cartões da home.
-- Trigger `requisicao_exige_jwt()` no gancho `request.jwt.claim` do PostgREST para rejeitar requisições sem JWT válido.
-- Trigger de criação automática de perfil ao inserir usuário em `auth.users`.
-- Trigger `fn_auto_justificar_frequencias` que marca as frequências como `'justificado'` quando uma justificativa é aceita.
-- RLS em `storage.objects` para o bucket `justificativas`: gestão tem acesso total, responsável insere e lê apenas seus próprios anexos.
-- **Visualização de anexos sem tokens na URL**: o frontend baixa o arquivo com `storage.download()`, autenticando com o JWT da sessão no header `Authorization`, e renderiza via `URL.createObjectURL()` (blob). Não são usados signed URLs, portanto nenhum token aparece na barra de endereço ou nas requisições de rede.
-- Soft delete em `frequencias` para preservação de dados históricos.
-- Índices parciais para dados ativos (otimização de consultas frequentes).
-- **Integridade referencial do catálogo**: restrições `CHECK` validam toda escrita de chaves de `opcoes_configuracao` e nomes de `tags_comportamento` nas tabelas que as referenciam (turmas, vínculos, atribuições, frequências, perfis, alunos, ocorrências), impedindo referências órfãs. As funções de validação são `SECURITY DEFINER` para funcionar com qualquer role.
+- Autorização por papel, módulo e escopo na camada de serviços da API, com RLS como backstop no banco (papel restrito + `app.usuario_id` por requisição).
+- Módulos de acesso com semântica fail-closed: professor em `frequencias` e `ocorrencias` e responsável nas telas de alertas, termômetro, justificativa e chat exigem o módulo correspondente; lista vazia significa nenhum acesso. Aplicação simultânea na API, nas guardas de rota e nos cartões da home.
+- **Integridade referencial do catálogo**: restrições `CHECK` validam toda escrita de chaves de `opcoes_configuracao` e nomes de `tags_comportamento` nas tabelas que as referenciam (turmas, vínculos, atribuições, frequências, perfis, alunos, ocorrências), impedindo referências órfãs.
 - **Exclusão protegida na interface**: opções de catálogo e tags ainda referenciadas não podem ser excluídas (ou renomeadas, no caso de tags); a interface orienta a desativação.
 - **Exclusão de turmas com `ON DELETE RESTRICT`** em conversas e atribuições, evitando apagamento silencioso do histórico de chat.
-- **Chave `service_role` restrita ao servidor**: usada somente pelas Edge Functions e pela suíte de testes, nunca exposta ao navegador.
-- Relatório de órfãos `fn_relatorio_orfas()` para auditoria de referências pendentes.
-
-## Edge Functions
-
-Seis funções serverless em Deno, usadas para operações que exigem a chave `service_role` ou processamento pesado de mídia.
-
-| Função | Rota | Método | Autenticação | Descrição |
-|--------|------|--------|--------------|-----------|
-| `solicitar-codigo` | `/functions/v1/solicitar-codigo` | POST | Usuário autenticado | Registra a solicitação de código de redefinição e notifica a gestão, suprimindo duplicatas pendentes. |
-| `redefinir-senha-codigo` | `/functions/v1/redefinir-senha-codigo` | POST | Código como autenticação | Valida o código de 6 dígitos (existência, expiração, revogação), atualiza a senha em `auth.users` e ativa o perfil se estiver pendente. |
-| `criar-usuario` | `/functions/v1/criar-usuario` | POST | Papel gestão | Cria o usuário em `auth.users` com senha temporária, insere o perfil e gera o código de redefinição automaticamente. |
-| `processar-anexo` | `/functions/v1/processar-anexo` | POST | Usuário autenticado | Otimiza anexos de justificativas: converte imagens para JPEG (qualidade 50, máximo 2000px, via magick-wasm) e compacta metadados de PDFs (via pdf-lib). Atualiza `tamanho_bytes`, `mime_type` e `processado_em`. Chamada assíncrona a partir do frontend. |
-| `limpar-anexos` | `/functions/v1/limpar-anexos` | POST | `cron-secret` (opcional) | Job de manutenção: remove anexos expirados e não processados (`expurgo_em` vencido) com seus objetos do bucket `justificativas`, além de objetos de storage órfãos. Pode ser agendado via cron no Dashboard do Supabase. |
-| `limpar-codigos` | `/functions/v1/limpar-codigos` | POST | `cron-secret` (opcional) | Job de manutenção: remove códigos de redefinição fora da janela de retenção configurada (`dias_retencao_codigos`). |
-
-### Exemplo de Payload
-
-**redefinir-senha-codigo**
-```json
-{
-  "email": "resp1@email.com",
-  "codigo": "482913",
-  "nova_senha": "NovaSenha123!"
-}
-```
-
-**criar-usuario**
-```json
-{
-  "email": "novo@email.com",
-  "senha_temporaria": "Temp123!",
-  "nome": "Novo Usuario",
-  "papel": "professor"
-}
-```
+- Soft delete em `frequencias` para preservação de dados históricos e índices parciais para dados ativos.
+- Hashes de senha bcrypt legados são verificados uma única vez e regravados em scrypt no login, permitindo a migração transparente das bases antigas.
 
 ## Tempo Real
 
-Toda a atualização automática da aplicação usa canais `postgres_changes` do Supabase Realtime sobre a publicação `supabase_realtime`, com entrega filtrada pelas políticas RLS de quem assina.
+A atualização automática usa o stream autenticado `GET /api/eventos` (Server-Sent Events). Cada evento `invalidar` carrega `{ tabela, escopo }`, e o frontend recarrega apenas as telas inscritas naquela tabela, sem enviar dados sensíveis pelo canal.
 
-**Tabelas publicadas:** `notificacoes`, `codigos_redefinicao`, `alunos`, `perfis`, `ocorrencias`, `justificativas_faltas`, `frequencias`, `conversas`, `mensagens` e `enturmacoes`.
+**Como funciona**
 
-As tabelas operacionais `frequencias`, `ocorrencias` e `justificativas_faltas` utilizam `REPLICA IDENTITY FULL`, garantindo que eventos UPDATE e DELETE carreguem todas as colunas (necessário para filtros por coluna e para a checagem de RLS em exclusões).
+- O `EventSource` é único por aba e se reconecta sozinho com o backoff do navegador; `useRealtimeRefresh` dispara uma recarga ao (re)conectar e ao voltar para a aba, com debounce de 500 ms.
+- O servidor envia heartbeat a cada 25 s e pode endereçar eventos a destinatários específicos (notificações por usuário, frequências e justificativas para responsáveis do aluno).
+- Escopos: `mensagens` por `conversa_id` e `notificacoes` por destinatário; os demais eventos invalidam a tabela para os usuários autorizados.
+- **Fallback**: o popover de notificações também recarrega a cada 30 s caso o stream esteja indisponível.
+- **Indicador de conexão**: combina o estado do stream SSE com a verificação periódica de `/api/saude` a cada 30 s.
 
-**Canais por tela:**
-
-| Tela | Tabelas assinadas |
-|------|-------------------|
-| Global (badges do sino) | `notificacoes` filtrada por destinatário |
-| Responsável: Alertas | `frequencias`, `ocorrencias`, `justificativas_faltas` |
-| Responsável: Termômetro | `frequencias`, `ocorrencias` |
-| Responsável e Gestão: Chat | `mensagens` (conversa ativa) e `mensagens`/`conversas` (lista de contatos) |
-| Professor: Frequência e Ausência | `frequencias`, `enturmacoes` |
-| Gestão: Ranking | `frequencias`, `ocorrencias` |
-| Gestão: Infrequências | `frequencias` |
-| Gestão: Justificativas | `justificativas_faltas` |
-| Gestão: Ocorrências | `ocorrencias` |
-| Gestão: Usuários | `perfis` |
-| Gestão: Alunos | `alunos`, `enturmacoes` |
-| Gestão: Códigos | `notificacoes`, `codigos_redefinicao` |
+**Tabelas que publicam invalidações:** `notificacoes`, `mensagens`, `conversas`, `frequencias`, `justificativas_faltas`, `ocorrencias`, `registros_comportamento`, `tags_comportamento`, `turmas`, `enturmacoes`, `atribuicoes_professores`, `anos_letivos`, `vinculos_responsaveis`, `opcoes_configuracao`, `configuracoes_sistema` e `horarios_letivos`.
 
 **Triggers de domínio ligados ao tempo real:**
 
 - `fn_notificar_nova_mensagem`: notifica o destinatário (responsável ou gestão) a cada nova mensagem.
-- `fn_notificar_mensagem_lida`: limpa as notificações de mensagem da conversa quando ela é lida pelo grupo destinatário.
 - `fn_notificar_ocorrencia`: avisa os responsáveis vinculados quando uma ocorrência é registrada com notificação habilitada.
-
-**Comportamentos complementares:**
-
-- O composável `useRealtimeRefresh` gerencia inscrição, reconexão com backoff e recarga ao retornar à aba.
-- O guard de rotas garante o usuário carregado antes das views montarem, de modo que carga inicial e inscrição aconteçam sempre.
-- No horário protegido do chat, se todas as janelas de `horarios_letivos` estiverem desativadas, o canal é considerado permanentemente fechado; o fallback para a janela padrão ocorre apenas quando nenhuma janela está cadastrada.
+- `fn_auto_justificar_frequencias`: dispara a atualização das frequências e dos painéis quando uma justificativa é aceita.
 
 ## Configuração
 
 Variáveis definidas em `.env` (local) ou no painel do provedor de deploy (produção). Consulte `.env.example`.
 
-| Variável | Onde é usada | Descrição |
-|----------|--------------|-----------|
-| `VITE_SUPABASE_URL` | Frontend | URL do projeto Supabase. |
-| `VITE_SUPABASE_PUBLISHABLE_KEY` | Frontend | Chave publishable (pública) do Supabase. |
-| `VITE_EDGE_FUNCTIONS_URL` | Frontend | URL base das Edge Functions (opcional; padrão `{VITE_SUPABASE_URL}/functions/v1`). |
-| `SUPABASE_SERVICE_ROLE_KEY` | Servidor e testes | Chave administrativa. Nunca exposta ao navegador. |
-| `SEED_SENHA_ADMIN` | Testes | Senha do usuário de gestão do seed. |
-| `SEED_SENHA_PROF` | Testes | Senha dos usuários professores do seed. |
-| `SEED_SENHA_RESP` | Testes | Senha dos usuários responsáveis do seed. |
+| Variável                                                                            | Onde é usada         | Descrição                                                                                     |
+| ----------------------------------------------------------------------------------- | -------------------- | --------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`                                                                      | API (runtime)        | Conexão com o papel restrito `buscapp_api` (sujeito ao RLS).                                  |
+| `MIGRATE_DATABASE_URL`                                                              | Migrações e seed     | Conexão dona do schema, usada por `prisma migrate` e pelo seed.                               |
+| `DATABASE_URL_ADMIN`                                                                | Fixtures de teste    | Conexão dona do schema usada apenas nos testes de integração/E2E.                             |
+| `APP_DB_PASSWORD`                                                                   | Container            | Senha aplicada ao papel `buscapp_api` pelo entrypoint do Compose.                             |
+| `DIRECT_URL`                                                                        | Migrações (opcional) | Conexão direta para aplicar migrações em bancos gerenciados atrás de pooler.                  |
+| `PORT` / `HOST`                                                                     | API                  | Porta e interface de escuta (padrão `3001` e `0.0.0.0`).                                      |
+| `APP_URL`                                                                           | API                  | Origem do frontend liberada no CORS com credenciais (padrão `http://localhost:5173`).         |
+| `APP_ORIGINS`                                                                       | API                  | Origens adicionais para CORS, separadas por vírgula.                                          |
+| `WEB_DIST`                                                                          | API                  | Caminho do build da SPA servido na mesma origem (padrão `../web/dist`).                       |
+| `AUTH_PEPPER`                                                                       | API                  | Segredo do HMAC dos códigos de redefinição; mínimo de 32 caracteres em produção.              |
+| `SESSAO_COOKIE`                                                                     | API                  | Nome do cookie de sessão (padrão `buscapp_sessao`).                                           |
+| `COOKIE_SAMESITE`                                                                   | API                  | Atributo `SameSite` do cookie (`lax`, `strict` ou `none`).                                    |
+| `COOKIE_SECURE`                                                                     | API                  | Força `Secure` no cookie; por padrão ativo quando `NODE_ENV=production`.                      |
+| `STORAGE_DRIVER`                                                                    | API                  | Driver de anexos: `disco` (padrão) ou `s3`.                                                   |
+| `UPLOAD_DIR`                                                                        | API (disco)          | Diretório dos uploads (padrão `uploads`).                                                     |
+| `S3_BUCKET`, `S3_REGION`, `S3_ENDPOINT`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | API (S3)             | Credenciais e endpoint do bucket (MinIO, R2 ou AWS).                                          |
+| `SEED_SENHA_ADMIN`, `SEED_SENHA_PROF`, `SEED_SENHA_RESP`                            | Seed                 | Senhas dos usuários de teste criados pelo seed de desenvolvimento.                            |
+| `VITE_API_URL`                                                                      | Frontend             | URL base da API. Vazio (padrão) usa a mesma origem; defina ao hospedar a SPA separada da API. |
 
 ## Como Executar
 
 ### Pré-requisitos
 
-- Node.js 22.12+ (ou 20.19+)
-- Docker em execução (para o Supabase local)
+- Node.js 22.12+ (ou 20.19+); o container usa Node 24
+- Docker e Docker Compose em execução
 - npm
 
 ### Passos para Instalação
@@ -609,209 +477,150 @@ cd buscapp
 npm install
 ```
 
-4. Inicie o Supabase local:
-
-```bash
-npx supabase start
-```
-
-5. Copie o arquivo de ambiente:
+4. Copie o arquivo de ambiente e ajuste o `AUTH_PEPPER`:
 
 ```bash
 cp .env.example .env
 ```
 
-Os valores de `VITE_SUPABASE_URL` e `VITE_SUPABASE_PUBLISHABLE_KEY` podem ser obtidos com:
+5. Suba a aplicação e o PostgreSQL (as migrações são aplicadas automaticamente no start do container):
 
 ```bash
-npx supabase status
+npm run compose:up
 ```
 
-6. Aplique a migration única e popule o banco com dados de teste:
+6. Popule o banco com usuários e fixtures de desenvolvimento:
 
 ```bash
-npx supabase db reset
+npm run seed -w @buscapp/api
 ```
 
-7. Crie os usuários de teste no Supabase Auth:
+7. Acesse a aplicação em `http://localhost:3000` (SPA servida pela própria API, com cookie de sessão de mesma origem).
+
+Para desenvolver com hot-module replacement, rode os dois processos em terminais separados:
 
 ```bash
-bash scripts/seed-users.sh
+npm run dev:api    # API em http://localhost:3001
+VITE_API_URL=http://localhost:3001 npm run dev:web   # SPA em http://localhost:5173
 ```
 
-8. Inicie o servidor de desenvolvimento:
+O `APP_URL` do `.env` já aponta para `http://localhost:5173`, liberando o CORS com credenciais do modo de desenvolvimento.
 
-```bash
-npm run dev
-```
+### URLs
 
-9. Acesse a aplicação em `http://localhost:5173`.
+| Serviço               | URL                                                  |
+| --------------------- | ---------------------------------------------------- |
+| SPA no container      | `http://localhost:3000`                              |
+| API (desenvolvimento) | `http://localhost:3001/api/saude`                    |
+| SPA (desenvolvimento) | `http://localhost:5173`                              |
+| PostgreSQL do Compose | `localhost:5433` (usuário, senha e banco: `buscapp`) |
 
 ### Credenciais de Teste
 
-| Papel | Email | Senha |
-|-------|-------|-------|
-| Gestão | gestao@escola.edu.br | Admin123! |
-| Professor | prof1@escola.edu.br | Prof123! |
-| Responsável | resp1@email.com | Resp123! |
+| Papel       | Email                | Senha     |
+| ----------- | -------------------- | --------- |
+| Gestão      | gestao@escola.edu.br | Admin123! |
+| Professor   | prof1@escola.edu.br  | Prof123!  |
+| Responsável | resp1@email.com      | Resp123!  |
 
-Usuários adicionais: prof2/prof3@escola.edu.br (Prof123!) e resp2/resp3@email.com (Resp123!).
+Usuários adicionais: prof2/prof3@escola.edu.br (Prof123!) e resp2/resp3@email.com (Resp123!). O `prof2` não possui o módulo de ocorrências, o que permite testar o gating de módulos.
 
 ### Parando o Ambiente Local
 
 ```bash
-npx supabase stop
+npm run compose:down
 ```
+
+Para remover também os volumes de dados e uploads, use `docker compose down -v`.
 
 ### Solução de Problemas do Ambiente Local
 
-- **Versão do CLI:** use Supabase CLI **>= 2.115** (`npx supabase --version`). Versões antigas falham ao subir a stack local em imagens recentes do Docker (healthchecks de storage/realtime).
-- **Analytics desabilitado:** o `supabase/config.toml` mantém `[analytics] enabled = false`. O Logflare não aquece dentro da janela de healthcheck em devcontainers e nenhum módulo do BuscApp depende do Studio Analytics. Para reabilitar, ajuste a chave e execute `npx supabase stop && npx supabase start`.
-- **Reset com dados canônicos:** o `db reset` já popula catálogos, horários, tags, disciplinas, parâmetros e o ano letivo ativo pela migration única; o seed adiciona apenas pessoas e atividade de exemplo.
+- **Portas ocupadas:** a API usa `3001` (dev) e `3000` (container), a SPA usa `5173` e o PostgreSQL do Compose usa `5433`. Libere-as ou ajuste `PORT` e as portas do `compose.yaml`.
+- **Migrações pendentes:** no container elas são aplicadas pelo entrypoint; no desenvolvimento local aplique com `npm run db:migrate` antes de subir a API.
+- **`AUTH_PEPPER` inválido:** a API falha no boot se a variável não existir; em produção ela precisa ter ao menos 32 caracteres.
+- **Banco desatualizado:** rode `npm run db:migrate` ou `npm run compose:up` novamente para aplicar as migrações do Prisma.
 
 ## Scripts
 
-| Comando | Descrição |
-|---------|-----------|
-| `npm run dev` | Servidor de desenvolvimento Vite com HMR |
-| `npm run build` | Verificação de tipos e build de produção |
-| `npm run preview` | Preview do build de produção |
-| `npm run type-check` | `vue-tsc --build` para verificação de tipos |
-| `npm run lint` | oxlint e ESLint com auto-fix |
-| `npm run format` | Prettier em todos os arquivos de `src/` |
-| `npm run test:typecheck` | Verificação de tipos TypeScript |
-| `npm run test:lint` | Verificação de lint |
-| `npm run test:build` | Build de produção como teste |
-| `npm run test:db` | Testes de banco de dados (requer Supabase local) |
-| `npm run test:api` | Testes de API (requer Supabase local; reseta o banco antes) |
-| `npm run test:e2e` | Testes E2E Playwright (requer Supabase local + seed; sobe o dev server automaticamente) |
-| `npm run test:pwa` | Testes de PWA contra o build de produção (build + preview + Playwright) |
-| `npm run test` | Typecheck + lint + build + testes de API |
-
-Para acelerar a suíte E2E em máquinas locais, execute com workers adicionais:
-
-```bash
-npx playwright test --workers=6
-```
+| Comando                | Descrição                                                              |
+| ---------------------- | ---------------------------------------------------------------------- |
+| `npm run dev`          | Inicia a SPA em modo desenvolvimento (alias de `dev:web`).             |
+| `npm run dev:web`      | Servidor Vite com HMR em `http://localhost:5173`.                      |
+| `npm run dev:api`      | API Fastify em `http://localhost:3001` com `tsx watch`.                |
+| `npm run build`        | Verificação de tipos e build de produção.                              |
+| `npm run build-only`   | Build de produção da SPA sem verificação de tipos.                     |
+| `npm run preview`      | Preview do build de produção com `vite preview`.                       |
+| `npm run type-check`   | Verificação de tipos em todos os workspaces (`vue-tsc`/`tsc`).         |
+| `npm run lint`         | oxlint e ESLint com auto-fix.                                          |
+| `npm run format`       | Prettier em `apps/web/src`, `apps/api/src` e `packages/contratos/src`. |
+| `npm run test`         | Typecheck + lint + build + testes de integração da API.                |
+| `npm run test:unit`    | Testes de integração da API (Vitest).                                  |
+| `npm run test:api`     | Alias de `test:unit`.                                                  |
+| `npm run test:db`      | Smoke test do schema no PostgreSQL do Compose.                         |
+| `npm run test:e2e`     | Testes E2E Playwright (sobe API e web automaticamente).                |
+| `npm run test:pwa`     | Build de produção + preview + testes de PWA.                           |
+| `npm run db:generate`  | Gera o Prisma Client.                                                  |
+| `npm run db:migrate`   | Aplica as migrações no `DATABASE_URL`.                                 |
+| `npm run compose:up`   | Sobe app e PostgreSQL com build e migrações no start.                  |
+| `npm run compose:down` | Derruba o ambiente do Compose.                                         |
 
 ## Testes
 
-O projeto possui quatro camadas de teste independentes.
+O projeto possui quatro camadas de teste independentes, além das verificações estáticas do `npm run test`.
 
-### Tipos (TypeScript)
+### Integração da API (Vitest)
 
-- **Ferramenta:** vue-tsc.
-- **Cobertura:** verificação estática de tipos em todo o código TypeScript e nos componentes Vue.
-- **Execução:** `npm run test:typecheck`.
-
-### Banco de Dados (PL/pgSQL)
-
-- **Arquivos:** `supabase/tests/*.sql`. Cada arquivo roda em transação própria com `ROLLBACK` final (não altera o banco); `scripts/test-db.sh` executa todos em sequência e falha se houver qualquer `[FAIL]`.
-- **`0001_validacao_completa.sql`:** validação completa do schema:
-  - Constraints (chaves estrangeiras, unicidade, check)
-  - Triggers (criação automática de perfil, nome completo da turma)
-  - RLS para todos os papéis (gestão, professor, responsável, usuário não autenticado)
-  - Soft delete em frequências
-  - Views analíticas
-  - Geração, expiração, revogação e validação de códigos de redefinição
-  - Casos extremos (limites, dados maliciosos)
-  - Estrutura, RLS e UNIQUE da tabela `opcoes_configuracao` e restrições `CHECK` de catálogo
-  - Colunas de catálogo como texto validado (séries/letras fora do catálogo são rejeitadas)
-  - Integridade de catálogo (referências órfãs, `auth.users` ↔ `perfis` 1:1, enturmação ativa por aluno, anexos sem vínculo)
-- **`0002_anos_letivos.sql`:** virada de ano letivo:
-  - Ano corrente ativo garantido pela migration, com flags consistentes
-  - RPC `ativar_ano_letivo`: gestão ativa, professor é bloqueado, ano vigente arquivado atomicamente
-  - Rejeição de reativação do ano corrente e de ano inexistente
-  - Trilha de auditoria (`ARQUIVAR_ANO_LETIVO` / `ATIVAR_ANO_LETIVO`) e virada de retorno
-- **Execução:** `npm run test:db` (usa `psql` no container Docker do Supabase).
-
-### API (Bash + curl)
-
-- **Arquivo:** `scripts/test-api.sh`, com 323 verificações distribuídas em cerca de 29 seções. Reseta o banco antes de executar.
-- **Cobertura:**
-  - Autenticação (login, logout, claims do JWT)
-  - Edge Functions (todas as seis, incluindo jobs de manutenção)
-  - Funções RPC (gerar código, revogar código, relatório de órfãos)
-  - Operações CRUD completas
-  - Casos extremos (tabelas inexistentes, permissão negada, payloads inválidos)
-  - Idempotência de frequência
-  - Ciclo de vida completo dos códigos de redefinição
-  - Campos de ocorrências, frequências, perfis e alunos
-  - Ciclo completo de justificativas com anexos (upload, RLS, auto-justify via trigger)
-  - Compressão de anexos via Edge Function (upload, processamento, verificação de metadados)
-  - Chat: conversas, envio de mensagens, RLS, triggers de notificação e leitura, integridade (unicode, SQL injection, textos longos), concorrência
-  - Catálogo de configuração: CRUD de `opcoes_configuracao`, RLS por papel e restrições (valores fora do catálogo rejeitados)
-  - CASCADE → RESTRICT: exclusão de turma com conversas/atribuições bloqueada no banco
-  - Expurgo: remoção de anexos expirados e objetos de storage órfãos
-  - Visualizador de anexo: download autenticado via Storage API com o JWT no header `Authorization`, integridade do conteúdo e negação sem autenticação
-- **Execução:** `npm run test:api` (requer Supabase local).
+- **Arquivos:** `apps/api/src/**/*.test.ts` (11 arquivos, 149 testes).
+- **Ferramenta:** Vitest com a fábrica `construirApp()` e requisições via `inject`, contra o PostgreSQL do Compose.
+- **Cobertura:** autenticação e sessões, papéis e módulos, escopo de alunos, CRUD dos domínios, códigos de redefinição, anexos, chat, notificações, configurações e regras de segurança (caso anônimo, 403 e 404 fora do escopo).
+- **Execução:** `npm run test:unit` (as suítes rodam em série para não competir pelo mesmo banco).
 
 ### E2E (Playwright)
 
-- **Arquivos:** `tests/*.spec.ts` organizados por domínio (17 arquivos + `tests/suporte/` com helpers), ~160 testes por projeto (2 skipped) + `tests/pwa.spec.ts` dedicado.
+- **Arquivos:** `tests/e2e/*.spec.ts` (19 especificações, incluindo a suíte de PWA) com os helpers de `tests/suporte/`.
 - **Projetos:** Chromium, Firefox, WebKit, Mobile Chrome (Pixel 5) e Mobile Safari (iPhone 12).
-- **Cobertura:**
-  - Login, logout e credenciais inválidas
-  - Gestão: home, usuários com confirmação de ativação/desativação, módulos de acesso para todos os papéis, infrequências (chamada por turma e registro individual), alunos, códigos, turmas, anos letivos (virada e reversão), atribuições, ranking com botões de chat e falta
-  - Professor: frequência, ausência e ocorrências
-  - Responsável: chat, home com cartões por módulo, alertas, justificativas (incluindo anexo por arrastar e soltar)
-  - Termômetro inteligente: barra segmentada fixa, limiar 9/10 faltas, gatilho crítico, abatimento de justificativa e persistência de pesos (CT-T1..T5)
-  - Tempo real: alertas, notificações, ocorrências, ranking e lista de frequência atualizam sem reload
-  - Visualizador de anexo (modal blob, sem token na URL)
-  - Notificações por papel com deep-link `?aluno`/`?conversa` sem 403 (popover, marcar lidas, limpar todas)
-  - Chat completo (sidebar, mensagens, busca, header, horário protegido) e chat iniciado pela coordenação via ranking
-  - Configurações do sistema (catálogos, tags, parâmetros com pesos do termômetro, horários)
-  - Integridade de catálogo e transferência de enturmação
-  - Resiliência e casos extremos
-- **Execução:** `npm run test:e2e` (o dev server é iniciado automaticamente; requer Supabase local + seed).
-- **Configuração:** `playwright.config.ts` com worker único por padrão e timeout de expect de 10 segundos; em máquinas locais recomenda-se elevar os workers via CLI (`npx playwright test --workers=6`) para reduzir o tempo total.
+- **Cobertura:** login e recuperação de senha; gestão (navegação, usuários, alunos, códigos, catálogos, estrutura, infrequências, ranking, ocorrências e justificativas); professor (frequência, ausência, ocorrências e gating); responsável (alertas, termômetro, justificativa com arrastar e soltar e chat); tempo real, notificações sem 403, combobox, anexos e resiliência.
+- **Execução:** `npm run test:e2e`. O `playwright.config.ts` sobe a API (`http://localhost:3001`) e a web (`http://localhost:5173`) automaticamente, com worker único por padrão e timeout de expect de 10 segundos; em máquinas locais é possível elevar os workers via CLI (`npx playwright test --workers=6`).
+
+### Banco de Dados (smoke test)
+
+- **Arquivo:** `scripts/test-db.sh`, executado contra o PostgreSQL do Docker Compose.
+- **Cobertura:** aplica as migrações pendentes e confere as migrações, as 31 tabelas de `public`, os CHECKs, os triggers de domínio e o índice parcial `idx_frequencias_unicidade`.
+- **Execução:** `npm run test:db` (requer `npm run compose:up`).
+
+### PWA
+
+- **Arquivo:** `tests/e2e/pwa.spec.ts`, com configuração dedicada em `playwright.pwa.config.ts`.
+- **Cobertura:** manifest, service worker e funcionamento offline do build de produção servido por `vite preview`.
+- **Execução:** `npm run test:pwa` (executa o build antes dos testes).
 
 ## PWA
 
 A aplicação é instalável como Progressive Web App.
 
-- **Plugin:** `vite-plugin-pwa` registrado no `vite.config.ts`, com service worker e manifest gerados apenas no build de produção.
+- **Plugin:** `vite-plugin-pwa` registrado no `apps/web/vite.config.ts`, com service worker e manifest gerados apenas no build de produção.
 - **Ícones:** gerados a partir de imagem fonte pelo script `scripts/gerar-icones.sh`.
-- **Testes dedicados:** `tests/pwa.spec.ts` executa contra o build de produção via `vite preview`, com Supabase simulado por variáveis de ambiente de teste.
+- **Testes dedicados:** `tests/e2e/pwa.spec.ts` executa contra o build de produção via `vite preview`, apontando para a API configurada em `VITE_API_URL`.
 - **Execução:** `npm run test:pwa` (configuração em `playwright.pwa.config.ts`, projetos Desktop Chrome e Mobile Chrome).
 
 ## CI/CD e Deploy
 
 ### Integração Contínua (GitHub Actions)
 
-- **Workflow:** `.github/workflows/codeql.yml`
-- **Análise:** CodeQL Advanced para javascript-typescript
-- **Gatilhos:** push e pull request para `main`, além de agendamento semanal
-- **Resultados:** GitHub Security > Code scanning alerts
-
-### Deploy das Edge Functions
-
-- **Workflow:** `.github/workflows/deploy-functions.yml`
-- **Gatilhos:** push para `main` e execução manual
-- **Ação:** `supabase functions deploy` para o projeto Supabase vinculado (requer os secrets `SUPABASE_ACCESS_TOKEN` e `PROJECT_ID`)
+- **`qualidade.yml`:** type-check, lint e build em pushes para `main` e pull requests.
+- **`testes.yml`:** sobe o ambiente completo com `docker compose up -d --build`, aguarda `/api/saude` responder, exibe os logs em caso de falha e derruba o ambiente ao final.
+- **`migracoes.yml`:** aplica `prisma migrate deploy` com `DATABASE_URL` vindo do secret `DIRECT_URL_PROD` quando há mudanças em `apps/api/prisma/`.
+- **`publicacao.yml`:** build da imagem Docker (`infra/docker/Dockerfile`) e push para o GHCR (`ghcr.io/<repo>:latest` e `:<sha>`) em pushes para `main` e tags `v*`.
+- **`codeql.yml`:** análise de segurança CodeQL Advanced para javascript-typescript em push, pull request e agendamento semanal.
 
 ### Dependências (Dependabot)
 
-- **Configuração:** `.github/dependabot.yml`
-- **Escopo:** atualizações semanais para o ecossistema `devcontainers`
-
-### Reset Database (workflow manual)
-
-- **Workflow:** `.github/workflows/reset-database.yml`
-- **Gatilho:** `workflow_dispatch` (execução manual na aba Actions)
-- **O que faz:** executa `supabase db reset --linked --no-seed --yes`, que apaga e recria o banco de produção aplicando a migration única (`0001_schema_completo.sql`), que já inclui todos os dados canônicos (catálogos, horários, tags, disciplinas, parâmetros e ano letivo ativo). O seed de desenvolvimento não é aplicado.
-
-> [!CAUTION]
-> Operação destrutiva: remove todos os dados, usuários e storage do ambiente. Use apenas quando a reconstrução completa for intencional.
-
-- **Após o reset:** recriar a conta de gestão no Dashboard (Authentication > Add users), definindo o *Raw User Meta Data* com `{"nome": "...", "papel": "gestao"}`; o trigger `fn_handle_new_user` cria o perfil correspondente. Os demais usuários podem se cadastrar normalmente pela tela de login.
+- **Configuração:** `.github/dependabot.yml`.
+- **Escopo:** atualizações semanais para o ecossistema `devcontainers`.
 
 ### Deploy (Vercel)
 
-- **Configuração:** `vercel.json` com rewrites que direcionam todas as rotas para `index.html` (modo SPA)
-- **Branch de produção:** `main`
-- **Previews:** deploys de preview automáticos para cada pull request
-- **Build:** `npm run build` (type-check + build Vite)
+A SPA pode ser publicada na Vercel a partir do diretório `apps/web`, com o build padrão do workspace (`npm run build`). Quando a API estiver em outro host, defina `VITE_API_URL` no projeto da Vercel e libere a origem em `APP_ORIGINS`; com a API servindo o `dist/` na mesma origem, deixe `VITE_API_URL` vazio. O cookie de sessão é first-party por padrão.
 
 ## Licença
 

@@ -1,0 +1,48 @@
+name: Testes
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: testes-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compose:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      # Sobe app + PostgreSQL, aplica as migrações no entrypoint e valida a saúde da API.
+      - run: docker compose up -d --build
+
+      - name: Aguarda a API responder
+        run: |
+          for tentativa in $(seq 1 60); do
+            if curl -fsS http://localhost:3000/api/saude > /dev/null; then
+              echo "API disponível após ${tentativa} tentativa(s)."
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "API não respondeu no tempo esperado."
+          docker compose logs app
+          exit 1
+
+      - name: Exibe os logs em caso de falha
+        if: failure()
+        run: docker compose logs
+
+      - name: Derruba o ambiente
+        if: always()
+        run: docker compose down -v

@@ -1,0 +1,344 @@
+<script setup lang="ts">
+import { computed, onMounted, ref, nextTick } from 'vue';
+import { useRouter } from 'vue-router';
+import { useAutenticacao } from '@/composables/useAutenticacao';
+import { useMonitoramento } from '@/composables/useMonitoramento';
+import { useOpcoesConfiguracao } from '@/composables/useOpcoesConfiguracao';
+import { useAlturaUniformeCards } from '@/composables/useAlturaUniformeCards';
+import { api } from '@/servicos/api';
+import CampoFormulario from '@/componentes/CampoFormulario.vue';
+import Combobox from '@/componentes/Combobox.vue';
+import GrupoCheckbox from '@/componentes/GrupoCheckbox.vue';
+import CartaoSelecao from '@/componentes/CartaoSelecao.vue';
+import ModalConfirmacao from '@/componentes/ModalConfirmacao.vue';
+import type { AlunoFrequencia, OpcaoCheckbox } from '@/tipos/componentes';
+import type { TagComportamento } from '@/tipos/database';
+
+const router = useRouter();
+const { usuario } = useAutenticacao();
+const { buscarAlunosParaFrequencia, registrarOcorrenciaGrave, carregando } = useMonitoramento();
+
+const alunos = ref<AlunoFrequencia[]>([]);
+const alunoId = ref('');
+const tipos = ref<string[]>(['grave']);
+const tags = ref<string[]>([]);
+const descricao = ref('');
+const exigePresenca = ref(false);
+const notificarCoordenacao = ref(true);
+const notificarResponsavel = ref(false);
+const mensagemSucesso = ref<string | null>(null);
+const mensagemErro = ref<string | null>(null);
+
+const { buscarOpcoes } = useOpcoesConfiguracao();
+const opcoesTipo = ref<OpcaoCheckbox[]>([]);
+const opcoesTags = ref<OpcaoCheckbox[]>([]);
+
+const alunoOpcoes = computed(() =>
+  alunos.value.map((a) => ({ valor: a.id, rotulo: a.nome, descricao: a.turma || 'Sem turma' })),
+);
+
+const tipoOcorrenciaRef = ref<HTMLElement | null>(null);
+const { altura: alturaCartaoTipo } = useAlturaUniformeCards(tipoOcorrenciaRef);
+
+function corOcorrencia(valor: string): 'warning' | 'danger' | 'info' | 'success' | 'primary' {
+  const idx = opcoesTipo.value.findIndex((t) => t.valor === valor);
+  const cols = ['warning', 'danger', 'info', 'success', 'primary'];
+  const pos = idx >= 0 ? idx % cols.length : 0;
+  return cols[pos] as 'warning' | 'danger' | 'info' | 'success' | 'primary';
+}
+
+const rotuloTipo = computed(() => {
+  if (tipos.value.includes('suspensao')) return 'suspensão';
+  if (tipos.value.includes('grave')) return 'ocorrência grave';
+  return 'ocorrência';
+});
+
+const descricaoSugerida = computed(() => {
+  if (!tags.value.length) return '';
+  const nomes = tags.value.map((t) => opcoesTags.value.find((o) => o.valor === t)?.rotulo ?? t);
+  return `Relato de ${rotuloTipo.value}: ${nomes.join(', ')}. `;
+});
+
+const contadorDescricao = computed(() => descricao.value.length);
+
+const confirmarEnvio = ref(false);
+const confirmarCancelar = ref(false);
+
+/** Verifica se há dados não salvos para confirmação ao cancelar. */
+const temDados = computed(
+  () => !!alunoId.value || !!descricao.value.trim() || tags.value.length > 0,
+);
+
+function aplicarTags() {
+  if (!descricao.value.startsWith('Relato de')) {
+    descricao.value = descricaoSugerida.value;
+  } else {
+    const resto = descricao.value.split('. ').slice(1).join('. ');
+    descricao.value = descricaoSugerida.value + resto;
+  }
+}
+
+async function solicitarConfirmacao() {
+  if (!usuario.value || !alunoId.value) {
+    mensagemErro.value = 'Selecione um aluno.';
+    return;
+  }
+  if (!tipos.value.length) {
+    mensagemErro.value = 'Selecione o tipo de ocorrência.';
+    return;
+  }
+  if (descricao.value.trim().length < 10) {
+    mensagemErro.value = 'Descreva a ocorrência com pelo menos 10 caracteres.';
+    return;
+  }
+  confirmarEnvio.value = true;
+}
+
+async function confirmar() {
+  confirmarEnvio.value = false;
+  if (!usuario.value || !alunoId.value) return;
+  const ok = await registrarOcorrenciaGrave(
+    alunoId.value,
+    usuario.value.id,
+    descricao.value.trim(),
+    tipos.value,
+    exigePresenca.value,
+    tags.value,
+    notificarCoordenacao.value,
+    notificarResponsavel.value,
+  );
+  if (ok) {
+    mensagemSucesso.value = 'Ocorrência registrada com sucesso!';
+    alunoId.value = '';
+    descricao.value = '';
+    tags.value = [];
+    notificarCoordenacao.value = true;
+    notificarResponsavel.value = false;
+    exigePresenca.value = false;
+    await nextTick();
+    requestAnimationFrame(() => {
+      document
+        .querySelector('.alert-success')
+        ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    setTimeout(() => (mensagemSucesso.value = null), 4000);
+  } else {
+    mensagemErro.value = 'Falha ao registrar ocorrência. Tente novamente.';
+  }
+}
+
+onMounted(async () => {
+  opcoesTipo.value = await buscarOpcoes('tipo_ocorrencia');
+  const { tags } = await api<{ tags: TagComportamento[] }>('/api/tags-comportamento', {
+    parametros: { ativo: 'true' },
+  });
+  opcoesTags.value = tags.map((t) => ({
+    valor: t.nome,
+    rotulo: t.descricao ?? t.nome,
+    icone: t.icone ?? undefined,
+  }));
+  alunos.value = await buscarAlunosParaFrequencia();
+});
+</script>
+
+<template>
+  <div class="container py-4" style="max-width: 800px">
+    <div class="d-flex gap-2 mb-3">
+      <router-link to="/professor" class="btn btn-sm btn-outline-success">
+        <i class="bi bi-house me-1" aria-hidden="true"></i>
+        Início
+      </router-link>
+      <button type="button" class="btn btn-sm btn-outline-secondary" @click="router.back()">
+        <i class="bi bi-arrow-left me-1" aria-hidden="true"></i>
+        Voltar
+      </button>
+    </div>
+
+    <h1 class="h5 fw-bold mb-3">
+      <i class="bi bi-exclamation-triangle text-success me-2" aria-hidden="true"></i>
+      Registrar ocorrência grave
+    </h1>
+
+    <div class="alert alert-warning d-flex align-items-start gap-2 small py-2 mb-3" role="note">
+      <i class="bi bi-shield-exclamation mt-1" aria-hidden="true"></i>
+      <span
+        >Use apenas para comportamentos extremos que ameacem a permanência do aluno na escola.</span
+      >
+    </div>
+
+    <div v-if="mensagemSucesso" class="alert alert-success py-2 small mb-3" role="status">
+      <i class="bi bi-check-circle me-1" aria-hidden="true"></i>
+      {{ mensagemSucesso }}
+    </div>
+    <div v-if="mensagemErro" class="alert alert-danger py-2 small mb-3" role="alert">
+      <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>
+      {{ mensagemErro }}
+    </div>
+
+    <div class="card border">
+      <div class="card-body">
+        <CampoFormulario id="alunoSelect" label="Aluno" :obrigatorio="true">
+          <Combobox
+            id="alunoSelect"
+            v-model="alunoId"
+            :opcoes="alunoOpcoes"
+            placeholder="Selecione um aluno"
+            tamanho="sm"
+            :desabilitado="!alunos.length"
+          />
+        </CampoFormulario>
+
+        <CampoFormulario id="tipoOcorrencia" label="Tipo de ocorrência" :obrigatorio="true">
+          <div
+            class="d-flex gap-2 flex-wrap"
+            ref="tipoOcorrenciaRef"
+            :style="{ '--altura-cartao': alturaCartaoTipo ? `${alturaCartaoTipo}px` : undefined }"
+          >
+            <CartaoSelecao
+              v-for="op in opcoesTipo"
+              :key="op.valor"
+              :selecionado="tipos.includes(op.valor)"
+              :variante="corOcorrencia(op.valor)"
+              @click="
+                tipos = tipos.includes(op.valor)
+                  ? tipos.filter((t) => t !== op.valor)
+                  : [...tipos, op.valor]
+              "
+            >
+              <i :class="`bi bi-${op.icone} me-1`" aria-hidden="true"></i>
+              {{ op.rotulo }}
+            </CartaoSelecao>
+          </div>
+        </CampoFormulario>
+
+        <CampoFormulario
+          id="tagsComportamento"
+          label="Tags de comportamento (preenchimento rápido)"
+          dica="Selecione para compor a descrição automaticamente"
+        >
+          <GrupoCheckbox
+            nome="tag"
+            :opcoes="opcoesTags"
+            :modelo="tags"
+            :colunas="2"
+            @update:modelo="
+              (v) => {
+                tags = v;
+                aplicarTags();
+              }
+            "
+          />
+        </CampoFormulario>
+
+        <CampoFormulario
+          id="descricaoText"
+          label="Descrição"
+          :obrigatorio="true"
+          :maxlength="1000"
+          :contador="contadorDescricao"
+        >
+          <textarea
+            id="descricaoText"
+            v-model="descricao"
+            class="form-control form-control-sm"
+            :class="{ 'is-invalid': mensagemErro && descricao.trim().length < 10 }"
+            rows="4"
+            placeholder="Descreva objetivamente o comportamento. Mínimo 10 caracteres."
+            maxlength="1000"
+          ></textarea>
+        </CampoFormulario>
+
+        <div class="mb-3">
+          <label class="form-label small fw-medium">Notificações</label>
+          <div class="d-flex gap-3 flex-wrap">
+            <div class="form-check">
+              <input
+                id="notifCoordenacao"
+                v-model="notificarCoordenacao"
+                type="checkbox"
+                class="form-check-input"
+              />
+              <label for="notifCoordenacao" class="form-check-label small">
+                <i class="bi bi-megaphone me-1" aria-hidden="true"></i>
+                Notificar coordenação
+              </label>
+            </div>
+            <div class="form-check">
+              <input
+                id="notifResponsavel"
+                v-model="notificarResponsavel"
+                type="checkbox"
+                class="form-check-input"
+              />
+              <label for="notifResponsavel" class="form-check-label small">
+                <i class="bi bi-person-badge me-1" aria-hidden="true"></i>
+                Notificar responsável
+              </label>
+            </div>
+            <div class="form-check">
+              <input
+                id="exigePresenca"
+                v-model="exigePresenca"
+                type="checkbox"
+                class="form-check-input"
+              />
+              <label for="exigePresenca" class="form-check-label small">
+                <i class="bi bi-house-door me-1" aria-hidden="true"></i>
+                Exigir presença do responsável na escola
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="d-flex gap-2 justify-content-end">
+          <button
+            type="button"
+            class="btn btn-sm btn-outline-secondary"
+            @click="temDados ? (confirmarCancelar = true) : router.back()"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            class="btn btn-sm btn-success"
+            :disabled="carregando || !alunoId"
+            @click="solicitarConfirmacao"
+          >
+            <span
+              v-if="carregando"
+              class="spinner-border spinner-border-sm me-1"
+              role="status"
+            ></span>
+            <i v-else class="bi bi-exclamation-octagon me-1" aria-hidden="true"></i>
+            Registrar
+          </button>
+        </div>
+      </div>
+    </div>
+    <ModalConfirmacao
+      :visivel="confirmarEnvio"
+      titulo="Confirmar ocorrência"
+      mensagem="Deseja registrar esta ocorrência? Ela afetará o termômetro de atenção do aluno."
+      rotulo-confirmar="Registrar"
+      icone="exclamation-octagon"
+      variante="danger"
+      @confirmar="confirmar"
+      @cancelar="confirmarEnvio = false"
+    />
+    <ModalConfirmacao
+      :visivel="confirmarCancelar"
+      titulo="Descartar ocorrência?"
+      mensagem="Há dados preenchidos que serão perdidos. Deseja realmente cancelar?"
+      rotulo-confirmar="Descartar"
+      icone="exclamation-triangle"
+      variante="danger"
+      @confirmar="
+        () => {
+          confirmarCancelar = false;
+          router.back();
+        }
+      "
+      @cancelar="confirmarCancelar = false"
+    />
+  </div>
+</template>

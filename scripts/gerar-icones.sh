@@ -5,7 +5,7 @@ set -euo pipefail
 
 raiz="$(cd "$(dirname "$0")/.." && pwd)"
 glifo="$raiz/node_modules/bootstrap-icons/icons/mortarboard.svg"
-saida="$raiz/public"
+saida="$raiz/apps/web/public"
 
 verde="#008241"
 branco="#ffffff"

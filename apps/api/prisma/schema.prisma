@@ -1,0 +1,813 @@
+generator client {
+  provider        = "prisma-client"
+  output          = "../generated/prisma"
+  previewFeatures = ["partialIndexes"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model alunos {
+  id                       String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nome                     String
+  matricula                String                    @unique(map: "uq_aluno_matricula")
+  codigo_inep              String?
+  status                   status_aluno              @default(ativo)
+  observacoes              String?
+  data_nascimento          DateTime?                 @db.Date
+  data_matricula           DateTime?                 @db.Date
+  created_at               DateTime                  @default(now()) @db.Timestamptz(6)
+  updated_at               DateTime                  @default(now()) @db.Timestamptz(6)
+  transporte_escolar       Boolean                   @default(false)
+  alimentacao_diferenciada Boolean                   @default(false)
+  necessidades_especiais   Boolean                   @default(false)
+  documentos_recebidos     String[]                  @default([])
+  conversas                conversas[]
+  enturmacoes              enturmacoes[]
+  frequencias              frequencias[]
+  justificativas_faltas    justificativas_faltas[]
+  monitoramento_acoes      monitoramento_acoes[]
+  ocorrencias              ocorrencias[]
+  registros_comportamento  registros_comportamento[]
+  vinculos_responsaveis    vinculos_responsaveis[]
+
+  @@index([matricula], map: "idx_alunos_matricula")
+  @@index([nome(ops: raw("gin_trgm_ops"))], map: "idx_alunos_nome_trgm", type: Gin)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model anexos {
+  id                   String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  storage_path         String
+  nome_arquivo         String
+  mime_type            String
+  tamanho_bytes        Int
+  criado_por           String?                @db.Uuid
+  expurgo_em           DateTime               @default(dbgenerated("(now() + '30 days'::interval)")) @db.Timestamptz(6)
+  expurgado_em         DateTime?              @db.Timestamptz(6)
+  created_at           DateTime               @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime               @default(now()) @db.Timestamptz(6)
+  processado_em        DateTime?              @db.Timestamptz(6)
+  perfis               perfis?                @relation(fields: [criado_por], references: [id], onUpdate: NoAction)
+  justificativa_anexos justificativa_anexos[]
+  ocorrencia_anexos    ocorrencia_anexos[]
+
+  @@index([expurgo_em], map: "idx_anexos_expurgo", where: raw("(expurgado_em IS NULL)"))
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model anos_letivos {
+  id                      String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ano                     Int                       @unique(map: "uq_ano_letivo_ano")
+  status                  status_ano_letivo         @default(planejado)
+  data_inicio             DateTime                  @db.Date
+  data_fim                DateTime                  @db.Date
+  ativo                   Boolean                   @default(false)
+  created_at              DateTime                  @default(now()) @db.Timestamptz(6)
+  updated_at              DateTime                  @default(now()) @db.Timestamptz(6)
+  enturmacoes             enturmacoes[]
+  exportacoes             exportacoes[]
+  frequencias             frequencias[]
+  importacoes_log         importacoes_log[]
+  ocorrencias             ocorrencias[]
+  pontuacao_turmas        pontuacao_turmas[]
+  registros_comportamento registros_comportamento[]
+  turmas                  turmas[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model atribuicoes_professores {
+  id            String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  professor_id  String       @db.Uuid
+  turma_id      String       @db.Uuid
+  disciplina_id String?      @db.Uuid
+  papel         String       @default("titular")
+  data_inicio   DateTime     @default(dbgenerated("CURRENT_DATE")) @db.Date
+  data_fim      DateTime?    @db.Date
+  ativo         Boolean      @default(true)
+  created_at    DateTime     @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime     @default(now()) @db.Timestamptz(6)
+  disciplinas   disciplinas? @relation(fields: [disciplina_id], references: [id], onUpdate: NoAction)
+  perfis        perfis       @relation(fields: [professor_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  turmas        turmas       @relation(fields: [turma_id], references: [id], onUpdate: NoAction)
+
+  @@index([professor_id], map: "idx_atribuicoes_professor")
+  @@index([turma_id], map: "idx_atribuicoes_turma")
+  @@index([professor_id], map: "idx_atribuicoes_vigente", where: raw("ativo"))
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model auditoria {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  usuario_id       String?  @db.Uuid
+  acao             String
+  entidade         String
+  entidade_id      String?  @db.Uuid
+  dados_anteriores Json?
+  dados_novos      Json?
+  ip_origem        String?  @db.Inet
+  created_at       DateTime @default(now()) @db.Timestamptz(6)
+  perfis           perfis?  @relation(fields: [usuario_id], references: [id], onUpdate: NoAction)
+
+  @@index([entidade, entidade_id], map: "idx_auditoria_entidade")
+  @@index([usuario_id, created_at(sort: Desc)], map: "idx_auditoria_usuario")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model codigos_redefinicao {
+  id                                            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email                                         String
+  perfil_id                                     String    @db.Uuid
+  codigo                                        String?
+  codigo_hash                                   String?
+  criado_por                                    String?   @db.Uuid
+  usado_em                                      DateTime? @db.Timestamptz(6)
+  expira_em                                     DateTime  @default(dbgenerated("(now() + '01:00:00'::interval)")) @db.Timestamptz(6)
+  created_at                                    DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at                                    DateTime  @default(now()) @db.Timestamptz(6)
+  revogado_em                                   DateTime? @db.Timestamptz(6)
+  perfis_codigos_redefinicao_criado_porToperfis perfis?   @relation("codigos_redefinicao_criado_porToperfis", fields: [criado_por], references: [id], onUpdate: NoAction)
+  perfis_codigos_redefinicao_perfil_idToperfis  perfis    @relation("codigos_redefinicao_perfil_idToperfis", fields: [perfil_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([email], map: "idx_codigos_redefinicao_email")
+  @@index([email, codigo], map: "idx_codigos_redefinicao_email_codigo")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model codigos_redefinicao_tentativas {
+  email         String    @id
+  tentativas    Int       @default(0)
+  bloqueado_ate DateTime? @db.Timestamptz(6)
+  updated_at    DateTime  @default(now()) @db.Timestamptz(6)
+}
+
+/// Sessões próprias de autenticação; o token opaco só existe no cookie do navegador,
+/// o banco guarda apenas o hash SHA-256.
+model sessoes {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  perfil_id     String    @db.Uuid
+  token_hash    String    @unique(map: "uq_sessoes_token_hash")
+  criado_em     DateTime  @default(now()) @db.Timestamptz(6)
+  expira_em     DateTime  @db.Timestamptz(6)
+  ultimo_uso_em DateTime? @db.Timestamptz(6)
+  revogada_em   DateTime? @db.Timestamptz(6)
+  user_agent    String?
+  ip            String?   @db.Inet
+  perfis        perfis    @relation(fields: [perfil_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([perfil_id], map: "idx_sessoes_perfil")
+  @@index([expira_em], map: "idx_sessoes_expira")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model configuracoes_sistema {
+  id                          Int      @id @default(1)
+  limite_critico_faltas       Int      @default(25)
+  limite_preventivo_faltas    Int      @default(10)
+  dias_expurgo_anexos         Int      @default(30)
+  escola_nome                 String   @default("EEMTI")
+  mensagem_fora_horario       String   @default("O canal de diálogo está fora do horário escolar. Mensagens enviadas agora serão respondidas quando a coordenação estiver disponível.")
+  updated_at                  DateTime @default(now()) @db.Timestamptz(6)
+  minutos_validade_codigo     Int      @default(60)
+  max_tentativas_codigo       Int      @default(5)
+  minutos_bloqueio_codigo     Int      @default(15)
+  dias_retencao_codigos       Int      @default(30)
+  peso_falta                  Decimal  @default(1.0) @db.Decimal
+  peso_ocorrencia             Decimal  @default(1.0) @db.Decimal
+  peso_recencia               Decimal  @default(1.0) @db.Decimal
+  janela_recencia_dias        Int      @default(14)
+  limite_score_medio          Int      @default(40)
+  limite_score_alto           Int      @default(75)
+  peso_ocorrencia_grave       Decimal  @default(15) @db.Decimal
+  forcar_medio_em_grave       Boolean  @default(true)
+  janela_ocorrencia_dias      Int      @default(90)
+  decaimento_ocorrencia_tipo  String   @default("janela")
+  peso_resolvida              Decimal  @default(0.5) @db.Decimal
+  peso_comportamento_positivo Decimal  @default(5) @db.Decimal
+  janela_positivo_dias        Int      @default(30)
+  bonus_presenca_confirmada   Decimal  @default(10) @db.Decimal
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model conversas {
+  id                   String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  turma_id             String      @db.Uuid
+  responsavel_id       String      @db.Uuid
+  aluno_id             String      @db.Uuid
+  assunto              String?
+  ativa                Boolean     @default(true)
+  iniciada_pela_gestao Boolean     @default(false)
+  ultima_mensagem_em   DateTime?   @db.Timestamptz(6)
+  created_at           DateTime    @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime    @default(now()) @db.Timestamptz(6)
+  alunos               alunos      @relation(fields: [aluno_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  perfis               perfis      @relation(fields: [responsavel_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  turmas               turmas      @relation(fields: [turma_id], references: [id], onUpdate: NoAction)
+  mensagens            mensagens[]
+
+  @@unique([responsavel_id, aluno_id], map: "uq_conversa_responsavel_aluno")
+  @@index([responsavel_id], map: "idx_conversas_responsavel")
+  @@index([turma_id], map: "idx_conversas_turma")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model convites {
+  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email          String
+  papel          papel_perfil
+  nome_convidado String?
+  enviado_por    String       @db.Uuid
+  status         String       @default("pendente")
+  expira_em      DateTime     @db.Timestamptz(6)
+  aceito_em      DateTime?    @db.Timestamptz(6)
+  created_at     DateTime     @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime     @default(now()) @db.Timestamptz(6)
+  perfis         perfis       @relation(fields: [enviado_por], references: [id], onUpdate: NoAction)
+
+  @@index([status, expira_em], map: "idx_convites_status")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model disciplinas {
+  id                      String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nome                    String
+  codigo_sige             String?                   @unique(map: "uq_disciplina_codigo_sige")
+  carga_horaria           Int?
+  ativo                   Boolean                   @default(true)
+  created_at              DateTime                  @default(now()) @db.Timestamptz(6)
+  updated_at              DateTime                  @default(now()) @db.Timestamptz(6)
+  atribuicoes_professores atribuicoes_professores[]
+  frequencias             frequencias[]
+  registros_comportamento registros_comportamento[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model enturmacoes {
+  id                String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  aluno_id          String       @db.Uuid
+  turma_id          String       @db.Uuid
+  ano_letivo_id     String       @db.Uuid
+  status            String       @default("matriculado")
+  data_matricula    DateTime     @default(dbgenerated("CURRENT_DATE")) @db.Date
+  data_encerramento DateTime?    @db.Date
+  observacoes       String?
+  created_at        DateTime     @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime     @default(now()) @db.Timestamptz(6)
+  alunos            alunos       @relation(fields: [aluno_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  anos_letivos      anos_letivos @relation(fields: [ano_letivo_id], references: [id], onUpdate: NoAction)
+  turmas            turmas       @relation(fields: [turma_id], references: [id], onUpdate: NoAction)
+
+  @@unique([aluno_id, ano_letivo_id], map: "uq_enturmacao_aluno_ano")
+  @@index([aluno_id], map: "idx_enturmacoes_aluno")
+  @@index([ano_letivo_id], map: "idx_enturmacoes_ano")
+  @@index([status], map: "idx_enturmacoes_status")
+  @@index([turma_id], map: "idx_enturmacoes_turma")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model exportacoes {
+  id             String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  coordenador_id String?           @db.Uuid
+  tipo           String
+  turma_id       String?           @db.Uuid
+  ano_letivo_id  String            @db.Uuid
+  periodo_inicio DateTime          @db.Date
+  periodo_fim    DateTime          @db.Date
+  formato        String
+  arquivo_path   String?
+  status         status_exportacao @default(agendada)
+  created_at     DateTime          @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime          @default(now()) @db.Timestamptz(6)
+  finished_at    DateTime?         @db.Timestamptz(6)
+  anos_letivos   anos_letivos      @relation(fields: [ano_letivo_id], references: [id], onUpdate: NoAction)
+  perfis         perfis?           @relation(fields: [coordenador_id], references: [id], onUpdate: NoAction)
+  turmas         turmas?           @relation(fields: [turma_id], references: [id], onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
+model frequencias {
+  id                    String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  aluno_id              String                   @db.Uuid
+  professor_id          String                   @db.Uuid
+  turma_id              String                   @db.Uuid
+  disciplina_id         String?                  @db.Uuid
+  ano_letivo_id         String                   @db.Uuid
+  data_aula             DateTime                 @db.Date
+  tipo_registro         tipo_registro_frequencia @default(chamada_aula)
+  periodo               String
+  status                status_frequencia        @default(presente)
+  observacao            String?
+  client_request_id     String?                  @unique(map: "uq_frequencia_client_req") @db.Uuid
+  deleted_at            DateTime?                @db.Timestamptz(6)
+  created_at            DateTime                 @default(now()) @db.Timestamptz(6)
+  updated_at            DateTime                 @default(now()) @db.Timestamptz(6)
+  motivos_ausencia      String[]                 @default([])
+  alunos                alunos                   @relation(fields: [aluno_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  anos_letivos          anos_letivos             @relation(fields: [ano_letivo_id], references: [id], onUpdate: NoAction)
+  disciplinas           disciplinas?             @relation(fields: [disciplina_id], references: [id], onUpdate: NoAction)
+  perfis                perfis                   @relation(fields: [professor_id], references: [id], onUpdate: NoAction)
+  turmas                turmas                   @relation(fields: [turma_id], references: [id], onUpdate: NoAction)
+  justificativas_faltas justificativas_faltas[]
+
+  @@index([aluno_id, data_aula], map: "idx_frequencias_aluno_data")
+  @@index([ano_letivo_id], map: "idx_frequencias_ano")
+  @@index([professor_id], map: "idx_frequencias_professor")
+  @@index([status], map: "idx_frequencias_status")
+  @@index([turma_id, data_aula], map: "idx_frequencias_turma_data")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model horarios_letivos {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  dia_semana  Int      @db.SmallInt
+  hora_inicio DateTime @db.Time(6)
+  hora_fim    DateTime @db.Time(6)
+  ativo       Boolean  @default(true)
+  created_at  DateTime @default(now()) @db.Timestamptz(6)
+  updated_at  DateTime @default(now()) @db.Timestamptz(6)
+
+  @@unique([dia_semana, hora_inicio, hora_fim], map: "uq_horario_dia")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model importacoes_log {
+  id                    String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  coordenador_id        String?           @db.Uuid
+  ano_letivo_id         String            @db.Uuid
+  arquivo_nome          String
+  formato               String
+  mapeamento            Json
+  total_registros       Int?              @default(0)
+  registros_criados     Int?              @default(0)
+  registros_atualizados Int?              @default(0)
+  erros                 Json?
+  status                status_importacao @default(processando)
+  started_at            DateTime          @default(now()) @db.Timestamptz(6)
+  finished_at           DateTime?         @db.Timestamptz(6)
+  created_at            DateTime          @default(now()) @db.Timestamptz(6)
+  updated_at            DateTime          @default(now()) @db.Timestamptz(6)
+  anos_letivos          anos_letivos      @relation(fields: [ano_letivo_id], references: [id], onUpdate: NoAction)
+  perfis                perfis?           @relation(fields: [coordenador_id], references: [id], onUpdate: NoAction)
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model justificativa_anexos {
+  justificativa_id      String                @db.Uuid
+  anexo_id              String                @db.Uuid
+  created_at            DateTime              @default(now()) @db.Timestamptz(6)
+  anexos                anexos                @relation(fields: [anexo_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  justificativas_faltas justificativas_faltas @relation(fields: [justificativa_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([justificativa_id, anexo_id])
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model justificativas_faltas {
+  id                                                  String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  responsavel_id                                      String                 @db.Uuid
+  aluno_id                                            String                 @db.Uuid
+  frequencia_id                                       String?                @db.Uuid
+  data_falta                                          DateTime               @db.Date
+  data_fim                                            DateTime?              @db.Date
+  motivo                                              String
+  status                                              status_justificativa   @default(pendente)
+  avaliado_por                                        String?                @db.Uuid
+  avaliado_em                                         DateTime?              @db.Timestamptz(6)
+  parecer                                             String?
+  created_at                                          DateTime               @default(now()) @db.Timestamptz(6)
+  updated_at                                          DateTime               @default(now()) @db.Timestamptz(6)
+  justificativa_anexos                                justificativa_anexos[]
+  alunos                                              alunos                 @relation(fields: [aluno_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  perfis_justificativas_faltas_avaliado_porToperfis   perfis?                @relation("justificativas_faltas_avaliado_porToperfis", fields: [avaliado_por], references: [id], onUpdate: NoAction)
+  frequencias                                         frequencias?           @relation(fields: [frequencia_id], references: [id], onUpdate: NoAction)
+  perfis_justificativas_faltas_responsavel_idToperfis perfis                 @relation("justificativas_faltas_responsavel_idToperfis", fields: [responsavel_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([aluno_id], map: "idx_justificativas_aluno")
+  @@index([responsavel_id], map: "idx_justificativas_responsavel")
+  @@index([status], map: "idx_justificativas_status", where: raw("(status = 'pendente'::status_justificativa)"))
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model mensagens {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  conversa_id       String    @db.Uuid
+  remetente_id      String    @db.Uuid
+  conteudo          String
+  is_system_message Boolean   @default(false)
+  lida_em           DateTime? @db.Timestamptz(6)
+  edited_at         DateTime? @db.Timestamptz(6)
+  deleted_at        DateTime? @db.Timestamptz(6)
+  client_request_id String?   @unique(map: "uq_mensagem_client_req") @db.Uuid
+  created_at        DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime  @default(now()) @db.Timestamptz(6)
+  conversas         conversas @relation(fields: [conversa_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  perfis            perfis    @relation(fields: [remetente_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([conversa_id, created_at], map: "idx_mensagens_conversa")
+  @@index([conversa_id], map: "idx_mensagens_nao_lidas", where: raw("(lida_em IS NULL)"))
+  @@index([remetente_id], map: "idx_mensagens_remetente")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model monitoramento_acoes {
+  id                                                String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  aluno_id                                          String               @db.Uuid
+  responsavel_id                                    String?              @db.Uuid
+  tipo_contato                                      tipo_contato_busca
+  status                                            status_monitoramento @default(pendente)
+  realizado_por                                     String?              @db.Uuid
+  observacao                                        String?
+  agendado_para                                     DateTime?            @db.Timestamptz(6)
+  realizado_em                                      DateTime?            @db.Timestamptz(6)
+  created_at                                        DateTime             @default(now()) @db.Timestamptz(6)
+  updated_at                                        DateTime             @default(now()) @db.Timestamptz(6)
+  alunos                                            alunos               @relation(fields: [aluno_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  perfis_monitoramento_acoes_realizado_porToperfis  perfis?              @relation("monitoramento_acoes_realizado_porToperfis", fields: [realizado_por], references: [id], onUpdate: NoAction)
+  perfis_monitoramento_acoes_responsavel_idToperfis perfis?              @relation("monitoramento_acoes_responsavel_idToperfis", fields: [responsavel_id], references: [id], onUpdate: NoAction)
+
+  @@index([aluno_id], map: "idx_monitoramento_aluno")
+  @@index([status], map: "idx_monitoramento_status", where: raw("(status = ANY (ARRAY['pendente'::status_monitoramento, 'em_andamento'::status_monitoramento]))"))
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model notificacoes {
+  id              String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  destinatario_id String           @db.Uuid
+  tipo            tipo_notificacao
+  titulo          String
+  corpo           String?
+  metadados       Json?
+  lida            Boolean          @default(false)
+  lida_em         DateTime?        @db.Timestamptz(6)
+  created_at      DateTime         @default(now()) @db.Timestamptz(6)
+  perfis          perfis           @relation(fields: [destinatario_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([destinatario_id, lida, created_at(sort: Desc)], map: "idx_notificacoes_destinatario")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model ocorrencia_anexos {
+  ocorrencia_id String      @db.Uuid
+  anexo_id      String      @db.Uuid
+  created_at    DateTime    @default(now()) @db.Timestamptz(6)
+  anexos        anexos      @relation(fields: [anexo_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  ocorrencias   ocorrencias @relation(fields: [ocorrencia_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([ocorrencia_id, anexo_id])
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model ocorrencias {
+  id                                        String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  aluno_id                                  String              @db.Uuid
+  professor_id                              String?             @db.Uuid
+  coordenador_id                            String?             @db.Uuid
+  turma_id                                  String              @db.Uuid
+  ano_letivo_id                             String              @db.Uuid
+  titulo                                    String
+  descricao                                 String
+  tipo                                      String[]
+  status                                    status_ocorrencia   @default(aberta)
+  exige_presenca_responsavel                Boolean             @default(false)
+  presenca_responsavel_confirmada           Boolean             @default(false)
+  data_confirmacao_presenca                 DateTime?           @db.Timestamptz(6)
+  data_ocorrencia                           DateTime            @default(now()) @db.Timestamptz(6)
+  closed_at                                 DateTime?           @db.Timestamptz(6)
+  created_at                                DateTime            @default(now()) @db.Timestamptz(6)
+  updated_at                                DateTime            @default(now()) @db.Timestamptz(6)
+  tags_comportamento                        String[]            @default([])
+  notificar_coordenacao                     Boolean             @default(true)
+  notificar_responsavel                     Boolean             @default(false)
+  ocorrencia_anexos                         ocorrencia_anexos[]
+  alunos                                    alunos              @relation(fields: [aluno_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  anos_letivos                              anos_letivos        @relation(fields: [ano_letivo_id], references: [id], onUpdate: NoAction)
+  perfis_ocorrencias_coordenador_idToperfis perfis?             @relation("ocorrencias_coordenador_idToperfis", fields: [coordenador_id], references: [id], onUpdate: NoAction)
+  perfis_ocorrencias_professor_idToperfis   perfis?             @relation("ocorrencias_professor_idToperfis", fields: [professor_id], references: [id], onUpdate: NoAction)
+  turmas                                    turmas              @relation(fields: [turma_id], references: [id], onUpdate: NoAction)
+
+  @@index([aluno_id], map: "idx_ocorrencias_aluno")
+  @@index([ano_letivo_id], map: "idx_ocorrencias_ano")
+  @@index([aluno_id], map: "idx_ocorrencias_presenca_pendente", where: raw("(exige_presenca_responsavel AND (NOT presenca_responsavel_confirmada))"))
+  @@index([status], map: "idx_ocorrencias_status")
+  @@index([turma_id], map: "idx_ocorrencias_turma")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model opcoes_configuracao {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tipo       String
+  chave      String
+  rotulo     String
+  icone      String?
+  ordem      Int      @default(0)
+  ativo      Boolean  @default(true)
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+
+  @@unique([tipo, chave])
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model perfis {
+  id                                                                 String                    @id @db.Uuid
+  nome                                                               String
+  papel                                                              papel_perfil
+  email                                                              String?                   @unique(map: "uq_perfil_email")
+  telefone                                                           String?
+  cargo                                                              String?
+  notificacoes_ativas                                                Boolean                   @default(true)
+  status                                                             status_perfil             @default(ativo)
+  senha_hash                                                         String?
+  senha_alterada_em                                                  DateTime?                 @db.Timestamptz(6)
+  ultimo_acesso_em                                                   DateTime?                 @db.Timestamptz(6)
+  acesso_modulos                                                     String[]                  @default([])
+  permissoes                                                         String[]                  @default([])
+  created_at                                                         DateTime                  @default(now()) @db.Timestamptz(6)
+  updated_at                                                         DateTime                  @default(now()) @db.Timestamptz(6)
+  anexos                                                             anexos[]
+  atribuicoes_professores                                            atribuicoes_professores[]
+  auditoria                                                          auditoria[]
+  codigos_redefinicao_codigos_redefinicao_criado_porToperfis         codigos_redefinicao[]     @relation("codigos_redefinicao_criado_porToperfis")
+  codigos_redefinicao_codigos_redefinicao_perfil_idToperfis          codigos_redefinicao[]     @relation("codigos_redefinicao_perfil_idToperfis")
+  conversas                                                          conversas[]
+  convites                                                           convites[]
+  exportacoes                                                        exportacoes[]
+  frequencias                                                        frequencias[]
+  importacoes_log                                                    importacoes_log[]
+  justificativas_faltas_justificativas_faltas_avaliado_porToperfis   justificativas_faltas[]   @relation("justificativas_faltas_avaliado_porToperfis")
+  justificativas_faltas_justificativas_faltas_responsavel_idToperfis justificativas_faltas[]   @relation("justificativas_faltas_responsavel_idToperfis")
+  mensagens                                                          mensagens[]
+  monitoramento_acoes_monitoramento_acoes_realizado_porToperfis      monitoramento_acoes[]     @relation("monitoramento_acoes_realizado_porToperfis")
+  monitoramento_acoes_monitoramento_acoes_responsavel_idToperfis     monitoramento_acoes[]     @relation("monitoramento_acoes_responsavel_idToperfis")
+  notificacoes                                                       notificacoes[]
+  sessoes                                                            sessoes[]
+  ocorrencias_ocorrencias_coordenador_idToperfis                     ocorrencias[]             @relation("ocorrencias_coordenador_idToperfis")
+  ocorrencias_ocorrencias_professor_idToperfis                       ocorrencias[]             @relation("ocorrencias_professor_idToperfis")
+  registros_comportamento                                            registros_comportamento[]
+  vinculos_responsaveis                                              vinculos_responsaveis[]
+
+  @@index([papel], map: "idx_perfis_papel", where: raw("(status = 'ativo'::status_perfil)"))
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model pontuacao_turmas {
+  id                   String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  turma_id             String       @db.Uuid
+  ano_letivo_id        String       @db.Uuid
+  mes_referencia       DateTime     @db.Date
+  pontos_presenca      Int          @default(0)
+  pontos_comportamento Int          @default(0)
+  /// Coluna gerada no banco (`generated always as (pontos_presenca + pontos_comportamento) stored`),
+  /// representada aqui como leitura simples porque o Prisma não modela colunas geradas.
+  pontos_total         Int?
+  created_at           DateTime     @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime     @default(now()) @db.Timestamptz(6)
+  anos_letivos         anos_letivos @relation(fields: [ano_letivo_id], references: [id], onUpdate: NoAction)
+  turmas               turmas       @relation(fields: [turma_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([turma_id, ano_letivo_id, mes_referencia], map: "uq_pontuacao_turma_mes")
+  @@index([ano_letivo_id, mes_referencia, pontos_total(sort: Desc)], map: "idx_pontuacao_ranking")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model registro_comportamento_tags {
+  registro_id             String                  @db.Uuid
+  tag_id                  String                  @db.Uuid
+  created_at              DateTime                @default(now()) @db.Timestamptz(6)
+  registros_comportamento registros_comportamento @relation(fields: [registro_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  tags_comportamento      tags_comportamento      @relation(fields: [tag_id], references: [id], onUpdate: NoAction)
+
+  @@id([registro_id, tag_id])
+  @@index([registro_id], map: "idx_comportamento_tags_registro")
+  @@index([tag_id], map: "idx_comportamento_tags_tag")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model registros_comportamento {
+  id                          String                        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  aluno_id                    String                        @db.Uuid
+  professor_id                String                        @db.Uuid
+  turma_id                    String                        @db.Uuid
+  disciplina_id               String?                       @db.Uuid
+  ano_letivo_id               String                        @db.Uuid
+  data_hora                   DateTime                      @default(now()) @db.Timestamptz(6)
+  observacao                  String?
+  client_request_id           String?                       @unique(map: "uq_comportamento_client_req") @db.Uuid
+  created_at                  DateTime                      @default(now()) @db.Timestamptz(6)
+  updated_at                  DateTime                      @default(now()) @db.Timestamptz(6)
+  registro_comportamento_tags registro_comportamento_tags[]
+  alunos                      alunos                        @relation(fields: [aluno_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  anos_letivos                anos_letivos                  @relation(fields: [ano_letivo_id], references: [id], onUpdate: NoAction)
+  disciplinas                 disciplinas?                  @relation(fields: [disciplina_id], references: [id], onUpdate: NoAction)
+  perfis                      perfis                        @relation(fields: [professor_id], references: [id], onUpdate: NoAction)
+  turmas                      turmas                        @relation(fields: [turma_id], references: [id], onUpdate: NoAction)
+
+  @@index([aluno_id, data_hora], map: "idx_comportamento_aluno_data")
+  @@index([ano_letivo_id], map: "idx_comportamento_ano")
+  @@index([professor_id], map: "idx_comportamento_professor")
+  @@index([turma_id, data_hora], map: "idx_comportamento_turma_data")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model tags_comportamento {
+  id                          String                        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nome                        String                        @unique(map: "uq_tag_nome")
+  categoria                   categoria_tag
+  icone                       String?
+  descricao                   String?
+  peso_pontuacao              Int                           @default(0)
+  ativo                       Boolean                       @default(true)
+  created_at                  DateTime                      @default(now()) @db.Timestamptz(6)
+  updated_at                  DateTime                      @default(now()) @db.Timestamptz(6)
+  registro_comportamento_tags registro_comportamento_tags[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model turmas {
+  id                      String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ano_letivo_id           String                    @db.Uuid
+  serie                   String
+  letra                   String
+  nome_completo           String
+  capacidade              Int?
+  ativo                   Boolean                   @default(true)
+  created_at              DateTime                  @default(now()) @db.Timestamptz(6)
+  updated_at              DateTime                  @default(now()) @db.Timestamptz(6)
+  atribuicoes_professores atribuicoes_professores[]
+  conversas               conversas[]
+  enturmacoes             enturmacoes[]
+  exportacoes             exportacoes[]
+  frequencias             frequencias[]
+  ocorrencias             ocorrencias[]
+  pontuacao_turmas        pontuacao_turmas[]
+  registros_comportamento registros_comportamento[]
+  anos_letivos            anos_letivos              @relation(fields: [ano_letivo_id], references: [id], onUpdate: NoAction)
+
+  @@unique([ano_letivo_id, serie, letra], map: "uq_turma_ano_serie_letra")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model vinculos_responsaveis {
+  id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  responsavel_id      String   @db.Uuid
+  aluno_id            String   @db.Uuid
+  tipo_relacao        String   @default("outro")
+  contato_prioritario Boolean  @default(false)
+  ativo               Boolean  @default(true)
+  created_at          DateTime @default(now()) @db.Timestamptz(6)
+  updated_at          DateTime @default(now()) @db.Timestamptz(6)
+  alunos              alunos   @relation(fields: [aluno_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  perfis              perfis   @relation(fields: [responsavel_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([responsavel_id, aluno_id], map: "uq_vinculo_responsavel_aluno")
+  @@index([aluno_id], map: "idx_vinculos_aluno")
+  @@index([responsavel_id], map: "idx_vinculos_responsavel")
+}
+
+enum categoria_tag {
+  positivo
+  atencao
+  critico
+}
+
+enum papel_perfil {
+  professor
+  gestao
+  responsavel
+}
+
+enum status_aluno {
+  ativo
+  egresso
+  transferido
+  inativo
+}
+
+enum status_ano_letivo {
+  planejado
+  ativo
+  arquivado
+}
+
+enum status_exportacao {
+  agendada
+  processando
+  concluida
+  falhou
+}
+
+enum status_frequencia {
+  presente
+  ausente
+  justificado
+}
+
+enum status_importacao {
+  processando
+  concluido
+  parcial
+  falhou
+}
+
+enum status_justificativa {
+  pendente
+  aceita
+  recusada
+}
+
+enum status_monitoramento {
+  pendente
+  em_andamento
+  realizado
+  sem_contato
+  cancelado
+}
+
+enum status_ocorrencia {
+  aberta
+  em_andamento
+  resolvida
+  arquivada
+}
+
+enum status_perfil {
+  ativo
+  pendente
+  inativo
+}
+
+enum tipo_contato_busca {
+  telefone
+  whatsapp
+  presencial
+  carta
+  outro
+}
+
+enum tipo_notificacao {
+  ausencia_portao
+  ausencia_aula
+  monitoramento
+  ocorrencia
+  justificativa
+  mensagem
+  sistema
+  codigo_redefinicao
+}
+
+enum tipo_registro_frequencia {
+  entrada_portao
+  chamada_aula
+  saida
+}

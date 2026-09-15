@@ -30,3 +30,9 @@ jobs:
         run: npm run db:migrate
         env:
           DATABASE_URL: ${{ secrets.DIRECT_URL_PROD }}
+
+      - name: Define a senha do papel de runtime
+        run: node infra/docker/role.mjs
+        env:
+          MIGRATE_DATABASE_URL: ${{ secrets.DIRECT_URL_PROD }}
+          APP_DB_PASSWORD: ${{ secrets.APP_DB_PASSWORD_PROD }}

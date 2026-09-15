@@ -12,13 +12,13 @@ let carregamentoEmAndamento: Promise<void> | null = null;
 /** Indica que o servidor já respondeu de forma definitiva sobre a sessão atual. */
 let sessaoVerificada = false;
 
-/** Busca o perfil autenticado; 401 significa sessão ausente ou expirada. */
+/** Busca o perfil autenticado; `perfil: null` (ou 401 legado) significa sessão ausente ou expirada. */
 function carregarPerfil(): Promise<void> {
   if (carregamentoEmAndamento) return carregamentoEmAndamento;
 
   carregamentoEmAndamento = (async () => {
     try {
-      const { perfil } = await api<{ perfil: Perfil }>('/api/auth/me');
+      const { perfil } = await api<{ perfil: Perfil | null }>('/api/auth/me');
       usuario.value = perfil;
       sessaoVerificada = true;
     } catch (erro) {

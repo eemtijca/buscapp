@@ -27,6 +27,6 @@ jobs:
       - run: npm ci
 
       - name: Aplica as migrações no banco de produção
-        run: npm run db:migrate -w @buscapp/api
+        run: npm run db:migrate
         env:
           DATABASE_URL: ${{ secrets.DIRECT_URL_PROD }}

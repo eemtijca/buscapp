@@ -140,13 +140,14 @@ describe('sessão', () => {
       url: '/api/auth/me',
       cookies: { buscapp_sessao: token },
     });
-    expect(depois.statusCode).toBe(401);
+    expect(depois.statusCode).toBe(200);
+    expect(depois.json().perfil).toBeNull();
   });
 
-  it('nega acesso sem cookie com o envelope de erro', async () => {
+  it('devolve perfil null sem cookie (sonda de sessão)', async () => {
     const resposta = await app.inject({ method: 'GET', url: '/api/auth/me' });
-    expect(resposta.statusCode).toBe(401);
-    expect(resposta.json().erro.codigo).toBe('nao_autenticado');
+    expect(resposta.statusCode).toBe(200);
+    expect(resposta.json().perfil).toBeNull();
   });
 });
 
@@ -186,7 +187,8 @@ describe('redefinição por código', () => {
       url: '/api/auth/me',
       cookies: { buscapp_sessao: tokenAntigo },
     });
-    expect(sessaoAntiga.statusCode).toBe(401);
+    expect(sessaoAntiga.statusCode).toBe(200);
+    expect(sessaoAntiga.json().perfil).toBeNull();
 
     const loginNovo = await app.inject({
       method: 'POST',

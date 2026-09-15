@@ -4,7 +4,7 @@ Rotas HTTP da API Fastify. Todas ficam sob `/api` e respondem JSON, exceto o dow
 
 ## Convenções
 
-- **Sessão:** rotas privadas resolvem o usuário pelo cookie `buscapp_sessao` (HttpOnly). Sem sessão válida respondem `401` com `{ erro: { codigo: 'nao_autenticado', mensagem } }`. O frontend usa `credentials: 'include'`.
+- **Sessão:** rotas privadas resolvem o usuário pelo cookie `buscapp_sessao` (HttpOnly). Sem sessão válida respondem `401` com `{ erro: { codigo: 'nao_autenticado', mensagem } }`. A exceção é `GET /api/auth/me`, uma sonda que sempre responde `200` com `perfil: null` quando não há sessão, para o frontend descobrir o estado sem gerar erro. O frontend usa `credentials: 'include'`.
 - **Erros:** envelope único `{ "erro": { "codigo": "string", "mensagem": "string" } }`. O status indica a categoria: `400` validação ou regra de negócio, `401` sem sessão, `403` sem permissão, `404` recurso ausente ou fora do escopo, `413` arquivo grande e `429` tentativas de código excedidas.
 - **Papel e módulo:** `exigirPapel` valida o papel e `exigirModulo` aplica `acesso_modulos` com semântica fail-closed. A gestão não passa por módulos; professor e responsável dependem dos módulos habilitados.
 - **Escopo:** toda leitura filtra pelos alunos visíveis ao perfil. Recurso fora do escopo responde `404`, para não revelar a existência.
@@ -21,7 +21,7 @@ Rotas HTTP da API Fastify. Todas ficam sob `/api` e respondem JSON, exceto o dow
 | GET                    | `/api/eventos`                                           | Sessão                            | Stream SSE de invalidação                                                  |
 | POST                   | `/api/auth/login`                                        | Público                           | Inicia a sessão                                                            |
 | POST                   | `/api/auth/logout`                                       | Público                           | Revoga a sessão e limpa o cookie                                           |
-| GET                    | `/api/auth/me`                                           | Sessão                            | Perfil autenticado                                                         |
+| GET                    | `/api/auth/me`                                           | Público (sonda)                   | Perfil da sessão ou `null`                                                 |
 | POST                   | `/api/auth/solicitar-codigo`                             | Público                           | Solicita código, notificando a gestão                                      |
 | POST                   | `/api/auth/redefinir-senha`                              | Público                           | Define a senha com o código                                                |
 | GET                    | `/api/usuarios`                                          | Gestão                            | Lista perfis com filtros `papel`, `status` e `busca`                       |
@@ -115,7 +115,7 @@ Revoga a sessão do cookie e o limpa. Responde `200`.
 
 ### `GET /api/auth/me`
 
-Responde `200` com `{ perfil }` no formato `perfilAutenticadoSchema` (id, nome, email, papel, status, telefone, cargo, notificacoes_ativas e acesso_modulos).
+Sonda a sessão sem falhar: responde `200` com `{ perfil }` quando o cookie é válido, ou `{ perfil: null }` quando não há cookie, a sessão expirou ou foi revogada. O `perfil` segue o `perfilAutenticadoSchema` (id, nome, email, papel, status, telefone, cargo, notificacoes_ativas e acesso_modulos).
 
 ### `POST /api/auth/solicitar-codigo`
 

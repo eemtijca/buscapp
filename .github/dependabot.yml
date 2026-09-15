@@ -1,12 +1,68 @@
-# To get started with Dependabot version updates, you'll need to specify which
-# package ecosystems to update and where the package manifests are located.
-# Please see the documentation for more information:
-# https://docs.github.com/github/administering-a-repository/configuration-options-for-dependency-updates
-# https://containers.dev/guide/dependabot
+# Atualizações de versão versionadas pelo Dependabot.
+# Referência das opções: https://docs.github.com/code-security/dependabot/working-with-dependabot/dependabot-options-reference
+# Regra: permitir apenas releases minor e patch (majors são ignorados) e agrupar
+# as atualizações em um único PR por ecossistema. `update-types` afeta apenas
+# atualizações de versão; atualizações de segurança continuam sendo abertas.
 
 version: 2
 updates:
-  - package-ecosystem: 'devcontainers'
+  # npm (workspaces com lockfile único na raiz; cobre apps/* e packages/*)
+  - package-ecosystem: 'npm'
     directory: '/'
     schedule:
       interval: weekly
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: 'chore(deps)'
+    groups:
+      npm:
+        patterns: ['*']
+        update-types: ['minor', 'patch']
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
+
+  # GitHub Actions (.github/workflows/*.yml)
+  - package-ecosystem: 'github-actions'
+    directory: '/'
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: 'chore(deps)'
+    groups:
+      github-actions:
+        patterns: ['*']
+        update-types: ['minor', 'patch']
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
+
+  # Docker (infra/docker/Dockerfile)
+  - package-ecosystem: 'docker'
+    directory: '/infra/docker'
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: 'chore(deps)'
+    groups:
+      docker:
+        patterns: ['*']
+        update-types: ['minor', 'patch']
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
+
+  # Dev Container (.devcontainer/devcontainer.json)
+  - package-ecosystem: 'devcontainers'
+    directory: '/.devcontainer'
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: 'chore(deps)'
+    groups:
+      devcontainers:
+        patterns: ['*']
+        update-types: ['minor', 'patch']
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']

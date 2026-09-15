@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { onUnmounted, watch } from 'vue';
+import { onMounted, onUnmounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAutenticacao } from '@/composables/useAutenticacao';
+import { useStatusConta } from '@/composables/useStatusConta';
 import { useStatusConexao } from '@/composables/useStatusConexao';
 import { useNotificacoes } from '@/composables/useNotificacoes';
 import IndicadorConexao from '@/componentes/IndicadorConexao.vue';
@@ -12,6 +13,10 @@ const router = useRouter();
 const { usuario, logout } = useAutenticacao();
 const { status } = useStatusConexao();
 const { naoLidasMensagens, iniciar, parar } = useNotificacoes();
+const { iniciar: iniciarStatusConta, parar: pararStatusConta } = useStatusConta();
+
+// A verificação de status da conta só faz sentido com sessão ativa; fica no shell autenticado.
+onMounted(() => iniciarStatusConta());
 
 watch(
   usuario,
@@ -27,6 +32,7 @@ watch(
 
 onUnmounted(() => {
   parar();
+  pararStatusConta();
 });
 
 async function handleLogout(): Promise<void> {

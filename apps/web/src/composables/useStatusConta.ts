@@ -16,11 +16,11 @@ let ouvinteRegistrado: ((event: Event) => void) | null = null;
 let ultimaVerificacaoEm = 0;
 let emVerificacao = false;
 
-/** Consulta o status do perfil autenticado; 401 ou falha transitória devolvem null. */
+/** Consulta o status do perfil autenticado; sessão ausente ou falha transitória devolvem null. */
 async function verificarStatus(): Promise<StatusPerfilConta | null> {
   try {
-    const { perfil } = await api<{ perfil: { status: StatusPerfilConta } }>('/api/auth/me');
-    return perfil.status;
+    const { perfil } = await api<{ perfil: { status: StatusPerfilConta } | null }>('/api/auth/me');
+    return perfil?.status ?? null;
   } catch {
     return null;
   }

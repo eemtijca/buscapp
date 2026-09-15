@@ -159,7 +159,8 @@ describe('leituras e edição', () => {
       url: '/api/auth/me',
       cookies: { buscapp_sessao: sessaoProf },
     });
-    expect(depois.statusCode).toBe(401);
+    expect(depois.statusCode).toBe(200);
+    expect(depois.json().perfil).toBeNull();
 
     await prisma.perfis.update({ where: { id: profId }, data: { status: 'ativo' } });
   });

@@ -17,9 +17,10 @@ async function encerrar(sinal: string) {
 process.on('SIGINT', () => void encerrar('SIGINT'));
 process.on('SIGTERM', () => void encerrar('SIGTERM'));
 
-try {
-  await app.listen({ port: ambiente.PORT, host: ambiente.HOST });
-} catch (erro) {
+await app.ready();
+// Sem `await`: na Vercel o `listen` é capturado para expor o servidor e não emite `listening`;
+// aguardar a Promise travaria a avaliação do módulo.
+app.listen({ port: ambiente.PORT, host: ambiente.HOST }).catch((erro) => {
   app.log.error(erro);
   process.exit(1);
-}
+});

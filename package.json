@@ -13,7 +13,7 @@
     "build": "run-p type-check build-only",
     "build-only": "npm run build-only -w @buscapp/web",
     "preview": "npm run preview -w @buscapp/web",
-    "prepare": "npm run build -w @buscapp/contratos",
+    "prepare": "node scripts/preparar-contratos.mjs",
     "type-check": "npm run build -w @buscapp/contratos && npm run type-check --workspaces --if-present",
     "lint": "run-s lint:*",
     "lint:oxlint": "oxlint . --fix",

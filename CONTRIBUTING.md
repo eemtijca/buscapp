@@ -29,6 +29,7 @@ npm run test:e2e      # com o Compose no ar e o banco com seed
 - Datas civis trafegam como `yyyy-mm-dd` e timestamps como ISO 8601.
 - Migrações: crie com `npx prisma migrate dev --name ajuste` em `apps/api`. Nunca edite uma migração aplicada.
 - Segredos apenas por ambiente. Ver [docs/ambiente.md](docs/ambiente.md).
+- Cada workspace declara no próprio `package.json` as ferramentas de build que seus scripts usam, para que o install filtrado por serviço funcione sem depender do hoisting do root.
 - Ao alterar comportamento, atualize a documentação correspondente e os testes.
 
 ## Comentários no código

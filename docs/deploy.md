@@ -57,6 +57,12 @@ Configuração do projeto:
 4. `AUTH_PEPPER` com pelo menos 32 caracteres, `COOKIE_SECURE=true`, `APP_URL` com o domínio do projeto e as origens extras em `APP_ORIGINS`.
 5. Anexos com `STORAGE_DRIVER=s3`, endpoint S3 do Supabase Storage e bucket com underscore no nome, como `buscapp_anexos`. Isso força URLs pré-assinadas path-style e evita erro de CORS no envio direto do navegador.
 
+Build no monorepo:
+
+- A Vercel instala dependências por serviço. Por isso o `prepare` do root é ignorado no ambiente da Vercel e cada workspace declara as ferramentas que os próprios scripts usam (`typescript`, `@types/node`, `vue-tsc` e `@tsconfig/node24` onde se aplica). No desenvolvimento local, o `prepare` continua compilando os contratos.
+- O `buildCommand` do serviço `api` roda `npm run build`, que compila `@buscapp/contratos`, gera o Prisma Client e transpila a API. O serviço `web` roda `npm run build-only`, que não depende dos contratos.
+- Não defina `NODE_ENV` manualmente no projeto da Vercel, para não omitir as devDependencies no install.
+
 Limites do perfil serverless:
 
 - As Functions limitam corpo de requisição e resposta a 4,5 MB. Por isso o anexo usa URL pré-assinada para envio e streaming no download.

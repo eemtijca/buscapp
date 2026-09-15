@@ -32,4 +32,4 @@ if [ "$SEED" = "true" ]; then
 fi
 
 echo "Iniciando a API..."
-exec node dist/src/principal.js
+exec node dist/src/server.js

@@ -1,6 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import { useAutenticacao } from '@/composables/useAutenticacao';
-import { iniciarNavegacao, finalizarNavegacao } from '@/composables/useNavegacao';
+import { tituloParaRota } from '@/composables/useNavegacao';
 import LayoutPrincipal from '@/layouts/LayoutPrincipal.vue';
 import LoginView from '@/paginas/auth/LoginView.vue';
 
@@ -379,7 +379,6 @@ const router = createRouter({
 });
 
 router.beforeEach(async (to, _from) => {
-  iniciarNavegacao(to);
   const { usuario, garantirUsuario } = useAutenticacao();
 
   // Recupera a sessão por cookie antes de qualquer decisão de rota.
@@ -432,12 +431,8 @@ router.beforeEach(async (to, _from) => {
   }
 });
 
-router.afterEach(() => {
-  finalizarNavegacao();
-});
-
-router.onError(() => {
-  finalizarNavegacao();
+router.afterEach((to) => {
+  document.title = `${tituloParaRota(to)} · BuscApp`;
 });
 
 export default router;

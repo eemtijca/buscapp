@@ -12,6 +12,7 @@ import {
 } from 'fastify-type-provider-zod';
 import { ambiente, origensPermitidas } from './ambiente.js';
 import { contextoBanco } from './nucleo/banco/contexto.js';
+import { registrarCacheHttp } from './nucleo/http/etag.js';
 import { ErroHttp } from './nucleo/http/erros.js';
 import { rotasEventos } from './nucleo/http/rotas-eventos.js';
 import { rotasSaude } from './nucleo/http/rotas-saude.js';
@@ -24,7 +25,6 @@ import { rotasConfiguracoes } from './modulos/configuracoes/configuracoes.rotas.
 import { rotasEstrutura } from './modulos/estrutura/estrutura.rotas.js';
 import { rotasFrequencias } from './modulos/frequencias/frequencias.rotas.js';
 import { rotasJustificativas } from './modulos/justificativas/justificativas.rotas.js';
-import { rotasMonitoramento } from './modulos/monitoramento/monitoramento.rotas.js';
 import { rotasNotificacoes } from './modulos/notificacoes/notificacoes.rotas.js';
 import { rotasOcorrencias } from './modulos/ocorrencias/ocorrencias.rotas.js';
 import { rotasUsuarios } from './modulos/usuarios/usuarios.rotas.js';
@@ -44,6 +44,8 @@ export async function construirApp(): Promise<FastifyInstance> {
 
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);
+
+  registrarCacheHttp(app);
 
   // Contexto por requisição: o middleware de autenticação preenche `usuarioId`.
   app.addHook('onRequest', (_pedido, _resposta, concluir) => {
@@ -76,6 +78,8 @@ export async function construirApp(): Promise<FastifyInstance> {
     origin: origensPermitidas,
     credentials: true,
     methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    exposedHeaders: ['ETag'],
+    maxAge: 86_400,
   });
   await app.register(multipart, { limits: { fileSize: 10 * 1024 * 1024, files: 1 } });
   await app.register(rotasSaude);
@@ -93,7 +97,6 @@ export async function construirApp(): Promise<FastifyInstance> {
   await app.register(rotasChat);
   await app.register(rotasNotificacoes);
   await app.register(rotasConfiguracoes);
-  await app.register(rotasMonitoramento);
 
   const distWeb = path.resolve(process.cwd(), ambiente.WEB_DIST);
   if (existsSync(path.join(distWeb, 'index.html'))) {

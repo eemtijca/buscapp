@@ -13,8 +13,15 @@ import { createApp } from 'vue';
 import { registerSW } from 'virtual:pwa-register';
 import App from './App.vue';
 import router from './rotas';
+import { definirTratadorSessaoInvalida, inicializarCache } from '@/servicos/cache';
+import { tratarSessaoExpirada } from '@/composables/useAutenticacao';
 
 registerSW({ immediate: true });
+
+inicializarCache();
+definirTratadorSessaoInvalida(() => {
+  void tratarSessaoExpirada().then(() => router.push('/'));
+});
 
 const app = createApp(App);
 

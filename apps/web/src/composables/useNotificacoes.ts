@@ -1,6 +1,7 @@
 import { ref, type Ref } from 'vue';
 import { api } from '@/servicos/api';
-import { inscreverEventos } from '@/servicos/eventos';
+import { Consultas } from '@/servicos/consultas';
+import { invalidarChave, observar, recarregar, type SnapshotConsulta } from '@/servicos/cache';
 import { timestampRelativo } from '@/utils/chatUtils';
 import type { Notificacao } from '@/tipos/database';
 import type { NotificacaoItem } from '@/tipos/componentes';
@@ -11,20 +12,14 @@ const naoLidasOutros: Ref<number> = ref(0);
 const notificacoes: Ref<NotificacaoItem[]> = ref([]);
 const carregando: Ref<boolean> = ref(false);
 
-const ATRASO_DEBOUNCE_MS = 500;
 const INTERVALO_POLLING_MS = 30_000;
 const LIMITE_NOTIFICACOES = 20;
 
-interface RespostaNotificacoes {
-  notificacoes: Notificacao[];
-  nao_lidas: number;
-}
-
 let usuarioId: string | null = null;
-let timerRecarga: ReturnType<typeof setTimeout> | null = null;
 let timerPolling: ReturnType<typeof setInterval> | null = null;
-let cancelarEventos: (() => void) | null = null;
-let ouvinteVisibilidadeRegistrado = false;
+let cancelarObservacao: (() => void) | null = null;
+
+const OPCOES = Consultas.notificacoes({ limite: LIMITE_NOTIFICACOES });
 
 const ICONE_TIPO: Record<string, string> = {
   mensagem: 'chat-dots',
@@ -37,11 +32,10 @@ const ICONE_TIPO: Record<string, string> = {
   codigo_redefinicao: 'key',
 };
 
-/** Obtém o papel do usuário logado para roteamento de notificações (Opção A). */
+/** Obtém o papel do usuário logado para roteamento de notificações. */
 function obterPapel(): string | undefined {
   const usuario = useAutenticacao().usuario.value;
-  if (usuario?.papel) return usuario.papel;
-  return undefined;
+  return usuario?.papel ?? undefined;
 }
 
 function rotaPorTipo(tipo: string, metadados?: Record<string, unknown> | null): string {
@@ -54,7 +48,6 @@ function rotaPorTipo(tipo: string, metadados?: Record<string, unknown> | null): 
   if (tipo === 'mensagem') {
     if (papel === 'responsavel') return `/responsavel/chat${qsConversa}`;
     if (papel === 'gestao') return `/gestao/chat${qsConversa}`;
-    // Professor não tem chat; cai no home
     return papel ? `/${papel}` : '/';
   }
   if (tipo === 'ausencia_portao' || tipo === 'ausencia_aula' || tipo === 'monitoramento') {
@@ -69,144 +62,108 @@ function rotaPorTipo(tipo: string, metadados?: Record<string, unknown> | null): 
   }
   if (tipo === 'justificativa') {
     if (papel === 'responsavel') return `/responsavel/justificativa${qsAluno}`;
-    if (papel === 'professor') return `/professor`;
+    if (papel === 'professor') return '/professor';
     return `/gestao/justificativas${qsAluno}`;
   }
   if (tipo === 'codigo_redefinicao') return '/gestao/codigos';
   return papel ? `/${papel}` : '/';
 }
 
-async function carregar() {
-  if (!usuarioId) return;
-  carregando.value = true;
-  try {
-    const resposta = await api<RespostaNotificacoes>('/api/notificacoes', {
-      parametros: { limite: LIMITE_NOTIFICACOES },
-    });
+function aplicar(
+  estado: SnapshotConsulta<{ notificacoes: Notificacao[]; nao_lidas: number }>,
+): void {
+  const lista = estado.dados?.notificacoes ?? [];
 
-    const itens: NotificacaoItem[] = resposta.notificacoes.map((n) => ({
-      id: n.id,
-      tipo: n.tipo,
-      titulo: n.titulo,
-      corpo: n.corpo,
-      tempoRelativo: timestampRelativo(n.created_at),
-      lida: n.lida,
-      rota: rotaPorTipo(n.tipo, n.metadados),
-    }));
+  const itens: NotificacaoItem[] = lista.map((notificacao) => ({
+    id: notificacao.id,
+    tipo: notificacao.tipo,
+    titulo: notificacao.titulo,
+    corpo: notificacao.corpo,
+    tempoRelativo: timestampRelativo(notificacao.created_at),
+    lida: notificacao.lida,
+    rota: rotaPorTipo(notificacao.tipo, notificacao.metadados),
+  }));
 
-    const naoLidas = itens.filter((n) => !n.lida);
-    if (resposta.nao_lidas === 0) {
-      naoLidasMensagens.value = 0;
-      naoLidasOutros.value = 0;
-    } else {
-      naoLidasMensagens.value = naoLidas.filter((n) => n.tipo === 'mensagem').length;
-      naoLidasOutros.value = naoLidas.filter((n) => n.tipo !== 'mensagem').length;
-    }
-    notificacoes.value = itens.filter((n) => n.tipo !== 'mensagem');
-  } catch {
-    /* Falha transitória: o SSE e o polling de segurança tentam novamente. */
-  } finally {
-    carregando.value = false;
+  const naoLidas = itens.filter((item) => !item.lida);
+  if ((estado.dados?.nao_lidas ?? 0) === 0) {
+    naoLidasMensagens.value = 0;
+    naoLidasOutros.value = 0;
+  } else {
+    naoLidasMensagens.value = naoLidas.filter((item) => item.tipo === 'mensagem').length;
+    naoLidasOutros.value = naoLidas.filter((item) => item.tipo !== 'mensagem').length;
   }
+
+  notificacoes.value = itens.filter((item) => item.tipo !== 'mensagem');
+  carregando.value = estado.pendente || estado.atualizando;
 }
 
-function recarregarDebounced() {
-  if (!usuarioId || timerRecarga) return;
-  timerRecarga = setTimeout(() => {
-    timerRecarga = null;
-    void carregar();
-  }, ATRASO_DEBOUNCE_MS);
+async function iniciar(userId: string): Promise<void> {
+  if (cancelarObservacao && usuarioId === userId) return;
+
+  parar();
+  usuarioId = userId;
+
+  cancelarObservacao = observar(OPCOES, aplicar);
+  // O cache já recebe o SSE de `notificacoes`; o polling cobre instâncias sem barramento.
+  timerPolling = setInterval(() => {
+    if (usuarioId) void recarregar(OPCOES.chave, true);
+  }, INTERVALO_POLLING_MS);
+
+  await recarregar(OPCOES.chave);
 }
 
-function aoMudarVisibilidade() {
-  if (document.visibilityState === 'visible' && usuarioId) {
-    void carregar();
-  }
-}
-
-function cancelarInscricoes() {
-  if (timerRecarga) {
-    clearTimeout(timerRecarga);
-    timerRecarga = null;
-  }
+function parar(): void {
   if (timerPolling) {
     clearInterval(timerPolling);
     timerPolling = null;
   }
-  if (cancelarEventos) {
-    cancelarEventos();
-    cancelarEventos = null;
+  if (cancelarObservacao) {
+    cancelarObservacao();
+    cancelarObservacao = null;
   }
-}
-
-async function iniciar(userId: string) {
-  if (cancelarEventos && usuarioId === userId) return;
-
-  cancelarInscricoes();
-  usuarioId = userId;
-
-  if (!ouvinteVisibilidadeRegistrado && typeof document !== 'undefined') {
-    ouvinteVisibilidadeRegistrado = true;
-    document.addEventListener('visibilitychange', aoMudarVisibilidade);
-  }
-
-  await carregar();
-
-  // Atualização em tempo real por SSE mais polling de segurança.
-  cancelarEventos = inscreverEventos((tabela) => {
-    if (tabela === 'notificacoes') recarregarDebounced();
-  });
-  timerPolling = setInterval(() => {
-    if (usuarioId) void carregar();
-  }, INTERVALO_POLLING_MS);
-}
-
-function parar() {
-  cancelarInscricoes();
   usuarioId = null;
   naoLidasMensagens.value = 0;
   naoLidasOutros.value = 0;
   notificacoes.value = [];
+  carregando.value = false;
 }
 
-async function marcarTodasComoLidas() {
-  if (!usuarioId) return;
+async function marcarTodasComoLidas(): Promise<void> {
   try {
     await api('/api/notificacoes/lidas', { metodo: 'PATCH' });
   } catch {
-    /* A recarga abaixo reconcilia o estado real. */
+    /* A invalidação abaixo reconcilia o estado real. */
   }
-  await carregar();
+  invalidarChave('notificacoes');
 }
 
-async function limparTodas() {
-  if (!usuarioId) return;
+async function limparTodas(): Promise<void> {
   try {
     await api('/api/notificacoes', { metodo: 'DELETE' });
   } catch {
-    /* A recarga abaixo reconcilia o estado real. */
+    /* A invalidação abaixo reconcilia o estado real. */
   }
-  await carregar();
+  invalidarChave('notificacoes');
 }
 
-async function marcarLida(id: string) {
+async function marcarLida(id: string): Promise<void> {
   try {
     await api(`/api/notificacoes/${id}/lida`, { metodo: 'PATCH' });
   } catch {
-    /* A recarga abaixo reconcilia o estado real. */
+    /* A invalidação abaixo reconcilia o estado real. */
   }
-  await carregar();
+  invalidarChave('notificacoes');
 }
 
 /** Limpa as notificações de mensagem de uma conversa lida; a API propaga o restante. */
-async function marcarNotificacoesConversaLidas(conversaId: string) {
+async function marcarNotificacoesConversaLidas(conversaId: string): Promise<void> {
   if (!usuarioId) return;
   try {
     await api(`/api/notificacoes/conversa/${conversaId}/lidas`, { metodo: 'PATCH' });
   } catch {
-    /* A recarga abaixo reconcilia o estado real. */
+    /* A invalidação abaixo reconcilia o estado real. */
   }
-  await carregar();
+  invalidarChave('notificacoes');
 }
 
 export function useNotificacoes() {
@@ -217,7 +174,7 @@ export function useNotificacoes() {
     carregando,
     iniciar,
     parar,
-    carregar,
+    carregar: () => recarregar(OPCOES.chave, true),
     marcarTodasComoLidas,
     limparTodas,
     marcarLida,

@@ -19,6 +19,15 @@ export interface OpcoesRequisicao {
   corpo?: unknown;
   parametros?: Record<string, string | number | boolean | string[] | undefined | null>;
   formData?: FormData;
+  ifNoneMatch?: string | null;
+}
+
+/** Resposta crua da API, incluindo o validador de cache para revalidação condicional. */
+export interface RespostaRequisicao<T> {
+  status: number;
+  dados: T;
+  etag: string | null;
+  naoModificado: boolean;
 }
 
 function montarUrl(caminho: string, parametros?: OpcoesRequisicao['parametros']): string {
@@ -60,18 +69,47 @@ async function interpretarResposta<T>(resposta: Response): Promise<T> {
 }
 /** Cliente tipado da API própria; usa cookies de sessão first-party. */
 export async function api<T>(caminho: string, opcoes: OpcoesRequisicao = {}): Promise<T> {
+  const resposta = await requisitar<T>(caminho, opcoes);
+  return resposta.dados;
+}
+
+/**
+ * Executa a requisição e devolve status, corpo e ETag. A revalidação condicional
+ * envia `If-None-Match` e trata o 304 sem corpo, mantendo o dado do cache local.
+ */
+export async function requisitar<T>(
+  caminho: string,
+  opcoes: OpcoesRequisicao = {},
+): Promise<RespostaRequisicao<T>> {
   const temCorpo = opcoes.corpo !== undefined;
   const cabecalhos: Record<string, string> = {};
   if (!opcoes.formData && temCorpo) cabecalhos['Content-Type'] = 'application/json';
+  if (opcoes.ifNoneMatch) cabecalhos['If-None-Match'] = opcoes.ifNoneMatch;
 
   const resposta = await fetch(montarUrl(caminho, opcoes.parametros), {
     method: opcoes.metodo ?? 'GET',
     credentials: 'include',
     headers: cabecalhos,
     body: opcoes.formData ?? (temCorpo ? JSON.stringify(opcoes.corpo) : undefined),
+    cache: 'no-store',
   });
 
-  return interpretarResposta<T>(resposta);
+  if (resposta.status === 304) {
+    return {
+      status: resposta.status,
+      dados: undefined as T,
+      etag: resposta.headers.get('etag'),
+      naoModificado: true,
+    };
+  }
+
+  const dados = await interpretarResposta<T>(resposta);
+  return {
+    status: resposta.status,
+    dados,
+    etag: resposta.headers.get('etag'),
+    naoModificado: false,
+  };
 }
 
 /** Baixa o conteúdo de um anexo autenticado e devolve um blob para visualização. */

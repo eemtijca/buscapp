@@ -1,35 +1,46 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
-import { useGestaoUsuarios } from '@/composables/useGestaoUsuarios';
-import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh';
-import { api } from '@/servicos/api';
+import {
+  gerarCodigoRedefinicao,
+  limparCodigosNaoAtivos,
+  marcarNotificacaoLida,
+  revogarCodigo,
+  useCodigosGerados,
+  useSolicitacoesCodigo,
+} from '@/composables/consultas/useGestaoUsuarios';
+import { useStatusConexao } from '@/composables/useStatusConexao';
 import type { SolicitacaoCodigo, CodigoGerado } from '@/tipos/componentes';
 
 const router = useRouter();
-const {
-  buscarNotificacoesCodigos,
-  gerarCodigoRedefinicao,
-  buscarCodigosGerados,
-  marcarNotificacaoLida,
-  limparCodigosNaoAtivos,
-  carregando,
-  erro,
-} = useGestaoUsuarios();
+const consultaSolicitacoes = useSolicitacoesCodigo();
+const consultaCodigos = useCodigosGerados();
+const { status: statusConexao } = useStatusConexao();
 
-const solicitacoes = ref<SolicitacaoCodigo[]>([]);
-const codigosGerados = ref<CodigoGerado[]>([]);
+const solicitacoes = consultaSolicitacoes.solicitacoes;
+const codigosGerados = computed<CodigoGerado[]>(() =>
+  consultaCodigos.codigos.value.map((codigo) => ({
+    ...codigo,
+    status:
+      codigo.status === 'ativo' && new Date(codigo.expira_em).getTime() <= agora.value
+        ? 'expirado'
+        : codigo.status,
+  })),
+);
+const pendente = computed(
+  () => consultaSolicitacoes.pendente.value || consultaCodigos.pendente.value,
+);
+const atualizando = computed(
+  () => consultaSolicitacoes.pendente.value || consultaCodigos.atualizando.value,
+);
+const ultimaAtualizacao = computed(() =>
+  consultaCodigos.atualizadoEm.value ? new Date(consultaCodigos.atualizadoEm.value) : null,
+);
 const mensagemSucesso = ref<string | null>(null);
 const mensagemErro = ref<string | null>(null);
 
-const {
-  ultimaAtualizacao,
-  estaAtualizando,
-  statusConexao,
-  atualizar: refresh,
-  inscrever,
-  encerrar,
-} = useRealtimeRefresh();
+const agora = ref(Date.now());
+let timerGlobal: ReturnType<typeof setInterval> | null = null;
 
 const codigosVisiveis = ref<Set<string>>(new Set());
 const codigosSessao = ref<Record<string, string>>({});
@@ -50,8 +61,6 @@ const gerandoCodigo = ref(false);
 const limpandoCodigos = ref(false);
 const codigoCopiado = ref(false);
 let timerCopiado: ReturnType<typeof setTimeout> | null = null;
-
-let timerGlobal: ReturnType<typeof setInterval> | null = null;
 
 function mostrarSucesso(msg: string) {
   mensagemSucesso.value = msg;
@@ -150,16 +159,6 @@ watch(filtroBusca, () => {
   paginaAtual.value = 1;
 });
 
-function recalcularTimers() {
-  if (document.visibilityState !== 'visible') return;
-  codigosGerados.value.forEach((c) => {
-    if (c.status !== 'ativo') return;
-    if (new Date(c.expira_em).getTime() <= Date.now()) {
-      c.status = 'expirado';
-    }
-  });
-}
-
 function abrirConfirmacaoGerar(solicitacao: SolicitacaoCodigo) {
   solicitacaoSelecionada.value = solicitacao;
   modalConfirmacaoGerar.value = true;
@@ -176,12 +175,11 @@ async function confirmarGerar() {
       codigoGeradoAtual.value = codigo;
       codigosSessao.value = { ...codigosSessao.value, [solicitacao.email]: codigo };
       modalCodigoGerado.value = true;
+      // A geração atende a solicitação pendente; a invalidação remove a entrada.
       await marcarNotificacaoLida(solicitacao.id);
-      // A geração atende a solicitação pendente; remove a entrada local.
-      solicitacoes.value = solicitacoes.value.filter((s) => s.perfil_id !== solicitacao.perfil_id);
-      codigosGerados.value = await buscarCodigosGerados();
+      await consultaCodigos.recarregar();
     } else {
-      mostrarErro(erro.value || 'Falha ao gerar código.');
+      mostrarErro('Falha ao gerar código.');
     }
   } finally {
     gerandoCodigo.value = false;
@@ -239,8 +237,9 @@ async function confirmarRevogar() {
   if (!alvo) return;
   modalRevogar.value = false;
   try {
-    await api(`/api/codigos/${alvo.id}/revogar`, { metodo: 'PATCH' });
-    codigosGerados.value = await buscarCodigosGerados();
+    const ok = await revogarCodigo(alvo.id);
+    if (!ok) throw new Error('Falha ao revogar código.');
+    await consultaCodigos.recarregar();
     mostrarSucesso('Código revogado com sucesso.');
   } catch (e) {
     mostrarErro(e instanceof Error ? e.message : 'Erro ao revogar código.');
@@ -262,7 +261,7 @@ async function confirmarLimpar() {
   limpandoCodigos.value = true;
   try {
     const removidos = await limparCodigosNaoAtivos();
-    codigosGerados.value = await buscarCodigosGerados();
+    await consultaCodigos.recarregar();
     mostrarSucesso(
       removidos > 0
         ? `${removidos} código${removidos !== 1 ? 's' : ''} removido${removidos !== 1 ? 's' : ''}.`
@@ -276,15 +275,8 @@ async function confirmarLimpar() {
 }
 
 async function atualizarManual() {
-  await refresh(async () => {
-    await carregarDados();
-    mostrarSucesso('Dados atualizados.');
-  });
-}
-
-async function carregarDados() {
-  solicitacoes.value = await buscarNotificacoesCodigos();
-  codigosGerados.value = await buscarCodigosGerados();
+  await Promise.all([consultaSolicitacoes.recarregar(), consultaCodigos.recarregar()]);
+  mostrarSucesso('Dados atualizados.');
 }
 
 function fecharModalCodigo() {
@@ -292,28 +284,13 @@ function fecharModalCodigo() {
   codigoGeradoAtual.value = null;
 }
 
-onMounted(async () => {
-  await carregarDados();
-
-  await inscrever([{ tabela: 'notificacoes' }, { tabela: 'codigos_redefinicao' }], carregarDados);
-
-  timerGlobal = setInterval(() => {
-    codigosGerados.value.forEach((c) => {
-      if (c.status !== 'ativo') return;
-      if (new Date(c.expira_em).getTime() <= Date.now()) {
-        c.status = 'expirado';
-      }
-    });
-  }, 1000);
-
-  document.addEventListener('visibilitychange', recalcularTimers);
+onMounted(() => {
+  timerGlobal = setInterval(() => (agora.value = Date.now()), 1000);
 });
 
 onUnmounted(() => {
-  encerrar();
   if (timerGlobal) clearInterval(timerGlobal);
   if (timerCopiado) clearTimeout(timerCopiado);
-  document.removeEventListener('visibilitychange', recalcularTimers);
 });
 </script>
 
@@ -337,12 +314,12 @@ onUnmounted(() => {
         <button
           type="button"
           class="btn btn-sm btn-outline-secondary"
-          :disabled="estaAtualizando"
+          :disabled="atualizando"
           @click="atualizarManual"
           title="Recarregar dados manualmente"
         >
           <span
-            v-if="estaAtualizando"
+            v-if="atualizando"
             class="spinner-border spinner-border-sm me-1"
             role="status"
             aria-hidden="true"
@@ -405,7 +382,7 @@ onUnmounted(() => {
     </ul>
 
     <div v-if="guiaAtiva === 'pendentes'">
-      <div v-if="carregando && !solicitacoes.length" class="text-center py-5">
+      <div v-if="pendente && !solicitacoes.length" class="text-center py-5">
         <div class="spinner-border text-primary" role="status">
           <span class="visually-hidden">Carregando...</span>
         </div>
@@ -510,7 +487,7 @@ onUnmounted(() => {
         </button>
       </div>
 
-      <div v-if="carregando && !codigosGerados.length" class="text-center py-5">
+      <div v-if="pendente && !codigosGerados.length" class="text-center py-5">
         <div class="spinner-border text-primary" role="status">
           <span class="visually-hidden">Carregando...</span>
         </div>

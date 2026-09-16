@@ -5,6 +5,7 @@ import { useAutenticacao } from '@/composables/useAutenticacao';
 import { useStatusConta } from '@/composables/useStatusConta';
 import { useStatusConexao } from '@/composables/useStatusConexao';
 import { useNotificacoes } from '@/composables/useNotificacoes';
+import { prefetchEssenciais } from '@/servicos/prefetch';
 import IndicadorConexao from '@/componentes/IndicadorConexao.vue';
 import CabecalhoNavegacao from '@/componentes/CabecalhoNavegacao.vue';
 import NotificacoesPopover from '@/componentes/NotificacoesPopover.vue';
@@ -16,7 +17,10 @@ const { naoLidasMensagens, iniciar, parar } = useNotificacoes();
 const { iniciar: iniciarStatusConta, parar: pararStatusConta } = useStatusConta();
 
 // A verificação de status da conta só faz sentido com sessão ativa; fica no shell autenticado.
-onMounted(() => iniciarStatusConta());
+onMounted(() => {
+  iniciarStatusConta();
+  prefetchEssenciais();
+});
 
 watch(
   usuario,

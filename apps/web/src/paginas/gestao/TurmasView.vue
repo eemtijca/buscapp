@@ -1,11 +1,9 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch, nextTick } from 'vue';
+import { computed, ref, watch, nextTick } from 'vue';
 import { useRouter, onBeforeRouteLeave } from 'vue-router';
 import { api } from '@/servicos/api';
-import { useOpcoesConfiguracao } from '@/composables/useOpcoesConfiguracao';
-import { useAnoLetivo } from '@/composables/useAnoLetivo';
+import { useAnoLetivoAtivo, useOpcoes, useTurmas } from '@/composables/consultas/useCatalogos';
 import { useFormSnapshot } from '@/composables/useFormSnapshot';
-import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh';
 import {
   mensagemSucesso as criarMensagemSucesso,
   mensagemErroExplicita,
@@ -14,18 +12,15 @@ import CampoFormulario from '@/componentes/CampoFormulario.vue';
 import Combobox from '@/componentes/Combobox.vue';
 import type { OpcaoCombobox } from '@/componentes/Combobox.vue';
 import type { Turma } from '@/tipos/database';
-import type { OpcaoCheckbox } from '@/tipos/componentes';
 
 const router = useRouter();
 
-const { buscarOpcoes } = useOpcoesConfiguracao();
-const { buscarAnoLetivoAtivo } = useAnoLetivo();
-const { inscrever, encerrar } = useRealtimeRefresh();
-
-const turmas = ref<Turma[]>([]);
-const opcoesSerie = ref<OpcaoCheckbox[]>([]);
-const opcoesLetra = ref<OpcaoCheckbox[]>([]);
-const carregando = ref(false);
+const { opcoes: opcoesSerie } = useOpcoes(() => 'serie_turma');
+const { opcoes: opcoesLetra } = useOpcoes(() => 'letra_turma');
+const { anoAtivo } = useAnoLetivoAtivo();
+const { turmas, pendente, recarregar } = useTurmas();
+const salvando = ref(false);
+const carregando = computed(() => pendente.value || salvando.value);
 const mensagemSucesso = ref<string | null>(null);
 const mensagemErro = ref<string | null>(null);
 
@@ -98,20 +93,6 @@ function resetForm() {
   });
 }
 
-async function carregarTurmas() {
-  carregando.value = true;
-  try {
-    opcoesSerie.value = await buscarOpcoes('serie_turma');
-    opcoesLetra.value = await buscarOpcoes('letra_turma');
-    const { turmas: lista } = await api<{ turmas: Turma[] }>('/api/turmas');
-    turmas.value = lista;
-  } catch {
-    mostrarErro('Falha ao carregar turmas.');
-  } finally {
-    carregando.value = false;
-  }
-}
-
 async function abrirEditar(turma: Turma) {
   pausarSnapshot(true);
   modoEdicao.value = true;
@@ -138,7 +119,7 @@ function abrirNovo() {
 
 async function salvar() {
   document.querySelector('.modal-body')?.scrollTo({ top: 0, behavior: 'smooth' });
-  carregando.value = true;
+  salvando.value = true;
   try {
     if (modoEdicao.value && editandoId.value) {
       try {
@@ -161,7 +142,7 @@ async function salvar() {
         criarMensagemSucesso('Turma', `${formSerie.value} ${formLetra.value}`, 'atualizada'),
       );
     } else {
-      const anoLetivo = await buscarAnoLetivoAtivo();
+      const anoLetivo = anoAtivo.value;
       if (!anoLetivo) {
         mostrarErro(
           mensagemErroExplicita(
@@ -196,9 +177,9 @@ async function salvar() {
     }
     modalAberto.value = false;
     resetForm();
-    await carregarTurmas();
+    await recarregar();
   } finally {
-    carregando.value = false;
+    salvando.value = false;
   }
 }
 
@@ -209,21 +190,12 @@ async function alternarAtivo(turma: Turma) {
       metodo: 'PATCH',
       corpo: { ativo: novoValor },
     });
-    turma.ativo = novoValor;
     mostrarSucesso(novoValor ? 'Turma ativada.' : 'Turma desativada.');
+    await recarregar();
   } catch {
     mostrarErro('Falha ao alterar status.');
   }
 }
-
-onMounted(async () => {
-  await carregarTurmas();
-  await inscrever([{ tabela: 'turmas' }], carregarTurmas);
-});
-
-onUnmounted(() => {
-  encerrar();
-});
 </script>
 
 <template>

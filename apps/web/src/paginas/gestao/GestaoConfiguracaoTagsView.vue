@@ -1,17 +1,17 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, ref } from 'vue';
 import { api } from '@/servicos/api';
-import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh';
+import { useTags } from '@/composables/consultas/useCatalogos';
 import CampoFormulario from '@/componentes/CampoFormulario.vue';
 import Combobox from '@/componentes/Combobox.vue';
 import type { OpcaoCombobox } from '@/componentes/Combobox.vue';
 import SeletorIcone from '@/componentes/SeletorIcone.vue';
 import type { TagComportamento } from '@/tipos/database';
 
-const { inscrever, encerrar } = useRealtimeRefresh();
-
-const tags = ref<TagComportamento[]>([]);
-const carregando = ref(false);
+const { tags: catalogoTags, pendente, recarregar } = useTags();
+const tags = computed(() => catalogoTags.value);
+const salvando = ref(false);
+const carregando = computed(() => pendente.value || salvando.value);
 const mensagemSucesso = ref<string | null>(null);
 const mensagemErro = ref<string | null>(null);
 
@@ -52,18 +52,6 @@ function resetForm() {
   modoEdicao.value = false;
 }
 
-async function carregar() {
-  carregando.value = true;
-  try {
-    const { tags: lista } = await api<{ tags: TagComportamento[] }>('/api/tags-comportamento');
-    tags.value = lista;
-  } catch {
-    mostrarErro('Falha ao carregar tags.');
-  } finally {
-    carregando.value = false;
-  }
-}
-
 function abrirNovo() {
   resetForm();
   modalAberto.value = true;
@@ -99,7 +87,7 @@ async function salvar() {
     return;
   }
   if (!validarPeso()) return;
-  carregando.value = true;
+  salvando.value = true;
   try {
     if (modoEdicao.value && editandoId.value) {
       const corpo = {
@@ -127,12 +115,12 @@ async function salvar() {
       mostrarSucesso('Tag criada.');
     }
     modalAberto.value = false;
-    await carregar();
+    await recarregar();
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     mostrarErro(msg);
   } finally {
-    carregando.value = false;
+    salvando.value = false;
   }
 }
 
@@ -142,7 +130,7 @@ async function alternarAtivo(item: TagComportamento) {
       metodo: 'PATCH',
       corpo: { ativo: !item.ativo },
     });
-    await carregar();
+    await recarregar();
   } catch {
     mostrarErro('Falha ao alternar status.');
   }
@@ -155,21 +143,12 @@ async function excluir(id: string) {
   try {
     await api(`/api/tags-comportamento/${id}`, { metodo: 'DELETE' });
     mostrarSucesso('Tag excluída.');
-    await carregar();
+    await recarregar();
   } catch (e) {
     // A API recusa com 409 `tag_em_uso` e mensagem contextual.
     mostrarErro(e instanceof Error ? e.message : 'Falha ao excluir.');
   }
 }
-
-onMounted(async () => {
-  await carregar();
-  await inscrever([{ tabela: 'tags_comportamento' }], carregar);
-});
-
-onUnmounted(() => {
-  encerrar();
-});
 </script>
 
 <template>

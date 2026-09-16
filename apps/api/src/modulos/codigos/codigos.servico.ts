@@ -1,6 +1,7 @@
 import type { CodigoRedefinicao } from '@buscapp/contratos';
 import { gerarCodigoRedefinicao } from '../../nucleo/autenticacao/codigos.js';
 import { prisma } from '../../nucleo/banco/cliente.js';
+import { publicarEvento } from '../../nucleo/eventos/barramento.js';
 import { erroNaoEncontrado } from '../../nucleo/http/erros.js';
 import {
   buscarCodigo,
@@ -28,6 +29,7 @@ export async function listar(): Promise<CodigoRedefinicao[]> {
 export async function gerar(perfilId: string, criadoPor: string): Promise<string> {
   const codigo = await gerarCodigoRedefinicao(perfilId, criadoPor);
   await codigoGeradoParaAuditoria(perfilId, criadoPor);
+  publicarEvento({ tabela: 'codigos_redefinicao' });
   return codigo;
 }
 
@@ -36,9 +38,12 @@ export async function revogar(id: string, usuarioId: string): Promise<CodigoRede
   if (!existente) throw erroNaoEncontrado('Código não encontrado.');
   await revogarCodigo(id, usuarioId);
   const atualizado = await buscarCodigo(id);
+  publicarEvento({ tabela: 'codigos_redefinicao' });
   return paraCodigo(atualizado!, new Date());
 }
 
 export async function limpar(usuarioId: string): Promise<number> {
-  return limparCodigosNaoAtivos(usuarioId);
+  const removidos = await limparCodigosNaoAtivos(usuarioId);
+  publicarEvento({ tabela: 'codigos_redefinicao' });
+  return removidos;
 }

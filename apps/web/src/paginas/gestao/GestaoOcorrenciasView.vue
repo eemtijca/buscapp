@@ -1,53 +1,56 @@
 <script setup lang="ts">
-import { computed, nextTick, onUnmounted, ref, watch } from 'vue';
+import { computed, nextTick, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAutenticacao } from '@/composables/useAutenticacao';
-import { useMonitoramento } from '@/composables/useMonitoramento';
-import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh';
-import { useOpcoesConfiguracao } from '@/composables/useOpcoesConfiguracao';
+import {
+  alternarBloqueioRetorno,
+  registrarOcorrenciaGrave,
+  useAlunosFrequencia,
+  useOcorrenciasGraves,
+} from '@/composables/consultas/useMonitoramento';
+import { useOpcoes, useTags } from '@/composables/consultas/useCatalogos';
 import ListaOcorrencias from '@/componentes/ListaOcorrencias.vue';
 import CampoFormulario from '@/componentes/CampoFormulario.vue';
 import Combobox from '@/componentes/Combobox.vue';
 import type { OpcaoCombobox } from '@/componentes/Combobox.vue';
 import GrupoCheckbox from '@/componentes/GrupoCheckbox.vue';
 import ModalConfirmacao from '@/componentes/ModalConfirmacao.vue';
-import type { AlunoFrequencia, OcorrenciaGrave, OpcaoCheckbox } from '@/tipos/componentes';
-import type { TagComportamento } from '@/tipos/database';
-import { api } from '@/servicos/api';
+import type { OpcaoCheckbox } from '@/tipos/componentes';
 
 const router = useRouter();
 const { usuario } = useAutenticacao();
-const {
-  buscarOcorrenciasGraves,
-  alternarBloqueioRetorno,
-  buscarAlunosParaFrequencia,
-  registrarOcorrenciaGrave,
-} = useMonitoramento();
-const {
-  ultimaAtualizacao,
-  estaAtualizando,
-  atualizar: refresh,
-  inscrever,
-  encerrar,
-} = useRealtimeRefresh();
-const { buscarOpcoes } = useOpcoesConfiguracao();
+const { ocorrencias, pendente, atualizando, recarregar } = useOcorrenciasGraves();
+const { alunos } = useAlunosFrequencia(() => '');
+const { opcoes: opcoesTipo } = useOpcoes(() => 'tipo_ocorrencia');
+const { tags: catalogoTags } = useTags();
 
-const ocorrencias = ref<OcorrenciaGrave[]>([]);
 const mensagemSucesso = ref<string | null>(null);
 const mensagemErro = ref<string | null>(null);
 
 // Registro de ocorrência pela gestão (mesmo fluxo do professor).
 const mostrarFormulario = ref(false);
 const salvando = ref(false);
-const alunos = ref<AlunoFrequencia[]>([]);
-const opcoesTipo = ref<OpcaoCheckbox[]>([]);
-const opcoesTags = ref<OpcaoCheckbox[]>([]);
 const alunoId = ref('');
 const tipos = ref<string[]>(['grave']);
 
 const alunoOpcoes = computed<OpcaoCombobox[]>(() =>
-  alunos.value.map((a) => ({ valor: a.id, rotulo: a.nome, descricao: a.turma ?? undefined })),
+  alunos.value.map((aluno) => ({
+    valor: aluno.id,
+    rotulo: aluno.nome,
+    descricao: aluno.turma ?? undefined,
+  })),
 );
+
+const opcoesTags = computed<OpcaoCheckbox[]>(() =>
+  catalogoTags.value
+    .filter((tag) => tag.ativo)
+    .map((tag) => ({
+      valor: tag.nome,
+      rotulo: tag.descricao ?? tag.nome,
+      icone: tag.icone ?? undefined,
+    })),
+);
+
 const tags = ref<string[]>([]);
 const descricao = ref('');
 const exigePresenca = ref(false);
@@ -72,14 +75,13 @@ function mostrarErro(msg: string) {
 }
 
 async function alternarBloqueio(ocorrenciaId: string) {
-  const oc = ocorrencias.value.find((o) => o.id === ocorrenciaId);
-  if (!oc) return;
-  const novoValor = !oc.exigePresencaResponsavel;
+  const ocorrencia = ocorrencias.value.find((registro) => registro.id === ocorrenciaId);
+  if (!ocorrencia) return;
+  const novoValor = !ocorrencia.exigePresencaResponsavel;
   const ok = await alternarBloqueioRetorno(ocorrenciaId, novoValor);
   if (ok) {
-    oc.exigePresencaResponsavel = novoValor;
-    oc.bloqueado = novoValor;
     mostrarSucesso(novoValor ? 'Retorno bloqueado.' : 'Retorno liberado.');
+    await recarregar();
   } else {
     mostrarErro('Falha ao atualizar bloqueio.');
   }
@@ -89,32 +91,12 @@ function registrarSuspensao() {
   mostrarSucesso('Encaminhado para formalização de suspensão.');
 }
 
-async function carregarOcorrencias() {
-  ocorrencias.value = await buscarOcorrenciasGraves();
-}
-
-async function atualizarManual() {
-  await refresh(carregarOcorrencias);
-}
-
-async function alternarFormulario() {
+function alternarFormulario() {
   if (mostrarFormulario.value && temDadosOcorrencia.value) {
     confirmarCancelar.value = true;
     return;
   }
   mostrarFormulario.value = !mostrarFormulario.value;
-  if (mostrarFormulario.value && !alunos.value.length) {
-    opcoesTipo.value = await buscarOpcoes('tipo_ocorrencia');
-    const { tags: tagsApi } = await api<{ tags: TagComportamento[] }>('/api/tags-comportamento', {
-      parametros: { ativo: 'true' },
-    });
-    opcoesTags.value = tagsApi.map((t) => ({
-      valor: t.nome,
-      rotulo: t.descricao ?? t.nome,
-      icone: t.icone ?? undefined,
-    }));
-    alunos.value = await buscarAlunosParaFrequencia();
-  }
 }
 
 function solicitarRegistroOcorrencia() {
@@ -151,7 +133,7 @@ async function registrarOcorrencia() {
       notificarCoordenacao.value = true;
       notificarResponsavel.value = false;
       mostrarFormulario.value = false;
-      await carregarOcorrencias();
+      await recarregar();
       await nextTick();
       requestAnimationFrame(() => {
         document
@@ -165,22 +147,6 @@ async function registrarOcorrencia() {
     salvando.value = false;
   }
 }
-
-let inicializado = false;
-
-// Inicializa quando usuario existir: garante carga e inscrição realtime mesmo após reload direto.
-async function inicializar() {
-  if (!usuario.value || inicializado) return;
-  inicializado = true;
-  await carregarOcorrencias();
-  await inscrever([{ tabela: 'ocorrencias' }], carregarOcorrencias);
-}
-
-watch(usuario, () => void inicializar(), { immediate: true });
-
-onUnmounted(() => {
-  encerrar();
-});
 </script>
 
 <template>
@@ -217,12 +183,12 @@ onUnmounted(() => {
         <button
           type="button"
           class="btn btn-sm btn-outline-secondary"
-          :disabled="estaAtualizando"
-          @click="atualizarManual"
+          :disabled="atualizando"
+          @click="recarregar"
           title="Recarregar dados"
         >
           <span
-            v-if="estaAtualizando"
+            v-if="atualizando"
             class="spinner-border spinner-border-sm me-1"
             role="status"
             aria-hidden="true"
@@ -231,11 +197,6 @@ onUnmounted(() => {
           Atualizar
         </button>
       </div>
-    </div>
-
-    <div v-if="ultimaAtualizacao" class="small text-body-tertiary mb-2 text-end">
-      <i class="bi bi-clock me-1" aria-hidden="true"></i>
-      Última atualização: {{ ultimaAtualizacao.toLocaleTimeString('pt-BR') }}
     </div>
 
     <div v-if="mensagemSucesso" class="alert alert-success py-2 small mb-3" role="status">
@@ -358,7 +319,13 @@ onUnmounted(() => {
 
     <div class="card border">
       <div class="card-body p-0">
+        <div v-if="pendente" class="text-center py-5" aria-busy="true">
+          <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Carregando ocorrências</span>
+          </div>
+        </div>
         <ListaOcorrencias
+          v-else
           :ocorrencias="ocorrencias"
           @bloquear-retorno="alternarBloqueio"
           @registrar-suspensao="registrarSuspensao"

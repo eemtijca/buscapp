@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, nextTick, watch } from 'vue';
+import { computed, ref, nextTick, watch } from 'vue';
 import { useRouter, onBeforeRouteLeave } from 'vue-router';
 import { api } from '@/servicos/api';
 import { useFormSnapshot } from '@/composables/useFormSnapshot';
-import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh';
+import { useAnosLetivos } from '@/composables/consultas/useCatalogos';
 import {
   mensagemSucesso as criarMensagemSucesso,
   mensagemErroExplicita,
@@ -12,10 +12,9 @@ import CampoFormulario from '@/componentes/CampoFormulario.vue';
 import type { AnoLetivo } from '@/tipos/database';
 
 const router = useRouter();
-const { inscrever, encerrar } = useRealtimeRefresh();
-
-const anos = ref<AnoLetivo[]>([]);
-const carregando = ref(false);
+const { anos, pendente, recarregar } = useAnosLetivos();
+const salvando = ref(false);
+const carregando = computed(() => pendente.value || salvando.value);
 const mensagemSucesso = ref<string | null>(null);
 const mensagemErro = ref<string | null>(null);
 
@@ -78,18 +77,6 @@ function resetForm() {
   });
 }
 
-async function carregarAnos() {
-  carregando.value = true;
-  try {
-    const { anos_letivos } = await api<{ anos_letivos: AnoLetivo[] }>('/api/anos-letivos');
-    anos.value = anos_letivos;
-  } catch {
-    mostrarErro('Falha ao carregar anos letivos.');
-  } finally {
-    carregando.value = false;
-  }
-}
-
 function abrirNovo() {
   pausarSnapshot(true);
   resetForm();
@@ -138,7 +125,7 @@ async function salvar() {
     );
     return;
   }
-  carregando.value = true;
+  salvando.value = true;
   try {
     if (modoEdicao.value && editandoId.value) {
       try {
@@ -176,9 +163,9 @@ async function salvar() {
     }
     modalAberto.value = false;
     resetForm();
-    await carregarAnos();
+    await recarregar();
   } finally {
-    carregando.value = false;
+    salvando.value = false;
   }
 }
 
@@ -189,7 +176,7 @@ async function ativar(ano: AnoLetivo) {
     : `Ativar o ano letivo ${ano.ano}?`;
   if (!window.confirm(aviso)) return;
 
-  carregando.value = true;
+  salvando.value = true;
   try {
     try {
       await api(`/api/anos-letivos/${ano.id}/ativar`, { metodo: 'POST' });
@@ -198,20 +185,11 @@ async function ativar(ano: AnoLetivo) {
       return;
     }
     mostrarSucesso(`Ano letivo ${ano.ano} ativado.`);
-    await carregarAnos();
+    await recarregar();
   } finally {
-    carregando.value = false;
+    salvando.value = false;
   }
 }
-
-onMounted(async () => {
-  await carregarAnos();
-  await inscrever([{ tabela: 'anos_letivos' }], carregarAnos);
-});
-
-onUnmounted(() => {
-  encerrar();
-});
 </script>
 
 <template>

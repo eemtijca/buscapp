@@ -150,6 +150,52 @@ test.describe('Tempo real — Atualizações sem reload', () => {
     }
   });
 
+  test('CT144 - Alunos criados por outro cliente aparecem na listagem em tempo real', async ({
+    page,
+  }) => {
+    const marcador = Date.now();
+    const nome = `Aluno RT ${marcador}`;
+    const matricula = `RT${marcador}`;
+    await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
+    await page.goto('/gestao/alunos');
+    await page.waitForSelector('table');
+
+    try {
+      const { cookie } = await loginApi('gestao@escola.edu.br', SENHA_ADMIN);
+      const res = await apiFetch('/api/alunos', {
+        metodo: 'POST',
+        cookie,
+        corpo: { nome, matricula },
+      });
+      if (!res.ok) throw new Error(`Setup aluno: ${res.status} ${await res.text()}`);
+      await expect(page.getByText(nome)).toBeVisible({ timeout: 15_000 });
+    } finally {
+      await excluirLinhas('alunos', 'matricula = $1', [matricula]);
+    }
+  });
+
+  test('CT145 - Disciplinas criadas por outro cliente aparecem na listagem em tempo real', async ({
+    page,
+  }) => {
+    const nome = `Disciplina RT ${Date.now()}`;
+    await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
+    await page.goto('/gestao/disciplinas');
+    await page.waitForSelector('table');
+
+    try {
+      const { cookie } = await loginApi('gestao@escola.edu.br', SENHA_ADMIN);
+      const res = await apiFetch('/api/disciplinas', {
+        metodo: 'POST',
+        cookie,
+        corpo: { nome },
+      });
+      if (!res.ok) throw new Error(`Setup disciplina: ${res.status} ${await res.text()}`);
+      await expect(page.getByText(nome)).toBeVisible({ timeout: 15_000 });
+    } finally {
+      await excluirLinhas('disciplinas', 'nome = $1', [nome]);
+    }
+  });
+
   test.beforeAll(async () => {
     await excluirLinhas('notificacoes', 'destinatario_id = $1 and titulo like $2', [
       GESTAO_ID,

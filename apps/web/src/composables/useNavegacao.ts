@@ -1,9 +1,5 @@
-// Estado global de navegação para o overlay de carregamento.
-import { ref } from 'vue';
+// Títulos de página derivados da rota, usados no `document.title`.
 import type { RouteLocationNormalized } from 'vue-router';
-
-export const isNavigating = ref(false);
-export const destinoTitulo = ref('');
 
 const mapaTitulos: Record<string, string> = {
   login: 'Login',
@@ -40,9 +36,9 @@ const mapaTitulos: Record<string, string> = {
   'responsavel-termometro': 'Termômetro',
   'responsavel-justificativa': 'Justificativa',
   'responsavel-chat': 'Chat',
-  '403': 'Acesso negado',
-  '404': 'Página não encontrada',
-  '500': 'Erro interno',
+  403: 'Acesso negado',
+  404: 'Página não encontrada',
+  500: 'Erro interno',
   'conta-desativada': 'Conta desativada',
 };
 
@@ -55,16 +51,4 @@ export function tituloParaRota(to: RouteLocationNormalized): string {
   const seg = to.path.split('/').filter(Boolean).pop();
   if (seg) return seg.charAt(0).toUpperCase() + seg.slice(1).replace(/-/g, ' ');
   return 'conteúdo';
-}
-
-export function iniciarNavegacao(to: RouteLocationNormalized): void {
-  destinoTitulo.value = tituloParaRota(to);
-  isNavigating.value = true;
-}
-
-export function finalizarNavegacao(): void {
-  // Pequeno delay para evitar flicker em navegações rápidas.
-  setTimeout(() => {
-    isNavigating.value = false;
-  }, 250);
 }

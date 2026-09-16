@@ -1,67 +1,43 @@
 <script setup lang="ts">
-import { onUnmounted, ref, watch, nextTick } from 'vue';
+import { computed, ref, watch, nextTick } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
-import { useAutenticacao } from '@/composables/useAutenticacao';
-import { useMonitoramento } from '@/composables/useMonitoramento';
-import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh';
+import {
+  useAlertasResponsavel,
+  useJustificativasPendentes,
+} from '@/composables/consultas/useMonitoramento';
+import { useTags } from '@/composables/consultas/useCatalogos';
 import CartaoAlertaResponsavel from '@/componentes/CartaoAlertaResponsavel.vue';
 import VisualizadorAnexo from '@/componentes/VisualizadorAnexo.vue';
 import type { AlertaResponsavel } from '@/tipos/componentes';
-import type { TagComportamento } from '@/tipos/database';
-import { api } from '@/servicos/api';
 
 const router = useRouter();
 const route = useRoute();
-const { usuario } = useAutenticacao();
-const { buscarAlertasResponsavel, buscarJustificativasPendentes } = useMonitoramento();
-const {
-  ultimaAtualizacao,
-  estaAtualizando,
-  atualizar: refresh,
-  inscrever,
-  encerrar,
-} = useRealtimeRefresh();
+const { alertas, pendente, atualizando, recarregar } = useAlertasResponsavel();
+const { justificativas } = useJustificativasPendentes();
+const { tags } = useTags();
 
-const alertas = ref<AlertaResponsavel[]>([]);
 const alertaSelecionado = ref<AlertaResponsavel | null>(null);
 const mostrarModal = ref(false);
 const anexoSelecionado = ref<{ id: string; nome: string; mime?: string } | null>(null);
 
-const tagsMap = ref<Record<string, { rotulo: string; icone: string }>>({});
+const tagsMap = computed<Record<string, { rotulo: string; icone: string }>>(() => {
+  const mapa: Record<string, { rotulo: string; icone: string }> = {};
+  for (const tag of tags.value.filter((registro) => registro.ativo)) {
+    mapa[tag.nome] = { rotulo: tag.descricao ?? tag.nome, icone: tag.icone ?? 'tag' };
+  }
+  return mapa;
+});
 
 // O alerta expõe o `storage_path` do anexo, mas o download autenticado exige o id.
-let anexoIdPorPath = new Map<string, string>();
-
-async function carregarTags() {
-  try {
-    const { tags } = await api<{ tags: TagComportamento[] }>('/api/tags-comportamento', {
-      parametros: { ativo: 'true' },
-    });
-    const map: Record<string, { rotulo: string; icone: string }> = {};
-    for (const t of tags) {
-      map[t.nome] = { rotulo: t.descricao ?? t.nome, icone: t.icone ?? 'tag' };
+const anexoIdPorPath = computed(() => {
+  const mapa = new Map<string, string>();
+  for (const justificativa of justificativas.value) {
+    if (justificativa.anexoPath && justificativa.anexoId) {
+      mapa.set(justificativa.anexoPath, justificativa.anexoId);
     }
-    tagsMap.value = map;
-  } catch (e) {
-    console.error('[AlertasView] Erro ao carregar as tags de comportamento:', e);
-    tagsMap.value = {};
   }
-}
-
-/** Associa o caminho de armazenamento do anexo ao id usado no endpoint de download. */
-async function carregarAnexos() {
-  try {
-    const justificativas = await buscarJustificativasPendentes();
-    const mapa = new Map<string, string>();
-    for (const j of justificativas) {
-      if (j.anexoPath && j.anexoId) mapa.set(j.anexoPath, j.anexoId);
-    }
-    anexoIdPorPath = mapa;
-  } catch (e) {
-    console.error('[AlertasView] Erro ao mapear anexos das justificativas:', e);
-    anexoIdPorPath = new Map();
-  }
-}
+  return mapa;
+});
 
 function abrirJustificativa(payload: { alertaId: string; frequenciaId?: string }) {
   const query: Record<string, string> = {};
@@ -72,7 +48,7 @@ function abrirJustificativa(payload: { alertaId: string; frequenciaId?: string }
 function verAnexo(alertaId: string) {
   const alerta = alertas.value.find((a) => a.id === alertaId);
   if (!alerta?.anexoPath) return;
-  const anexoId = anexoIdPorPath.get(alerta.anexoPath);
+  const anexoId = anexoIdPorPath.value.get(alerta.anexoPath);
   if (!anexoId) return;
   anexoSelecionado.value = {
     id: anexoId,
@@ -94,14 +70,6 @@ function fecharModal() {
   alertaSelecionado.value = null;
 }
 
-async function carregarAlertas() {
-  if (!usuario.value) return;
-  const [lista] = await Promise.all([buscarAlertasResponsavel(usuario.value.id), carregarAnexos()]);
-  alertas.value = lista;
-  await nextTick();
-  destacarAlertaDeepLink();
-}
-
 /** Destaca os alertas via ?aluno= (deep-link da notificação). */
 function destacarAlertaDeepLink() {
   const alunoId = route.query.aluno as string | undefined;
@@ -116,8 +84,11 @@ function destacarAlertaDeepLink() {
 }
 
 async function atualizarManual() {
-  await refresh(carregarAlertas);
+  await recarregar();
 }
+
+// O destaque por deep-link depende dos alertas já renderizados.
+watch(alertas, () => void nextTick(destacarAlertaDeepLink));
 
 watch(
   () => route.query.aluno,
@@ -125,26 +96,6 @@ watch(
     void nextTick(() => destacarAlertaDeepLink());
   },
 );
-
-let inicializado = false;
-
-// Inicializa quando usuario existir: garante carga e inscrição realtime mesmo após reload direto.
-async function inicializar() {
-  if (!usuario.value || inicializado) return;
-  inicializado = true;
-  await carregarTags();
-  await carregarAlertas();
-  await inscrever(
-    [{ tabela: 'frequencias' }, { tabela: 'ocorrencias' }, { tabela: 'justificativas_faltas' }],
-    carregarAlertas,
-  );
-}
-
-watch(usuario, () => void inicializar(), { immediate: true });
-
-onUnmounted(() => {
-  encerrar();
-});
 </script>
 
 <template>
@@ -169,12 +120,12 @@ onUnmounted(() => {
         <button
           type="button"
           class="btn btn-sm btn-outline-secondary"
-          :disabled="estaAtualizando"
+          :disabled="atualizando"
           @click="atualizarManual"
           title="Recarregar dados"
         >
           <span
-            v-if="estaAtualizando"
+            v-if="atualizando"
             class="spinner-border spinner-border-sm me-1"
             role="status"
             aria-hidden="true"
@@ -186,12 +137,13 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <div v-if="ultimaAtualizacao" class="small text-body-tertiary mb-2 text-end">
-      <i class="bi bi-clock me-1" aria-hidden="true"></i>
-      Última atualização: {{ ultimaAtualizacao.toLocaleTimeString('pt-BR') }}
+    <div v-if="pendente && !alertas.length" class="text-center py-5" aria-busy="true">
+      <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Carregando alertas</span>
+      </div>
     </div>
 
-    <div v-if="!alertas.length" class="text-center py-5 text-body-secondary">
+    <div v-else-if="!alertas.length" class="text-center py-5 text-body-secondary">
       <span
         class="d-inline-flex align-items-center justify-content-center rounded-circle bg-success-subtle mb-3"
         style="width: 72px; height: 72px"

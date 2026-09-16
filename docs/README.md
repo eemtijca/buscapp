@@ -31,6 +31,7 @@ As decisões estruturais ficam registradas como ADRs (Architecture Decision Reco
 - [ADR-005: tempo real por Server-Sent Events](adr/005-tempo-real-sse.md)
 - [ADR-006: mesma origem e perfis de implantação](adr/006-same-origin-e-perfis.md)
 - [ADR-007: sonda de sessão sem 401 em GET /api/auth/me](adr/007-sonda-de-sessao-sem-401.md)
+- [ADR-008: cache de dados do cliente com IndexedDB e ETag](adr/008-cache-de-dados-cliente.md)
 
 Novas decisões seguem o formato descrito em [../CONTRIBUTING.md](../CONTRIBUTING.md).
 

@@ -1,55 +1,53 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAutenticacao } from '@/composables/useAutenticacao';
-import { useMonitoramento } from '@/composables/useMonitoramento';
+import {
+  enviarMensagem,
+  marcarMensagensComoLidas,
+  ocultarConversa,
+  useContatosChat,
+  useConversaDetalhe,
+} from '@/composables/consultas/useChat';
+import { useHorarioProtegido } from '@/composables/consultas/useCatalogos';
 import { useNotificacoes } from '@/composables/useNotificacoes';
-import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh';
 import ChatPainelDuplo from '@/componentes/ChatPainelDuplo.vue';
-import type { ContatoChat, MensagemChat } from '@/tipos/componentes';
-import { avatarCor } from '@/utils/chatUtils';
 
 const route = useRoute();
 const router = useRouter();
 const { usuario } = useAutenticacao();
-const {
-  buscarContatosGestao,
-  buscarConversaDetalhe,
-  enviarMensagem,
-  marcarMensagensComoLidas,
-  ocultarConversa,
-  horarioProtegidoAtivo,
-  obterHorarioProtegido,
-} = useMonitoramento();
 const { marcarNotificacoesConversaLidas } = useNotificacoes();
 
-const contatos = ref<ContatoChat[]>([]);
-const mensagens = ref<MensagemChat[]>([]);
+const { contatos, pendente: carregandoContatos } = useContatosChat(
+  () => usuario.value?.papel ?? '',
+  () => usuario.value?.id ?? '',
+);
+
 const conversaAtivaId = ref<string | null>(null);
-const contatoAtivo = ref<ContatoChat | null>(null);
+const { mensagens } = useConversaDetalhe(
+  () => conversaAtivaId.value,
+  () => usuario.value?.id,
+);
+
+const { horario, horarioAtivo } = useHorarioProtegido();
+
 const abertaPorDetalhe = ref(false);
-const horarioAtivo = ref(false);
 const enviando = ref(false);
-const carregandoContatos = ref(true);
-const horarioConfig = ref({
-  inicio: '07:00',
-  fim: '17:00',
-  diasSemana: [1, 2, 3, 4, 5],
-  mensagemForaHorario: '',
-});
 const statusMsg = ref<string | null>(null);
 const confirmandoExcluir = ref(false);
 const ocultarConvId = ref<string | null>(null);
+
+let timeoutStatus: ReturnType<typeof setTimeout> | null = null;
+
+const contatoAtivo = computed(
+  () => contatos.value.find((contato) => contato.conversaId === conversaAtivaId.value) ?? null,
+);
 
 const podeEnviar = computed(() => {
   if (horarioAtivo.value) return true;
   if ((usuario.value?.papel ?? '') !== 'gestao') return false;
   return contatoAtivo.value?.iniciadaPelaGestao === true;
 });
-
-const { inscrever, encerrar } = useRealtimeRefresh();
-let timeoutStatus: ReturnType<typeof setTimeout> | null = null;
-let intervaloRelogio: number | null = null;
 
 function mostrarStatus(msg: string) {
   if (timeoutStatus) clearTimeout(timeoutStatus);
@@ -59,45 +57,27 @@ function mostrarStatus(msg: string) {
   }, 4000);
 }
 
-async function carregarContatos() {
-  if (!usuario.value) return;
-  carregandoContatos.value = true;
-  contatos.value = await buscarContatosGestao(usuario.value.id);
-  for (const c of contatos.value) {
-    c.avatarCor = avatarCor(c.nomeContato);
-  }
-  carregandoContatos.value = false;
-
-  if (
-    conversaAtivaId.value &&
-    !contatos.value.find((c) => c.conversaId === conversaAtivaId.value) &&
-    !abertaPorDetalhe.value
-  ) {
-    conversaAtivaId.value = null;
-    contatoAtivo.value = null;
-    mensagens.value = [];
-  }
-}
-
 async function selecionarConversa(conversaId: string) {
-  if (!usuario.value) return;
-  const userId = usuario.value.id;
   conversaAtivaId.value = conversaId;
   confirmandoExcluir.value = false;
-
-  await marcarMensagensComoLidas(conversaId, userId);
-  // Badge de mensagens novas zera na hora em que a conversa é aberta.
-  await marcarNotificacoesConversaLidas(conversaId);
-
-  const det = await buscarConversaDetalhe(conversaId, userId);
-  mensagens.value = det.mensagens;
-
-  const contato = contatos.value.find((c) => c.conversaId === conversaId);
-  abertaPorDetalhe.value = !contato;
-  contatoAtivo.value = contato ?? det.contato;
-
-  if (contato) contato.naoLidas = 0;
+  await Promise.all([
+    marcarMensagensComoLidas(conversaId),
+    marcarNotificacoesConversaLidas(conversaId),
+  ]);
 }
+
+// Abre a conversa do deep-link quando os contatos chegam; sem deep-link, mantém o placeholder.
+watch(
+  contatos,
+  async (lista) => {
+    if (conversaAtivaId.value) return;
+    const conversaInicial = route.query.conversa as string | undefined;
+    if (!conversaInicial) return;
+    abertaPorDetalhe.value = !lista.some((contato) => contato.conversaId === conversaInicial);
+    await selecionarConversa(conversaInicial);
+  },
+  { immediate: true },
+);
 
 async function handleEnviarMensagem(texto: string) {
   if (!conversaAtivaId.value) return;
@@ -122,62 +102,14 @@ async function handleOcultarConversa() {
     ocultarConvId.value = null;
     abertaPorDetalhe.value = false;
     mostrarStatus('Conversa ocultada. Reaparecerá se o responsável enviar nova mensagem.');
-    if (convId === conversaAtivaId.value) {
-      conversaAtivaId.value = null;
-      contatoAtivo.value = null;
-    }
-    await carregarContatos();
+    if (convId === conversaAtivaId.value) conversaAtivaId.value = null;
   }
-}
-
-/** Recarrega contatos e, se houver, as mensagens da conversa aberta. */
-async function recarregarChat() {
-  const conversaAntes = conversaAtivaId.value;
-  await carregarContatos();
-  if (!usuario.value || !conversaAntes || conversaAtivaId.value !== conversaAntes) return;
-  const det = await buscarConversaDetalhe(conversaAntes, usuario.value.id);
-  mensagens.value = det.mensagens;
-  contatoAtivo.value = contatos.value.find((c) => c.conversaId === conversaAntes) ?? det.contato;
-}
-
-async function inscreverChat() {
-  await inscrever([{ tabela: 'mensagens' }, { tabela: 'conversas' }], recarregarChat);
 }
 
 function handleVoltar() {
   conversaAtivaId.value = null;
-  contatoAtivo.value = null;
   abertaPorDetalhe.value = false;
 }
-
-onMounted(async () => {
-  horarioConfig.value = await obterHorarioProtegido();
-  horarioAtivo.value = horarioProtegidoAtivo();
-  if (usuario.value) {
-    await carregarContatos();
-    await inscreverChat();
-    const conversaInicial = route.query.conversa as string | undefined;
-    if (conversaInicial && !conversaAtivaId.value) {
-      await selecionarConversa(conversaInicial);
-    }
-  }
-  intervaloRelogio = window.setInterval(() => {
-    horarioAtivo.value = horarioProtegidoAtivo();
-  }, 60_000);
-});
-
-watch(usuario, async (val) => {
-  if (val && contatos.value.length === 0) {
-    await carregarContatos();
-    await inscreverChat();
-  }
-});
-
-onUnmounted(() => {
-  encerrar();
-  if (intervaloRelogio) window.clearInterval(intervaloRelogio);
-  if (timeoutStatus) clearTimeout(timeoutStatus);
-});
 </script>
 
 <template>
@@ -246,7 +178,7 @@ onUnmounted(() => {
       :mensagens="mensagens"
       :conversa-ativa-id="conversaAtivaId"
       :horario-ativo="horarioAtivo"
-      :mensagem-fora-horario="horarioConfig.mensagemForaHorario"
+      :mensagem-fora-horario="horario.mensagemForaHorario"
       :enviando="enviando"
       :pode-enviar="podeEnviar"
       :carregando-contatos="carregandoContatos"

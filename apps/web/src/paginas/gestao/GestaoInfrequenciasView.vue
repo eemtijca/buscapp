@@ -1,37 +1,33 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch, nextTick } from 'vue';
+import { computed, ref, watch, nextTick } from 'vue';
 import { useRoute } from 'vue-router';
 import { useAutenticacao } from '@/composables/useAutenticacao';
-import { useMonitoramento } from '@/composables/useMonitoramento';
-import { useOpcoesConfiguracao } from '@/composables/useOpcoesConfiguracao';
-import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh';
+import {
+  registrarAusenciaEmPeriodo,
+  registrarFrequenciaEmMassa,
+  useAlunosFrequencia,
+} from '@/composables/consultas/useMonitoramento';
+import { useOpcoes } from '@/composables/consultas/useCatalogos';
 import CartaoAlunoFrequencia from '@/componentes/CartaoAlunoFrequencia.vue';
 import CampoFormulario from '@/componentes/CampoFormulario.vue';
 import Combobox from '@/componentes/Combobox.vue';
 import type { OpcaoCombobox } from '@/componentes/Combobox.vue';
 import GrupoCheckbox from '@/componentes/GrupoCheckbox.vue';
 import ModalConfirmacao from '@/componentes/ModalConfirmacao.vue';
-import type { AlunoFrequencia, OpcaoCheckbox } from '@/tipos/componentes';
+import type { AlunoFrequencia } from '@/tipos/componentes';
 
 const route = useRoute();
 const { usuario } = useAutenticacao();
-const {
-  buscarAlunosParaFrequencia,
-  registrarFrequenciaEmMassa,
-  registrarAusenciaEmPeriodo,
-  carregando,
-} = useMonitoramento();
-
 const abaAtiva = ref<'turma' | 'individual'>('turma');
-const alunos = ref<AlunoFrequencia[]>([]);
 const dataAula = ref(new Date().toISOString().slice(0, 10));
+const { alunos: alunosRemotos, pendente, recarregar } = useAlunosFrequencia(() => dataAula.value);
+const alunos = ref<AlunoFrequencia[]>([]);
+const carregando = computed(() => pendente.value || salvandoChamada.value);
 const mensagemSucesso = ref<string | null>(null);
 const mensagemErro = ref<string | null>(null);
 
-const { buscarOpcoes } = useOpcoesConfiguracao();
-const opcoesPeriodos = ref<OpcaoCheckbox[]>([]);
-const opcoesMotivos = ref<OpcaoCheckbox[]>([]);
-const { inscrever, encerrar } = useRealtimeRefresh();
+const { opcoes: opcoesPeriodos } = useOpcoes(() => 'periodo');
+const { opcoes: opcoesMotivos } = useOpcoes(() => 'motivo_ausencia');
 
 const turmaSelecionada = ref('');
 const buscaTurma = ref('');
@@ -128,21 +124,33 @@ function mostrarErro(msg: string) {
   setTimeout(() => (mensagemErro.value = null), 4000);
 }
 
-async function carregarAlunos() {
-  alunos.value = await buscarAlunosParaFrequencia(dataAula.value);
-  if (!turmaSelecionada.value && turmasDisponiveis.value.length) {
-    turmaSelecionada.value = turmasDisponiveis.value[0]!.id;
-  }
-  const alunoQuery = route.query.aluno;
-  if (
-    typeof alunoQuery === 'string' &&
-    alunos.value.some((a) => a.id === alunoQuery) &&
-    !alunoIdIndividual.value
-  ) {
-    abaAtiva.value = 'individual';
-    alunoIdIndividual.value = alunoQuery;
-  }
-}
+// Cópia local para preservar marcações não salvas enquanto o cache revalida em segundo plano.
+watch(
+  alunosRemotos,
+  (lista) => {
+    const temMarcacoes = alunos.value.some((aluno) => aluno.ausente);
+    if (temMarcacoes && lista.length === alunos.value.length) return;
+    alunos.value = lista.map((aluno) => ({
+      ...aluno,
+      periodosAusentes: [...(aluno.periodosAusentes ?? [])],
+      motivosAusencia: [...(aluno.motivosAusencia ?? [])],
+    }));
+
+    if (!turmaSelecionada.value && turmasDisponiveis.value.length) {
+      turmaSelecionada.value = turmasDisponiveis.value[0]!.id;
+    }
+    const alunoQuery = route.query.aluno;
+    if (
+      typeof alunoQuery === 'string' &&
+      alunos.value.some((aluno) => aluno.id === alunoQuery) &&
+      !alunoIdIndividual.value
+    ) {
+      abaAtiva.value = 'individual';
+      alunoIdIndividual.value = alunoQuery;
+    }
+  },
+  { immediate: true },
+);
 
 async function salvarChamada() {
   if (!totalAusentesMarcados.value) {
@@ -170,7 +178,7 @@ async function confirmarSalvarChamada() {
       mostrarErro(errMsg);
     } else {
       mostrarSucesso(`${registradas} ausência(s) registrada(s) para ${turmaNome}.`);
-      await carregarAlunos();
+      await recarregar();
     }
   } finally {
     salvandoChamada.value = false;
@@ -232,19 +240,9 @@ async function registrarIndividual() {
   });
 }
 
-onMounted(async () => {
-  opcoesPeriodos.value = await buscarOpcoes('periodo');
-  opcoesMotivos.value = await buscarOpcoes('motivo_ausencia');
-  await carregarAlunos();
-  await inscrever([{ tabela: 'frequencias' }], carregarAlunos);
-});
-
-onUnmounted(() => {
-  encerrar();
-});
-
 watch(dataAula, () => {
-  carregarAlunos();
+  // Ao trocar a data, descarta o rascunho local para receber a chamada do novo dia.
+  alunos.value = [];
 });
 </script>
 

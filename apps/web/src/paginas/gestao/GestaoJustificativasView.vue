@@ -1,25 +1,16 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { useMonitoramento } from '@/composables/useMonitoramento';
-import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh';
-import { useAutenticacao } from '@/composables/useAutenticacao';
+import {
+  useJustificativasPendentes,
+  validarJustificativa,
+} from '@/composables/consultas/useMonitoramento';
 import FilaJustificativas from '@/componentes/FilaJustificativas.vue';
 import VisualizadorAnexo from '@/componentes/VisualizadorAnexo.vue';
-import type { JustificativaPendente } from '@/tipos/componentes';
 
 const router = useRouter();
-const { usuario } = useAutenticacao();
-const { buscarJustificativasPendentes, validarJustificativa } = useMonitoramento();
-const {
-  ultimaAtualizacao,
-  estaAtualizando,
-  atualizar: refresh,
-  inscrever,
-  encerrar,
-} = useRealtimeRefresh();
+const { justificativas, pendente, atualizando, recarregar } = useJustificativasPendentes();
 
-const justificativas = ref<JustificativaPendente[]>([]);
 const mensagemSucesso = ref<string | null>(null);
 const mensagemErro = ref<string | null>(null);
 const anexoSelecionado = ref<{ id: string; nome: string; mime?: string } | null>(null);
@@ -35,16 +26,16 @@ function mostrarErro(msg: string) {
 }
 
 const justificativasPendentes = computed(() =>
-  justificativas.value.filter((j) => j.status === 'pendente'),
+  justificativas.value.filter((justificativa) => justificativa.status === 'pendente'),
 );
 
 function verAnexoJustificativa(justId: string) {
-  const j = justificativas.value.find((x) => x.id === justId);
-  if (j?.anexoId) {
+  const justificativa = justificativas.value.find((registro) => registro.id === justId);
+  if (justificativa?.anexoId) {
     anexoSelecionado.value = {
-      id: j.anexoId,
-      nome: j.anexoNome ?? 'anexo',
-      mime: j.anexoMime,
+      id: justificativa.anexoId,
+      nome: justificativa.anexoNome ?? 'anexo',
+      mime: justificativa.anexoMime,
     };
   } else {
     mostrarErro('Anexo não disponível.');
@@ -52,44 +43,24 @@ function verAnexoJustificativa(justId: string) {
 }
 
 async function aceitarJustificativa(justId: string) {
-  const ok = await validarJustificativa(justId, 'aceitar', usuario.value?.id);
+  const ok = await validarJustificativa(justId, 'aceitar');
   if (ok) {
-    const j = justificativas.value.find((x) => x.id === justId);
-    if (j) j.status = 'aceita';
     mostrarSucesso('Justificativa aceita. Frequências atualizadas.');
+    await recarregar();
   } else {
     mostrarErro('Falha ao aceitar justificativa.');
   }
 }
 
 async function recusarJustificativa(justId: string) {
-  const ok = await validarJustificativa(justId, 'recusar', usuario.value?.id);
+  const ok = await validarJustificativa(justId, 'recusar');
   if (ok) {
-    const j = justificativas.value.find((x) => x.id === justId);
-    if (j) j.status = 'recusada';
     mostrarSucesso('Justificativa recusada.');
+    await recarregar();
   } else {
     mostrarErro('Falha ao recusar justificativa.');
   }
 }
-
-async function processarJustificativas() {
-  const j = await buscarJustificativasPendentes();
-  justificativas.value = j;
-}
-
-async function atualizarManual() {
-  await refresh(processarJustificativas);
-}
-
-onMounted(async () => {
-  await processarJustificativas();
-  await inscrever([{ tabela: 'justificativas_faltas' }], processarJustificativas);
-});
-
-onUnmounted(() => {
-  encerrar();
-});
 </script>
 
 <template>
@@ -113,12 +84,12 @@ onUnmounted(() => {
         <button
           type="button"
           class="btn btn-sm btn-outline-secondary"
-          :disabled="estaAtualizando"
-          @click="atualizarManual"
+          :disabled="atualizando"
+          @click="recarregar"
           title="Recarregar dados"
         >
           <span
-            v-if="estaAtualizando"
+            v-if="atualizando"
             class="spinner-border spinner-border-sm me-1"
             role="status"
             aria-hidden="true"
@@ -128,11 +99,6 @@ onUnmounted(() => {
         </button>
         <span class="rounded-circle d-inline-block" style="width: 8px; height: 8px"></span>
       </div>
-    </div>
-
-    <div v-if="ultimaAtualizacao" class="small text-body-tertiary mb-2 text-end">
-      <i class="bi bi-clock me-1" aria-hidden="true"></i>
-      Última atualização: {{ ultimaAtualizacao.toLocaleTimeString('pt-BR') }}
     </div>
 
     <div v-if="mensagemSucesso" class="alert alert-success py-2 small mb-3" role="status">
@@ -146,7 +112,13 @@ onUnmounted(() => {
 
     <div class="card border">
       <div class="card-body p-0">
+        <div v-if="pendente" class="text-center py-5" aria-busy="true">
+          <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Carregando justificativas</span>
+          </div>
+        </div>
         <FilaJustificativas
+          v-else
           :justificativas="justificativas"
           @aceitar="aceitarJustificativa"
           @recusar="recusarJustificativa"

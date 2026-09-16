@@ -11,6 +11,7 @@ Rotas HTTP da API Fastify. Todas ficam sob `/api` e respondem JSON, exceto o dow
 - **Idempotência:** frequências, mensagens e registros de comportamento aceitam `client_request_id` com índice único parcial.
 - **Datas:** datas civis usam `yyyy-mm-dd` e timestamps usam ISO 8601.
 - **Listas:** os endpoints de listagem devolvem arrays completos nomeados pela coleção. A única paginação é a de notificações (`limite`, de 1 a 100, padrão 20).
+- **Cache HTTP:** respostas de sucesso sob `/api` usam `Cache-Control: private, no-store` e, em `GET` e `HEAD` 2xx, ganham ETag próprio. O cliente revalida com `If-None-Match` e recebe `304` quando o corpo não mudou. Erros, streams de anexo e o SSE não geram ETag. Ver [ADR-008](adr/008-cache-de-dados-cliente.md).
 - **Uploads:** `multipart/form-data` no endpoint clássico ou URL pré-assinada no fluxo direto. Ver [modulos.md](modulos.md).
 
 ## Resumo das rotas

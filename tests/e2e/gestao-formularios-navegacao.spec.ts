@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { login } from '../suporte/sessao.js';
-import { SENHA_ADMIN, SENHA_PROF, emailUnico } from '../suporte/dados.js';
+import { SENHA_ADMIN, emailUnico } from '../suporte/dados.js';
 import { criarUsuarioApi, deletarUsuario } from '../suporte/api.js';
 import { excluirLinhas } from '../suporte/banco.js';
 
@@ -103,49 +103,62 @@ test.describe('Gestão - Usuários - Salvamento limpa estado de edição', () =>
   });
 });
 
-test.describe('Navegação - Indicador de carregamento', () => {
-  test('CT-Load-1: exibe indicador com título da página de destino', async ({ page }) => {
+test.describe('Navegação - cache de dados', () => {
+  test('CT-Cache-1: reabrir rota visitada não espera a rede nem exibe overlay', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
-    await page.goto('/gestao');
-    await page.waitForSelector('text=Gestão');
+    await page.goto('/gestao/usuarios');
+    await page.waitForSelector('table');
+
+    await page.locator('a[href="/gestao"]').first().click();
+    await expect(page.getByText('Ranking de risco')).toBeVisible();
+
     await page.route('**/api/usuarios*', async (route) => {
-      await new Promise((r) => setTimeout(r, 500));
+      await new Promise((r) => setTimeout(r, 1500));
       await route.continue();
     });
-    const navPromise = page.goto('/gestao/usuarios');
-    await expect(page.locator('.tela-carregamento')).toBeVisible({ timeout: 3000 });
-    await expect(page.locator('.tela-carregamento')).toContainText(/Carregando Usuários/i);
-    await navPromise;
-    await expect(page.locator('.tela-carregamento')).toBeHidden({ timeout: 3000 });
+
+    const inicio = Date.now();
+    await page.locator('a[href="/gestao/usuarios"]').first().click();
+    await expect(page.locator('table')).toBeVisible({ timeout: 1500 });
+    expect(Date.now() - inicio).toBeLessThan(1500);
+    await expect(page.locator('.tela-carregamento')).toHaveCount(0);
     await page.unroute('**/api/usuarios*');
   });
 
-  test('CT-Load-2: rota com carregamento sob demanda', async ({ page }) => {
-    await login(page, 'prof1@escola.edu.br', SENHA_PROF);
-    await page.goto('/professor');
-    await page.waitForSelector('text=Professor');
-    await page.route('**/api/usuarios*', async (route) => {
-      await new Promise((r) => setTimeout(r, 400));
-      await route.continue();
+  test('CT-Cache-2: usuário criado por outro cliente aparece sem recarregar', async ({ page }) => {
+    const email = emailUnico('cache-sse-');
+    const { id } = await criarUsuarioApi({
+      nome: 'Usuario Cache SSE',
+      email,
+      papel: 'responsavel',
     });
-    const nav = page.goto('/professor/frequencia');
-    await expect(page.locator('.tela-carregamento')).toBeVisible({ timeout: 3000 });
-    await nav;
-    await expect(page).toHaveURL(/\/professor\/frequencia/);
-    await expect(page.locator('h1, h5')).toBeVisible();
-    await page.unroute('**/api/usuarios*');
+
+    try {
+      await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
+      await page.goto('/gestao/usuarios');
+      await page.waitForSelector('table');
+      await expect(page.getByText('Usuario Cache SSE')).toBeVisible({ timeout: 15_000 });
+    } finally {
+      await deletarUsuario(id);
+    }
   });
 
-  test('CT-Load-3: indicador é responsivo em viewport estreito', async ({ page }) => {
-    await page.setViewportSize({ width: 320, height: 800 });
+  test('CT-Cache-3: passar o mouse no cartão aquece as consultas da rota', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao');
-    await page.waitForLoadState('load');
-    const p = page.goto('/gestao/turmas');
-    await expect(page.locator('.tela-carregamento__conteudo')).toBeVisible({ timeout: 3000 });
-    const box = await page.locator('.tela-carregamento__conteudo').boundingBox();
-    expect(box!.width).toBeLessThan(330);
-    await p;
+    await expect(page.getByText('Ranking de risco')).toBeVisible();
+
+    const requisicoes: string[] = [];
+    page.on('request', (requisicao) => {
+      if (requisicao.url().includes('/api/alunos')) requisicoes.push(requisicao.url());
+    });
+
+    const cartaoRanking = page.locator('a[href="/gestao/ranking"]').first();
+    await cartaoRanking.hover();
+    await expect.poll(() => requisicoes.length, { timeout: 5000 }).toBeGreaterThan(0);
+
+    await cartaoRanking.click();
+    await expect(page.getByText('Ranking de priorização de risco')).toBeVisible();
   });
 });
 

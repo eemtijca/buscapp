@@ -1,11 +1,18 @@
 <script setup lang="ts">
-defineProps<{
+import { prefetchRota } from '@/servicos/prefetch';
+
+const props = defineProps<{
   icone: string;
   titulo: string;
   descricao: string;
   rota: string;
   cor?: string;
 }>();
+
+/** Aquece as consultas da rota na intenção de navegação, sem bloquear o clique. */
+function aquecer(): void {
+  prefetchRota(props.rota);
+}
 </script>
 
 <template>
@@ -13,6 +20,8 @@ defineProps<{
     :to="rota"
     class="card card-nav text-decoration-none h-100"
     :class="cor ? 'card-nav--' + cor : ''"
+    @mouseenter="aquecer"
+    @focusin="aquecer"
   >
     <div class="card-body card-nav-body">
       <span

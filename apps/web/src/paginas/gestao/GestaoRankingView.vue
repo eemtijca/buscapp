@@ -1,24 +1,14 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { useAutenticacao } from '@/composables/useAutenticacao';
-import { useMonitoramento } from '@/composables/useMonitoramento';
-import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh';
+import { useRankingRisco } from '@/composables/consultas/useMonitoramento';
+import { abrirConversaDoAluno } from '@/composables/consultas/useChat';
 import CartaoAlunoRisco from '@/componentes/CartaoAlunoRisco.vue';
 import type { AlunoRisco } from '@/tipos/componentes';
 
 const router = useRouter();
-const { usuario } = useAutenticacao();
-const { buscarRankingRisco, abrirConversaResponsavel, carregando } = useMonitoramento();
-const {
-  ultimaAtualizacao,
-  estaAtualizando,
-  atualizar: refresh,
-  inscrever,
-  encerrar,
-} = useRealtimeRefresh();
+const { ranking, pendente, atualizando, recarregar } = useRankingRisco();
 
-const ranking = ref<AlunoRisco[]>([]);
 const filtroRisco = ref<'todos' | 'alto' | 'medio' | 'baixo'>('todos');
 const buscaAluno = ref('');
 const mensagemInfo = ref<string | null>(null);
@@ -31,18 +21,18 @@ function mostrarInfo(msg: string) {
   timeoutInfo = setTimeout(() => (mensagemInfo.value = null), 5000);
 }
 
-const rankingFiltrado = computed(() => {
+const rankingFiltrado = computed<AlunoRisco[]>(() => {
   let lista = ranking.value;
   if (filtroRisco.value !== 'todos') {
-    lista = lista.filter((a) => a.nivel === filtroRisco.value);
+    lista = lista.filter((aluno) => aluno.nivel === filtroRisco.value);
   }
   if (buscaAluno.value.trim()) {
     const termo = buscaAluno.value.toLowerCase().trim();
     lista = lista.filter(
-      (a) =>
-        a.nome.toLowerCase().includes(termo) ||
-        a.matricula.toLowerCase().includes(termo) ||
-        (a.turma ?? '').toLowerCase().includes(termo),
+      (aluno) =>
+        aluno.nome.toLowerCase().includes(termo) ||
+        aluno.matricula.toLowerCase().includes(termo) ||
+        (aluno.turma ?? '').toLowerCase().includes(termo),
     );
   }
   return lista;
@@ -53,7 +43,7 @@ const totalRiscoMedio = computed(() => ranking.value.filter((r) => r.nivel === '
 const totalRiscoBaixo = computed(() => ranking.value.filter((r) => r.nivel === 'baixo').length);
 
 async function abrirChat(alunoId: string) {
-  const conversaId = await abrirConversaResponsavel(alunoId, usuario.value?.id);
+  const conversaId = await abrirConversaDoAluno(alunoId);
   if (!conversaId) {
     mostrarInfo('Não foi possível abrir o chat: aluno sem responsável ou turma vinculados.');
     return;
@@ -64,23 +54,6 @@ async function abrirChat(alunoId: string) {
 async function registrarFalta(alunoId: string) {
   await router.push({ path: '/gestao/infrequencias', query: { aluno: alunoId } });
 }
-
-async function carregarRanking() {
-  ranking.value = await buscarRankingRisco();
-}
-
-async function atualizarManual() {
-  await refresh(carregarRanking);
-}
-
-onMounted(async () => {
-  await carregarRanking();
-  await inscrever([{ tabela: 'frequencias' }, { tabela: 'ocorrencias' }], carregarRanking);
-});
-
-onUnmounted(() => {
-  encerrar();
-});
 </script>
 
 <template>
@@ -103,12 +76,12 @@ onUnmounted(() => {
         <button
           type="button"
           class="btn btn-sm btn-outline-secondary"
-          :disabled="estaAtualizando"
-          @click="atualizarManual"
+          :disabled="atualizando"
+          @click="recarregar"
           title="Recarregar dados"
         >
           <span
-            v-if="estaAtualizando"
+            v-if="atualizando"
             class="spinner-border spinner-border-sm me-1"
             role="status"
             aria-hidden="true"
@@ -118,11 +91,6 @@ onUnmounted(() => {
         </button>
         <span class="rounded-circle d-inline-block" style="width: 8px; height: 8px"></span>
       </div>
-    </div>
-
-    <div v-if="ultimaAtualizacao" class="small text-body-tertiary mb-2 text-end">
-      <i class="bi bi-clock me-1" aria-hidden="true"></i>
-      Última atualização: {{ ultimaAtualizacao.toLocaleTimeString('pt-BR') }}
     </div>
 
     <div class="d-flex flex-wrap gap-2 mb-3">
@@ -197,7 +165,7 @@ onUnmounted(() => {
       {{ mensagemInfo }}
     </div>
 
-    <div v-if="carregando && !ranking.length" class="text-center py-5">
+    <div v-if="pendente && !ranking.length" class="text-center py-5" aria-busy="true">
       <div class="spinner-border text-primary" role="status">
         <span class="visually-hidden">Carregando...</span>
       </div>

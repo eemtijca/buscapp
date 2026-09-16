@@ -1,5 +1,6 @@
 import { useRouter, type Router } from 'vue-router';
-import { api } from '@/servicos/api';
+import { Consultas } from '@/servicos/consultas';
+import { consultar, recarregar } from '@/servicos/cache';
 
 export type StatusPerfilConta = 'ativo' | 'pendente' | 'inativo';
 
@@ -19,8 +20,8 @@ let emVerificacao = false;
 /** Consulta o status do perfil autenticado; sessão ausente ou falha transitória devolvem null. */
 async function verificarStatus(): Promise<StatusPerfilConta | null> {
   try {
-    const { perfil } = await api<{ perfil: { status: StatusPerfilConta } | null }>('/api/auth/me');
-    return perfil?.status ?? null;
+    await recarregar('auth/me', true, 'sessao');
+    return consultar(Consultas.authMe()).dados?.perfil?.status ?? null;
   } catch {
     return null;
   }

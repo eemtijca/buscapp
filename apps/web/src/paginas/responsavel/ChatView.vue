@@ -1,82 +1,69 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAutenticacao } from '@/composables/useAutenticacao';
-import { useMonitoramento } from '@/composables/useMonitoramento';
+import {
+  enviarMensagem,
+  garantirConversasDosFilhos,
+  marcarMensagensComoLidas,
+  useContatosChat,
+  useConversaDetalhe,
+} from '@/composables/consultas/useChat';
+import { useFilhosResponsavel } from '@/composables/consultas/useMonitoramento';
+import { useHorarioProtegido } from '@/composables/consultas/useCatalogos';
 import { useNotificacoes } from '@/composables/useNotificacoes';
-import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh';
 import ChatPainelDuplo from '@/componentes/ChatPainelDuplo.vue';
-import type { ContatoChat, MensagemChat, HorarioProtegido } from '@/tipos/componentes';
-import { avatarCor } from '@/utils/chatUtils';
 
 const router = useRouter();
 const { usuario } = useAutenticacao();
-const {
-  buscarContatosResponsavel,
-  buscarConversaDetalhe,
-  enviarMensagem,
-  marcarMensagensComoLidas,
-  horarioProtegidoAtivo,
-  obterHorarioProtegido,
-} = useMonitoramento();
+const { filhos } = useFilhosResponsavel();
 const { marcarNotificacoesConversaLidas } = useNotificacoes();
 
-const contatos = ref<ContatoChat[]>([]);
-const mensagens = ref<MensagemChat[]>([]);
+const { contatos, pendente: carregandoContatos } = useContatosChat(
+  () => usuario.value?.papel ?? '',
+  () => usuario.value?.id ?? '',
+);
+
 const conversaAtivaId = ref<string | null>(null);
-const contatoAtivo = ref<ContatoChat | null>(null);
-const horarioAtivo = ref(false);
+const { mensagens } = useConversaDetalhe(
+  () => conversaAtivaId.value,
+  () => usuario.value?.id,
+);
+
+const { horario, horarioAtivo } = useHorarioProtegido();
+
 const enviando = ref(false);
-const carregandoContatos = ref(true);
-const horarioConfig = ref<HorarioProtegido | null>(null);
 const erro = ref<string | null>(null);
 
-const { inscrever, encerrar } = useRealtimeRefresh();
-let intervaloRelogio: number | null = null;
-
+const contatoAtivo = computed(
+  () => contatos.value.find((contato) => contato.conversaId === conversaAtivaId.value) ?? null,
+);
 const podeEnviar = computed(() => horarioAtivo.value);
 
-async function carregarContatos() {
-  if (!usuario.value) return;
-  carregandoContatos.value = true;
-  contatos.value = await buscarContatosResponsavel(usuario.value.id);
-  for (const c of contatos.value) {
-    c.avatarCor = avatarCor(c.nomeContato);
-  }
-  carregandoContatos.value = false;
+// Cada filho precisa de uma conversa aberta para aparecer na lista.
+watch(
+  filhos,
+  (lista) => {
+    if (!lista.length) return;
+    void garantirConversasDosFilhos(lista.map((filho) => filho.id));
+  },
+  { immediate: true },
+);
 
-  if (
-    conversaAtivaId.value &&
-    !contatos.value.find((c) => c.conversaId === conversaAtivaId.value)
-  ) {
-    conversaAtivaId.value = null;
-    contatoAtivo.value = null;
-    mensagens.value = [];
-  }
-
-  if (contatos.value.length > 0 && !conversaAtivaId.value) {
-    const primeiro = contatos.value[0];
-    if (primeiro) await selecionarConversa(primeiro.conversaId);
-  }
-}
+watch(
+  contatos,
+  (lista) => {
+    if (!conversaAtivaId.value && lista.length) void selecionarConversa(lista[0]!.conversaId);
+  },
+  { immediate: true },
+);
 
 async function selecionarConversa(conversaId: string) {
-  if (!usuario.value) return;
-  const userId = usuario.value.id;
   conversaAtivaId.value = conversaId;
-  contatoAtivo.value = contatos.value.find((c) => c.conversaId === conversaId) ?? null;
-
-  await marcarMensagensComoLidas(conversaId, userId);
-  // Badge de mensagens novas zera na hora em que a conversa é aberta.
-  await marcarNotificacoesConversaLidas(conversaId);
-
-  const det = await buscarConversaDetalhe(conversaId, userId);
-  mensagens.value = det.mensagens;
-
-  const contato = contatos.value.find((c) => c.conversaId === conversaId);
-  if (contato) {
-    contato.naoLidas = 0;
-  }
+  await Promise.all([
+    marcarMensagensComoLidas(conversaId),
+    marcarNotificacoesConversaLidas(conversaId),
+  ]);
 }
 
 async function handleEnviarMensagem(texto: string) {
@@ -84,23 +71,8 @@ async function handleEnviarMensagem(texto: string) {
   enviando.value = true;
   erro.value = null;
   const ok = await enviarMensagem(conversaAtivaId.value, texto);
-  if (!ok) {
-    erro.value = 'Falha ao enviar mensagem. Tente novamente.';
-  }
+  if (!ok) erro.value = 'Falha ao enviar mensagem. Tente novamente.';
   enviando.value = false;
-}
-
-/** Recarrega contatos e, se houver, as mensagens da conversa aberta. */
-async function recarregarChat() {
-  const conversaAntes = conversaAtivaId.value;
-  await carregarContatos();
-  if (!usuario.value || !conversaAntes || conversaAtivaId.value !== conversaAntes) return;
-  const det = await buscarConversaDetalhe(conversaAntes, usuario.value.id);
-  mensagens.value = det.mensagens;
-}
-
-async function inscreverChat() {
-  await inscrever([{ tabela: 'mensagens' }, { tabela: 'conversas' }], recarregarChat);
 }
 
 function rotaInicio(): string {
@@ -109,32 +81,7 @@ function rotaInicio(): string {
 
 function handleVoltar() {
   conversaAtivaId.value = null;
-  contatoAtivo.value = null;
 }
-
-onMounted(async () => {
-  horarioConfig.value = await obterHorarioProtegido();
-  horarioAtivo.value = horarioProtegidoAtivo();
-  if (usuario.value) {
-    await carregarContatos();
-    await inscreverChat();
-  }
-  intervaloRelogio = window.setInterval(() => {
-    horarioAtivo.value = horarioProtegidoAtivo();
-  }, 60_000);
-});
-
-watch(usuario, async (val) => {
-  if (val && contatos.value.length === 0) {
-    await carregarContatos();
-    await inscreverChat();
-  }
-});
-
-onUnmounted(() => {
-  encerrar();
-  if (intervaloRelogio) window.clearInterval(intervaloRelogio);
-});
 </script>
 
 <template>
@@ -169,7 +116,7 @@ onUnmounted(() => {
       :mensagens="mensagens"
       :conversa-ativa-id="conversaAtivaId"
       :horario-ativo="horarioAtivo"
-      :mensagem-fora-horario="horarioConfig?.mensagemForaHorario ?? ''"
+      :mensagem-fora-horario="horario.mensagemForaHorario"
       :enviando="enviando"
       :pode-enviar="podeEnviar"
       :carregando-contatos="carregandoContatos"

@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, watch, nextTick } from 'vue';
+import { computed, ref, watch, nextTick } from 'vue';
 import { useRouter, onBeforeRouteLeave } from 'vue-router';
 import { api } from '@/servicos/api';
 import { useFormSnapshot } from '@/composables/useFormSnapshot';
-import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh';
+import { useDisciplinas } from '@/composables/consultas/useCatalogos';
 import {
   mensagemSucesso as criarMensagemSucesso,
   mensagemErroExplicita,
@@ -12,10 +12,9 @@ import CampoFormulario from '@/componentes/CampoFormulario.vue';
 import type { Disciplina } from '@/tipos/database';
 
 const router = useRouter();
-const { inscrever, encerrar } = useRealtimeRefresh();
-
-const disciplinas = ref<Disciplina[]>([]);
-const carregando = ref(false);
+const { disciplinas, pendente, recarregar: recarregarDisciplinas } = useDisciplinas();
+const salvando = ref(false);
+const carregando = computed(() => pendente.value || salvando.value);
 const mensagemSucesso = ref<string | null>(null);
 const mensagemErro = ref<string | null>(null);
 
@@ -80,18 +79,6 @@ function resetForm() {
   });
 }
 
-async function carregarDisciplinas() {
-  carregando.value = true;
-  try {
-    const { disciplinas: lista } = await api<{ disciplinas: Disciplina[] }>('/api/disciplinas');
-    disciplinas.value = lista;
-  } catch {
-    mostrarErro('Falha ao carregar disciplinas.');
-  } finally {
-    carregando.value = false;
-  }
-}
-
 async function abrirEditar(disciplina: Disciplina) {
   pausarSnapshot(true);
   modoEdicao.value = true;
@@ -129,7 +116,7 @@ async function salvar() {
     );
     return;
   }
-  carregando.value = true;
+  salvando.value = true;
   try {
     if (modoEdicao.value && editandoId.value) {
       try {
@@ -166,9 +153,9 @@ async function salvar() {
     }
     modalAberto.value = false;
     resetForm();
-    await carregarDisciplinas();
+    await recarregarDisciplinas();
   } finally {
-    carregando.value = false;
+    salvando.value = false;
   }
 }
 
@@ -179,21 +166,12 @@ async function alternarAtivo(disciplina: Disciplina) {
       metodo: 'PATCH',
       corpo: { ativo: novoValor },
     });
-    disciplina.ativo = novoValor;
     mostrarSucesso(novoValor ? 'Disciplina ativada.' : 'Disciplina desativada.');
+    await recarregarDisciplinas();
   } catch {
     mostrarErro('Falha ao alterar status.');
   }
 }
-
-onMounted(async () => {
-  await carregarDisciplinas();
-  await inscrever([{ tabela: 'disciplinas' }], carregarDisciplinas);
-});
-
-onUnmounted(() => {
-  encerrar();
-});
 </script>
 
 <template>

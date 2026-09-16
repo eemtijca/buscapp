@@ -59,7 +59,11 @@ Leituras fora do escopo respondem 404, para não revelar a existência do regist
 
 ## Tempo real
 
-O stream `GET /api/eventos` usa Server-Sent Events e publica eventos de invalidação `{ tabela, escopo }`, sem dados sensíveis. O barramento é em memória, com heartbeat de 25 segundos, e o frontend recarrega as telas inscritas com debounce, além de recarregar ao reconectar e ao voltar para a aba. Ver [ADR-005](adr/005-tempo-real-sse.md) e [modulos.md](modulos.md).
+O stream `GET /api/eventos` usa Server-Sent Events e publica eventos de invalidação `{ tabela, escopo }`, sem dados sensíveis. O barramento é em memória, com heartbeat de 25 segundos, e o cache do cliente invalida as consultas inscritas na tabela, revalidando ao reconectar, ao voltar para a aba e ao voltar a rede. A conexão é aberta apenas com sessão ativa e encerrada no logout. Ver [ADR-005](adr/005-tempo-real-sse.md) e [modulos.md](modulos.md).
+
+## Cache de dados do cliente
+
+O estado remoto fica em `apps/web/src/servicos/cache.ts`, com `stale-while-revalidate`: dados retidos aparecem de imediato e são revalidados em segundo plano, com deduplicação de requisições e invalidação por tabela do SSE. `apps/web/src/servicos/persistenciaCache.ts` guarda no IndexedDB uma lista explícita de consultas, com namespace por usuário, validade e purga no logout. `apps/web/src/servicos/prefetch.ts` aquece as consultas da rota na intenção de navegação. A API responde `/api` com `Cache-Control: private, no-store` e ETag próprio; a revalidação envia `If-None-Match` e aceita `304`. Ver [ADR-008](adr/008-cache-de-dados-cliente.md) e [interface.md](interface.md).
 
 ## Topologia
 
@@ -80,11 +84,12 @@ apps/
     src/
       assets/            tokens de cor e fontes
       componentes/       componentes reutilizáveis
-      composables/       estado e orquestração (autenticação, monitoramento, SSE)
+      composables/       estado, view models de consulta e orquestração
+        consultas/       hooks derivados do cache por domínio
       layouts/           shell da aplicação
       paginas/           auth, professor, gestao, responsavel e error
       rotas/             Vue Router com guardas de papel e módulo
-      servicos/          cliente da API, EventSource e cálculo do termômetro
+      servicos/          cliente da API com ETag, cache, IndexedDB, EventSource e termômetro
       tipos/             tipos do banco e de componentes
       utils/             compressão de imagem, mensagens e formatação
   api/

@@ -1,10 +1,11 @@
 # Testes
 
-Suítes de integração da API (Vitest), Playwright (E2E e PWA) e smoke test do schema. Os comandos e pré-requisitos de execução estão em [../tests/README.md](../tests/README.md); esta página descreve a convenção e a integração contínua.
+Suítes de integração da API (Vitest), unidade do cache do frontend (Vitest), Playwright (E2E e PWA) e smoke test do schema. Os comandos e pré-requisitos de execução estão em [../tests/README.md](../tests/README.md); esta página descreve a convenção e a integração contínua.
 
 ## Convenção
 
 - Os testes de API ficam junto do código, em `apps/api/src/**/*.test.ts`, e usam `construirApp()` com `app.inject`, contra o PostgreSQL do Compose.
+- Os testes de unidade do frontend ficam junto do código, em `apps/web/src/**/*.test.ts`, e isolam a persistência com mocks.
 - Cada arquivo cobre um módulo e usa `beforeAll` e `afterAll` para criar e limpar a própria massa, com emails datados.
 - As suítes rodam em série (`fileParallelism: false`) por compartilharem o mesmo banco, com timeout de 20 segundos por teste.
 - Os testes E2E ficam em `tests/e2e` e usam os helpers de `tests/suporte` para API, banco, fixtures e sessão.
@@ -14,9 +15,10 @@ Suítes de integração da API (Vitest), Playwright (E2E e PWA) e smoke test do 
 
 | Suíte             | Arquivos                                  | Dependências                         | Cobertura                                                                                          |
 | ----------------- | ----------------------------------------- | ------------------------------------ | -------------------------------------------------------------------------------------------------- |
-| Integração da API | `apps/api/src/**/*.test.ts` (12 arquivos) | Banco do Compose migrado             | Autenticação e sessões, senhas, autorização e escopo, CRUD dos domínios, códigos, anexos e regras. |
-| E2E               | `tests/e2e/*.spec.ts` (19 especificações) | API e SPA no ar, banco com seed      | Fluxos dos três papéis, tempo real, notificações, anexos, termômetro, ranking e resiliência.       |
-| PWA               | `tests/e2e/pwa.spec.ts`                   | Build de produção via `vite preview` | Manifest, service worker, ícones e shell offline.                                                  |
+| Integração da API | `apps/api/src/**/*.test.ts` (13 arquivos) | Banco do Compose migrado             | Autenticação e sessões, senhas, autorização e escopo, CRUD dos domínios, códigos, anexos, regras e ETag/304. |
+| Unidade do cache  | `apps/web/src/**/*.test.ts` (1 arquivo)   | Nenhuma                              | Deduplicação, frescor, 304, invalidação por tabela e escopo, GC e namespace.                        |
+| E2E               | `tests/e2e/*.spec.ts` (20 especificações, exceto PWA) | API e SPA no ar, banco com seed      | Fluxos dos três papéis, tempo real, notificações, anexos, termômetro, ranking, cache, sessão e resiliência. |
+| PWA               | `tests/e2e/pwa*.spec.ts` (2 especificações) | Build via `vite preview` e API em `:3001` | Manifest, service worker, ícones, shell offline, dados persistidos e revalidação por 304.  |
 | Smoke do banco    | `scripts/test-db.sh`                      | Compose no ar                        | Migrações aplicadas, 33 tabelas, CHECKs, triggers e índice parcial de frequência.                  |
 
 ## Como executar
@@ -24,8 +26,8 @@ Suítes de integração da API (Vitest), Playwright (E2E e PWA) e smoke test do 
 Na raiz, com o Compose no ar:
 
 ```bash
-npm run test          # type-check, lint, build da SPA e testes de integração da API
-npm run test:unit     # apenas os testes de integração (Vitest)
+npm run test          # type-check, lint, build da SPA e testes de unidade
+npm run test:unit     # integração da API e unidade do cache do web (Vitest)
 npm run test:e2e      # Playwright sobe API e SPA automaticamente
 npm run test:pwa      # build de produção e testes de PWA
 npm run test:db       # smoke test do schema

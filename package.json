@@ -31,9 +31,11 @@
     "db:migrate": "npm run migrate:deploy -w @buscapp/api",
     "compose:up": "docker compose up -d --build",
     "compose:down": "docker compose down",
-    "test:unit": "npm run test -w @buscapp/api",
+    "test:unit": "run-s test:unit:api test:unit:web",
+    "test:unit:api": "npm run test -w @buscapp/api",
+    "test:unit:web": "npm run test -w @buscapp/web",
     "test:api": "npm run test -w @buscapp/api",
-    "test:pwa": "run-s build-only test:pwa:run"
+    "test:pwa": "VITE_API_URL=http://localhost:3001 run-s build-only test:pwa:run"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",

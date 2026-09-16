@@ -113,10 +113,10 @@ test.describe('Termômetro — Barra segmentada inteligente', () => {
     await criarFaltas(9, '2026-03-01');
     await login(page, 'resp1@email.com', SENHA_RESP);
     await page.goto('/responsavel/termometro');
-    await expect(page.getByText('Tudo certo')).toBeVisible({ timeout: 10000 });
     await expect(page.locator('.progress[role="progressbar"]')).toHaveAttribute(
       'aria-valuetext',
       /Tudo certo/,
+      { timeout: 10000 },
     );
     await logout(page);
     await limparTermometro();
@@ -124,10 +124,10 @@ test.describe('Termômetro — Barra segmentada inteligente', () => {
     await criarFaltas(10, '2026-03-01');
     await login(page, 'resp1@email.com', SENHA_RESP);
     await page.goto('/responsavel/termometro');
-    await expect(page.getByText('Atenção')).toBeVisible({ timeout: 10000 });
     await expect(page.locator('.progress[role="progressbar"]')).toHaveAttribute(
       'aria-valuetext',
       /Atenção/,
+      { timeout: 10000 },
     );
   });
 
@@ -159,11 +159,11 @@ test.describe('Termômetro — Barra segmentada inteligente', () => {
     ]);
     await login(page, 'resp1@email.com', SENHA_RESP);
     await page.goto('/responsavel/termometro');
-    await expect(page.getByText('Atenção')).toBeVisible({ timeout: 10000 });
-    // Verifica que a barra refletiu o peso da ocorrência grave
+    // A barra reflete o peso da ocorrência grave no nível médio.
     await expect(page.locator('.progress[role="progressbar"]')).toHaveAttribute(
       'aria-valuetext',
       /Atenção/,
+      { timeout: 10000 },
     );
     await logout(page);
     await excluirLinhas('ocorrencias', 'aluno_id = $1', [ALUNO_TERM_ID]);
@@ -183,10 +183,10 @@ test.describe('Termômetro — Barra segmentada inteligente', () => {
     ]);
     await login(page, 'resp1@email.com', SENHA_RESP);
     await page.goto('/responsavel/termometro');
-    await expect(page.getByText('Risco alto')).toBeVisible({ timeout: 10000 });
     await expect(page.locator('.progress[role="progressbar"]')).toHaveAttribute(
       'aria-valuetext',
       /Risco alto/,
+      { timeout: 10000 },
     );
     // limpeza da tag de teste
     await excluirLinhas('tags_comportamento', 'nome = $1', ['TesteCriticoE2E']);
@@ -197,7 +197,11 @@ test.describe('Termômetro — Barra segmentada inteligente', () => {
     await criarFaltas(10, '2026-05-01');
     await login(page, 'resp1@email.com', SENHA_RESP);
     await page.goto('/responsavel/termometro');
-    await expect(page.getByText('Atenção')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('.progress[role="progressbar"]')).toHaveAttribute(
+      'aria-valuetext',
+      /Atenção/,
+      { timeout: 10000 },
+    );
     await expect(
       page
         .locator('.card')

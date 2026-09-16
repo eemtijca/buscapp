@@ -1,6 +1,7 @@
 import type { Aluno, AtualizarAluno, CriarAluno, ListarAlunos } from '@buscapp/contratos';
 import type { PerfilAutenticado } from '../../nucleo/autenticacao/tipos.js';
 import { filtroAlunosVisiveis, podeVerAluno } from '../../nucleo/autorizacao/escopo.js';
+import { publicarEvento } from '../../nucleo/eventos/barramento.js';
 import { ErroHttp, erroNaoEncontrado } from '../../nucleo/http/erros.js';
 import {
   atualizarAluno,
@@ -66,7 +67,9 @@ export async function obter(usuario: PerfilAutenticado, id: string): Promise<Alu
 
 export async function criar(dados: CriarAluno): Promise<Aluno> {
   try {
-    return paraAluno(await criarAluno(dados));
+    const aluno = await criarAluno(dados);
+    publicarEvento({ tabela: 'alunos' });
+    return paraAluno(aluno);
   } catch (erro) {
     if ((erro as { code?: string }).code === 'P2002') {
       throw new ErroHttp(409, 'matricula_duplicada', 'Já existe um aluno com esta matrícula.');
@@ -80,7 +83,9 @@ export async function atualizar(id: string, dados: AtualizarAluno): Promise<Alun
   if (!existente) throw erroNaoEncontrado('Aluno não encontrado.');
 
   try {
-    return paraAluno(await atualizarAluno(id, dados));
+    const aluno = await atualizarAluno(id, dados);
+    publicarEvento({ tabela: 'alunos' });
+    return paraAluno(aluno);
   } catch (erro) {
     if ((erro as { code?: string }).code === 'P2002') {
       throw new ErroHttp(409, 'matricula_duplicada', 'Já existe um aluno com esta matrícula.');

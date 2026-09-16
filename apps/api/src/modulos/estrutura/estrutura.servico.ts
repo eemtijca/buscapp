@@ -195,7 +195,9 @@ export async function listarDisciplinas(consulta: ListarDisciplinas): Promise<Di
 
 export async function criarDisciplina(dados: CriarDisciplina): Promise<Disciplina> {
   try {
-    return paraDisciplina(await criarDisciplinaNoBanco(dados));
+    const disciplina = await criarDisciplinaNoBanco(dados);
+    publicarEvento({ tabela: 'disciplinas' });
+    return paraDisciplina(disciplina);
   } catch (erro) {
     if (ehConflitoUnicidade(erro)) {
       throw new ErroHttp(
@@ -216,7 +218,9 @@ export async function atualizarDisciplina(
   if (!existente) throw erroNaoEncontrado('Disciplina não encontrada.');
 
   try {
-    return paraDisciplina(await atualizarDisciplinaNoBanco(id, dados));
+    const disciplina = await atualizarDisciplinaNoBanco(id, dados);
+    publicarEvento({ tabela: 'disciplinas' });
+    return paraDisciplina(disciplina);
   } catch (erro) {
     if (ehConflitoUnicidade(erro)) {
       throw new ErroHttp(
@@ -232,7 +236,9 @@ export async function atualizarDisciplina(
 export async function atualizarStatusDisciplina(id: string, ativo: boolean): Promise<Disciplina> {
   const existente = await buscarDisciplinaPorId(id);
   if (!existente) throw erroNaoEncontrado('Disciplina não encontrada.');
-  return paraDisciplina(await atualizarStatusDisciplinaNoBanco(id, ativo));
+  const disciplina = await atualizarStatusDisciplinaNoBanco(id, ativo);
+  publicarEvento({ tabela: 'disciplinas' });
+  return paraDisciplina(disciplina);
 }
 
 // --- Atribuições ---

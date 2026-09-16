@@ -6,10 +6,11 @@ import type {
   ListarUsuarios,
   Usuario,
 } from '@buscapp/contratos';
-import { ErroHttp, erroNaoEncontrado } from '../../nucleo/http/erros.js';
 import { gerarCodigoRedefinicao } from '../../nucleo/autenticacao/codigos.js';
 import { gerarHashSenha } from '../../nucleo/autenticacao/senhas.js';
 import { revogarSessoesDoPerfil } from '../../nucleo/autenticacao/sessoes.js';
+import { publicarEvento } from '../../nucleo/eventos/barramento.js';
+import { ErroHttp, erroNaoEncontrado } from '../../nucleo/http/erros.js';
 import {
   atualizarStatusUsuario,
   atualizarUsuario,
@@ -128,6 +129,7 @@ export async function criar(dados: CriarUsuario, criadoPor: string): Promise<Usu
     throw erro;
   }
 
+  publicarEvento({ tabela: 'perfis' });
   return { usuario: paraUsuario(perfil), codigo, senha_temporaria: senhaTemporaria };
 }
 
@@ -141,6 +143,7 @@ export async function atualizar(id: string, dados: AtualizarUsuario): Promise<Us
       dados,
       dados.email !== undefined ? dados.email.toLowerCase() : undefined,
     );
+    publicarEvento({ tabela: 'perfis' });
     return paraUsuario(perfil);
   } catch (erro) {
     traduzirErroBanco(erro);
@@ -160,5 +163,6 @@ export async function atualizarStatus(
 
   const perfil = await atualizarStatusUsuario(id, dados.status);
   if (dados.status === 'inativo') await revogarSessoesDoPerfil(id);
+  publicarEvento({ tabela: 'perfis' });
   return paraUsuario(perfil);
 }

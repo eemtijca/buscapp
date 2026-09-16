@@ -1,10 +1,9 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, computed, nextTick } from 'vue';
+import { onUnmounted, ref, computed, nextTick, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { api } from '@/servicos/api';
-import { useOpcoesConfiguracao } from '@/composables/useOpcoesConfiguracao';
+import { useOpcoesConfiguracao } from '@/composables/consultas/useCatalogos';
 import { useAlturaUniformeCards } from '@/composables/useAlturaUniformeCards';
-import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh';
 import CampoFormulario from '@/componentes/CampoFormulario.vue';
 import CartaoSelecao from '@/componentes/CartaoSelecao.vue';
 import { obterRegra, gerarChave } from '@/utils/opcoesConfiguracao';
@@ -12,18 +11,18 @@ import type { OpcaoConfiguracao } from '@/tipos/database';
 import Sortable from 'sortablejs';
 
 const route = useRoute();
-const { limparCache } = useOpcoesConfiguracao();
-const { inscrever, encerrar } = useRealtimeRefresh();
-
 const tipo = computed(() => route.params.tipo as string);
+const { opcoes: opcoesRemotas, pendente, recarregar } = useOpcoesConfiguracao(() => tipo.value);
 
 const regra = computed(() => obterRegra(tipo.value));
 const tituloPagina = computed(() => regra.value.titulo);
 const labelNome = computed(() => regra.value.rotulo);
 const placeholderNome = computed(() => regra.value.placeholder);
 
+// Cópia local mutável para o modo de reordenação não tocar o cache compartilhado.
 const opcoes = ref<OpcaoConfiguracao[]>([]);
-const carregando = ref(false);
+const salvando = ref(false);
+const carregando = computed(() => pendente.value || salvando.value);
 const mensagemSucesso = ref<string | null>(null);
 const mensagemErro = ref<string | null>(null);
 
@@ -39,6 +38,15 @@ const opcaoSelecionada = ref<string | null>(null);
 const mostrarCustom = ref(false);
 
 const modoReordenar = ref(false);
+
+watch(
+  opcoesRemotas,
+  (lista) => {
+    if (modoReordenar.value) return;
+    opcoes.value = lista.map((opcao) => ({ ...opcao }));
+  },
+  { immediate: true },
+);
 const snapshotPreReordenacao = ref<OpcaoConfiguracao[]>([]);
 
 const ordemAlterada = computed(() => {
@@ -194,7 +202,7 @@ function entrarModoReordenar() {
 }
 
 async function salvarOrdem() {
-  carregando.value = true;
+  salvando.value = true;
   const updates: { id: string; ordem: number }[] = [];
   document.querySelectorAll<HTMLElement>('.config-table tbody tr').forEach((row, i) => {
     const id = row.getAttribute('data-id');
@@ -209,15 +217,14 @@ async function salvarOrdem() {
     }
     modoReordenar.value = false;
     destroySortable();
-    limparCache(tipo.value);
     mostrarSucesso('Ordem salva.');
-    await carregar();
+    await recarregar();
   } catch (e) {
     opcoes.value = snapshotPreReordenacao.value.map((o) => ({ ...o }));
     initSortable();
     mostrarErro(`Erro ao salvar: ${e instanceof Error ? e.message : 'Conexão'}`);
   } finally {
-    carregando.value = false;
+    salvando.value = false;
   }
 }
 
@@ -225,20 +232,6 @@ function cancelarReordenar() {
   opcoes.value = snapshotPreReordenacao.value.map((o) => ({ ...o }));
   modoReordenar.value = false;
   destroySortable();
-}
-
-async function carregar() {
-  carregando.value = true;
-  try {
-    const { opcoes: lista } = await api<{ opcoes: OpcaoConfiguracao[] }>('/api/opcoes', {
-      parametros: { tipo: tipo.value },
-    });
-    opcoes.value = lista;
-  } catch {
-    mostrarErro('Falha ao carregar.');
-  } finally {
-    carregando.value = false;
-  }
 }
 
 function abrirNovo() {
@@ -259,7 +252,7 @@ function abrirEditar(item: OpcaoConfiguracao) {
 
 async function salvar() {
   if (!validarNome()) return;
-  carregando.value = true;
+  salvando.value = true;
   const rotulo = rotuloFinal();
   try {
     if (modoEdicao.value && editandoId.value) {
@@ -287,13 +280,12 @@ async function salvar() {
       });
       mostrarSucesso('Opção criada.');
     }
-    limparCache(tipo.value);
     modalAberto.value = false;
-    await carregar();
+    await recarregar();
   } catch (e) {
     mostrarErro(e instanceof Error ? e.message : String(e));
   } finally {
-    carregando.value = false;
+    salvando.value = false;
   }
 }
 
@@ -303,8 +295,7 @@ async function alternarAtivo(item: OpcaoConfiguracao) {
       metodo: 'PUT',
       corpo: { ativo: !item.ativo },
     });
-    limparCache(tipo.value);
-    await carregar();
+    await recarregar();
   } catch (e) {
     mostrarErro(e instanceof Error ? e.message : String(e));
   }
@@ -316,21 +307,15 @@ async function excluir(id: string) {
   if (!confirm(`Excluir "${item.rotulo}"?`)) return;
   try {
     await api(`/api/opcoes/${id}`, { metodo: 'DELETE' });
-    limparCache(tipo.value);
     mostrarSucesso(`"${item.rotulo}" excluído.`);
-    await carregar();
+    await recarregar();
   } catch (e) {
     mostrarErro(e instanceof Error ? e.message : String(e));
   }
 }
 
-onMounted(async () => {
-  await carregar();
-  await inscrever([{ tabela: 'opcoes_configuracao' }], carregar);
-});
 onUnmounted(() => {
   destroySortable();
-  encerrar();
 });
 </script>
 

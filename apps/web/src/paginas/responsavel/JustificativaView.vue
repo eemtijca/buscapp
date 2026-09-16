@@ -2,31 +2,33 @@
 import { computed, ref, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useAutenticacao } from '@/composables/useAutenticacao';
-import { useMonitoramento } from '@/composables/useMonitoramento';
+import {
+  useFilhosResponsavel,
+  enviarJustificativa,
+} from '@/composables/consultas/useMonitoramento';
 import { api } from '@/servicos/api';
 import FormularioJustificativa from '@/componentes/FormularioJustificativa.vue';
 import Combobox from '@/componentes/Combobox.vue';
 import type { OpcaoCombobox } from '@/componentes/Combobox.vue';
-import type { Aluno, Frequencia } from '@/tipos/database';
+import type { Frequencia } from '@/tipos/database';
 
 const router = useRouter();
 const route = useRoute();
 const { usuario } = useAutenticacao();
-const { buscarFilhosDoResponsavel, enviarJustificativa } = useMonitoramento();
+const { filhos, pendente } = useFilhosResponsavel();
 
-const filhos = ref<Aluno[]>([]);
-const filhoSelecionado = ref<Aluno | null>(null);
+const filhoSelecionadoId = ref('');
+const filhoSelecionado = computed(
+  () => filhos.value.find((filho) => filho.id === filhoSelecionadoId.value) ?? null,
+);
 
 const filhoOpcoes = computed<OpcaoCombobox[]>(() =>
-  filhos.value.map((f) => ({ valor: f.id, rotulo: f.nome, descricao: f.matricula ?? undefined })),
+  filhos.value.map((filho) => ({
+    valor: filho.id,
+    rotulo: filho.nome,
+    descricao: filho.matricula ?? undefined,
+  })),
 );
-const filhoSelecionadoId = computed({
-  get: () => filhoSelecionado.value?.id ?? '',
-  set: (id: string) => {
-    const filho = filhos.value.find((f) => f.id === id);
-    if (filho) filhoSelecionado.value = filho;
-  },
-});
 const enviando = ref(false);
 const mensagemSucesso = ref<string | null>(null);
 const mensagemErro = ref<string | null>(null);
@@ -65,34 +67,34 @@ async function handleEnviarJustificativa(payload: {
   enviando.value = false;
 }
 
-// Inicializa quando usuario existir: garante carga mesmo após reload direto na rota.
-async function inicializar() {
-  if (!usuario.value) return;
+let inicializado = false;
 
-  const frequenciaId = route.query.frequenciaId as string | undefined;
-  filhos.value = await buscarFilhosDoResponsavel(usuario.value.id);
+// Inicializa quando os filhos chegarem: garante carga mesmo após reload direto na rota.
+watch(
+  filhos,
+  async (lista) => {
+    if (inicializado || !lista.length) return;
+    inicializado = true;
 
-  if (frequenciaId) {
-    try {
-      const { frequencia } = await api<{ frequencia: Frequencia }>(
-        `/api/frequencias/${frequenciaId}`,
-      );
-      dataPrefill.value = frequencia.data_aula;
-      dataDesabilitada.value = !!frequencia.data_aula;
-      const aluno = filhos.value.find((a) => a.id === frequencia.aluno_id);
-      if (aluno) filhoSelecionado.value = aluno;
-      detalhesAusencia.value = `Período: ${frequencia.periodo}`;
-    } catch (e) {
-      console.error('[JustificativaView] Erro ao buscar a frequência do deep-link:', e);
+    const frequenciaId = route.query.frequenciaId as string | undefined;
+    if (frequenciaId) {
+      try {
+        const { frequencia } = await api<{ frequencia: Frequencia }>(
+          `/api/frequencias/${frequenciaId}`,
+        );
+        dataPrefill.value = frequencia.data_aula;
+        dataDesabilitada.value = !!frequencia.data_aula;
+        filhoSelecionadoId.value = frequencia.aluno_id;
+        detalhesAusencia.value = `Período: ${frequencia.periodo}`;
+      } catch (e) {
+        console.error('[JustificativaView] Erro ao buscar a frequência do deep-link:', e);
+      }
     }
-  }
 
-  if (!filhoSelecionado.value) {
-    filhoSelecionado.value = filhos.value[0] || null;
-  }
-}
-
-watch(usuario, () => void inicializar(), { immediate: true });
+    if (!filhoSelecionadoId.value && lista[0]) filhoSelecionadoId.value = lista[0].id;
+  },
+  { immediate: true },
+);
 </script>
 
 <template>
@@ -137,7 +139,13 @@ watch(usuario, () => void inicializar(), { immediate: true });
       Justificativa vinculada a uma falta registrada. {{ detalhesAusencia }}
     </div>
 
-    <div class="card border">
+    <div v-if="pendente && !filhos.length" class="text-center py-5" aria-busy="true">
+      <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Carregando alunos</span>
+      </div>
+    </div>
+
+    <div v-else class="card border">
       <div class="card-body">
         <FormularioJustificativa
           :key="formKey"

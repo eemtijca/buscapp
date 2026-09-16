@@ -1,31 +1,31 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, nextTick } from 'vue';
+import { computed, ref, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAutenticacao } from '@/composables/useAutenticacao';
-import { useMonitoramento } from '@/composables/useMonitoramento';
-import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh';
-import { useOpcoesConfiguracao } from '@/composables/useOpcoesConfiguracao';
+import {
+  registrarAusenciaEmPeriodo,
+  useAlunosFrequencia,
+} from '@/composables/consultas/useMonitoramento';
+import { useOpcoes } from '@/composables/consultas/useCatalogos';
 import CampoFormulario from '@/componentes/CampoFormulario.vue';
 import Combobox from '@/componentes/Combobox.vue';
 import GrupoCheckbox from '@/componentes/GrupoCheckbox.vue';
 import ModalConfirmacao from '@/componentes/ModalConfirmacao.vue';
-import type { AlunoFrequencia, OpcaoCheckbox } from '@/tipos/componentes';
 
 const router = useRouter();
 const { usuario } = useAutenticacao();
-const { buscarAlunosParaFrequencia, registrarAusenciaEmPeriodo, carregando } = useMonitoramento();
-const { inscrever, encerrar } = useRealtimeRefresh();
+const { alunos, pendente } = useAlunosFrequencia(() => '');
+const salvando = ref(false);
+const carregando = computed(() => pendente.value || salvando.value);
 
-const alunos = ref<AlunoFrequencia[]>([]);
 const alunoId = ref('');
 const periodos = ref<string[]>([]);
 const justificativa = ref('');
 const mensagemSucesso = ref<string | null>(null);
 const mensagemErro = ref<string | null>(null);
 
-const { buscarOpcoes } = useOpcoesConfiguracao();
-const opcoesPeriodos = ref<OpcaoCheckbox[]>([]);
-const opcoesMotivos = ref<OpcaoCheckbox[]>([]);
+const { opcoes: opcoesPeriodos } = useOpcoes(() => 'periodo');
+const { opcoes: opcoesMotivos } = useOpcoes(() => 'motivo_ausencia');
 
 const motivos = ref<string[]>([]);
 const dataAula = ref(new Date().toISOString().slice(0, 10));
@@ -72,50 +72,39 @@ function solicitarConfirmacao() {
 async function confirmar() {
   confirmarEnvio.value = false;
   if (!usuario.value || !alunoId.value) return;
-  for (const periodo of periodos.value) {
-    const ok = await registrarAusenciaEmPeriodo(
-      alunoId.value,
-      usuario.value.id,
-      dataAula.value,
-      periodo,
-      justificativa.value.trim() || undefined,
-      motivos.value.length ? motivos.value : undefined,
-    );
-    if (!ok) {
-      mensagemErro.value = `Falha ao registrar ausência no ${periodo}. Tente novamente.`;
-      return;
+  salvando.value = true;
+  try {
+    for (const periodo of periodos.value) {
+      const ok = await registrarAusenciaEmPeriodo(
+        alunoId.value,
+        usuario.value.id,
+        dataAula.value,
+        periodo,
+        justificativa.value.trim() || undefined,
+        motivos.value.length ? motivos.value : undefined,
+      );
+      if (!ok) {
+        mensagemErro.value = `Falha ao registrar ausência no ${periodo}. Tente novamente.`;
+        return;
+      }
     }
+    const total = periodos.value.length;
+    mensagemSucesso.value = `${total} ausência(s) registrada(s) com sucesso.`;
+    alunoId.value = '';
+    periodos.value = [];
+    motivos.value = [];
+    justificativa.value = '';
+    await nextTick();
+    requestAnimationFrame(() => {
+      document
+        .querySelector('.alert-success')
+        ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    setTimeout(() => (mensagemSucesso.value = null), 4000);
+  } finally {
+    salvando.value = false;
   }
-  const total = periodos.value.length;
-  mensagemSucesso.value = `${total} ausência(s) registrada(s) com sucesso.`;
-  alunoId.value = '';
-  periodos.value = [];
-  motivos.value = [];
-  justificativa.value = '';
-  await nextTick();
-  requestAnimationFrame(() => {
-    document
-      .querySelector('.alert-success')
-      ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  });
-  setTimeout(() => (mensagemSucesso.value = null), 4000);
 }
-
-async function carregarAlunos() {
-  alunos.value = await buscarAlunosParaFrequencia();
-}
-
-onMounted(async () => {
-  opcoesPeriodos.value = await buscarOpcoes('periodo');
-  opcoesMotivos.value = await buscarOpcoes('motivo_ausencia');
-  await carregarAlunos();
-  // Enturmacoes na inscrição: matrícula nova aparece na lista sem recarregar.
-  await inscrever([{ tabela: 'frequencias' }, { tabela: 'enturmacoes' }], carregarAlunos);
-});
-
-onUnmounted(() => {
-  encerrar();
-});
 </script>
 
 <template>

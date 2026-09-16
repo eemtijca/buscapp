@@ -1,22 +1,40 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch, nextTick } from 'vue';
+import { computed, ref, watch, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAutenticacao } from '@/composables/useAutenticacao';
-import { useMonitoramento } from '@/composables/useMonitoramento';
-import { useOpcoesConfiguracao } from '@/composables/useOpcoesConfiguracao';
-import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh';
+import {
+  registrarFrequenciaEmMassa,
+  useAlunosFrequencia,
+} from '@/composables/consultas/useMonitoramento';
+import { useOpcoes } from '@/composables/consultas/useCatalogos';
 import CartaoAlunoFrequencia from '@/componentes/CartaoAlunoFrequencia.vue';
 import GrupoCheckbox from '@/componentes/GrupoCheckbox.vue';
 import ModalConfirmacao from '@/componentes/ModalConfirmacao.vue';
-import type { AlunoFrequencia, OpcaoCheckbox } from '@/tipos/componentes';
+import type { AlunoFrequencia } from '@/tipos/componentes';
 
 const router = useRouter();
 const { usuario } = useAutenticacao();
-const { buscarAlunosParaFrequencia, registrarFrequenciaEmMassa, carregando } = useMonitoramento();
-
-const alunos = ref<AlunoFrequencia[]>([]);
 const buscaAluno = ref('');
 const dataAula = ref(new Date().toISOString().slice(0, 10));
+const { alunos: alunosRemotos, pendente, recarregar } = useAlunosFrequencia(() => dataAula.value);
+const alunos = ref<AlunoFrequencia[]>([]);
+const salvando = ref(false);
+const carregando = computed(() => pendente.value || salvando.value);
+
+// Cópia local para preservar marcações não salvas enquanto o cache revalida em segundo plano.
+watch(
+  alunosRemotos,
+  (lista) => {
+    const temMarcacoes = alunos.value.some((aluno) => aluno.ausente);
+    if (temMarcacoes && lista.length === alunos.value.length) return;
+    alunos.value = lista.map((aluno) => ({
+      ...aluno,
+      periodosAusentes: [...(aluno.periodosAusentes ?? [])],
+      motivosAusencia: [...(aluno.motivosAusencia ?? [])],
+    }));
+  },
+  { immediate: true },
+);
 const periodosSelecionados = ref<string[]>([]);
 const confirmarSalvar = ref(false);
 const confirmarCancelar = ref(false);
@@ -24,11 +42,8 @@ const confirmarCancelar = ref(false);
 /** Verifica se há faltas marcadas para confirmação ao cancelar. */
 const temDados = computed(() => alunos.value.some((a) => a.ausente));
 const mensagemSucesso = ref<string | null>(null);
-const salvando = ref(false);
 
-const { buscarOpcoes } = useOpcoesConfiguracao();
-const opcoesPeriodos = ref<OpcaoCheckbox[]>([]);
-const { inscrever, encerrar } = useRealtimeRefresh();
+const { opcoes: opcoesPeriodos } = useOpcoes(() => 'periodo');
 
 const alunosFiltrados = computed(() => {
   if (!buscaAluno.value.trim()) return alunos.value;
@@ -93,6 +108,7 @@ async function salvarFrequencia() {
     dataAula.value,
     periodosEfetivos,
   );
+  await recarregar();
   salvando.value = false;
   if (errMsg) {
     mensagemSucesso.value = errMsg;
@@ -109,23 +125,9 @@ async function salvarFrequencia() {
   setTimeout(() => (mensagemSucesso.value = null), 4000);
 }
 
-async function carregarAlunos() {
-  alunos.value = await buscarAlunosParaFrequencia(dataAula.value);
-}
-
-onMounted(async () => {
-  opcoesPeriodos.value = await buscarOpcoes('periodo');
-  await carregarAlunos();
-  // Enturmacoes na inscrição: matrícula nova aparece na lista sem recarregar.
-  await inscrever([{ tabela: 'frequencias' }, { tabela: 'enturmacoes' }], carregarAlunos);
-});
-
-onUnmounted(() => {
-  encerrar();
-});
-
 watch(dataAula, () => {
-  carregarAlunos();
+  // Ao trocar a data, descarta o rascunho local para receber a chamada do novo dia.
+  alunos.value = [];
 });
 </script>
 

@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch, nextTick } from 'vue';
+import { computed, ref, watch, nextTick } from 'vue';
 import { useRouter, onBeforeRouteLeave } from 'vue-router';
 import { api } from '@/servicos/api';
-import { useOpcoesConfiguracao } from '@/composables/useOpcoesConfiguracao';
+import { useDisciplinas, useOpcoes, useTurmas } from '@/composables/consultas/useCatalogos';
+import { useUsuarios } from '@/composables/consultas/useGestaoUsuarios';
+import { useConsulta } from '@/composables/useConsulta';
+import { Consultas } from '@/servicos/consultas';
 import { useFormSnapshot } from '@/composables/useFormSnapshot';
-import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh';
 import {
   mensagemSucesso as criarMensagemSucesso,
   mensagemErroExplicita,
@@ -12,20 +14,12 @@ import {
 import CampoFormulario from '@/componentes/CampoFormulario.vue';
 import Combobox from '@/componentes/Combobox.vue';
 import type { OpcaoCombobox } from '@/componentes/Combobox.vue';
-import type { AtribuicaoProfessor, Turma, Disciplina } from '@/tipos/database';
-import type { OpcaoCheckbox } from '@/tipos/componentes';
+import type { AtribuicaoProfessor } from '@/tipos/database';
 
 interface AtribuicaoItem extends AtribuicaoProfessor {
   professor_nome?: string;
   turma_nome?: string;
   disciplina_nome?: string | null;
-}
-
-/** Atribuição devolvida pela API, com professor, turma e disciplina já resolvidos. */
-interface AtribuicaoApi extends AtribuicaoProfessor {
-  professor: { id: string; nome: string };
-  turma: { id: string; nome_completo: string };
-  disciplina: { id: string; nome: string } | null;
 }
 
 /** Resumo de usuário usado no combo de professores. */
@@ -35,13 +29,44 @@ interface ProfessorResumo {
 }
 
 const router = useRouter();
-const { inscrever, encerrar } = useRealtimeRefresh();
 
-const atribuicoes = ref<AtribuicaoItem[]>([]);
-const professores = ref<ProfessorResumo[]>([]);
-const turmas = ref<Turma[]>([]);
-const disciplinas = ref<Disciplina[]>([]);
-const carregando = ref(false);
+const consultaAtribuicoes = useConsulta(() => Consultas.atribuicoes());
+const consultaProfessores = useUsuarios(() => ({ papel: 'professor' }));
+const consultaTurmas = useTurmas(() => ({ ativo: 'true' }));
+const consultaDisciplinas = useDisciplinas(() => ({ ativo: 'true' }));
+const { opcoes: opcoesPapel } = useOpcoes(() => 'papel_atribuicao');
+
+const atribuicoes = computed<AtribuicaoItem[]>(() =>
+  (consultaAtribuicoes.dados.value?.atribuicoes ?? []).map((atribuicao) => ({
+    ...atribuicao,
+    professor_nome: atribuicao.professor?.nome ?? '—',
+    turma_nome: atribuicao.turma?.nome_completo ?? '—',
+    disciplina_nome: atribuicao.disciplina?.nome ?? null,
+  })),
+);
+const professores = computed<ProfessorResumo[]>(() =>
+  consultaProfessores.usuarios.value.map((usuario) => ({ id: usuario.id, nome: usuario.nome })),
+);
+const turmas = consultaTurmas.turmas;
+const disciplinas = consultaDisciplinas.disciplinas;
+const pendente = computed(
+  () =>
+    consultaAtribuicoes.pendente.value ||
+    consultaProfessores.pendente.value ||
+    consultaTurmas.pendente.value ||
+    consultaDisciplinas.pendente.value,
+);
+const salvando = ref(false);
+const carregando = computed(() => pendente.value || salvando.value);
+
+async function recarregar() {
+  await Promise.all([
+    consultaAtribuicoes.recarregar(true),
+    consultaProfessores.recarregar(),
+    consultaTurmas.recarregar(),
+    consultaDisciplinas.recarregar(),
+  ]);
+}
 const mensagemSucesso = ref<string | null>(null);
 const mensagemErro = ref<string | null>(null);
 
@@ -52,8 +77,6 @@ const editandoId = ref<string | null>(null);
 const formProfessorId = ref('');
 const formTurmaId = ref('');
 const formDisciplinaId = ref('');
-const { buscarOpcoes } = useOpcoesConfiguracao();
-const opcoesPapel = ref<OpcaoCheckbox[]>([]);
 
 const formPapel = ref('titular');
 const formDataInicio = ref('');
@@ -147,33 +170,6 @@ function formatarData(data: string | null) {
   return new Date(data).toLocaleDateString('pt-BR');
 }
 
-async function carregarDados() {
-  carregando.value = true;
-  try {
-    const [resAtribuicoes, resProfessores, resTurmas, resDisciplinas] = await Promise.all([
-      api<{ atribuicoes: AtribuicaoApi[] }>('/api/atribuicoes'),
-      api<{ usuarios: ProfessorResumo[] }>('/api/usuarios', { parametros: { papel: 'professor' } }),
-      api<{ turmas: Turma[] }>('/api/turmas', { parametros: { ativo: 'true' } }),
-      api<{ disciplinas: Disciplina[] }>('/api/disciplinas', { parametros: { ativo: 'true' } }),
-    ]);
-
-    atribuicoes.value = resAtribuicoes.atribuicoes.map((a) => ({
-      ...a,
-      professor_nome: a.professor?.nome ?? '—',
-      turma_nome: a.turma?.nome_completo ?? '—',
-      disciplina_nome: a.disciplina?.nome ?? null,
-    }));
-
-    professores.value = resProfessores.usuarios;
-    turmas.value = resTurmas.turmas;
-    disciplinas.value = resDisciplinas.disciplinas;
-  } catch {
-    mostrarErro('Falha ao carregar dados.');
-  } finally {
-    carregando.value = false;
-  }
-}
-
 async function abrirEditar(atribuicao: AtribuicaoItem) {
   pausarSnapshot(true);
   modoEdicao.value = true;
@@ -209,7 +205,7 @@ async function salvar() {
     );
     return;
   }
-  carregando.value = true;
+  salvando.value = true;
   try {
     const payload = {
       professor_id: formProfessorId.value,
@@ -240,9 +236,9 @@ async function salvar() {
     }
     modalAberto.value = false;
     resetForm();
-    await carregarDados();
+    await recarregar();
   } finally {
-    carregando.value = false;
+    salvando.value = false;
   }
 }
 
@@ -253,8 +249,8 @@ async function alternarAtivo(atribuicao: AtribuicaoItem) {
       metodo: 'PATCH',
       corpo: { ativo: novoValor },
     });
-    atribuicao.ativo = novoValor;
     mostrarSucesso(novoValor ? 'Atribuição ativada.' : 'Atribuição desativada.');
+    await recarregar();
   } catch {
     mostrarErro('Falha ao alterar status.');
   }
@@ -265,19 +261,6 @@ const papelBadge = (papel: string) => {
   const cores = ['text-bg-primary', 'text-bg-info', 'text-bg-success', 'text-bg-warning'];
   return cores[idx % cores.length] || 'text-bg-secondary';
 };
-
-onMounted(async () => {
-  opcoesPapel.value = await buscarOpcoes('papel_atribuicao');
-  await carregarDados();
-  await inscrever(
-    [{ tabela: 'atribuicoes_professores' }, { tabela: 'turmas' }, { tabela: 'disciplinas' }],
-    carregarDados,
-  );
-});
-
-onUnmounted(() => {
-  encerrar();
-});
 </script>
 
 <template>

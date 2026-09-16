@@ -1,99 +1,55 @@
 <script setup lang="ts">
-import { computed, onUnmounted, ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
-import { useAutenticacao } from '@/composables/useAutenticacao';
-import { useMonitoramento } from '@/composables/useMonitoramento';
-import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh';
+import { useFilhosResponsavel, useTermometroAluno } from '@/composables/consultas/useMonitoramento';
+import { useConsulta } from '@/composables/useConsulta';
+import { Consultas } from '@/servicos/consultas';
 import TermometroRisco from '@/componentes/TermometroRisco.vue';
 import Combobox from '@/componentes/Combobox.vue';
 import type { OpcaoCombobox } from '@/componentes/Combobox.vue';
-import type { Aluno } from '@/tipos/database';
-import type { TermometroAtencao } from '@/tipos/componentes';
-import { api } from '@/servicos/api';
-
-/** Enturmação com a turma resolvida pela API. */
-interface EnturmacaoApi {
-  turma: { id: string; nome_completo: string };
-}
-
 const router = useRouter();
-const { usuario } = useAutenticacao();
-const { buscarFilhosDoResponsavel, buscarTermometroAluno } = useMonitoramento();
-const { inscrever, encerrar } = useRealtimeRefresh();
+const { filhos, pendente: pendenteFilhos } = useFilhosResponsavel();
 
-const filhos = ref<Aluno[]>([]);
-const filhoSelecionado = ref<Aluno | null>(null);
-const termometro = ref<TermometroAtencao | null>(null);
-const carregando = ref(true);
+const filhoSelecionadoId = ref('');
+const filhoSelecionado = computed(
+  () => filhos.value.find((filho) => filho.id === filhoSelecionadoId.value) ?? null,
+);
+
+const consultaEnturmacoes = useConsulta(() => ({
+  ...Consultas.enturmacoes({ aluno_id: filhoSelecionadoId.value, status: 'matriculado' }),
+  habilitado: Boolean(filhoSelecionadoId.value),
+}));
+const turmaNome = computed(
+  () => consultaEnturmacoes.dados.value?.enturmacoes?.[0]?.turma?.nome_completo ?? null,
+);
+
+const { termometro, pendente: pendenteTermometro } = useTermometroAluno(
+  () => filhoSelecionadoId.value,
+  () => filhoSelecionado.value?.nome ?? '',
+  () => turmaNome.value,
+);
 
 const filhoOpcoes = computed<OpcaoCombobox[]>(() =>
-  filhos.value.map((f) => ({ valor: f.id, rotulo: f.nome, descricao: f.matricula ?? undefined })),
+  filhos.value.map((filho) => ({
+    valor: filho.id,
+    rotulo: filho.nome,
+    descricao: filho.matricula ?? undefined,
+  })),
 );
-const filhoSelecionadoId = computed({
-  get: () => filhoSelecionado.value?.id ?? '',
-  set: (id: string) => {
-    const filho = filhos.value.find((f) => f.id === id);
-    if (filho) void selecionarFilho(filho);
+
+const carregando = computed(
+  () =>
+    (pendenteFilhos.value && !filhos.value.length) ||
+    (Boolean(filhoSelecionadoId.value) && pendenteTermometro.value && !termometro.value),
+);
+
+watch(
+  filhos,
+  (lista) => {
+    if (!filhoSelecionadoId.value && lista.length) filhoSelecionadoId.value = lista[0]!.id;
   },
-});
-
-/** Busca o nome da turma do aluno para exibir no termômetro. */
-async function buscarTurmaAluno(alunoId: string): Promise<string | null> {
-  try {
-    const { enturmacoes } = await api<{ enturmacoes: EnturmacaoApi[] }>('/api/enturmacoes', {
-      parametros: { aluno_id: alunoId, status: 'matriculado' },
-    });
-    return enturmacoes[0]?.turma?.nome_completo ?? null;
-  } catch {
-    return null;
-  }
-}
-
-async function selecionarFilho(filho: Aluno) {
-  filhoSelecionado.value = filho;
-  const turma = await buscarTurmaAluno(filho.id);
-  termometro.value = await buscarTermometroAluno(filho.id, filho.nome, turma);
-}
-
-async function recarregarTermometro() {
-  if (filhoSelecionado.value) {
-    const turma = await buscarTurmaAluno(filhoSelecionado.value.id);
-    termometro.value = await buscarTermometroAluno(
-      filhoSelecionado.value.id,
-      filhoSelecionado.value.nome,
-      turma,
-    );
-  }
-}
-
-let inicializado = false;
-
-// Inicializa quando usuario existir: garante carga e inscrição realtime mesmo após reload direto.
-async function inicializar() {
-  if (!usuario.value || inicializado) return;
-  inicializado = true;
-  filhos.value = await buscarFilhosDoResponsavel(usuario.value.id);
-  const primeiro = filhos.value[0];
-  if (primeiro) {
-    await selecionarFilho(primeiro);
-  }
-  await inscrever(
-    [
-      { tabela: 'frequencias' },
-      { tabela: 'ocorrencias' },
-      { tabela: 'justificativas_faltas' },
-      { tabela: 'configuracoes_sistema' },
-    ],
-    recarregarTermometro,
-  );
-  carregando.value = false;
-}
-
-watch(usuario, () => void inicializar(), { immediate: true });
-
-onUnmounted(() => {
-  encerrar();
-});
+  { immediate: true },
+);
 </script>
 
 <template>

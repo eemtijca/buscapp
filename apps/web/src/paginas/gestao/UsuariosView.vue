@@ -1,22 +1,17 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { useGestaoUsuarios } from '@/composables/useGestaoUsuarios';
-import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh';
+import {
+  ativarUsuario,
+  desativarUsuario,
+  useUsuarios,
+} from '@/composables/consultas/useGestaoUsuarios';
 import ModalConfirmacao from '@/componentes/ModalConfirmacao.vue';
 import type { UsuarioItem } from '@/tipos/componentes';
 
 const router = useRouter();
-const { buscarUsuarios, ativarUsuario, desativarUsuario, carregando } = useGestaoUsuarios();
-const {
-  ultimaAtualizacao,
-  estaAtualizando,
-  atualizar: refresh,
-  inscrever,
-  encerrar,
-} = useRealtimeRefresh();
+const { usuarios, pendente, atualizando, recarregar } = useUsuarios();
 
-const usuarios = ref<UsuarioItem[]>([]);
 const busca = ref('');
 const filtroPapel = ref<'todos' | 'professor' | 'responsavel'>('todos');
 const filtroStatus = ref<'todos' | 'ativo' | 'pendente' | 'inativo'>('todos');
@@ -101,45 +96,28 @@ function toggleAtivacao(usuario: UsuarioItem) {
 }
 
 async function executarToggleAtivacao() {
-  const pendente = confirmacaoPendente.value;
-  if (!pendente) return;
-  const { usuario, acao } = pendente;
+  const pendenteAcao = confirmacaoPendente.value;
+  if (!pendenteAcao) return;
+  const { usuario, acao } = pendenteAcao;
   confirmacaoPendente.value = null;
   if (acao === 'desativar') {
     const ok = await desativarUsuario(usuario.id);
     if (ok) {
-      usuario.status = 'inativo';
       mostrarSucesso('Usuário desativado.');
+      await recarregar();
     } else {
       mostrarErro('Falha ao desativar usuário.');
     }
   } else {
     const ok = await ativarUsuario(usuario.id);
     if (ok) {
-      usuario.status = 'ativo';
       mostrarSucesso('Usuário ativado.');
+      await recarregar();
     } else {
       mostrarErro('Falha ao ativar usuário.');
     }
   }
 }
-
-async function carregarUsuarios() {
-  usuarios.value = await buscarUsuarios();
-}
-
-async function atualizarManual() {
-  await refresh(carregarUsuarios);
-}
-
-onMounted(async () => {
-  await carregarUsuarios();
-  await inscrever([{ tabela: 'perfis' }], carregarUsuarios);
-});
-
-onUnmounted(() => {
-  encerrar();
-});
 </script>
 
 <template>
@@ -166,12 +144,12 @@ onUnmounted(() => {
         <button
           type="button"
           class="btn btn-sm btn-outline-secondary"
-          :disabled="estaAtualizando"
-          @click="atualizarManual"
+          :disabled="atualizando"
+          @click="recarregar"
           title="Recarregar dados"
         >
           <span
-            v-if="estaAtualizando"
+            v-if="atualizando"
             class="spinner-border spinner-border-sm me-1"
             role="status"
             aria-hidden="true"
@@ -181,11 +159,6 @@ onUnmounted(() => {
         </button>
         <span class="rounded-circle d-inline-block" style="width: 8px; height: 8px"></span>
       </div>
-    </div>
-
-    <div v-if="ultimaAtualizacao" class="small text-body-tertiary mb-2 text-end">
-      <i class="bi bi-clock me-1" aria-hidden="true"></i>
-      Última atualização: {{ ultimaAtualizacao.toLocaleTimeString('pt-BR') }}
     </div>
 
     <div v-if="mensagemSucesso" class="alert alert-success py-2 small mb-3" role="status">
@@ -286,7 +259,7 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <div v-if="carregando && !usuarios.length" class="text-center py-5">
+    <div v-if="pendente && !usuarios.length" class="text-center py-5" aria-busy="true">
       <div class="spinner-border text-primary" role="status">
         <span class="visually-hidden">Carregando...</span>
       </div>

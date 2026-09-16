@@ -1,21 +1,11 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { useGestaoUsuarios } from '@/composables/useGestaoUsuarios';
-import { useRealtimeRefresh } from '@/composables/useRealtimeRefresh';
-import type { AlunoItem } from '@/tipos/componentes';
+import { useAlunos } from '@/composables/consultas/useGestaoUsuarios';
 
 const router = useRouter();
-const { buscarAlunos, carregando } = useGestaoUsuarios();
-const {
-  ultimaAtualizacao,
-  estaAtualizando,
-  atualizar: refresh,
-  inscrever,
-  encerrar,
-} = useRealtimeRefresh();
+const { alunos, pendente, atualizando, recarregar } = useAlunos();
 
-const alunos = ref<AlunoItem[]>([]);
 const busca = ref('');
 const filtroStatus = ref<'todos' | 'ativo' | 'egresso' | 'transferido' | 'inativo'>('todos');
 
@@ -42,24 +32,6 @@ const statusBadge = (status: string) => {
   };
   return map[status] ?? 'secondary';
 };
-
-async function carregarAlunos() {
-  alunos.value = await buscarAlunos();
-}
-
-async function atualizarManual() {
-  await refresh(carregarAlunos);
-}
-
-onMounted(async () => {
-  await carregarAlunos();
-  // Enturmacoes na inscrição: matrícula nova aparece na lista sem recarregar.
-  await inscrever([{ tabela: 'alunos' }, { tabela: 'enturmacoes' }], carregarAlunos);
-});
-
-onUnmounted(() => {
-  encerrar();
-});
 </script>
 
 <template>
@@ -86,12 +58,12 @@ onUnmounted(() => {
         <button
           type="button"
           class="btn btn-sm btn-outline-secondary"
-          :disabled="estaAtualizando"
-          @click="atualizarManual"
+          :disabled="atualizando"
+          @click="recarregar"
           title="Recarregar dados"
         >
           <span
-            v-if="estaAtualizando"
+            v-if="atualizando"
             class="spinner-border spinner-border-sm me-1"
             role="status"
             aria-hidden="true"
@@ -101,11 +73,6 @@ onUnmounted(() => {
         </button>
         <span class="rounded-circle d-inline-block" style="width: 8px; height: 8px"></span>
       </div>
-    </div>
-
-    <div v-if="ultimaAtualizacao" class="small text-body-tertiary mb-2 text-end">
-      <i class="bi bi-clock me-1" aria-hidden="true"></i>
-      Última atualização: {{ ultimaAtualizacao.toLocaleTimeString('pt-BR') }}
     </div>
 
     <div class="d-flex flex-wrap gap-2 mb-3">
@@ -165,7 +132,7 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <div v-if="carregando && !alunos.length" class="text-center py-5">
+    <div v-if="pendente && !alunos.length" class="text-center py-5">
       <div class="spinner-border text-primary" role="status">
         <span class="visually-hidden">Carregando...</span>
       </div>

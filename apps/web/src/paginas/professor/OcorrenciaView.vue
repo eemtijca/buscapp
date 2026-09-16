@@ -1,24 +1,27 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, nextTick } from 'vue';
+import { computed, ref, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAutenticacao } from '@/composables/useAutenticacao';
-import { useMonitoramento } from '@/composables/useMonitoramento';
-import { useOpcoesConfiguracao } from '@/composables/useOpcoesConfiguracao';
+import {
+  registrarOcorrenciaGrave,
+  useAlunosFrequencia,
+} from '@/composables/consultas/useMonitoramento';
+import { useOpcoes, useTags } from '@/composables/consultas/useCatalogos';
 import { useAlturaUniformeCards } from '@/composables/useAlturaUniformeCards';
-import { api } from '@/servicos/api';
 import CampoFormulario from '@/componentes/CampoFormulario.vue';
 import Combobox from '@/componentes/Combobox.vue';
 import GrupoCheckbox from '@/componentes/GrupoCheckbox.vue';
 import CartaoSelecao from '@/componentes/CartaoSelecao.vue';
 import ModalConfirmacao from '@/componentes/ModalConfirmacao.vue';
-import type { AlunoFrequencia, OpcaoCheckbox } from '@/tipos/componentes';
-import type { TagComportamento } from '@/tipos/database';
+import type { OpcaoCheckbox } from '@/tipos/componentes';
 
 const router = useRouter();
 const { usuario } = useAutenticacao();
-const { buscarAlunosParaFrequencia, registrarOcorrenciaGrave, carregando } = useMonitoramento();
+const { alunos, pendente } = useAlunosFrequencia(() => '');
+const salvando = ref(false);
+const carregando = computed(() => pendente.value || salvando.value);
+const { tags: catalogoTags } = useTags();
 
-const alunos = ref<AlunoFrequencia[]>([]);
 const alunoId = ref('');
 const tipos = ref<string[]>(['grave']);
 const tags = ref<string[]>([]);
@@ -29,9 +32,16 @@ const notificarResponsavel = ref(false);
 const mensagemSucesso = ref<string | null>(null);
 const mensagemErro = ref<string | null>(null);
 
-const { buscarOpcoes } = useOpcoesConfiguracao();
-const opcoesTipo = ref<OpcaoCheckbox[]>([]);
-const opcoesTags = ref<OpcaoCheckbox[]>([]);
+const { opcoes: opcoesTipo } = useOpcoes(() => 'tipo_ocorrencia');
+const opcoesTags = computed<OpcaoCheckbox[]>(() =>
+  catalogoTags.value
+    .filter((tag) => tag.ativo)
+    .map((tag) => ({
+      valor: tag.nome,
+      rotulo: tag.descricao ?? tag.nome,
+      icone: tag.icone ?? undefined,
+    })),
+);
 
 const alunoOpcoes = computed(() =>
   alunos.value.map((a) => ({ valor: a.id, rotulo: a.nome, descricao: a.turma || 'Sem turma' })),
@@ -97,48 +107,40 @@ async function solicitarConfirmacao() {
 async function confirmar() {
   confirmarEnvio.value = false;
   if (!usuario.value || !alunoId.value) return;
-  const ok = await registrarOcorrenciaGrave(
-    alunoId.value,
-    usuario.value.id,
-    descricao.value.trim(),
-    tipos.value,
-    exigePresenca.value,
-    tags.value,
-    notificarCoordenacao.value,
-    notificarResponsavel.value,
-  );
-  if (ok) {
-    mensagemSucesso.value = 'Ocorrência registrada com sucesso!';
-    alunoId.value = '';
-    descricao.value = '';
-    tags.value = [];
-    notificarCoordenacao.value = true;
-    notificarResponsavel.value = false;
-    exigePresenca.value = false;
-    await nextTick();
-    requestAnimationFrame(() => {
-      document
-        .querySelector('.alert-success')
-        ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
-    setTimeout(() => (mensagemSucesso.value = null), 4000);
-  } else {
-    mensagemErro.value = 'Falha ao registrar ocorrência. Tente novamente.';
+  salvando.value = true;
+  try {
+    const ok = await registrarOcorrenciaGrave(
+      alunoId.value,
+      usuario.value.id,
+      descricao.value.trim(),
+      tipos.value,
+      exigePresenca.value,
+      tags.value,
+      notificarCoordenacao.value,
+      notificarResponsavel.value,
+    );
+    if (ok) {
+      mensagemSucesso.value = 'Ocorrência registrada com sucesso!';
+      alunoId.value = '';
+      descricao.value = '';
+      tags.value = [];
+      notificarCoordenacao.value = true;
+      notificarResponsavel.value = false;
+      exigePresenca.value = false;
+      await nextTick();
+      requestAnimationFrame(() => {
+        document
+          .querySelector('.alert-success')
+          ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+      setTimeout(() => (mensagemSucesso.value = null), 4000);
+    } else {
+      mensagemErro.value = 'Falha ao registrar ocorrência. Tente novamente.';
+    }
+  } finally {
+    salvando.value = false;
   }
 }
-
-onMounted(async () => {
-  opcoesTipo.value = await buscarOpcoes('tipo_ocorrencia');
-  const { tags } = await api<{ tags: TagComportamento[] }>('/api/tags-comportamento', {
-    parametros: { ativo: 'true' },
-  });
-  opcoesTags.value = tags.map((t) => ({
-    valor: t.nome,
-    rotulo: t.descricao ?? t.nome,
-    icone: t.icone ?? undefined,
-  }));
-  alunos.value = await buscarAlunosParaFrequencia();
-});
 </script>
 
 <template>

@@ -1,10 +1,16 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch, nextTick } from 'vue';
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router';
-import { useGestaoUsuarios } from '@/composables/useGestaoUsuarios';
-import { useOpcoesConfiguracao } from '@/composables/useOpcoesConfiguracao';
+import {
+  criarAluno,
+  criarUsuario,
+  atualizarAluno,
+  useAlunos,
+} from '@/composables/consultas/useGestaoUsuarios';
+import { useOpcoes, useTurmas } from '@/composables/consultas/useCatalogos';
 import { useFormSnapshot } from '@/composables/useFormSnapshot';
 import { api } from '@/servicos/api';
+import type { UsuarioApi } from '@/tipos/api';
 import {
   mensagemSucesso as criarMensagemSucesso,
   mensagemErroExplicita,
@@ -14,8 +20,7 @@ import Combobox from '@/componentes/Combobox.vue';
 import type { OpcaoCombobox } from '@/componentes/Combobox.vue';
 import GrupoCheckbox from '@/componentes/GrupoCheckbox.vue';
 import ModalConfirmacao from '@/componentes/ModalConfirmacao.vue';
-import type { Turma, Enturmacao, VinculoResponsavel } from '@/tipos/database';
-import type { OpcaoCheckbox } from '@/tipos/componentes';
+import type { Enturmacao, VinculoResponsavel } from '@/tipos/database';
 
 interface EnturmacaoApi {
   id: string;
@@ -44,17 +49,10 @@ interface VinculoApi {
 
 const route = useRoute();
 const router = useRouter();
-const {
-  buscarAlunos,
-  buscarTurmas,
-  buscarUsuarios,
-  criarAluno,
-  atualizarAluno,
-  criarUsuario,
-  carregando,
-  erro,
-} = useGestaoUsuarios();
-const { buscarOpcoes } = useOpcoesConfiguracao();
+const { turmas } = useTurmas(() => ({ ativo: 'true' }));
+const { opcoes: opcoesDocumentos } = useOpcoes(() => 'documento');
+const { opcoes: opcoesTipoVinculo } = useOpcoes(() => 'tipo_vinculo');
+const { alunos: listaAlunos, recarregar: recarregarAlunos } = useAlunos();
 
 const modoEdicao = ref(false);
 const alunoId = ref<string | null>(null);
@@ -67,15 +65,11 @@ const dataMatricula = ref('');
 const observacoes = ref('');
 const status = ref('ativo');
 const turmaId = ref('');
-const turmas = ref<Turma[]>([]);
 
 const transporteEscolar = ref(false);
 const alimentacaoDiferenciada = ref(false);
 const necessidadesEspeciais = ref(false);
 const documentosRecebidos = ref<string[]>([]);
-
-const opcoesDocumentos = ref<OpcaoCheckbox[]>([]);
-const opcoesTipoVinculo = ref<OpcaoCheckbox[]>([]);
 
 const vinculoTipo = ref<'existente' | 'novo'>('existente');
 const responsavelEmail = ref('');
@@ -100,12 +94,20 @@ const statusOpcoes = computed<OpcaoCombobox[]>(() => [
   { valor: 'inativo', rotulo: 'Inativo' },
 ]);
 
+/** Busca de responsáveis para o combobox; consulta direta, sem retenção no cache. */
+async function buscarResponsaveisApi(termo?: string): Promise<UsuarioApi[]> {
+  const { usuarios } = await api<{ usuarios: UsuarioApi[] }>('/api/usuarios', {
+    parametros: { papel: 'responsavel', busca: termo || undefined },
+  });
+  return usuarios;
+}
+
 async function buscarResponsaveis(termo: string) {
   if (debounceResp) clearTimeout(debounceResp);
   debounceResp = setTimeout(async () => {
     carregandoResponsaveis.value = true;
     try {
-      const usuarios = await buscarUsuarios({ papel: 'responsavel', busca: termo || undefined });
+      const usuarios = await buscarResponsaveisApi(termo);
       // Limita a 30 para não sobrecarregar o combobox
       responsaveisOpcoes.value = usuarios
         .slice(0, 30)
@@ -317,7 +319,7 @@ async function carregarVinculos() {
     const { vinculos: vinculosApi } = await api<{ vinculos: VinculoApi[] }>('/api/vinculos', {
       parametros: { aluno_id: alunoId.value, ativo: 'true' },
     });
-    const responsaveis = await buscarUsuarios({ papel: 'responsavel' });
+    const responsaveis = await buscarResponsaveisApi();
     const responsavelPorId = new Map(responsaveis.map((r) => [r.id, r]));
     vinculos.value = vinculosApi.map((v) => {
       const responsavel = responsavelPorId.get(v.responsavel_id);
@@ -379,7 +381,7 @@ async function salvarNovoResponsavel() {
         mostrarErro('Informe o e-mail do responsável.');
         return;
       }
-      const usuarios = await buscarUsuarios({ busca: email });
+      const usuarios = await buscarResponsaveisApi(email);
       const encontrado = usuarios.find(
         (u) => (u.email ?? '').toLowerCase() === email.toLowerCase(),
       );
@@ -400,7 +402,7 @@ async function salvarNovoResponsavel() {
         telefone: novoRespTelefone.value.trim() || undefined,
       });
       if (!criado.id) {
-        mostrarErro(erro.value || 'Falha ao criar responsável.');
+        mostrarErro('Falha ao criar responsável.');
         return;
       }
       responsavelId = criado.id;
@@ -434,9 +436,6 @@ async function salvarNovoResponsavel() {
 
 onMounted(async () => {
   pausarSnapshot(true);
-  turmas.value = await buscarTurmas();
-  opcoesDocumentos.value = await buscarOpcoes('documento');
-  opcoesTipoVinculo.value = await buscarOpcoes('tipo_vinculo');
   // Pré-carrega responsáveis para o combobox de seleção existente
   void buscarResponsaveis('');
   const id = route.params.id as string | undefined;
@@ -444,8 +443,8 @@ onMounted(async () => {
     modoEdicao.value = true;
     alunoId.value = id;
     dataMatricula.value = hoje();
-    const alunos = await buscarAlunos();
-    const aluno = alunos.find((a) => a.id === id);
+    if (!listaAlunos.value.length) await recarregarAlunos();
+    const aluno = listaAlunos.value.find((a) => a.id === id);
     if (aluno) {
       nome.value = aluno.nome;
       matricula.value = aluno.matricula;
@@ -457,7 +456,7 @@ onMounted(async () => {
       transporteEscolar.value = aluno.transporte_escolar;
       alimentacaoDiferenciada.value = aluno.alimentacao_diferenciada;
       necessidadesEspeciais.value = aluno.necessidades_especiais;
-      documentosRecebidos.value = aluno.documentos_recebidos;
+      documentosRecebidos.value = [...aluno.documentos_recebidos];
     }
     await Promise.all([carregarEnturmacao(), carregarVinculos()]);
   } else {
@@ -566,12 +565,7 @@ async function salvar() {
         });
       } else {
         mostrarErro(
-          mensagemErroExplicita(
-            'Aluno',
-            nome.value,
-            'atualizar',
-            erro.value || 'Falha ao atualizar aluno.',
-          ),
+          mensagemErroExplicita('Aluno', nome.value, 'atualizar', 'Falha ao atualizar aluno.'),
         );
       }
     } else {
@@ -615,14 +609,7 @@ async function salvar() {
             ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         });
       } else {
-        mostrarErro(
-          mensagemErroExplicita(
-            'Aluno',
-            nome.value,
-            'criar',
-            erro.value || 'Falha ao criar aluno.',
-          ),
-        );
+        mostrarErro(mensagemErroExplicita('Aluno', nome.value, 'criar', 'Falha ao criar aluno.'));
       }
     }
   } finally {
@@ -1159,12 +1146,12 @@ async function salvar() {
         <button
           type="button"
           class="btn btn-sm btn-outline-secondary"
-          :disabled="salvando || carregando"
+          :disabled="salvando"
           @click="formDirty ? (confirmarCancelar = true) : router.push('/gestao/alunos')"
         >
           Cancelar
         </button>
-        <button type="submit" class="btn btn-sm btn-success" :disabled="salvando || carregando">
+        <button type="submit" class="btn btn-sm btn-success" :disabled="salvando">
           <span
             v-if="salvando"
             class="spinner-border spinner-border-sm me-1"

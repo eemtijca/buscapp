@@ -1,8 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch, nextTick } from 'vue';
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router';
-import { useGestaoUsuarios } from '@/composables/useGestaoUsuarios';
-import { useOpcoesConfiguracao } from '@/composables/useOpcoesConfiguracao';
+import {
+  atualizarUsuario,
+  criarUsuario,
+  useAlunos,
+  useUsuarios,
+} from '@/composables/consultas/useGestaoUsuarios';
+import { useOpcoes } from '@/composables/consultas/useCatalogos';
 import { useFormSnapshot } from '@/composables/useFormSnapshot';
 import { api } from '@/servicos/api';
 import {
@@ -19,7 +24,6 @@ import type {
   AtribuicaoProfessor,
   VinculoResponsavel,
 } from '@/tipos/database';
-import type { OpcaoCheckbox } from '@/tipos/componentes';
 
 interface AtribuicaoApi {
   id: string;
@@ -48,9 +52,16 @@ interface VinculoApi {
 
 const route = useRoute();
 const router = useRouter();
-const { buscarUsuarios, buscarAlunos, criarUsuario, atualizarUsuario, carregando, erro } =
-  useGestaoUsuarios();
-const { buscarOpcoes } = useOpcoesConfiguracao();
+const { opcoes: opcoesModulos, garantirDados: garantirOpcoesModulos } = useOpcoes(() => 'modulo');
+
+// No cadastro novo, o padrão depende do catálogo carregado de forma assíncrona.
+watch(opcoesModulos, (lista) => {
+  if (!modoEdicao.value && !acessoModulos.value.length && lista.length) {
+    acessoModulos.value = moduloPadrao();
+  }
+});
+const { usuarios: listaUsuarios, recarregar: recarregarUsuarios } = useUsuarios();
+const { alunos: listaAlunos, recarregar: recarregarAlunos } = useAlunos();
 
 const modoEdicao = ref(false);
 const usuarioId = ref<string | null>(null);
@@ -63,8 +74,6 @@ const cargo = ref('');
 const status = ref<StatusPerfil>('ativo');
 const notificacoesAtivas = ref(true);
 const acessoModulos = ref<string[]>([]);
-
-const opcoesModulos = ref<OpcaoCheckbox[]>([]);
 
 const papelOpcoes = computed<OpcaoCombobox[]>(() => [
   { valor: 'professor', rotulo: 'Professor' },
@@ -218,7 +227,8 @@ async function copiarCodigoCriado() {
 
 onMounted(async () => {
   pausarSnapshot(true);
-  opcoesModulos.value = await buscarOpcoes('modulo');
+  // O catálogo é necessário para validar os módulos salvos antes de filtrar.
+  await garantirOpcoesModulos();
   const id = route.params.id as string | undefined;
   if (!id) {
     acessoModulos.value = moduloPadrao();
@@ -226,8 +236,8 @@ onMounted(async () => {
   if (id) {
     modoEdicao.value = true;
     usuarioId.value = id;
-    const usuarios = await buscarUsuarios();
-    const usuario = usuarios.find((u) => u.id === id);
+    if (!listaUsuarios.value.length) await recarregarUsuarios();
+    const usuario = listaUsuarios.value.find((u) => u.id === id);
     if (usuario) {
       nome.value = usuario.nome;
       email.value = usuario.email ?? '';
@@ -280,8 +290,8 @@ onMounted(async () => {
         const { vinculos: vinculosApi } = await api<{ vinculos: VinculoApi[] }>('/api/vinculos', {
           parametros: { responsavel_id: id, ativo: 'true' },
         });
-        const alunos = await buscarAlunos();
-        const nomePorAluno = new Map(alunos.map((a) => [a.id, a.nome]));
+        if (!listaAlunos.value.length) await recarregarAlunos();
+        const nomePorAluno = new Map(listaAlunos.value.map((a) => [a.id, a.nome]));
         vinculos.value = vinculosApi
           .map((v) => ({
             id: v.id,
@@ -375,12 +385,7 @@ async function salvar() {
         });
       } else {
         mostrarErro(
-          mensagemErroExplicita(
-            'Usuário',
-            nome.value,
-            'atualizar',
-            erro.value || 'Falha ao atualizar usuário.',
-          ),
+          mensagemErroExplicita('Usuário', nome.value, 'atualizar', 'Falha ao atualizar usuário.'),
         );
       }
     } else {
@@ -402,9 +407,7 @@ async function salvar() {
         usuarioCriado.value = true;
         codigoCriado.value = codigo;
         if (!extrasOk) {
-          mostrarErro(
-            erro.value || 'Usuário criado, mas não foi possível salvar os módulos de acesso.',
-          );
+          mostrarErro('Usuário criado, mas não foi possível salvar os módulos de acesso.');
         }
         if (codigo) {
           mostrarSucesso(
@@ -419,12 +422,7 @@ async function salvar() {
         }
       } else {
         mostrarErro(
-          mensagemErroExplicita(
-            'Usuário',
-            nome.value,
-            'criar',
-            erro.value || 'Falha ao criar usuário.',
-          ),
+          mensagemErroExplicita('Usuário', nome.value, 'criar', 'Falha ao criar usuário.'),
         );
       }
     }
@@ -719,12 +717,12 @@ async function salvar() {
         <button
           type="button"
           class="btn btn-sm btn-outline-secondary"
-          :disabled="salvando || carregando"
+          :disabled="salvando"
           @click="router.push('/gestao/usuarios')"
         >
           Cancelar
         </button>
-        <button type="submit" class="btn btn-sm btn-success" :disabled="salvando || carregando">
+        <button type="submit" class="btn btn-sm btn-success" :disabled="salvando">
           <span
             v-if="salvando"
             class="spinner-border spinner-border-sm me-1"

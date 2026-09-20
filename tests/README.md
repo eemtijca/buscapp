@@ -18,6 +18,7 @@ export NODE_ENV=test
 export AUTH_PEPPER=dev-pepper-local-com-mais-de-16-caracteres
 export DATABASE_URL=postgresql://buscapp_api:buscapp_api@127.0.0.1:5433/buscapp
 export MIGRATE_DATABASE_URL=postgresql://buscapp:buscapp@127.0.0.1:5433/buscapp
+export REDIS_URL=redis://127.0.0.1:6379
 export STORAGE_DRIVER=disco
 ```
 

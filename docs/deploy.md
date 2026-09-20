@@ -116,6 +116,13 @@ node apps/api/dist/src/server.js
 - As migrações rodam no workflow `migracoes.yml` em push para `main` quando há mudança em `apps/api/prisma/**` ou no schema, usando a conexão de sessão ou direta de produção no secret `DIRECT_URL_PROD`.
 - O mesmo workflow aplica a senha do papel `buscapp_api` com o secret `APP_DB_PASSWORD_PROD`, via `infra/docker/role.mjs`.
 - O build da Vercel não migra. Garanta a ordem: migrar e, se necessário, fazer deploy compatível com a versão anterior do schema.
+- Desde o ADR-009, a migração de RLS em `perfis` exige o código novo no ar antes de ser aplicada.
+
+## Redis e cron
+
+- `REDIS_URL` é obrigatória em todos os ambientes; o Redis atende apenas ao pub/sub do SSE, com fallback por `LISTEN/NOTIFY` na conexão de sessão.
+- O expurgo é agendado por Vercel Cron (`crons` no topo do `vercel.json`) ou GitHub Actions, com `CRON_SECRET`.
+- Os cabeçalhos da SPA ficam no topo do `vercel.json`, aplicados às rotas fora de `/api`.
 
 ## Verificação pós-deploy
 

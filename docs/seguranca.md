@@ -67,7 +67,16 @@ As ameaças consideradas incluem enumeração de contas, força bruta de senhas 
 2. Sem limite de tentativas por IP na autenticação.
 3. Upload sem inspeção de conteúdo e sem varredura.
 4. Auditoria parcial, sem leitura pela interface.
-5. Sessão sem rotação de token e sem limite de sessões simultâneas.
+5. Sessão sem rotação de token e sem limite de sessões simultâneas. A expiração por inatividade é de 2 horas, com teto de 12 horas (ou 30 dias com `lembrar`), e o usuário pode listar e revogar as outras sessões.
+
+## Controles adicionados
+
+- **Rate limiting:** `@fastify/rate-limit` com store no Postgres, nas rotas de login (10/min, contando só falhas), solicitação de código (3/5 min), redefinição de senha (5/15 min) e upload de anexos (20/h).
+- **Cabeçalhos:** CSP, `nosniff`, `Referrer-Policy`, `X-Frame-Options` e HSTS, além da verificação de `Origin` em métodos mutáveis.
+- **Uploads:** validação de bytes mágicos, `ContentLength` na URL pré-assinada e download com `attachment`, sandbox e `nosniff`.
+- **Auditoria:** login, falhas de login, logout, revogação de sessões, CRUD de usuários e alunos, anexos, expurgo e anonimização, com `ip_origem`.
+- **LGPD:** exportação e anonimização de dados do titular, restritas à gestão e auditadas.
+- **Retenção:** expurgo agendado de anexos, códigos, sessões encerradas e contadores de rate limiting.
 
 ## Resposta a incidentes
 

@@ -51,10 +51,13 @@ Os testes E2E usam `DATABASE_URL_ADMIN` para fixtures e limpeza direta no banco,
 | Workflow         | Etapas                                                                                            |
 | ---------------- | ------------------------------------------------------------------------------------------------- |
 | `qualidade.yml`  | `npm ci`, `type-check`, `lint` e `build-only` em push para `main` e pull requests.                |
-| `testes.yml`     | `docker compose up -d --build`, espera `/api/saude` e derruba o ambiente.                         |
+| `testes.yml`     | `docker compose up -d --build`, espera `/api/saude` e roda `npm run test:unit` com PostgreSQL e Redis. |
 | `migracoes.yml`  | `prisma migrate deploy` e aplicação da senha do papel em push para `main` com mudanças no schema. |
 | `publicacao.yml` | Build da imagem e push para o GHCR em push para `main` e tags `v*`.                               |
 | `codeql.yml`     | Análise CodeQL para javascript-typescript em push, pull request e agenda semanal.                 |
 
 > [!WARNING]
-> Vitest, Playwright e o teste de PWA não são executados no CI hoje. A integração contínua cobre verificação de tipos, lint, build e a subida do container com checagem de saúde. Rode as suítes localmente antes de abrir um pull request.
+> Vitest roda no CI desde a integração com o Compose. Playwright e o teste de PWA continuam de execução local: rode as suítes antes de abrir um pull request.
+
+> [!NOTE]
+> Os testes de API e de integração exigem `REDIS_URL` (Redis do Compose) além das variáveis do banco.

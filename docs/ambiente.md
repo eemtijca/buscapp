@@ -25,6 +25,10 @@ Todas as variáveis da API passam por `apps/api/src/ambiente.ts`, validadas com 
 | `S3_UPLOAD_URL_EXPIRA_S`                                                            | API (S3)          | Validade da URL pré-assinada do upload direto, em segundos (padrão `300`).                     |
 | `UPLOAD_DIRETO_MAX_BYTES`                                                           | API               | Limite do upload direto, em bytes (padrão `20971520`, 20 MB).                                  |
 | `DB_POOL_MAX`                                                                       | API               | Conexões por instância do pool `pg` (padrão `10`; use `1` ou `2` em serverless).               |
+| `TZ_ESCOLA`                                                                         | API               | Fuso IANA da escola para o horário protegido e datas civis (padrão `America/Sao_Paulo`).       |
+| `REDIS_URL`                                                                         | API               | Redis do pub/sub do SSE; obrigatória em todos os ambientes.                                    |
+| `DATABASE_URL_ESCUTA`                                                               | API               | Conexão de sessão do `LISTEN`; vazia usa `MIGRATE_DATABASE_URL`.                               |
+| `CRON_SECRET`                                                                       | API               | Segredo do agendador do expurgo; sem ele a rota responde 404.                                  |
 | `SEED`                                                                              | Compose           | Com `SEED=true`, o entrypoint do container popula o banco na partida.                          |
 | `SEED_SENHA_ADMIN`, `SEED_SENHA_PROF`, `SEED_SENHA_RESP`                            | Seed              | Senhas dos usuários de teste criados pelo seed de desenvolvimento.                             |
 | `VITE_API_URL`                                                                      | Frontend          | URL base da API. Vazio (padrão) usa a mesma origem; defina ao hospedar a SPA separada da API.  |

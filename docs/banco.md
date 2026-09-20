@@ -35,6 +35,11 @@ Nunca edite uma migração já aplicada. Crie uma nova com `prisma migrate dev`.
 | `20260913000300_rotinas_dominio`         | Funções e triggers de domínio.                                                 |
 | `20260913000400_rls_backstop`            | Papel `buscapp_api`, funções auxiliares e políticas RLS.                       |
 | `20260913000500_corrige_politica_anexos` | Correção da política de leitura de `anexos`.                                   |
+| `20260920215818_rate_limit_contadores`   | Tabela de contadores do rate limiting.                                         |
+| `20260920223000_integridade_anos_anexos_codigos` | Unicidade do ano ativo, do `storage_path` e do código ativo; triggers de enturmação. |
+| `20260920224500_indices_catalogos`       | Índices B-tree e GIN para contagens de catálogo.                               |
+| `20260920230000_rls_tabelas_administrativas` | RLS e privilégios de coluna em `perfis`, `configuracoes_sistema`, `auditoria` e `codigos_redefinicao`. |
+| `20260920231500_dedupe_notificacoes`     | `notificacoes.dedupe_key` e índice único parcial por pendência.                |
 
 O container aplica as migrações na partida pelo entrypoint. Em produção, o workflow `migracoes.yml` aplica e em seguida define a senha do papel. Ver [deploy.md](deploy.md).
 
@@ -46,7 +51,7 @@ O container aplica as migrações na partida pelo entrypoint. Em produção, o w
 - As funções auxiliares (`app_usuario_id`, `app_papel`, `app_modulos`, `app_is_gestao`, `app_professor_da_turma` e `app_aluno_visivel`) são `security definer` e concentram as regras das políticas.
 - Tabelas com RLS e políticas: `alunos`, `enturmacoes`, `vinculos_responsaveis`, `frequencias`, `registros_comportamento`, `registro_comportamento_tags`, `ocorrencias`, `ocorrencia_anexos`, `justificativas_faltas`, `justificativa_anexos`, `anexos`, `conversas`, `mensagens`, `notificacoes`, `turmas`, `disciplinas`, `anos_letivos`, `atribuicoes_professores`, `opcoes_configuracao`, `horarios_letivos`, `tags_comportamento`, `monitoramento_acoes`, `pontuacao_turmas`, `importacoes_log`, `exportacoes` e `convites`.
 - `sessoes` tem RLS habilitado sem política, de propósito: o acesso é feito pelo cliente administrativo.
-- `perfis`, `auditoria`, `codigos_redefinicao`, `codigos_redefinicao_tentativas` e `configuracoes_sistema` não têm RLS e são acessados pelo papel administrativo.
+- `perfis`, `auditoria`, `codigos_redefinicao`, `codigos_redefinicao_tentativas` e `configuracoes_sistema` também usam o cliente administrativo nos fluxos de autenticação e auditoria. Desde o ADR-009, `perfis`, `configuracoes_sistema`, `auditoria` e `codigos_redefinicao` têm RLS (leitura autenticada e escrita da gestão), e o papel de runtime não lê `senha_hash` por privilégio de coluna.
 
 A autorização efetiva é a camada de serviços da API; a RLS é a segunda barreira. Ver [seguranca.md](seguranca.md) e [ADR-003](adr/003-rls-backstop.md).
 
@@ -77,11 +82,12 @@ São 29 triggers, incluindo os quatro de domínio e o `trg_set_updated_at` prese
 
 ## Retenção
 
-Hoje a retenção é declarativa:
+A retenção é aplicada por `POST /api/tarefas/expurgo`, autenticado por `CRON_SECRET` e agendado externamente (Vercel Cron ou GitHub Actions):
 
-- `anexos.expurgo_em` tem padrão de 30 dias e `anexos.expurgado_em` existe no schema, mas nenhuma rotina grava o expurgo.
-- `configuracoes_sistema.dias_expurgo_anexos` e `dias_retencao_codigos` são parâmetros editáveis, sem tarefa agendada que os aplique.
-- `POST /api/codigos/limpar` remove códigos usados, expirados e revogados manualmente, sem considerar a janela de retenção.
+- Anexos vencidos têm o objeto removido do storage e o registro excluído; `dias_expurgo_anexos` define a data de expurgo na criação.
+- Códigos usados, revogados ou expirados além de `dias_retencao_codigos` são removidos, junto das tentativas antigas.
+- Sessões encerradas ou expiradas há mais de 7 dias são removidas.
+- Contadores de rate limiting expirados são removidos.
 - Frequências usam soft delete (`deleted_at`); mensagens têm `deleted_at` e `edited_at`.
 
 O servidor não possui cron nem `pg_cron`. Qualquer rotina de expurgo futuro deve ser agendado externamente. Ver [operacao.md](operacao.md).

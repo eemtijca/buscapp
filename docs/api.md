@@ -13,12 +13,20 @@ Rotas HTTP da API Fastify. Todas ficam sob `/api` e respondem JSON, exceto o dow
 - **Listas:** os endpoints de listagem devolvem arrays completos nomeados pela coleção. A única paginação é a de notificações (`limite`, de 1 a 100, padrão 20).
 - **Cache HTTP:** respostas de sucesso sob `/api` usam `Cache-Control: private, no-store` e, em `GET` e `HEAD` 2xx, ganham ETag próprio. O cliente revalida com `If-None-Match` e recebe `304` quando o corpo não mudou. Erros, streams de anexo e o SSE não geram ETag. Ver [ADR-008](adr/008-cache-de-dados-cliente.md).
 - **Uploads:** `multipart/form-data` no endpoint clássico ou URL pré-assinada no fluxo direto. Ver [modulos.md](modulos.md).
+- **Rate limiting:** login (10/min, contando apenas falhas), `solicitar-codigo` (3/5 min), `redefinir-senha` (5/15 min) e uploads (20/h) respondem `429` com `muitas_requisicoes` ao exceder.
+- **Auditoria e LGPD:** login, falhas, CRUD, anexos, expurgo e anonimização ficam na trilha de auditoria; exportação e anonimização do titular são restritas à gestão.
 
 ## Resumo das rotas
 
 | Método                 | Caminho                                                  | Acesso                            | Descrição                                                                  |
 | ---------------------- | -------------------------------------------------------- | --------------------------------- | -------------------------------------------------------------------------- |
 | GET                    | `/api/saude`                                             | Público                           | Liveness da API, sem consulta ao banco                                     |
+| GET                    | `/api/saude/pronto`                                      | Público                           | Readiness com consulta ao banco                                            |
+| GET                    | `/api/saude/metricas`                                    | Gestão                            | Resumo de requisições e conexões SSE                                       |
+| GET, DELETE            | `/api/auth/sessoes`                                      | Sessão                            | Lista e revoga as outras sessões ativas                                    |
+| GET                    | `/api/lgpd/alunos/:id/exportar`                          | Gestão                            | Exporta os dados pessoais do aluno                                         |
+| POST                   | `/api/lgpd/alunos/:id/anonimizar`                        | Gestão                            | Anonimiza os dados e remove os anexos (irreversível)                       |
+| POST                   | `/api/tarefas/expurgo`                                   | Segredo do agendador              | Aplica a retenção de anexos, códigos, sessões e contadores                 |
 | GET                    | `/api/eventos`                                           | Sessão                            | Stream SSE de invalidação                                                  |
 | POST                   | `/api/auth/login`                                        | Público                           | Inicia a sessão                                                            |
 | POST                   | `/api/auth/logout`                                       | Público                           | Revoga a sessão e limpa o cookie                                           |
@@ -108,7 +116,7 @@ Stream SSE autenticado. Envia `event: invalidar` com `{ tabela, escopo }`, além
 
 ### `POST /api/auth/login`
 
-Corpo: `email`, `senha` e `lembrar` opcional. Responde `200` com `{ perfil }` e grava o cookie de sessão. Credenciais inválidas respondem `401` com `credenciais_invalidas`; perfil inativo responde `403` com `conta_inativa`. O tempo de resposta é equalizado com um hash falso quando o email não existe.
+Corpo: `email`, `senha` e `lembrar` opcional. Responde `200` com `{ perfil }` e grava o cookie de sessão. Credenciais inválidas respondem `401` com `credenciais_invalidas`; perfil inativo responde `403` com `conta_inativa`; perfil pendente responde `403` com `conta_pendente`. O tempo de resposta é equalizado com um hash falso quando o email não existe, e as tentativas falhas contam para o rate limiting.
 
 ### `POST /api/auth/logout`
 

@@ -121,8 +121,10 @@ export async function gerarCodigoRedefinicao(
 
   // Duas gerações concorrentes disputam o índice único de código ativo; a segunda tenta de novo.
   for (let tentativa = 0; tentativa < 2; tentativa += 1) {
+    // Revoga qualquer código anterior ainda não consumido, inclusive os expirados:
+    // o índice único considera ativo todo registro sem uso e sem revogação.
     await db.codigos_redefinicao.updateMany({
-      where: { email, usado_em: null, revogado_em: null, expira_em: { gt: agora } },
+      where: { email, usado_em: null, revogado_em: null },
       data: { revogado_em: agora, expira_em: agora },
     });
 

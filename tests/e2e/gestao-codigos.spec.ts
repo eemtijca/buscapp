@@ -498,9 +498,15 @@ test.describe('Códigos — Limpar não ativos', () => {
       const criado = await criarUsuarioApi({ nome, email, papel: 'responsavel' });
       userId = criado.id;
 
+      // A criação gera um código ativo; ele sai para os fixtures não ferirem a unicidade.
+      await excluirLinhas('codigos_redefinicao', 'perfil_id = $1', [criado.id]);
       await inserirCodigo(criado.id, email, '111111', 'usado');
       await inserirCodigo(criado.id, email, '222222', 'expirado');
       await inserirCodigo(criado.id, email, '333333', 'revogado');
+
+      // Um código ativo novo precisa sobreviver à limpeza.
+      const { cookie } = await loginApi('gestao@escola.edu.br', SENHA_ADMIN);
+      await apiFetch(`/api/codigos/perfil/${criado.id}`, { metodo: 'POST', cookie });
 
       await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
       await page.goto('/gestao/codigos');

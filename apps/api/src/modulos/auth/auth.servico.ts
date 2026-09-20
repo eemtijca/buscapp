@@ -1,4 +1,4 @@
-import { prisma } from '../../nucleo/banco/cliente.js';
+import { prismaAdmin } from '../../nucleo/banco/cliente.js';
 import { auditar } from '../../nucleo/auditoria/registrar.js';
 import {
   HASH_FALSO,
@@ -66,7 +66,22 @@ export interface DadosLogin {
 
 export async function autenticar(dados: DadosLogin) {
   const email = dados.email.toLowerCase();
-  const perfil = await prisma.perfis.findUnique({ where: { email } });
+  // Contexto anônimo: o login roda antes de haver `app.usuario_id`, então usa o cliente administrativo.
+  const perfil = await prismaAdmin.perfis.findUnique({
+    where: { email },
+    select: {
+      id: true,
+      nome: true,
+      email: true,
+      papel: true,
+      status: true,
+      telefone: true,
+      cargo: true,
+      notificacoes_ativas: true,
+      acesso_modulos: true,
+      senha_hash: true,
+    },
+  });
 
   // A verificação roda mesmo sem perfil para equalizar o tempo de resposta.
   const hash = perfil?.senha_hash ?? HASH_FALSO;
@@ -86,13 +101,13 @@ export async function autenticar(dados: DadosLogin) {
 
   if (precisaRehash(perfil.senha_hash)) {
     const novoSenhaHash = await gerarHashSenha(dados.senha);
-    await prisma.perfis.update({
+    await prismaAdmin.perfis.update({
       where: { id: perfil.id },
       data: { senha_hash: novoSenhaHash, senha_alterada_em: new Date() },
     });
   }
 
-  await prisma.perfis.update({
+  await prismaAdmin.perfis.update({
     where: { id: perfil.id },
     data: { ultimo_acesso_em: new Date() },
   });

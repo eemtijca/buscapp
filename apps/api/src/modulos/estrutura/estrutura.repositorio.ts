@@ -348,7 +348,10 @@ export async function buscarAlunoPorId(id: string) {
 }
 
 export async function buscarPerfilPorId(id: string) {
-  return prisma.perfis.findUnique({ where: { id } });
+  return prisma.perfis.findUnique({
+    where: { id },
+    select: { id: true, papel: true, status: true },
+  });
 }
 
 export interface DadosEnturmacao {

@@ -1,6 +1,25 @@
 import type { AtualizarUsuario, CriarUsuario, ListarUsuarios } from '@buscapp/contratos';
 import { prisma } from '../../nucleo/banco/cliente.js';
 
+/**
+ * Campos devolvidos ao serviço. O `senha_hash` fica fora do select: além de não ser usado,
+ * o papel de runtime não tem privilégio de leitura nessa coluna.
+ */
+const SELECT_PERFIL = {
+  id: true,
+  nome: true,
+  email: true,
+  papel: true,
+  status: true,
+  telefone: true,
+  cargo: true,
+  notificacoes_ativas: true,
+  acesso_modulos: true,
+  ultimo_acesso_em: true,
+  created_at: true,
+  updated_at: true,
+} as const;
+
 export async function listarUsuarios(consulta: ListarUsuarios) {
   return prisma.perfis.findMany({
     where: {
@@ -15,12 +34,13 @@ export async function listarUsuarios(consulta: ListarUsuarios) {
           }
         : {}),
     },
+    select: SELECT_PERFIL,
     orderBy: { nome: 'asc' },
   });
 }
 
 export async function buscarUsuarioPorId(id: string) {
-  return prisma.perfis.findUnique({ where: { id } });
+  return prisma.perfis.findUnique({ where: { id }, select: SELECT_PERFIL });
 }
 
 export async function criarUsuario(
@@ -42,6 +62,7 @@ export async function criarUsuario(
       senha_hash: senhaHash,
       senha_alterada_em: new Date(),
     },
+    select: SELECT_PERFIL,
   });
 }
 
@@ -62,11 +83,12 @@ export async function atualizarUsuario(
         : {}),
       ...(dados.acesso_modulos !== undefined ? { acesso_modulos: dados.acesso_modulos } : {}),
     },
+    select: SELECT_PERFIL,
   });
 }
 
 export async function atualizarStatusUsuario(id: string, status: 'ativo' | 'inativo') {
-  return prisma.perfis.update({ where: { id }, data: { status } });
+  return prisma.perfis.update({ where: { id }, data: { status }, select: SELECT_PERFIL });
 }
 
 export async function excluirUsuario(id: string) {

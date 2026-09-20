@@ -8,6 +8,7 @@ export * from './configuracoes.js';
 export * from './estrutura.js';
 export * from './frequencias.js';
 export * from './justificativas.js';
+export * from './lgpd.js';
 export * from './monitoramento.js';
 export * from './notificacoes.js';
 export * from './ocorrencias.js';

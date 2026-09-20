@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
+import Modal from '@/componentes/Modal.vue';
 
 const props = withDefaults(
   defineProps<{
@@ -167,55 +168,49 @@ function abrir() {
       <i class="bi bi-chevron-down ms-auto small text-body-secondary"></i>
     </button>
 
-    <div v-if="modalAberto" class="modal d-block" tabindex="-1" @click.self="modalAberto = false">
-      <div class="modal-dialog modal-lg modal-dialog-scrollable">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">Selecionar ícone</h5>
-            <button type="button" class="btn-close" @click="modalAberto = false"></button>
-          </div>
-          <div class="modal-body">
-            <input
-              v-model="busca"
-              type="search"
-              class="form-control mb-3"
-              placeholder="Buscar ícone..."
-              autofocus
-            />
-            <div class="d-flex gap-1 flex-wrap mb-3">
-              <button
-                v-for="cat in ['Todos', ...categorias]"
-                :key="cat"
-                class="btn btn-sm"
-                :class="categoriaAtiva === cat ? 'btn-success' : 'btn-outline-success'"
-                @click="categoriaAtiva = cat"
-              >
-                {{ cat }}
-              </button>
-            </div>
-            <div class="row g-2" v-if="iconesFiltrados.length">
-              <div v-for="ico in iconesFiltrados" :key="ico.nome" class="col-4 col-md-3 col-lg-2">
-                <button
-                  type="button"
-                  class="btn btn-outline-success w-100 text-center py-2"
-                  :class="{ 'btn-success text-white': modelValue === ico.nome }"
-                  @click="selecionar(ico.nome)"
-                  :title="ico.rotulo"
-                >
-                  <i :class="'bi bi-' + ico.nome" style="font-size: 1.5rem"></i>
-                  <br />
-                  <span class="small" style="font-size: 0.6rem">{{ ico.nome }}</span>
-                </button>
-              </div>
-            </div>
-            <div v-else class="text-center text-body-secondary py-4">
-              <i class="bi bi-search" style="font-size: 2rem"></i>
-              <p class="mt-2 mb-0">Nenhum ícone encontrado para "{{ busca }}"</p>
-            </div>
-          </div>
+    <Modal
+      :visivel="modalAberto"
+      titulo="Selecionar ícone"
+      largura="lg"
+      @update:visivel="(aberto) => !aberto && (modalAberto = false)"
+    >
+      <input
+        v-model="busca"
+        type="search"
+        class="form-control mb-3"
+        placeholder="Buscar ícone..."
+        autofocus
+      />
+      <div class="d-flex gap-1 flex-wrap mb-3">
+        <button
+          v-for="cat in ['Todos', ...categorias]"
+          :key="cat"
+          class="btn btn-sm"
+          :class="categoriaAtiva === cat ? 'btn-success' : 'btn-outline-success'"
+          @click="categoriaAtiva = cat"
+        >
+          {{ cat }}
+        </button>
+      </div>
+      <div class="row g-2" v-if="iconesFiltrados.length">
+        <div v-for="ico in iconesFiltrados" :key="ico.nome" class="col-4 col-md-3 col-lg-2">
+          <button
+            type="button"
+            class="btn btn-outline-success w-100 text-center py-2"
+            :class="{ 'btn-success text-white': modelValue === ico.nome }"
+            @click="selecionar(ico.nome)"
+            :title="ico.rotulo"
+          >
+            <i :class="'bi bi-' + ico.nome" style="font-size: 1.5rem"></i>
+            <br />
+            <span class="small" style="font-size: 0.6rem">{{ ico.nome }}</span>
+          </button>
         </div>
       </div>
-    </div>
-    <div v-if="modalAberto" class="modal-backdrop fade show"></div>
+      <div v-else class="text-center text-body-secondary py-4">
+        <i class="bi bi-search" style="font-size: 2rem"></i>
+        <p class="mt-2 mb-0">Nenhum ícone encontrado para "{{ busca }}"</p>
+      </div>
+    </Modal>
   </div>
 </template>

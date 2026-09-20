@@ -287,7 +287,7 @@ describe('redefinição por código', () => {
     });
     const tokenAntigo = extrairCookie(login.headers['set-cookie']);
 
-    const codigo = await gerarCodigoRedefinicao(pendenteId);
+    const { codigo } = await gerarCodigoRedefinicao(pendenteId);
     const resposta = await app.inject({
       method: 'POST',
       url: '/api/auth/redefinir-senha',

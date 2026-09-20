@@ -28,13 +28,15 @@ export const rotasCodigos: FastifyPluginAsyncZod = async (app) => {
         tags: ['codigos'],
         summary: 'Gera um novo código para o perfil',
         params: z.object({ perfilId: uuidSchema }),
-        response: { 201: z.object({ codigo: z.string() }) },
+        response: {
+          201: z.object({ codigo: z.string(), expira_em: z.string() }),
+        },
       },
     },
     async (pedido, resposta) => {
-      const codigo = await gerar(pedido.params.perfilId, usuarioAtual(pedido).id);
+      const { codigo, expiraEm } = await gerar(pedido.params.perfilId, usuarioAtual(pedido).id);
       resposta.status(201);
-      return { codigo };
+      return { codigo, expira_em: expiraEm.toISOString() };
     },
   );
 

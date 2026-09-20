@@ -9,6 +9,7 @@ import {
   mensagemErroExplicita,
 } from '@/utils/mensagemExplicita';
 import CampoFormulario from '@/componentes/CampoFormulario.vue';
+import Modal from '@/componentes/Modal.vue';
 import type { Disciplina } from '@/tipos/database';
 
 const router = useRouter();
@@ -310,91 +311,67 @@ async function alternarAtivo(disciplina: Disciplina) {
       </div>
     </div>
 
-    <div
-      v-if="modalAberto"
-      class="modal d-block"
-      tabindex="-1"
-      style="background-color: rgba(0, 0, 0, 0.5)"
+    <Modal
+      :visivel="modalAberto"
+      :titulo="modoEdicao ? 'Editar disciplina' : 'Nova disciplina'"
+      icone="bookmark-star"
+      cor-icone="text-primary"
+      largura="md"
+      @update:visivel="(aberto) => !aberto && (modalAberto = false)"
     >
-      <div class="modal-dialog modal-dialog-centered modal-fullscreen-sm-down">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title small fw-bold">
-              <i class="bi bi-bookmark-star text-primary me-1" aria-hidden="true"></i>
-              {{ modoEdicao ? 'Editar disciplina' : 'Nova disciplina' }}
-            </h5>
-            <button
-              type="button"
-              class="btn-close"
-              @click="modalAberto = false"
-              aria-label="Fechar"
-            ></button>
+      <form @submit.prevent="salvar">
+        <CampoFormulario id="campoNome" label="Nome" :obrigatorio="true">
+          <input
+            id="campoNome"
+            v-model="formNome"
+            type="text"
+            class="form-control form-control-sm"
+            required
+            autocomplete="off"
+          />
+        </CampoFormulario>
+        <CampoFormulario id="campoCodigoSige" label="Código SIGE">
+          <input
+            id="campoCodigoSige"
+            v-model="formCodigoSige"
+            type="text"
+            class="form-control form-control-sm"
+            autocomplete="off"
+          />
+        </CampoFormulario>
+        <CampoFormulario id="campoCargaHoraria" label="Carga horária">
+          <input
+            id="campoCargaHoraria"
+            v-model.number="formCargaHoraria"
+            type="number"
+            min="0"
+            class="form-control form-control-sm"
+            autocomplete="off"
+          />
+        </CampoFormulario>
+        <div class="mb-0">
+          <div class="form-check">
+            <input id="campoAtivo" v-model="formAtivo" type="checkbox" class="form-check-input" />
+            <label class="form-check-label small fw-medium" for="campoAtivo">Ativo</label>
           </div>
-          <form @submit.prevent="salvar">
-            <div class="modal-body">
-              <CampoFormulario id="campoNome" label="Nome" :obrigatorio="true">
-                <input
-                  id="campoNome"
-                  v-model="formNome"
-                  type="text"
-                  class="form-control form-control-sm"
-                  required
-                  autocomplete="off"
-                />
-              </CampoFormulario>
-              <CampoFormulario id="campoCodigoSige" label="Código SIGE">
-                <input
-                  id="campoCodigoSige"
-                  v-model="formCodigoSige"
-                  type="text"
-                  class="form-control form-control-sm"
-                  autocomplete="off"
-                />
-              </CampoFormulario>
-              <CampoFormulario id="campoCargaHoraria" label="Carga horária">
-                <input
-                  id="campoCargaHoraria"
-                  v-model.number="formCargaHoraria"
-                  type="number"
-                  min="0"
-                  class="form-control form-control-sm"
-                  autocomplete="off"
-                />
-              </CampoFormulario>
-              <div class="mb-0">
-                <div class="form-check">
-                  <input
-                    id="campoAtivo"
-                    v-model="formAtivo"
-                    type="checkbox"
-                    class="form-check-input"
-                  />
-                  <label class="form-check-label small fw-medium" for="campoAtivo">Ativo</label>
-                </div>
-              </div>
-            </div>
-            <div class="modal-footer">
-              <button
-                type="button"
-                class="btn btn-sm btn-outline-secondary"
-                @click="modalAberto = false"
-              >
-                Cancelar
-              </button>
-              <button type="submit" class="btn btn-sm btn-success" :disabled="carregando">
-                <span
-                  v-if="carregando"
-                  class="spinner-border spinner-border-sm me-1"
-                  role="status"
-                  aria-hidden="true"
-                ></span>
-                <i v-else class="bi bi-check-lg me-1" aria-hidden="true"></i>
-                {{ modoEdicao ? 'Salvar' : 'Criar' }}
-              </button>
-            </div>
-          </form>
         </div>
-      </div>
-    </div>
+      </form>
+
+      <template #rodape>
+        <button type="button" class="btn btn-sm btn-outline-secondary" @click="modalAberto = false">
+          Cancelar
+        </button>
+        <button type="button" class="btn btn-sm btn-success" :disabled="carregando" @click="salvar">
+          <span
+            v-if="carregando"
+            class="spinner-border spinner-border-sm me-1"
+            role="status"
+            aria-hidden="true"
+          ></span>
+          <i v-else class="bi bi-check-lg me-1" aria-hidden="true"></i>
+          {{ modoEdicao ? 'Salvar' : 'Criar' }}
+        </button>
+      </template>
+    </Modal>
   </div>
 </template>

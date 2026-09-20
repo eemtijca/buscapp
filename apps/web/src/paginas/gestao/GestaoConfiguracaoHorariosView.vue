@@ -5,6 +5,7 @@ import { useHorariosLetivos } from '@/composables/consultas/useCatalogos';
 import CampoFormulario from '@/componentes/CampoFormulario.vue';
 import Combobox from '@/componentes/Combobox.vue';
 import type { OpcaoCombobox } from '@/componentes/Combobox.vue';
+import Modal from '@/componentes/Modal.vue';
 import type { HorarioLetivo } from '@/tipos/database';
 
 const diasSemana = [
@@ -225,57 +226,52 @@ async function excluir(id: string) {
       </table>
     </div>
 
-    <div v-if="modalAberto" class="modal d-block" tabindex="-1" @click.self="modalAberto = false">
-      <div class="modal-dialog">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">{{ modoEdicao ? 'Editar' : 'Novo' }} horário</h5>
-            <button type="button" class="btn-close" @click="modalAberto = false"></button>
-          </div>
-          <div class="modal-body">
-            <CampoFormulario id="hr-dia" label="Dia da semana">
-              <Combobox
-                id="hr-dia"
-                v-model="formDiaStr"
-                :opcoes="diasOpcoes"
-                placeholder="Selecione o dia"
-              />
-            </CampoFormulario>
-            <CampoFormulario id="hr-inicio" label="Início">
-              <input
-                id="hr-inicio"
-                v-model="formInicio"
-                type="time"
-                class="form-control"
-                :disabled="carregando"
-              />
-            </CampoFormulario>
-            <CampoFormulario id="hr-fim" label="Fim">
-              <input
-                id="hr-fim"
-                v-model="formFim"
-                type="time"
-                class="form-control"
-                :disabled="carregando"
-              />
-            </CampoFormulario>
-            <div class="form-check form-switch mt-3">
-              <input class="form-check-input" type="checkbox" id="hr-ativo" v-model="formAtivo" />
-              <label class="form-check-label" for="hr-ativo">Ativo</label>
-            </div>
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-outline-secondary" @click="modalAberto = false">
-              Cancelar
-            </button>
-            <button type="button" class="btn btn-success" @click="salvar" :disabled="carregando">
-              <span v-if="carregando" class="spinner-border spinner-border-sm me-1"></span>
-              Salvar
-            </button>
-          </div>
-        </div>
+    <Modal
+      :visivel="modalAberto"
+      :titulo="(modoEdicao ? 'Editar' : 'Novo') + ' horário'"
+      largura="md"
+      @update:visivel="(aberto) => !aberto && (modalAberto = false)"
+    >
+      <CampoFormulario id="hr-dia" label="Dia da semana">
+        <Combobox
+          id="hr-dia"
+          v-model="formDiaStr"
+          :opcoes="diasOpcoes"
+          placeholder="Selecione o dia"
+        />
+      </CampoFormulario>
+      <CampoFormulario id="hr-inicio" label="Início">
+        <input
+          id="hr-inicio"
+          v-model="formInicio"
+          type="time"
+          class="form-control"
+          :disabled="carregando"
+        />
+      </CampoFormulario>
+      <CampoFormulario id="hr-fim" label="Fim">
+        <input
+          id="hr-fim"
+          v-model="formFim"
+          type="time"
+          class="form-control"
+          :disabled="carregando"
+        />
+      </CampoFormulario>
+      <div class="form-check form-switch mt-3">
+        <input class="form-check-input" type="checkbox" id="hr-ativo" v-model="formAtivo" />
+        <label class="form-check-label" for="hr-ativo">Ativo</label>
       </div>
-    </div>
-    <div v-if="modalAberto" class="modal-backdrop fade show"></div>
+
+      <template #rodape>
+        <button type="button" class="btn btn-outline-secondary" @click="modalAberto = false">
+          Cancelar
+        </button>
+        <button type="button" class="btn btn-success" @click="salvar" :disabled="carregando">
+          <span v-if="carregando" class="spinner-border spinner-border-sm me-1"></span>
+          Salvar
+        </button>
+      </template>
+    </Modal>
   </div>
 </template>

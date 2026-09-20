@@ -27,11 +27,14 @@ export async function listar(): Promise<CodigoRedefinicao[]> {
   return codigos.map((codigo) => paraCodigo(codigo, agora, bloqueados.has(codigo.email)));
 }
 
-export async function gerar(perfilId: string, criadoPor: string): Promise<string> {
-  const codigo = await gerarCodigoRedefinicao(perfilId, criadoPor);
+export async function gerar(
+  perfilId: string,
+  criadoPor: string,
+): Promise<{ codigo: string; expiraEm: Date }> {
+  const resultado = await gerarCodigoRedefinicao(perfilId, criadoPor);
   await codigoGeradoParaAuditoria(perfilId, criadoPor);
   publicarEvento({ tabela: 'codigos_redefinicao' });
-  return codigo;
+  return resultado;
 }
 
 export async function revogar(id: string, usuarioId: string): Promise<CodigoRedefinicao> {

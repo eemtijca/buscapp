@@ -109,7 +109,7 @@ export async function gerarCodigoRedefinicao(
   perfilId: string,
   criadoPor?: string,
   cliente?: Prisma.TransactionClient,
-): Promise<string> {
+): Promise<{ codigo: string; expiraEm: Date }> {
   const db = (cliente ?? prismaAdmin) as Prisma.TransactionClient;
   const perfil = await db.perfis.findUnique({ where: { id: perfilId } });
   if (!perfil?.email) throw new Error('Perfil sem email não pode receber código de redefinição.');
@@ -129,6 +129,7 @@ export async function gerarCodigoRedefinicao(
     });
 
     const codigo = gerarCodigo();
+    const expiraEm = new Date(agora.getTime() + validadeMinutos * 60 * 1000);
     try {
       await db.codigos_redefinicao.create({
         data: {
@@ -136,10 +137,10 @@ export async function gerarCodigoRedefinicao(
           perfil_id: perfil.id,
           codigo_hash: hashCodigo(email, codigo),
           criado_por: criadoPor ?? null,
-          expira_em: new Date(agora.getTime() + validadeMinutos * 60 * 1000),
+          expira_em: expiraEm,
         },
       });
-      return codigo;
+      return { codigo, expiraEm };
     } catch (erro) {
       if ((erro as { code?: string }).code !== 'P2002' || tentativa === 1) throw erro;
     }

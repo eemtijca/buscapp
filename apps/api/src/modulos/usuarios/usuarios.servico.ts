@@ -131,7 +131,7 @@ export async function criar(dados: CriarUsuario, criadoPor: string): Promise<Usu
           senha_alterada_em: new Date(),
         },
       });
-      const codigo = await gerarCodigoRedefinicao(id, criadoPor, tx);
+      const { codigo } = await gerarCodigoRedefinicao(id, criadoPor, tx);
       return { perfil, codigo };
     })
     .catch((erro: unknown) => traduzirErroBanco(erro));

@@ -11,6 +11,7 @@ import {
 import CampoFormulario from '@/componentes/CampoFormulario.vue';
 import Combobox from '@/componentes/Combobox.vue';
 import type { OpcaoCombobox } from '@/componentes/Combobox.vue';
+import Modal from '@/componentes/Modal.vue';
 import type { Turma } from '@/tipos/database';
 
 const router = useRouter();
@@ -333,91 +334,76 @@ async function alternarAtivo(turma: Turma) {
       </div>
     </div>
 
-    <div
-      v-if="modalAberto"
-      class="modal d-block"
-      tabindex="-1"
-      style="background-color: rgba(0, 0, 0, 0.5)"
+    <Modal
+      :visivel="modalAberto"
+      :titulo="modoEdicao ? 'Editar turma' : 'Nova turma'"
+      icone="book"
+      cor-icone="text-primary"
+      largura="md"
+      @update:visivel="(aberto) => !aberto && (modalAberto = false)"
     >
-      <div class="modal-dialog modal-dialog-centered modal-fullscreen-sm-down">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title small fw-bold">
-              <i class="bi bi-book text-primary me-1" aria-hidden="true"></i>
-              {{ modoEdicao ? 'Editar turma' : 'Nova turma' }}
-            </h5>
-            <button
-              type="button"
-              class="btn-close"
-              @click="modalAberto = false"
-              aria-label="Fechar"
-            ></button>
+      <form @submit.prevent="salvar">
+        <CampoFormulario id="campoSerie" label="Série" :obrigatorio="true">
+          <Combobox
+            id="campoSerie"
+            v-model="formSerie"
+            :opcoes="serieOpcoes"
+            placeholder="Selecione a série"
+            tamanho="sm"
+          />
+        </CampoFormulario>
+        <CampoFormulario id="campoLetra" label="Letra" :obrigatorio="true">
+          <Combobox
+            id="campoLetra"
+            v-model="formLetra"
+            :opcoes="letraOpcoes"
+            placeholder="Selecione a letra"
+            tamanho="sm"
+          />
+        </CampoFormulario>
+        <CampoFormulario id="campoCapacidade" label="Capacidade">
+          <input
+            id="campoCapacidade"
+            v-model.number="formCapacidade"
+            type="number"
+            min="0"
+            class="form-control form-control-sm"
+            autocomplete="off"
+          />
+        </CampoFormulario>
+        <div class="mb-0">
+          <div class="form-check">
+            <input
+              id="campoAtivo"
+              v-model="formAtivo"
+              type="checkbox"
+              class="form-check-input"
+            />
+            <label class="form-check-label small fw-medium" for="campoAtivo">Ativo</label>
           </div>
-          <form @submit.prevent="salvar">
-            <div class="modal-body">
-              <CampoFormulario id="campoSerie" label="Série" :obrigatorio="true">
-                <Combobox
-                  id="campoSerie"
-                  v-model="formSerie"
-                  :opcoes="serieOpcoes"
-                  placeholder="Selecione a série"
-                  tamanho="sm"
-                />
-              </CampoFormulario>
-              <CampoFormulario id="campoLetra" label="Letra" :obrigatorio="true">
-                <Combobox
-                  id="campoLetra"
-                  v-model="formLetra"
-                  :opcoes="letraOpcoes"
-                  placeholder="Selecione a letra"
-                  tamanho="sm"
-                />
-              </CampoFormulario>
-              <CampoFormulario id="campoCapacidade" label="Capacidade">
-                <input
-                  id="campoCapacidade"
-                  v-model.number="formCapacidade"
-                  type="number"
-                  min="0"
-                  class="form-control form-control-sm"
-                  autocomplete="off"
-                />
-              </CampoFormulario>
-              <div class="mb-0">
-                <div class="form-check">
-                  <input
-                    id="campoAtivo"
-                    v-model="formAtivo"
-                    type="checkbox"
-                    class="form-check-input"
-                  />
-                  <label class="form-check-label small fw-medium" for="campoAtivo">Ativo</label>
-                </div>
-              </div>
-            </div>
-            <div class="modal-footer">
-              <button
-                type="button"
-                class="btn btn-sm btn-outline-secondary"
-                :disabled="carregando"
-                @click="modalAberto = false"
-              >
-                Cancelar
-              </button>
-              <button type="submit" class="btn btn-sm btn-success" :disabled="carregando">
-                <span
-                  v-if="carregando"
-                  class="spinner-border spinner-border-sm me-1"
-                  role="status"
-                  aria-hidden="true"
-                ></span>
-                <i v-else class="bi bi-check-lg me-1" aria-hidden="true"></i>
-                {{ modoEdicao ? 'Salvar' : 'Criar' }}
-              </button>
-            </div>
-          </form>
         </div>
-      </div>
-    </div>
+      </form>
+
+      <template #rodape>
+        <button
+          type="button"
+          class="btn btn-sm btn-outline-secondary"
+          :disabled="carregando"
+          @click="modalAberto = false"
+        >
+          Cancelar
+        </button>
+        <button type="button" class="btn btn-sm btn-success" :disabled="carregando" @click="salvar">
+          <span
+            v-if="carregando"
+            class="spinner-border spinner-border-sm me-1"
+            role="status"
+            aria-hidden="true"
+          ></span>
+          <i v-else class="bi bi-check-lg me-1" aria-hidden="true"></i>
+          {{ modoEdicao ? 'Salvar' : 'Criar' }}
+        </button>
+      </template>
+    </Modal>
   </div>
 </template>

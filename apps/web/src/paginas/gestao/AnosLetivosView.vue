@@ -9,6 +9,7 @@ import {
   mensagemErroExplicita,
 } from '@/utils/mensagemExplicita';
 import CampoFormulario from '@/componentes/CampoFormulario.vue';
+import Modal from '@/componentes/Modal.vue';
 import type { AnoLetivo } from '@/tipos/database';
 
 const router = useRouter();
@@ -340,82 +341,63 @@ async function ativar(ano: AnoLetivo) {
       </div>
     </div>
 
-    <div
-      v-if="modalAberto"
-      class="modal d-block"
-      tabindex="-1"
-      style="background-color: rgba(0, 0, 0, 0.5)"
+    <Modal
+      :visivel="modalAberto"
+      :titulo="modoEdicao ? 'Editar ano letivo' : 'Novo ano letivo'"
+      icone="calendar3"
+      cor-icone="text-primary"
+      largura="md"
+      @update:visivel="(aberto) => !aberto && (modalAberto = false)"
     >
-      <div class="modal-dialog modal-dialog-centered modal-fullscreen-sm-down">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title small fw-bold">
-              <i class="bi bi-calendar3 text-primary me-1" aria-hidden="true"></i>
-              {{ modoEdicao ? 'Editar ano letivo' : 'Novo ano letivo' }}
-            </h5>
-            <button
-              type="button"
-              class="btn-close"
-              @click="modalAberto = false"
-              aria-label="Fechar"
-            ></button>
-          </div>
-          <form @submit.prevent="salvar">
-            <div class="modal-body">
-              <CampoFormulario id="campoAno" label="Ano" :obrigatorio="true">
-                <input
-                  id="campoAno"
-                  v-model.number="formAno"
-                  type="number"
-                  min="2000"
-                  max="2100"
-                  class="form-control form-control-sm"
-                  autocomplete="off"
-                />
-              </CampoFormulario>
-              <CampoFormulario id="campoDataInicio" label="Data de início" :obrigatorio="true">
-                <input
-                  id="campoDataInicio"
-                  v-model="formDataInicio"
-                  type="date"
-                  class="form-control form-control-sm"
-                />
-              </CampoFormulario>
-              <CampoFormulario id="campoDataFim" label="Data de fim" :obrigatorio="true">
-                <input
-                  id="campoDataFim"
-                  v-model="formDataFim"
-                  type="date"
-                  class="form-control form-control-sm"
-                />
-              </CampoFormulario>
-              <p v-if="!modoEdicao" class="text-body-secondary small mb-0 mt-2">
-                O novo ano é criado como <strong>planejado</strong>. A ativação ocorre pelo botão
-                "Ativar", que arquiva o ano vigente (virada de ano).
-              </p>
-            </div>
-            <div class="modal-footer">
-              <button
-                type="button"
-                class="btn btn-sm btn-outline-secondary"
-                @click="modalAberto = false"
-              >
-                Cancelar
-              </button>
-              <button type="submit" class="btn btn-sm btn-success" :disabled="carregando">
-                <span
-                  v-if="carregando"
-                  class="spinner-border spinner-border-sm me-1"
-                  role="status"
-                  aria-hidden="true"
-                ></span>
-                <i v-else class="bi bi-check-lg me-1" aria-hidden="true"></i>
-                {{ modoEdicao ? 'Salvar' : 'Criar' }}
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
+      <form @submit.prevent="salvar">
+        <CampoFormulario id="campoAno" label="Ano" :obrigatorio="true">
+          <input
+            id="campoAno"
+            v-model.number="formAno"
+            type="number"
+            min="2000"
+            max="2100"
+            class="form-control form-control-sm"
+            autocomplete="off"
+          />
+        </CampoFormulario>
+        <CampoFormulario id="campoDataInicio" label="Data de início" :obrigatorio="true">
+          <input
+            id="campoDataInicio"
+            v-model="formDataInicio"
+            type="date"
+            class="form-control form-control-sm"
+          />
+        </CampoFormulario>
+        <CampoFormulario id="campoDataFim" label="Data de fim" :obrigatorio="true">
+          <input
+            id="campoDataFim"
+            v-model="formDataFim"
+            type="date"
+            class="form-control form-control-sm"
+          />
+        </CampoFormulario>
+        <p v-if="!modoEdicao" class="text-body-secondary small mb-0 mt-2">
+          O novo ano é criado como <strong>planejado</strong>. A ativação ocorre pelo botão
+          "Ativar", que arquiva o ano vigente (virada de ano).
+        </p>
+      </form>
+
+      <template #rodape>
+        <button type="button" class="btn btn-sm btn-outline-secondary" @click="modalAberto = false">
+          Cancelar
+        </button>
+        <button type="button" class="btn btn-sm btn-success" :disabled="carregando" @click="salvar">
+          <span
+            v-if="carregando"
+            class="spinner-border spinner-border-sm me-1"
+            role="status"
+            aria-hidden="true"
+          ></span>
+          <i v-else class="bi bi-check-lg me-1" aria-hidden="true"></i>
+          {{ modoEdicao ? 'Salvar' : 'Criar' }}
+        </button>
+      </template>
+    </Modal>
   </div>
 </template>

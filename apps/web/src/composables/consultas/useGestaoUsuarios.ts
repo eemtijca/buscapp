@@ -379,13 +379,16 @@ export function useSolicitacoesCodigo(): {
   };
 }
 
-export async function gerarCodigoRedefinicao(perfilId: string): Promise<string | null> {
+export async function gerarCodigoRedefinicao(
+  perfilId: string,
+): Promise<{ codigo: string; expiraEm: string } | null> {
   try {
-    const { codigo } = await api<{ codigo: string }>(`/api/codigos/perfil/${perfilId}`, {
-      metodo: 'POST',
-    });
+    const resposta = await api<{ codigo: string; expira_em: string }>(
+      `/api/codigos/perfil/${perfilId}`,
+      { metodo: 'POST' },
+    );
     invalidarTabela('codigos_redefinicao', undefined, false);
-    return codigo;
+    return { codigo: resposta.codigo, expiraEm: resposta.expira_em };
   } catch (erro) {
     console.error('[useGestaoUsuarios] Erro ao gerar código:', mensagemDeErro(erro, ''));
     return null;

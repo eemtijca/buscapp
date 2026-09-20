@@ -102,10 +102,10 @@ function tratarMensagem(bruta: string): void {
 
 async function conectarAssinante(): Promise<void> {
   if (assinante) return;
+  // O assinante precisa enfileirar o `subscribe` até a conexão ficar pronta.
   assinante = new Redis(ambiente.REDIS_URL, {
     connectTimeout: 3_000,
     maxRetriesPerRequest: null,
-    enableOfflineQueue: false,
   });
   assinante.on('error', () => undefined);
   assinante.on('message', (_canal: string, mensagem: string) => tratarMensagem(mensagem));

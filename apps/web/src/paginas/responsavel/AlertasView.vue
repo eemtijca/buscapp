@@ -7,7 +7,7 @@ import {
 } from '@/composables/consultas/useMonitoramento';
 import { useTags } from '@/composables/consultas/useCatalogos';
 import CartaoAlertaResponsavel from '@/componentes/CartaoAlertaResponsavel.vue';
-import Modal from '@/componentes/Modal.vue';
+import ModalBase from '@/componentes/ModalBase.vue';
 import VisualizadorAnexo from '@/componentes/VisualizadorAnexo.vue';
 import type { AlertaResponsavel } from '@/tipos/componentes';
 
@@ -205,7 +205,7 @@ async function atualizarManual() {
     </div>
 
     <!-- Modal de detalhes -->
-    <Modal
+    <ModalBase
       :visivel="mostrarModal && !!alertaSelecionado"
       titulo="Detalhes do alerta"
       icone="info-circle"
@@ -387,7 +387,7 @@ async function atualizarManual() {
       <template #rodape>
         <button type="button" class="btn btn-sm btn-secondary" @click="fecharModal">Fechar</button>
       </template>
-    </Modal>
+    </ModalBase>
 
     <VisualizadorAnexo
       :aberto="!!anexoSelecionado"

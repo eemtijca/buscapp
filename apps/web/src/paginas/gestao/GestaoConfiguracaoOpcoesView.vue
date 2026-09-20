@@ -6,7 +6,7 @@ import { useOpcoesConfiguracao } from '@/composables/consultas/useCatalogos';
 import { useAlturaUniformeCards } from '@/composables/useAlturaUniformeCards';
 import CampoFormulario from '@/componentes/CampoFormulario.vue';
 import CartaoSelecao from '@/componentes/CartaoSelecao.vue';
-import Modal from '@/componentes/Modal.vue';
+import ModalBase from '@/componentes/ModalBase.vue';
 import { obterRegra, gerarChave } from '@/utils/opcoesConfiguracao';
 import type { OpcaoConfiguracao } from '@/tipos/database';
 import Sortable from 'sortablejs';
@@ -442,7 +442,7 @@ onUnmounted(() => {
       </table>
     </div>
 
-    <Modal
+    <ModalBase
       :visivel="modalAberto"
       :titulo="(modoEdicao ? 'Editar' : 'Nova') + ' opção'"
       largura="md"
@@ -534,6 +534,6 @@ onUnmounted(() => {
           <span v-if="carregando" class="spinner-border spinner-border-sm me-1"></span> Salvar
         </button>
       </template>
-    </Modal>
+    </ModalBase>
   </div>
 </template>

@@ -9,7 +9,7 @@ import {
   mensagemErroExplicita,
 } from '@/utils/mensagemExplicita';
 import CampoFormulario from '@/componentes/CampoFormulario.vue';
-import Modal from '@/componentes/Modal.vue';
+import ModalBase from '@/componentes/ModalBase.vue';
 import type { AnoLetivo } from '@/tipos/database';
 
 const router = useRouter();
@@ -341,7 +341,7 @@ async function ativar(ano: AnoLetivo) {
       </div>
     </div>
 
-    <Modal
+    <ModalBase
       :visivel="modalAberto"
       :titulo="modoEdicao ? 'Editar ano letivo' : 'Novo ano letivo'"
       icone="calendar3"
@@ -398,6 +398,6 @@ async function ativar(ano: AnoLetivo) {
           {{ modoEdicao ? 'Salvar' : 'Criar' }}
         </button>
       </template>
-    </Modal>
+    </ModalBase>
   </div>
 </template>

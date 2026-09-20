@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import Modal from '@/componentes/Modal.vue';
+import ModalBase from '@/componentes/ModalBase.vue';
 
 const props = withDefaults(
   defineProps<{
@@ -168,7 +168,7 @@ function abrir() {
       <i class="bi bi-chevron-down ms-auto small text-body-secondary"></i>
     </button>
 
-    <Modal
+    <ModalBase
       :visivel="modalAberto"
       titulo="Selecionar ícone"
       largura="lg"
@@ -211,6 +211,6 @@ function abrir() {
         <i class="bi bi-search" style="font-size: 2rem"></i>
         <p class="mt-2 mb-0">Nenhum ícone encontrado para "{{ busca }}"</p>
       </div>
-    </Modal>
+    </ModalBase>
   </div>
 </template>

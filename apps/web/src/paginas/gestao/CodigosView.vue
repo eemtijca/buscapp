@@ -10,7 +10,7 @@ import {
   useSolicitacoesCodigo,
 } from '@/composables/consultas/useGestaoUsuarios';
 import { useStatusConexao } from '@/composables/useStatusConexao';
-import Modal from '@/componentes/Modal.vue';
+import ModalBase from '@/componentes/ModalBase.vue';
 import type { SolicitacaoCodigo, CodigoGerado } from '@/tipos/componentes';
 
 const router = useRouter();
@@ -661,7 +661,7 @@ onUnmounted(() => {
       </template>
     </div>
 
-    <Modal
+    <ModalBase
       :visivel="modalConfirmacaoGerar && !!solicitacaoSelecionada"
       titulo="Confirmar geração"
       icone="shield-exclamation"
@@ -690,9 +690,9 @@ onUnmounted(() => {
           Sim, gerar
         </button>
       </template>
-    </Modal>
+    </ModalBase>
 
-    <Modal
+    <ModalBase
       :visivel="modalCodigoGerado && !!codigoGeradoAtual"
       titulo="Código gerado"
       icone="key"
@@ -747,9 +747,9 @@ onUnmounted(() => {
           Concluído
         </button>
       </template>
-    </Modal>
+    </ModalBase>
 
-    <Modal
+    <ModalBase
       :visivel="modalRevogar && !!codigoParaRevogar"
       titulo="Revogar código"
       icone="exclamation-triangle"
@@ -797,9 +797,9 @@ onUnmounted(() => {
           Sim, revogar
         </button>
       </template>
-    </Modal>
+    </ModalBase>
 
-    <Modal
+    <ModalBase
       :visivel="modalLimpar"
       titulo="Limpar códigos não ativos"
       icone="trash"
@@ -842,6 +842,6 @@ onUnmounted(() => {
           Sim, limpar
         </button>
       </template>
-    </Modal>
+    </ModalBase>
   </div>
 </template>

@@ -5,7 +5,7 @@ import { useTags } from '@/composables/consultas/useCatalogos';
 import CampoFormulario from '@/componentes/CampoFormulario.vue';
 import Combobox from '@/componentes/Combobox.vue';
 import type { OpcaoCombobox } from '@/componentes/Combobox.vue';
-import Modal from '@/componentes/Modal.vue';
+import ModalBase from '@/componentes/ModalBase.vue';
 import SeletorIcone from '@/componentes/SeletorIcone.vue';
 import type { TagComportamento } from '@/tipos/database';
 
@@ -251,7 +251,7 @@ async function excluir(id: string) {
       </table>
     </div>
 
-    <Modal
+    <ModalBase
       :visivel="modalAberto"
       :titulo="(modoEdicao ? 'Editar' : 'Nova') + ' tag'"
       largura="md"
@@ -310,6 +310,6 @@ async function excluir(id: string) {
           Salvar
         </button>
       </template>
-    </Modal>
+    </ModalBase>
   </div>
 </template>

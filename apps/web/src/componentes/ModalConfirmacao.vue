@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import Modal from '@/componentes/Modal.vue';
+import ModalBase from '@/componentes/ModalBase.vue';
 
 withDefaults(
   defineProps<{
@@ -36,7 +36,7 @@ function classeBotao(variante: 'danger' | 'success' | 'warning'): string {
 </script>
 
 <template>
-  <Modal
+  <ModalBase
     :visivel="visivel"
     :titulo="titulo"
     largura="sm"
@@ -64,5 +64,5 @@ function classeBotao(variante: 'danger' | 'success' | 'warning'): string {
         {{ rotuloConfirmar }}
       </button>
     </template>
-  </Modal>
+  </ModalBase>
 </template>

@@ -14,7 +14,7 @@ import {
 import CampoFormulario from '@/componentes/CampoFormulario.vue';
 import Combobox from '@/componentes/Combobox.vue';
 import type { OpcaoCombobox } from '@/componentes/Combobox.vue';
-import Modal from '@/componentes/Modal.vue';
+import ModalBase from '@/componentes/ModalBase.vue';
 import type { AtribuicaoProfessor } from '@/tipos/database';
 
 interface AtribuicaoItem extends AtribuicaoProfessor {
@@ -407,7 +407,7 @@ const papelBadge = (papel: string) => {
       </div>
     </div>
 
-    <Modal
+    <ModalBase
       :visivel="modalAberto"
       :titulo="modoEdicao ? 'Editar atribuição' : 'Nova atribuição'"
       icone="people"
@@ -494,6 +494,6 @@ const papelBadge = (papel: string) => {
           {{ modoEdicao ? 'Salvar' : 'Criar' }}
         </button>
       </template>
-    </Modal>
+    </ModalBase>
   </div>
 </template>

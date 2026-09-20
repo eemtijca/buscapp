@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onUnmounted, ref, watch } from 'vue';
 import { baixarArquivo } from '@/servicos/api';
-import Modal from '@/componentes/Modal.vue';
+import ModalBase from '@/componentes/ModalBase.vue';
 
 const props = defineProps<{
   aberto: boolean;
@@ -64,7 +64,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <Modal
+  <ModalBase
     :visivel="aberto"
     :titulo="nomeArquivo"
     icone="paperclip"
@@ -119,5 +119,5 @@ onUnmounted(() => {
         Baixar
       </a>
     </template>
-  </Modal>
+  </ModalBase>
 </template>

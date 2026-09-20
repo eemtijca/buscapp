@@ -158,6 +158,13 @@ export async function construirApp(): Promise<FastifyInstance> {  const app = Fa
     store: StoreRateLimitPostgres,
     // Indisponibilidade do store não derruba a API; o erro é registrado e a requisição segue.
     skipOnError: true,
+    onExceeded: (pedido) => {
+      // Alerta para monitoração: picos de 429 por rota e IP.
+      app.log.warn(
+        { rota: pedido.url, ip: pedido.ip },
+        'Limite de requisições excedido',
+      );
+    },
     errorResponseBuilder: (_pedido, contexto) => ({
       erro: {
         codigo: 'muitas_requisicoes',

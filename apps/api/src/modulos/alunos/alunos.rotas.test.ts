@@ -149,6 +149,14 @@ afterAll(async () => {
   await prisma.sessoes.deleteMany({
     where: { perfil_id: { in: [gestaoId, profComId, profSemId, respId] } },
   });
+  await prisma.auditoria.deleteMany({
+    where: {
+      OR: [
+        { usuario_id: { in: [gestaoId, profComId, profSemId, respId] } },
+        { entidade_id: { in: [alunoVisivelId, alunoForaId] } },
+      ],
+    },
+  });
   await prisma.perfis.deleteMany({
     where: { id: { in: [gestaoId, profComId, profSemId, respId] } },
   });

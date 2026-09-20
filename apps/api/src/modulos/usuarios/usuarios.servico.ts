@@ -7,6 +7,7 @@ import type {
   Usuario,
 } from '@buscapp/contratos';
 import { gerarCodigoRedefinicao } from '../../nucleo/autenticacao/codigos.js';
+import { auditar } from '../../nucleo/auditoria/registrar.js';
 import { gerarHashSenha } from '../../nucleo/autenticacao/senhas.js';
 import { revogarSessoesDoPerfil } from '../../nucleo/autenticacao/sessoes.js';
 import { publicarEvento } from '../../nucleo/eventos/barramento.js';
@@ -130,10 +131,21 @@ export async function criar(dados: CriarUsuario, criadoPor: string): Promise<Usu
   }
 
   publicarEvento({ tabela: 'perfis' });
+  await auditar({
+    usuarioId: criadoPor,
+    acao: 'CRIAR_USUARIO',
+    entidade: 'perfis',
+    entidadeId: perfil.id,
+    dadosNovos: { email, papel: perfil.papel, status: perfil.status },
+  });
   return { usuario: paraUsuario(perfil), codigo, senha_temporaria: senhaTemporaria };
 }
 
-export async function atualizar(id: string, dados: AtualizarUsuario): Promise<Usuario> {
+export async function atualizar(
+  id: string,
+  dados: AtualizarUsuario,
+  atualizadoPor: string,
+): Promise<Usuario> {
   const existente = await buscarUsuarioPorId(id);
   if (!existente) throw erroNaoEncontrado('Usuário não encontrado.');
 
@@ -144,6 +156,21 @@ export async function atualizar(id: string, dados: AtualizarUsuario): Promise<Us
       dados.email !== undefined ? dados.email.toLowerCase() : undefined,
     );
     publicarEvento({ tabela: 'perfis' });
+    await auditar({
+      usuarioId: atualizadoPor,
+      acao: 'ATUALIZAR_USUARIO',
+      entidade: 'perfis',
+      entidadeId: id,
+      dadosAnteriores: {
+        nome: existente.nome,
+        email: existente.email,
+        papel: existente.papel,
+        status: existente.status,
+        acesso_modulos: existente.acesso_modulos,
+        notificacoes_ativas: existente.notificacoes_ativas,
+      },
+      dadosNovos: dados,
+    });
     return paraUsuario(perfil);
   } catch (erro) {
     traduzirErroBanco(erro);
@@ -164,5 +191,13 @@ export async function atualizarStatus(
   const perfil = await atualizarStatusUsuario(id, dados.status);
   if (dados.status === 'inativo') await revogarSessoesDoPerfil(id);
   publicarEvento({ tabela: 'perfis' });
+  await auditar({
+    usuarioId: solicitanteId,
+    acao: 'ALTERAR_STATUS_USUARIO',
+    entidade: 'perfis',
+    entidadeId: id,
+    dadosAnteriores: { status: existente.status },
+    dadosNovos: { status: dados.status },
+  });
   return paraUsuario(perfil);
 }

@@ -55,7 +55,7 @@ export const rotasAlunos: FastifyPluginAsyncZod = async (app) => {
       },
     },
     async (pedido, resposta) => {
-      const aluno = await criar(pedido.body);
+      const aluno = await criar(pedido.body, usuarioAtual(pedido).id);
       resposta.status(201);
       return { aluno };
     },
@@ -73,6 +73,8 @@ export const rotasAlunos: FastifyPluginAsyncZod = async (app) => {
         response: { 200: z.object({ aluno: alunoSchema }) },
       },
     },
-    async (pedido) => ({ aluno: await atualizar(pedido.params.id, pedido.body) }),
+    async (pedido) => ({
+      aluno: await atualizar(pedido.params.id, pedido.body, usuarioAtual(pedido).id),
+    }),
   );
 };

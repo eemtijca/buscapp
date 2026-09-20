@@ -7,6 +7,7 @@ import {
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { ambiente } from '../../ambiente.js';
+import { auditar } from '../../nucleo/auditoria/registrar.js';
 import { assinaturaConfere } from '../../nucleo/armazenamento/magic-bytes.js';
 import { armazenamento, nomeSeguro, normalizarChave } from '../../nucleo/armazenamento/index.js';
 import { autenticar, exigirPapel, usuarioAtual } from '../../nucleo/autenticacao/middleware.js';
@@ -133,6 +134,19 @@ export const rotasAnexos: FastifyPluginAsyncZod = async (app) => {
         },
       });
 
+      await auditar({
+        usuarioId: usuarioAtual(pedido).id,
+        acao: 'CRIAR_ANEXO',
+        entidade: 'anexos',
+        entidadeId: anexo.id,
+        dadosNovos: {
+          nome_arquivo: anexo.nome_arquivo,
+          mime_type: anexo.mime_type,
+          tamanho_bytes: anexo.tamanho_bytes,
+        },
+        ip: pedido.ip,
+      });
+
       resposta.status(201);
       return { anexo: paraAnexo(anexo) };
     },
@@ -186,6 +200,19 @@ export const rotasAnexos: FastifyPluginAsyncZod = async (app) => {
           tamanho_bytes: conteudo.length,
           criado_por: usuario.id,
         },
+      });
+
+      await auditar({
+        usuarioId: usuario.id,
+        acao: 'CRIAR_ANEXO',
+        entidade: 'anexos',
+        entidadeId: anexo.id,
+        dadosNovos: {
+          nome_arquivo: anexo.nome_arquivo,
+          mime_type: anexo.mime_type,
+          tamanho_bytes: anexo.tamanho_bytes,
+        },
+        ip: pedido.ip,
       });
 
       resposta.status(201);
@@ -246,6 +273,14 @@ export const rotasAnexos: FastifyPluginAsyncZod = async (app) => {
         .remover(anexo.storage_path)
         .catch(() => undefined);
       await prisma.anexos.delete({ where: { id: anexo.id } });
+      await auditar({
+        usuarioId: usuario.id,
+        acao: 'REMOVER_ANEXO',
+        entidade: 'anexos',
+        entidadeId: anexo.id,
+        dadosAnteriores: { nome_arquivo: anexo.nome_arquivo, storage_path: anexo.storage_path },
+        ip: pedido.ip,
+      });
       return { ok: true as const };
     },
   );

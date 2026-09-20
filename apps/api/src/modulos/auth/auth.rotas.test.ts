@@ -60,7 +60,14 @@ afterAll(async () => {
   await prisma.codigos_redefinicao_tentativas.deleteMany({
     where: { email: { in: [emailProf, emailPendente, emailGestao] } },
   });
-  await prisma.auditoria.deleteMany({ where: { entidade_id: pendenteId } });
+  await prisma.auditoria.deleteMany({
+    where: {
+      OR: [
+        { usuario_id: { in: [gestaoId, profId, pendenteId] } },
+        { entidade_id: { in: [gestaoId, profId, pendenteId] } },
+      ],
+    },
+  });
   await prisma.perfis.deleteMany({ where: { id: { in: [gestaoId, profId, pendenteId] } } });
   await prisma.configuracoes_sistema.deleteMany({ where: { id: { not: 1 } } });
   await app.close();
@@ -121,6 +128,29 @@ describe('POST /api/auth/login', () => {
     });
     expect(resposta.statusCode).toBe(403);
     expect(resposta.json().erro.codigo).toBe('conta_pendente');
+  });
+
+  it('registra a auditoria de login e de falha', async () => {
+    await app.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      payload: { email: emailGestao, senha: 'SenhaAtual1!' },
+    });
+    await app.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      payload: { email: emailGestao, senha: 'Errada1!' },
+    });
+
+    const sucessos = await prisma.auditoria.count({
+      where: { usuario_id: gestaoId, acao: 'LOGIN' },
+    });
+    expect(sucessos).toBeGreaterThan(0);
+
+    const falhas = await prisma.auditoria.count({
+      where: { acao: 'LOGIN_FALHA', entidade_id: gestaoId },
+    });
+    expect(falhas).toBeGreaterThan(0);
   });
 
   it('bloqueia tentativas repetidas de login', async () => {

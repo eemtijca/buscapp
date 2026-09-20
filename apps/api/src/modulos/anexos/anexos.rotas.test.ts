@@ -63,6 +63,7 @@ afterAll(async () => {
   }
   await prisma.anexos.deleteMany({ where: { criado_por: gestaoId } });
   await prisma.sessoes.deleteMany({ where: { perfil_id: gestaoId } });
+  await prisma.auditoria.deleteMany({ where: { usuario_id: gestaoId } });
   await prisma.perfis.deleteMany({ where: { id: gestaoId } });
   await app.close();
   await prisma.$disconnect();

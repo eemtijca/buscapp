@@ -28,6 +28,7 @@ import {
   revogarSessao,
 } from '../../nucleo/autenticacao/sessoes.js';
 import { ErroHttp } from '../../nucleo/http/erros.js';
+import { auditar } from '../../nucleo/auditoria/registrar.js';
 import {
   autenticar as autenticarServico,
   ErroContaInativa,
@@ -112,9 +113,19 @@ export const rotasAuth: FastifyPluginAsyncZod = async (app) => {
       },
     },
     async (pedido, resposta) => {
+      const perfil = await autenticarOpcional(pedido);
       const token = pedido.cookies[nomeCookieSessao()];
       if (token) await revogarSessao(token);
       limparCookieSessao(resposta);
+      if (perfil) {
+        await auditar({
+          usuarioId: perfil.id,
+          acao: 'LOGOUT',
+          entidade: 'perfis',
+          entidadeId: perfil.id,
+          ip: pedido.ip,
+        });
+      }
       return { ok: true as const };
     },
   );
@@ -148,6 +159,13 @@ export const rotasAuth: FastifyPluginAsyncZod = async (app) => {
     async (pedido) => {
       const token = pedido.cookies[nomeCookieSessao()] ?? '';
       const revogadas = await revogarOutrasSessoes(usuarioAtual(pedido).id, token);
+      await auditar({
+        usuarioId: usuarioAtual(pedido).id,
+        acao: 'REVOGAR_SESSOES',
+        entidade: 'sessoes',
+        dadosNovos: { revogadas },
+        ip: pedido.ip,
+      });
       return { ok: true as const, revogadas };
     },
   );

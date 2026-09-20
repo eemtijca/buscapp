@@ -60,7 +60,14 @@ afterAll(async () => {
   });
   await prisma.codigos_redefinicao.deleteMany({ where: { perfil_id: { in: criados } } });
   await prisma.notificacoes.deleteMany({ where: { destinatario_id: { in: criados } } });
-  await prisma.auditoria.deleteMany({ where: { usuario_id: { in: criados } } });
+  await prisma.auditoria.deleteMany({
+    where: {
+      OR: [
+        { usuario_id: { in: [gestaoId, profId, ...criados] } },
+        { entidade_id: { in: criados } },
+      ],
+    },
+  });
   await prisma.perfis.deleteMany({ where: { id: { in: [gestaoId, profId, ...criados] } } });
   await app.close();
   await prisma.$disconnect();

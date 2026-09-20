@@ -1,4 +1,5 @@
 import { prisma } from '../../nucleo/banco/cliente.js';
+import { auditar } from '../../nucleo/auditoria/registrar.js';
 import {
   HASH_FALSO,
   gerarHashSenha,
@@ -70,7 +71,16 @@ export async function autenticar(dados: DadosLogin) {
   // A verificação roda mesmo sem perfil para equalizar o tempo de resposta.
   const hash = perfil?.senha_hash ?? HASH_FALSO;
   const senhaConfere = await verificarSenha(dados.senha, hash);
-  if (!perfil || !perfil.senha_hash || !senhaConfere) throw new ErroCredenciaisInvalidas();
+  if (!perfil || !perfil.senha_hash || !senhaConfere) {
+    await auditar({
+      acao: 'LOGIN_FALHA',
+      entidade: 'perfis',
+      entidadeId: perfil?.id ?? null,
+      dadosNovos: { email },
+      ip: dados.ip,
+    });
+    throw new ErroCredenciaisInvalidas();
+  }
   if (perfil.status === 'inativo') throw new ErroContaInativa();
   if (perfil.status === 'pendente') throw new ErroContaPendente();
 
@@ -90,6 +100,14 @@ export async function autenticar(dados: DadosLogin) {
   const sessao = await criarSessao(perfil.id, {
     lembrar: dados.lembrar,
     userAgent: dados.userAgent,
+    ip: dados.ip,
+  });
+
+  await auditar({
+    usuarioId: perfil.id,
+    acao: 'LOGIN',
+    entidade: 'perfis',
+    entidadeId: perfil.id,
     ip: dados.ip,
   });
 

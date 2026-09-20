@@ -2,6 +2,7 @@ import type { Aluno, AtualizarAluno, CriarAluno, ListarAlunos } from '@buscapp/c
 import type { PerfilAutenticado } from '../../nucleo/autenticacao/tipos.js';
 import { filtroAlunosVisiveis, podeVerAluno } from '../../nucleo/autorizacao/escopo.js';
 import { publicarEvento } from '../../nucleo/eventos/barramento.js';
+import { auditar } from '../../nucleo/auditoria/registrar.js';
 import { ErroHttp, erroNaoEncontrado } from '../../nucleo/http/erros.js';
 import {
   atualizarAluno,
@@ -65,10 +66,17 @@ export async function obter(usuario: PerfilAutenticado, id: string): Promise<Alu
   return paraAluno(aluno);
 }
 
-export async function criar(dados: CriarAluno): Promise<Aluno> {
+export async function criar(dados: CriarAluno, criadoPor: string): Promise<Aluno> {
   try {
     const aluno = await criarAluno(dados);
     publicarEvento({ tabela: 'alunos' });
+    await auditar({
+      usuarioId: criadoPor,
+      acao: 'CRIAR_ALUNO',
+      entidade: 'alunos',
+      entidadeId: aluno.id,
+      dadosNovos: { nome: aluno.nome, matricula: aluno.matricula, status: aluno.status },
+    });
     return paraAluno(aluno);
   } catch (erro) {
     if ((erro as { code?: string }).code === 'P2002') {
@@ -78,13 +86,25 @@ export async function criar(dados: CriarAluno): Promise<Aluno> {
   }
 }
 
-export async function atualizar(id: string, dados: AtualizarAluno): Promise<Aluno> {
+export async function atualizar(
+  id: string,
+  dados: AtualizarAluno,
+  atualizadoPor: string,
+): Promise<Aluno> {
   const existente = await buscarAlunoPorId(id);
   if (!existente) throw erroNaoEncontrado('Aluno não encontrado.');
 
   try {
     const aluno = await atualizarAluno(id, dados);
     publicarEvento({ tabela: 'alunos' });
+    await auditar({
+      usuarioId: atualizadoPor,
+      acao: 'ATUALIZAR_ALUNO',
+      entidade: 'alunos',
+      entidadeId: id,
+      dadosAnteriores: { nome: existente.nome, status: existente.status },
+      dadosNovos: dados,
+    });
     return paraAluno(aluno);
   } catch (erro) {
     if ((erro as { code?: string }).code === 'P2002') {

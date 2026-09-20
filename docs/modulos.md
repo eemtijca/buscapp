@@ -33,7 +33,7 @@ O registro é por exceção: o professor envia apenas os ausentes da turma em um
 - A ocorrência tem descrição (mínimo de 10 caracteres), um ou mais tipos do catálogo, status (`aberta`, `em_andamento`, `resolvida` ou `arquivada`), tags de comportamento e flags de notificação.
 - `exige_presenca_responsavel` marca a ocorrência que precisa de comparecimento; a gestão confirma a presença em `PATCH /api/ocorrencias/:id`.
 - O trigger `fn_notificar_ocorrencia` cria notificações para os responsáveis vinculados quando `notificar_responsavel` está ativo.
-- Os registros de comportamento são anotações com tags, usados no cálculo de pontuação e no ranking. O professor precisa do módulo `ocorrencias` para criar e ler ocorrências; os registros de comportamento usam apenas as verificações de escopo.
+- Os registros de comportamento são anotações com tags, usados no cálculo de pontuação e no ranking. O professor precisa do módulo `ocorrencias` para criar ocorrências e registros de comportamento; a leitura de ambos segue as verificações de escopo.
 - A gestão enxerga todas as ocorrências e alterna bloqueio e desbloqueio de retorno pela confirmação de presença.
 
 ## Justificativas

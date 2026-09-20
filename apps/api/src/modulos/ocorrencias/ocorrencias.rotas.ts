@@ -127,7 +127,7 @@ export const rotasOcorrencias: FastifyPluginAsyncZod = async (app) => {
   app.post(
     '/api/registros-comportamento',
     {
-      preHandler: [autenticar, podeEscrever],
+      preHandler: [autenticar, podeEscrever, exigirModuloDeEscrita],
       schema: {
         tags: ['ocorrencias'],
         summary: 'Registra um comportamento para um aluno da turma do professor',

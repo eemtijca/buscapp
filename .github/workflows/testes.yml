@@ -39,6 +39,17 @@ jobs:
           docker compose logs app
           exit 1
 
+      # Integração da API e unidade do cache contra o PostgreSQL e o Redis do Compose.
+      - name: Roda os testes de unidade e integração
+        env:
+          NODE_ENV: test
+          AUTH_PEPPER: dev-pepper-local-com-mais-de-16-caracteres
+          DATABASE_URL: postgresql://buscapp_api:buscapp_api@127.0.0.1:5433/buscapp
+          MIGRATE_DATABASE_URL: postgresql://buscapp:buscapp@127.0.0.1:5433/buscapp
+          REDIS_URL: redis://127.0.0.1:6379
+          STORAGE_DRIVER: disco
+        run: npm run test:unit
+
       - name: Exibe os logs em caso de falha
         if: failure()
         run: docker compose logs

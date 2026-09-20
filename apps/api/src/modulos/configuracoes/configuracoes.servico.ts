@@ -21,6 +21,7 @@ import type {
   tags_comportamento,
 } from '../../../generated/prisma/client.js';
 import { publicarEvento } from '../../nucleo/eventos/barramento.js';
+import { ambiente } from '../../ambiente.js';
 import { ErroHttp, erroNaoEncontrado } from '../../nucleo/http/erros.js';
 import {
   atualizarConfiguracao,
@@ -84,6 +85,7 @@ export function paraConfiguracao(row: configuracoes_sistema): ConfiguracaoSistem
     janela_positivo_dias: row.janela_positivo_dias,
     bonus_presenca_confirmada: numero(row.bonus_presenca_confirmada),
     updated_at: row.updated_at.toISOString(),
+    fuso_horario: ambiente.TZ_ESCOLA,
   };
 }
 

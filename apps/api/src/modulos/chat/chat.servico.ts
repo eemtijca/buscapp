@@ -7,7 +7,9 @@ import type {
   PapelAutorMensagem,
 } from '@buscapp/contratos';
 import type { PerfilAutenticado } from '../../nucleo/autenticacao/tipos.js';
+import { ambiente } from '../../ambiente.js';
 import { publicarEvento } from '../../nucleo/eventos/barramento.js';
+import { partesNaEscola } from '../../nucleo/tempo/fuso.js';
 import {
   ErroHttp,
   erroNaoAutorizado,
@@ -94,41 +96,32 @@ function minutosDoHorario(data: Date): number {
 }
 
 /**
- * Verifica se o horário atual (fuso do servidor) está dentro de alguma janela ativa.
+ * Verifica se o horário atual no fuso da escola está dentro de alguma janela ativa.
  * Sem nenhum horário cadastrado assume a janela escolar padrão; com janelas cadastradas
  * mas todas inativas o canal fica sempre bloqueado.
  */
-export function horarioPermitido(horarios: HorarioBruto[], agora: Date = new Date()): boolean {
-  const dia = agora.getDay();
-  const minutos = agora.getHours() * 60 + agora.getMinutes();
+export function horarioPermitido(
+  horarios: HorarioBruto[],
+  agora: Date = new Date(),
+  fuso: string = ambiente.TZ_ESCOLA,
+): boolean {
+  const { diaSemana, minutos } = partesNaEscola(agora, fuso);
 
   if (!horarios.length) {
     return (
-      HORARIO_PADRAO.dias.includes(dia) &&
+      HORARIO_PADRAO.dias.includes(diaSemana) &&
       minutos >= HORARIO_PADRAO.inicio &&
       minutos <= HORARIO_PADRAO.fim
     );
   }
 
-  const ativos = horarios.filter((horario) => horario.ativo);
-  if (!ativos.length) return false;
-
-  const dias = [...new Set(ativos.map((horario) => horario.dia_semana))].sort((a, b) => a - b);
-  const primeiroDia = dias[0]!;
-  const ultimoDia = dias[dias.length - 1]!;
-  const inicio = Math.min(
-    ...ativos
-      .filter((horario) => horario.dia_semana === primeiroDia)
-      .map((horario) => minutosDoHorario(horario.hora_inicio)),
+  return horarios.some(
+    (horario) =>
+      horario.ativo &&
+      horario.dia_semana === diaSemana &&
+      minutos >= minutosDoHorario(horario.hora_inicio) &&
+      minutos <= minutosDoHorario(horario.hora_fim),
   );
-  const fim = Math.max(
-    ...ativos
-      .filter((horario) => horario.dia_semana === ultimoDia)
-      .map((horario) => minutosDoHorario(horario.hora_fim)),
-  );
-
-  if (!dias.includes(dia)) return false;
-  return minutos >= inicio && minutos <= fim;
 }
 
 function paraConversa(

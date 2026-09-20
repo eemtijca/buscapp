@@ -7,6 +7,7 @@ import {
   useAlunosFrequencia,
 } from '@/composables/consultas/useMonitoramento';
 import { useOpcoes } from '@/composables/consultas/useCatalogos';
+import { hojeIso } from '@/utils/datas';
 import CartaoAlunoFrequencia from '@/componentes/CartaoAlunoFrequencia.vue';
 import GrupoCheckbox from '@/componentes/GrupoCheckbox.vue';
 import ModalConfirmacao from '@/componentes/ModalConfirmacao.vue';
@@ -15,7 +16,7 @@ import type { AlunoFrequencia } from '@/tipos/componentes';
 const router = useRouter();
 const { usuario } = useAutenticacao();
 const buscaAluno = ref('');
-const dataAula = ref(new Date().toISOString().slice(0, 10));
+const dataAula = ref(hojeIso());
 const { alunos: alunosRemotos, pendente, recarregar } = useAlunosFrequencia(() => dataAula.value);
 const alunos = ref<AlunoFrequencia[]>([]);
 const salvando = ref(false);

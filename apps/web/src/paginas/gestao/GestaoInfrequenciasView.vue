@@ -8,6 +8,7 @@ import {
   useAlunosFrequencia,
 } from '@/composables/consultas/useMonitoramento';
 import { useOpcoes } from '@/composables/consultas/useCatalogos';
+import { hojeIso } from '@/utils/datas';
 import CartaoAlunoFrequencia from '@/componentes/CartaoAlunoFrequencia.vue';
 import CampoFormulario from '@/componentes/CampoFormulario.vue';
 import Combobox from '@/componentes/Combobox.vue';
@@ -19,7 +20,7 @@ import type { AlunoFrequencia } from '@/tipos/componentes';
 const route = useRoute();
 const { usuario } = useAutenticacao();
 const abaAtiva = ref<'turma' | 'individual'>('turma');
-const dataAula = ref(new Date().toISOString().slice(0, 10));
+const dataAula = ref(hojeIso());
 const { alunos: alunosRemotos, pendente, recarregar } = useAlunosFrequencia(() => dataAula.value);
 const alunos = ref<AlunoFrequencia[]>([]);
 const carregando = computed(() => pendente.value || salvandoChamada.value);

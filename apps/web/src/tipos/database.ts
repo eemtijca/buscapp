@@ -73,6 +73,8 @@ export interface ConfiguracaoSistema {
   janela_positivo_dias: number;
   bonus_presenca_confirmada: number;
   updated_at: string;
+  /** Fornecido pela API a partir de `TZ_ESCOLA`; não é persistido no banco. */
+  fuso_horario?: string;
 }
 
 export interface OpcaoConfiguracao {

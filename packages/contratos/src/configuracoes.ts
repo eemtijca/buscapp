@@ -38,6 +38,7 @@ export const configuracaoSistemaSchema = z.object({
   janela_positivo_dias: z.number().int(),
   bonus_presenca_confirmada: z.number(),
   updated_at: z.string(),
+  fuso_horario: z.string(),
 });
 
 export type ConfiguracaoSistema = z.infer<typeof configuracaoSistemaSchema>;

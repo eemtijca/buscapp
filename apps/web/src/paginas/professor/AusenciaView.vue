@@ -7,6 +7,7 @@ import {
   useAlunosFrequencia,
 } from '@/composables/consultas/useMonitoramento';
 import { useOpcoes } from '@/composables/consultas/useCatalogos';
+import { hojeIso } from '@/utils/datas';
 import CampoFormulario from '@/componentes/CampoFormulario.vue';
 import Combobox from '@/componentes/Combobox.vue';
 import GrupoCheckbox from '@/componentes/GrupoCheckbox.vue';
@@ -28,7 +29,7 @@ const { opcoes: opcoesPeriodos } = useOpcoes(() => 'periodo');
 const { opcoes: opcoesMotivos } = useOpcoes(() => 'motivo_ausencia');
 
 const motivos = ref<string[]>([]);
-const dataAula = ref(new Date().toISOString().slice(0, 10));
+const dataAula = ref(hojeIso());
 const confirmarEnvio = ref(false);
 const confirmarCancelar = ref(false);
 

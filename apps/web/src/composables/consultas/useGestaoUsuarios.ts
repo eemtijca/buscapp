@@ -3,6 +3,7 @@ import { api, ErroApi } from '@/servicos/api';
 import { invalidarChave, invalidarTabela } from '@/servicos/cache';
 import { Consultas } from '@/servicos/consultas';
 import { useConsulta } from '@/composables/useConsulta';
+import { hojeIso } from '@/utils/datas';
 import type { Disciplina, Turma } from '@/tipos/database';
 import type { CodigoApi, UsuarioApi } from '@/tipos/api';
 import type {
@@ -18,10 +19,6 @@ function mensagemDeErro(erroCapturado: unknown, padrao: string): string {
   if (erroCapturado instanceof ErroApi) return erroCapturado.message;
   if (erroCapturado instanceof Error && erroCapturado.message) return erroCapturado.message;
   return padrao;
-}
-
-function hojeIso(): string {
-  return new Date().toISOString().slice(0, 10);
 }
 
 /** Usuários da gestão filtrados por papel, status e busca. */

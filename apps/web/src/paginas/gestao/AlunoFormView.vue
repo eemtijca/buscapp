@@ -10,6 +10,7 @@ import {
 import { useOpcoes, useTurmas } from '@/composables/consultas/useCatalogos';
 import { useFormSnapshot } from '@/composables/useFormSnapshot';
 import { api } from '@/servicos/api';
+import { hojeIso } from '@/utils/datas';
 import type { UsuarioApi } from '@/tipos/api';
 import {
   mensagemSucesso as criarMensagemSucesso,
@@ -268,7 +269,7 @@ watch(
 );
 
 function hoje() {
-  return new Date().toISOString().slice(0, 10);
+  return hojeIso();
 }
 
 function mostrarErro(msg: string) {

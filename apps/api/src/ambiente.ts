@@ -10,6 +10,17 @@ const esquema = z
     NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
     PORT: z.coerce.number().int().positive().default(3001),
     HOST: z.string().default('0.0.0.0'),
+    TZ_ESCOLA: z
+      .string()
+      .default('America/Sao_Paulo')
+      .refine((fuso) => {
+        try {
+          new Intl.DateTimeFormat('en-US', { timeZone: fuso });
+          return true;
+        } catch {
+          return false;
+        }
+      }, 'TZ_ESCOLA deve ser um fuso horário IANA válido (ex.: America/Sao_Paulo).'),
     DATABASE_URL: z.string().min(1, 'DATABASE_URL é obrigatória'),
     MIGRATE_DATABASE_URL: z.string().optional(),
     APP_URL: z.string().url().default('http://localhost:5173'),

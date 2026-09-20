@@ -5,7 +5,7 @@ import { Consultas } from '@/servicos/consultas';
 import { useConsulta, type ResultadoConsulta } from '@/composables/useConsulta';
 import { useConfiguracaoSistema } from '@/composables/consultas/useCatalogos';
 import { comprimirImagem } from '@/utils/comprimirImagem';
-import { diasEntre, formatarData, formatarDataHorario } from '@/utils/datas';
+import { diasEntre, formatarData, formatarDataHorario, hojeIso, isoLocal } from '@/utils/datas';
 import { calcularTermometro } from '@/servicos/termometro';
 import type { Aluno, Frequencia, TagComportamento } from '@/tipos/database';
 import type { JustificativaApi, OcorrenciaApi, RegistroComportamentoApi } from '@/tipos/api';
@@ -260,7 +260,7 @@ export function useRankingRisco(): {
       const inicio = new Date(`${justificativa.data_falta}T00:00:00`);
       const fimData = new Date(`${fim}T00:00:00`);
       for (let dia = new Date(inicio); dia <= fimData; dia.setDate(dia.getDate() + 1)) {
-        justificadas.add(`${justificativa.aluno_id}:${dia.toISOString().slice(0, 10)}`);
+        justificadas.add(`${justificativa.aluno_id}:${isoLocal(dia)}`);
       }
     }
 
@@ -269,10 +269,10 @@ export function useRankingRisco(): {
       pesoPorTag.set(tag.nome, { peso: tag.peso_pontuacao, categoria: tag.categoria });
     }
 
-    const hoje = new Date().toISOString().slice(0, 10);
+    const hoje = hojeIso();
     const janelaInicio = new Date();
     janelaInicio.setDate(janelaInicio.getDate() - cfg.janelaRecenciaDias);
-    const janelaIso = janelaInicio.toISOString().slice(0, 10);
+    const janelaIso = isoLocal(janelaInicio);
 
     const resultado = alunos.map((aluno) => {
       const todasAusencias = frequencias.filter((frequencia) => frequencia.aluno_id === aluno.id);
@@ -510,7 +510,7 @@ function montarJustificadas(justificativas: JustificativaApi[], alunoId: string)
     const inicio = new Date(justificativa.data_falta + 'T00:00:00');
     const fimData = new Date(fim + 'T00:00:00');
     for (let dia = new Date(inicio); dia <= fimData; dia.setDate(dia.getDate() + 1)) {
-      datas.add(dia.toISOString().slice(0, 10));
+      datas.add(isoLocal(dia));
     }
   }
   return datas;
@@ -554,7 +554,7 @@ export function useAlertasResponsavel(): {
       const fim = new Date(justificativa.data_fim ?? justificativa.data_falta);
       const anexo = justificativa.anexos[0];
       for (let dia = new Date(inicio); dia <= fim; dia.setDate(dia.getDate() + 1)) {
-        const chave = `${justificativa.aluno_id}:${dia.toISOString().slice(0, 10)}`;
+        const chave = `${justificativa.aluno_id}:${isoLocal(dia)}`;
         justificativaPorDia.set(chave, {
           status: justificativa.status,
           motivo: justificativa.motivo,
@@ -669,7 +669,7 @@ export function useTermometroAluno(
     return {
       ...Consultas.registrosComportamento({
         aluno_id: alunoId(),
-        data_inicio: janela.toISOString().slice(0, 10),
+        data_inicio: isoLocal(janela),
       }),
       habilitado: Boolean(alunoId()),
     };
@@ -690,10 +690,10 @@ export function useTermometroAluno(
     );
     const totalAusenciasJustificadas = frequencias.length - frequenciasInjustificadas.length;
 
-    const hoje = new Date().toISOString().slice(0, 10);
+    const hoje = hojeIso();
     const janelaInicio = new Date();
     janelaInicio.setDate(janelaInicio.getDate() - cfg.janelaRecenciaDias);
-    const janelaIso = janelaInicio.toISOString().slice(0, 10);
+    const janelaIso = isoLocal(janelaInicio);
     const faltasRecentes = frequenciasInjustificadas.filter(
       (frequencia) => frequencia.data_aula >= janelaIso,
     ).length;
@@ -708,8 +708,8 @@ export function useTermometroAluno(
     trintaDias.setDate(trintaDias.getDate() - 30);
     const sessentaDias = new Date();
     sessentaDias.setDate(sessentaDias.getDate() - 60);
-    const iso30 = trintaDias.toISOString().slice(0, 10);
-    const iso60 = sessentaDias.toISOString().slice(0, 10);
+    const iso30 = isoLocal(trintaDias);
+    const iso60 = isoLocal(sessentaDias);
     const contagem30 = frequenciasInjustificadas.filter(
       (frequencia) => frequencia.data_aula >= iso30,
     ).length;

@@ -262,11 +262,16 @@ export interface NotificacaoItem {
   rota: string;
 }
 
+/** Janela de atendimento em minutos desde a meia-noite, no fuso da escola. */
+export interface JanelaHorarioProtegido {
+  diaSemana: number; // 0 (Dom) a 6 (Sáb)
+  inicio: number;
+  fim: number;
+}
+
 /** Configuração do horário protegido do canal de diálogo. */
 export interface HorarioProtegido {
-  inicio: string; // formato "HH:MM"
-  fim: string; // formato "HH:MM"
-  diasSemana: number[]; // 0 (Dom) a 6 (Sáb)
+  janelas: JanelaHorarioProtegido[];
   mensagemForaHorario: string;
 }
 

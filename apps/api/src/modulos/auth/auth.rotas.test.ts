@@ -145,8 +145,7 @@ describe('POST /api/auth/login', () => {
   });
 });
 
-describe('status da conta em rotas privadas', () => {
-  it('rejeita sessão de perfil pendente', async () => {
+describe('status da conta em rotas privadas', () => {  it('rejeita sessão de perfil pendente', async () => {
     const { token } = await criarSessao(pendenteId, { lembrar: false });
     const resposta = await app.inject({
       method: 'GET',
@@ -304,5 +303,83 @@ describe('redefinição por código', () => {
       payload: { email: emailProf, codigo: '123456', novaSenha: 'fraca' },
     });
     expect(resposta.statusCode).toBe(400);
+  });
+});
+
+describe('sessões ativas', () => {
+  async function entrar(email: string): Promise<string> {
+    const resposta = await app.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      payload: { email, senha: 'SenhaAtual1!' },
+    });
+    expect(resposta.statusCode).toBe(200);
+    return extrairCookie(resposta.headers['set-cookie']);
+  }
+
+  it('lista as sessões e revoga as outras', async () => {
+    // Limpa sessões herdadas de outros testes antes de montar o cenário.
+    const tokenBase = await entrar(emailProf);
+    await app.inject({
+      method: 'DELETE',
+      url: '/api/auth/sessoes',
+      cookies: { buscapp_sessao: tokenBase },
+    });
+    await app.inject({
+      method: 'POST',
+      url: '/api/auth/logout',
+      cookies: { buscapp_sessao: tokenBase },
+    });
+
+    const token1 = await entrar(emailProf);
+    const token2 = await entrar(emailProf);
+
+    const lista = await app.inject({
+      method: 'GET',
+      url: '/api/auth/sessoes',
+      cookies: { buscapp_sessao: token2 },
+    });
+    expect(lista.statusCode).toBe(200);
+    expect(lista.json().sessoes).toHaveLength(2);
+    expect(lista.json().sessoes.filter((sessao: { atual: boolean }) => sessao.atual)).toHaveLength(1);
+
+    const revogacao = await app.inject({
+      method: 'DELETE',
+      url: '/api/auth/sessoes',
+      cookies: { buscapp_sessao: token2 },
+    });
+    expect(revogacao.statusCode).toBe(200);
+    expect(revogacao.json().revogadas).toBe(1);
+
+    const depois = await app.inject({
+      method: 'GET',
+      url: '/api/auth/sessoes',
+      cookies: { buscapp_sessao: token2 },
+    });
+    expect(depois.json().sessoes).toHaveLength(1);
+
+    // A sessão revogada deixa de valer; a atual segue ativa.
+    const revogada = await app.inject({
+      method: 'GET',
+      url: '/api/auth/me',
+      cookies: { buscapp_sessao: token1 },
+    });
+    expect(revogada.json().perfil).toBeNull();
+  });
+
+  it('expira a sessão por inatividade', async () => {
+    const token = await entrar(emailProf);
+    await prisma.sessoes.updateMany({
+      where: { perfil_id: profId },
+      data: { ultimo_uso_em: new Date(Date.now() - 3 * 60 * 60 * 1000) },
+    });
+
+    const eu = await app.inject({
+      method: 'GET',
+      url: '/api/auth/me',
+      cookies: { buscapp_sessao: token },
+    });
+    expect(eu.statusCode).toBe(200);
+    expect(eu.json().perfil).toBeNull();
   });
 });

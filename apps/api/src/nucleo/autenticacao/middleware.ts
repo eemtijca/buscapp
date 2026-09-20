@@ -1,8 +1,7 @@
 import type { FastifyRequest } from 'fastify';
-import { ambiente } from '../../ambiente.js';
 import { contextoBanco } from '../banco/contexto.js';
 import { erroNaoAutenticado, erroNaoAutorizado, ErroHttp } from '../http/erros.js';
-import { perfilDaSessao } from './sessoes.js';
+import { nomeCookieSessao, perfilDaSessao } from './sessoes.js';
 import type { PerfilAutenticado } from './tipos.js';
 
 declare module 'fastify' {
@@ -18,7 +17,7 @@ declare module 'fastify' {
 export async function autenticarOpcional(
   pedido: FastifyRequest,
 ): Promise<PerfilAutenticado | null> {
-  const token = pedido.cookies[ambiente.SESSAO_COOKIE];
+  const token = pedido.cookies[nomeCookieSessao()];
   if (!token) return null;
 
   const perfil = await perfilDaSessao(token);

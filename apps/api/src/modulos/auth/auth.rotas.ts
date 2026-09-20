@@ -1,8 +1,10 @@
 import {
   erroApiSchema,
+  listarSessoesRespostaSchema,
   loginSchema,
   perfilAutenticadoSchema,
   redefinirSenhaSchema,
+  revogarSessoesRespostaSchema,
   senhaForte,
   solicitarCodigoSchema,
 } from '@buscapp/contratos';
@@ -16,14 +18,16 @@ import {
   redefinirSenhaComCodigo,
   solicitarCodigoRedefinicao,
 } from '../../nucleo/autenticacao/codigos.js';
-import { autenticarOpcional } from '../../nucleo/autenticacao/middleware.js';
+import { autenticar, autenticarOpcional, usuarioAtual } from '../../nucleo/autenticacao/middleware.js';
 import {
   definirCookieSessao,
   limparCookieSessao,
+  listarSessoesAtivas,
+  nomeCookieSessao,
+  revogarOutrasSessoes,
   revogarSessao,
 } from '../../nucleo/autenticacao/sessoes.js';
 import { ErroHttp } from '../../nucleo/http/erros.js';
-import { ambiente } from '../../ambiente.js';
 import {
   autenticar as autenticarServico,
   ErroContaInativa,
@@ -108,10 +112,43 @@ export const rotasAuth: FastifyPluginAsyncZod = async (app) => {
       },
     },
     async (pedido, resposta) => {
-      const token = pedido.cookies[ambiente.SESSAO_COOKIE];
+      const token = pedido.cookies[nomeCookieSessao()];
       if (token) await revogarSessao(token);
       limparCookieSessao(resposta);
       return { ok: true as const };
+    },
+  );
+
+  app.get(
+    '/api/auth/sessoes',
+    {
+      preHandler: [autenticar],
+      schema: {
+        tags: ['auth'],
+        summary: 'Lista as sessões ativas do usuário autenticado',
+        response: { 200: listarSessoesRespostaSchema },
+      },
+    },
+    async (pedido) => {
+      const token = pedido.cookies[nomeCookieSessao()] ?? '';
+      return { sessoes: await listarSessoesAtivas(usuarioAtual(pedido).id, token) };
+    },
+  );
+
+  app.delete(
+    '/api/auth/sessoes',
+    {
+      preHandler: [autenticar],
+      schema: {
+        tags: ['auth'],
+        summary: 'Revoga as outras sessões ativas, preservando a atual',
+        response: { 200: revogarSessoesRespostaSchema },
+      },
+    },
+    async (pedido) => {
+      const token = pedido.cookies[nomeCookieSessao()] ?? '';
+      const revogadas = await revogarOutrasSessoes(usuarioAtual(pedido).id, token);
+      return { ok: true as const, revogadas };
     },
   );
 

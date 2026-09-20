@@ -39,6 +39,22 @@ export const redefinirSenhaSchema = z.object({
 
 export type RedefinirSenha = z.infer<typeof redefinirSenhaSchema>;
 
+export const sessaoSchema = z.object({
+  id: uuidSchema,
+  criado_em: z.string(),
+  ultimo_uso_em: z.string().nullable(),
+  expira_em: z.string(),
+  user_agent: z.string().nullable(),
+  ip: z.string().nullable(),
+  atual: z.boolean(),
+});
+
+export type Sessao = z.infer<typeof sessaoSchema>;
+
+export const listarSessoesRespostaSchema = z.object({ sessoes: z.array(sessaoSchema) });
+
+export const revogarSessoesRespostaSchema = z.object({ ok: z.literal(true), revogadas: z.number().int() });
+
 /** Política de senha forte: mínimo 8 com maiúscula, minúscula, dígito e símbolo. */
 export function senhaForte(senha: string): boolean {
   return (

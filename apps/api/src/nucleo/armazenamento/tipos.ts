@@ -14,9 +14,11 @@ export interface Armazenamento {
   salvar(chave: string, dados: Buffer, mimeType: string): Promise<void>;
   ler(chave: string): Promise<Buffer>;
   lerFluxo(chave: string): Promise<Readable>;
+  /** Primeiros bytes do objeto, usados para validar a assinatura sem ler o arquivo inteiro. */
+  lerTrecho?(chave: string, bytes: number): Promise<Buffer>;
   remover(chave: string): Promise<void>;
   /** URL pré-assinada para o cliente enviar o arquivo direto ao provedor. */
-  criarUrlUpload?(chave: string, mimeType: string): Promise<UrlUpload>;
+  criarUrlUpload?(chave: string, mimeType: string, tamanhoBytes: number): Promise<UrlUpload>;
   /** Metadados do objeto já enviado, usados para confirmar o upload direto. */
   estatistica?(chave: string): Promise<EstatisticaObjeto>;
 }

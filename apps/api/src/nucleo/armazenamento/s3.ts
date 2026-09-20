@@ -54,13 +54,26 @@ export function criarArmazenamentoS3(): Armazenamento {
       if (!resposta.Body) throw new Error('Objeto sem conteúdo.');
       return resposta.Body as unknown as Readable;
     },
-    async criarUrlUpload(chave, mimeType) {
+    async lerTrecho(chave, bytes) {
+      const resposta = await cliente.send(
+        new GetObjectCommand({
+          Bucket: bucket,
+          Key: normalizarChave(chave),
+          Range: `bytes=0-${Math.max(0, bytes - 1)}`,
+        }),
+      );
+      const conteudo = await resposta.Body?.transformToByteArray();
+      if (!conteudo) throw new Error('Objeto sem conteúdo.');
+      return Buffer.from(conteudo);
+    },
+    async criarUrlUpload(chave, mimeType, tamanhoBytes) {
       const url = await getSignedUrl(
         cliente,
         new PutObjectCommand({
           Bucket: bucket,
           Key: normalizarChave(chave),
           ContentType: mimeType,
+          ContentLength: tamanhoBytes,
         }),
         { expiresIn: ambiente.S3_UPLOAD_URL_EXPIRA_S },
       );

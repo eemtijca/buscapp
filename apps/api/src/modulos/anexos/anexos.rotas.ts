@@ -7,6 +7,7 @@ import {
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { ambiente } from '../../ambiente.js';
+import { assinaturaConfere } from '../../nucleo/armazenamento/magic-bytes.js';
 import { armazenamento, nomeSeguro, normalizarChave } from '../../nucleo/armazenamento/index.js';
 import { autenticar, exigirPapel, usuarioAtual } from '../../nucleo/autenticacao/middleware.js';
 import { prisma } from '../../nucleo/banco/cliente.js';
@@ -53,7 +54,11 @@ export const rotasAnexos: FastifyPluginAsyncZod = async (app) => {
 
       const usuario = usuarioAtual(pedido);
       const chave = normalizarChave(gerarChaveAnexo(usuario.id, nomeSeguro(dados.nome_arquivo)));
-      const { url, expiraEm } = await armazenamentoAtual.criarUrlUpload(chave, dados.mime_type);
+      const { url, expiraEm } = await armazenamentoAtual.criarUrlUpload(
+        chave,
+        dados.mime_type,
+        dados.tamanho_bytes,
+      );
 
       return { upload: { chave, url, expira_em: expiraEm.toISOString() } };
     },
@@ -107,6 +112,17 @@ export const rotasAnexos: FastifyPluginAsyncZod = async (app) => {
         throw new ErroHttp(400, 'tipo_invalido', 'O tipo do arquivo enviado não confere.');
       }
 
+      const trecho = armazenamentoAtual.lerTrecho
+        ? await armazenamentoAtual.lerTrecho(chave, 16)
+        : await armazenamentoAtual.ler(chave);
+      if (!assinaturaConfere(trecho, dados.mime_type)) {
+        throw new ErroHttp(
+          400,
+          'tipo_invalido',
+          'O conteúdo do arquivo não corresponde ao tipo declarado.',
+        );
+      }
+
       const anexo = await prisma.anexos.create({
         data: {
           storage_path: chave,
@@ -150,6 +166,13 @@ export const rotasAnexos: FastifyPluginAsyncZod = async (app) => {
       if (conteudo.length > TAMANHO_MAXIMO) {
         throw new ErroHttp(413, 'arquivo_grande', 'O arquivo excede o limite de 10 MB.');
       }
+      if (!assinaturaConfere(conteudo, arquivo.mimetype)) {
+        throw new ErroHttp(
+          400,
+          'tipo_invalido',
+          'O conteúdo do arquivo não corresponde ao tipo declarado.',
+        );
+      }
 
       const usuario = usuarioAtual(pedido);
       const chave = normalizarChave(gerarChaveAnexo(usuario.id, nomeSeguro(arquivo.filename)));
@@ -183,14 +206,18 @@ export const rotasAnexos: FastifyPluginAsyncZod = async (app) => {
     async (pedido, resposta) => {
       const anexo = await garantirAcessoAnexo(usuarioAtual(pedido), pedido.params.id);
       const fluxo = await armazenamento().lerFluxo(anexo.storage_path);
+      const exibivel = anexo.mime_type.startsWith('image/');
 
       return resposta
         .header('Content-Type', anexo.mime_type)
         .header('Content-Length', String(anexo.tamanho_bytes))
         .header(
           'Content-Disposition',
-          `inline; filename="${encodeURIComponent(anexo.nome_arquivo)}"`,
+          `${exibivel ? 'inline' : 'attachment'}; filename="${encodeURIComponent(anexo.nome_arquivo)}"`,
         )
+        // Conteúdo enviado por usuário: nunca deve ser interpretado como documento no domínio da API.
+        .header('Content-Security-Policy', 'sandbox')
+        .header('X-Content-Type-Options', 'nosniff')
         .header('Cache-Control', 'private, no-store')
         .send(fluxo);
     },

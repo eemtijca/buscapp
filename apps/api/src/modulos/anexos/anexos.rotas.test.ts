@@ -117,7 +117,10 @@ describe('upload direto de anexos', () => {
 
 describe('anexo multipart', () => {
   it('envia, lê em streaming e remove o arquivo', async () => {
-    const conteudo = Buffer.from('conteudo-pdf-de-teste-com-streaming');
+    const conteudo = Buffer.concat([
+      Buffer.from('%PDF-1.7\n'),
+      Buffer.from('conteudo-pdf-de-teste-com-streaming'),
+    ]);
     const { boundary, payload } = corpoMultipart('teste.pdf', 'application/pdf', conteudo);
 
     const envio = await app.inject({
@@ -140,6 +143,9 @@ describe('anexo multipart', () => {
     });
     expect(leitura.statusCode).toBe(200);
     expect(leitura.headers['content-type']).toContain('application/pdf');
+    expect(leitura.headers['x-content-type-options']).toBe('nosniff');
+    expect(leitura.headers['content-security-policy']).toBe('sandbox');
+    expect(String(leitura.headers['content-disposition'])).toContain('attachment');
     expect(leitura.rawPayload.equals(conteudo)).toBe(true);
 
     const remocao = await app.inject({
@@ -155,5 +161,21 @@ describe('anexo multipart', () => {
       cookies: { buscapp_sessao: cookieGestao },
     });
     expect(apagado.statusCode).toBe(404);
+  });
+
+  it('recusa conteúdo que não corresponde ao tipo declarado', async () => {
+    const conteudo = Buffer.from('<html><script>alert(1)</script></html>');
+    const { boundary, payload } = corpoMultipart('falsa.png', 'image/png', conteudo);
+
+    const envio = await app.inject({
+      method: 'POST',
+      url: '/api/anexos',
+      cookies: { buscapp_sessao: cookieGestao },
+      headers: { 'content-type': `multipart/form-data; boundary=${boundary}` },
+      payload,
+    });
+
+    expect(envio.statusCode).toBe(400);
+    expect(envio.json().erro.codigo).toBe('tipo_invalido');
   });
 });

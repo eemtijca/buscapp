@@ -178,7 +178,10 @@ export async function enviarAnexo<T = { anexo: { id: string } }>(
     if (erro instanceof ErroApi && erro.codigo === 'upload_direto_indisponivel') {
       return enviarArquivo<T>('/api/anexos', arquivo, nome);
     }
-    // Falha de rede/CORS no PUT também recorre ao multipart.
+    // Falha do provedor (403, URL expirada) ou de rede no PUT também recorre ao multipart.
+    if (erro instanceof ErroApi && erro.codigo === 'upload_falhou') {
+      return enviarArquivo<T>('/api/anexos', arquivo, nome);
+    }
     if (erro instanceof TypeError) {
       return enviarArquivo<T>('/api/anexos', arquivo, nome);
     }

@@ -30,10 +30,32 @@ import { rotasOcorrencias } from './modulos/ocorrencias/ocorrencias.rotas.js';
 import { rotasUsuarios } from './modulos/usuarios/usuarios.rotas.js';
 import { rotasVinculos } from './modulos/vinculos/vinculos.rotas.js';
 
+/** Código do envelope para erros 4xx gerados pelo próprio Fastify. */
+function codigoDoFastify(status: number): string {
+  if (status === 413) return 'payload_grande';
+  if (status === 415) return 'tipo_nao_suportado';
+  if (status === 429) return 'muitas_requisicoes';
+  return 'requisicao_invalida';
+}
+
+/** Mensagem do envelope para erros 4xx gerados pelo próprio Fastify. */
+function mensagemDoFastify(status: number): string {
+  if (status === 413) return 'O corpo da requisição excede o limite permitido.';
+  if (status === 415) return 'Tipo de conteúdo não suportado.';
+  if (status === 429) return 'Muitas requisições. Aguarde e tente novamente.';
+  return 'Requisição inválida.';
+}
+
 /** Monta a aplicação Fastify; exposta separadamente para testes com `inject`. */
-export async function construirApp(): Promise<FastifyInstance> {
-  const app = Fastify({
+export async function construirApp(): Promise<FastifyInstance> {  const app = Fastify({
     trustProxy: ambiente.TRUST_PROXY,
+    // O corpo JSON fica limitado a 1 MB; o multipart de anexos tem limite próprio de 10 MB.
+    bodyLimit: 1024 * 1024,
+    keepAliveTimeout: 72_000,
+    connectionTimeout: 0,
+    // Sem timeout de requisição: o SSE permanece aberto e é encerrado pela função ou pelo cliente.
+    requestTimeout: 0,
+    pluginTimeout: 10_000,
     logger:
       ambiente.NODE_ENV === 'test'
         ? false
@@ -63,6 +85,15 @@ export async function construirApp(): Promise<FastifyInstance> {
     if (erro.validation) {
       resposta.status(400).send({
         erro: { codigo: 'validacao', mensagem: erro.message },
+      });
+      return;
+    }
+
+    // Erros do próprio Fastify (JSON malformado, corpo grande, tipo não suportado) mantêm o status.
+    const status = erro.statusCode ?? 500;
+    if (status >= 400 && status < 500) {
+      resposta.status(status).send({
+        erro: { codigo: codigoDoFastify(status), mensagem: mensagemDoFastify(status) },
       });
       return;
     }

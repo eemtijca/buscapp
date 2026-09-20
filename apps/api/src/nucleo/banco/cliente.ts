@@ -10,6 +10,12 @@ function criarCliente(url: string) {
     connectionString: url,
     max: ambiente.DB_POOL_MAX,
     idleTimeoutMillis: 10_000,
+    // Sem tempo máximo de espera por conexão, uma requisição ficaria pendurada com o pool esgotado.
+    connectionTimeoutMillis: 10_000,
+    // Limites por conexão: declaração, consulta do cliente e transação ociosa.
+    statement_timeout: 15_000,
+    query_timeout: 15_000,
+    idle_in_transaction_session_timeout: 10_000,
   });
 
   // Na Vercel/Fluid, libera as conexões ociosas antes de a instância ser suspensa.

@@ -12,6 +12,7 @@ import { assinaturaConfere } from '../../nucleo/armazenamento/magic-bytes.js';
 import { armazenamento, nomeSeguro, normalizarChave } from '../../nucleo/armazenamento/index.js';
 import { autenticar, exigirPapel, usuarioAtual } from '../../nucleo/autenticacao/middleware.js';
 import { prisma } from '../../nucleo/banco/cliente.js';
+import { publicarEvento } from '../../nucleo/eventos/barramento.js';
 import { ErroHttp } from '../../nucleo/http/erros.js';
 import { garantirAcessoAnexo, gerarChaveAnexo, paraAnexo } from './anexos.servico.js';
 
@@ -269,10 +270,13 @@ export const rotasAnexos: FastifyPluginAsyncZod = async (app) => {
         throw new ErroHttp(403, 'nao_autorizado', 'Sem permissão para remover este anexo.');
       }
 
+      // O registro sai primeiro: se a remoção do objeto falhar, sobra um órfão no storage
+      // (tratado pelo expurgo) em vez de um registro apontando para arquivo inexistente.
+      await prisma.anexos.delete({ where: { id: anexo.id } });
+      publicarEvento({ tabela: 'anexos' });
       await armazenamento()
         .remover(anexo.storage_path)
         .catch(() => undefined);
-      await prisma.anexos.delete({ where: { id: anexo.id } });
       await auditar({
         usuarioId: usuario.id,
         acao: 'REMOVER_ANEXO',

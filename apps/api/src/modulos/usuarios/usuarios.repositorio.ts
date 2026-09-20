@@ -1,4 +1,4 @@
-import type { AtualizarUsuario, CriarUsuario, ListarUsuarios } from '@buscapp/contratos';
+import type { AtualizarUsuario, ListarUsuarios } from '@buscapp/contratos';
 import { prisma } from '../../nucleo/banco/cliente.js';
 
 /**
@@ -43,29 +43,6 @@ export async function buscarUsuarioPorId(id: string) {
   return prisma.perfis.findUnique({ where: { id }, select: SELECT_PERFIL });
 }
 
-export async function criarUsuario(
-  id: string,
-  email: string,
-  dados: CriarUsuario,
-  senhaHash: string,
-) {
-  return prisma.perfis.create({
-    data: {
-      id,
-      nome: dados.nome,
-      email,
-      papel: dados.papel,
-      status: 'pendente',
-      telefone: dados.telefone ?? null,
-      cargo: dados.cargo ?? null,
-      acesso_modulos: dados.acesso_modulos ?? [],
-      senha_hash: senhaHash,
-      senha_alterada_em: new Date(),
-    },
-    select: SELECT_PERFIL,
-  });
-}
-
 export async function atualizarUsuario(
   id: string,
   dados: AtualizarUsuario,
@@ -89,8 +66,4 @@ export async function atualizarUsuario(
 
 export async function atualizarStatusUsuario(id: string, status: 'ativo' | 'inativo') {
   return prisma.perfis.update({ where: { id }, data: { status }, select: SELECT_PERFIL });
-}
-
-export async function excluirUsuario(id: string) {
-  return prisma.perfis.delete({ where: { id } });
 }

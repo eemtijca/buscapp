@@ -1,4 +1,5 @@
 import { createHmac, randomInt, timingSafeEqual } from 'node:crypto';
+import type { Prisma } from '../../../generated/prisma/client.js';
 import { ambiente } from '../../ambiente.js';
 import { prismaAdmin } from '../banco/cliente.js';
 import { gerarHashSenha } from './senhas.js';
@@ -117,22 +118,24 @@ export async function limparTentativas(email: string): Promise<void> {
 export async function gerarCodigoRedefinicao(
   perfilId: string,
   criadoPor?: string,
+  cliente?: Prisma.TransactionClient,
 ): Promise<string> {
-  const perfil = await prismaAdmin.perfis.findUnique({ where: { id: perfilId } });
+  const db = (cliente ?? prismaAdmin) as Prisma.TransactionClient;
+  const perfil = await db.perfis.findUnique({ where: { id: perfilId } });
   if (!perfil?.email) throw new Error('Perfil sem email não pode receber código de redefinição.');
 
   const email = perfil.email.toLowerCase();
-  const config = await prismaAdmin.configuracoes_sistema.findUnique({ where: { id: 1 } });
+  const config = await db.configuracoes_sistema.findUnique({ where: { id: 1 } });
   const validadeMinutos = config?.minutos_validade_codigo ?? 60;
   const agora = new Date();
 
-  await prismaAdmin.codigos_redefinicao.updateMany({
+  await db.codigos_redefinicao.updateMany({
     where: { email, usado_em: null, revogado_em: null, expira_em: { gt: agora } },
     data: { revogado_em: agora, expira_em: agora },
   });
 
   const codigo = gerarCodigo();
-  await prismaAdmin.codigos_redefinicao.create({
+  await db.codigos_redefinicao.create({
     data: {
       email,
       perfil_id: perfil.id,

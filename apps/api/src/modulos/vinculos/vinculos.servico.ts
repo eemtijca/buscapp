@@ -73,6 +73,9 @@ export async function criar(dados: CriarVinculo): Promise<VinculoResponsavel> {
     if ((erro as { code?: string }).code === 'P2002') {
       throw new ErroHttp(409, 'vinculo_duplicado', 'Este responsável já está vinculado ao aluno.');
     }
+    if ((erro as { code?: string }).code === 'P2003') {
+      throw new ErroHttp(400, 'referencia_invalida', 'Responsável ou aluno inexistente.');
+    }
     throw erro;
   }
 }

@@ -8,6 +8,7 @@ import type {
 } from '@buscapp/contratos';
 import { gerarCodigoRedefinicao } from '../../nucleo/autenticacao/codigos.js';
 import { auditar } from '../../nucleo/auditoria/registrar.js';
+import { prismaAdmin } from '../../nucleo/banco/cliente.js';
 import { gerarHashSenha } from '../../nucleo/autenticacao/senhas.js';
 import { revogarSessoesDoPerfil } from '../../nucleo/autenticacao/sessoes.js';
 import { publicarEvento } from '../../nucleo/eventos/barramento.js';
@@ -16,8 +17,6 @@ import {
   atualizarStatusUsuario,
   atualizarUsuario,
   buscarUsuarioPorId,
-  criarUsuario,
-  excluirUsuario,
   listarUsuarios,
 } from './usuarios.repositorio.js';
 
@@ -113,32 +112,43 @@ export async function criar(dados: CriarUsuario, criadoPor: string): Promise<Usu
   const email = dados.email.toLowerCase();
   const senhaTemporaria = gerarSenhaTemporaria();
   const id = randomUUID();
+  const senhaHash = await gerarHashSenha(senhaTemporaria);
 
-  let perfil: PerfilBruto;
-  try {
-    perfil = await criarUsuario(id, email, dados, await gerarHashSenha(senhaTemporaria));
-  } catch (erro) {
-    traduzirErroBanco(erro);
-  }
-
-  let codigo: string;
-  try {
-    codigo = await gerarCodigoRedefinicao(id, criadoPor);
-  } catch (erro) {
-    // Compensa a criação para não deixar usuário sem código de acesso.
-    await excluirUsuario(id).catch(() => undefined);
-    throw erro;
-  }
+  // Usuário e código são criados na mesma transação: não há estado parcial.
+  const resultado = await prismaAdmin
+    .$transaction(async (tx) => {
+      const perfil = await tx.perfis.create({
+        data: {
+          id,
+          nome: dados.nome,
+          email,
+          papel: dados.papel,
+          status: 'pendente',
+          telefone: dados.telefone ?? null,
+          cargo: dados.cargo ?? null,
+          acesso_modulos: dados.acesso_modulos ?? [],
+          senha_hash: senhaHash,
+          senha_alterada_em: new Date(),
+        },
+      });
+      const codigo = await gerarCodigoRedefinicao(id, criadoPor, tx);
+      return { perfil, codigo };
+    })
+    .catch((erro: unknown) => traduzirErroBanco(erro));
 
   publicarEvento({ tabela: 'perfis' });
   await auditar({
     usuarioId: criadoPor,
     acao: 'CRIAR_USUARIO',
     entidade: 'perfis',
-    entidadeId: perfil.id,
-    dadosNovos: { email, papel: perfil.papel, status: perfil.status },
+    entidadeId: resultado.perfil.id,
+    dadosNovos: { email, papel: resultado.perfil.papel, status: resultado.perfil.status },
   });
-  return { usuario: paraUsuario(perfil), codigo, senha_temporaria: senhaTemporaria };
+  return {
+    usuario: paraUsuario(resultado.perfil),
+    codigo: resultado.codigo,
+    senha_temporaria: senhaTemporaria,
+  };
 }
 
 export async function atualizar(

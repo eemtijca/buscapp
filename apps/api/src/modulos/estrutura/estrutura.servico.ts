@@ -442,13 +442,25 @@ export async function criarEnturmacao(dados: CriarEnturmacao): Promise<Enturmaca
   const turma = await buscarTurmaPorId(dados.turma_id);
   if (!turma) throw erroNaoEncontrado('Turma não encontrada.');
 
-  const enturmacao = await enturmarAluno({
-    aluno_id: dados.aluno_id,
-    turma_id: dados.turma_id,
-    ano_letivo_id: turma.ano_letivo_id,
-    data_matricula: dados.data_matricula ? dataDeEntrada(dados.data_matricula) : hojeUtc(),
-    observacoes: dados.observacoes ?? null,
-  });
+  let enturmacao;
+  try {
+    enturmacao = await enturmarAluno({
+      aluno_id: dados.aluno_id,
+      turma_id: dados.turma_id,
+      ano_letivo_id: turma.ano_letivo_id,
+      data_matricula: dados.data_matricula ? dataDeEntrada(dados.data_matricula) : hojeUtc(),
+      observacoes: dados.observacoes ?? null,
+    });
+  } catch (erro) {
+    if ((erro as { code?: string }).code === 'P2002') {
+      throw new ErroHttp(
+        409,
+        'enturmacao_duplicada',
+        'O aluno já possui enturmação neste ano letivo.',
+      );
+    }
+    throw erro;
+  }
 
   publicarEvento({ tabela: 'enturmacoes' });
   return paraEnturmacao(enturmacao);

@@ -62,7 +62,16 @@ export async function marcarLida(destinatarioId: string, id: string): Promise<No
   const existente = await buscarNotificacaoDoUsuario(id, destinatarioId);
   if (!existente) throw erroNaoEncontrado('Notificação não encontrada.');
 
-  const notificacao = paraNotificacao(await marcarNotificacaoComoLida(id));
+  let notificacao: Notificacao;
+  try {
+    notificacao = paraNotificacao(await marcarNotificacaoComoLida(id));
+  } catch (erro) {
+    // Remoção concorrente entre a leitura e a escrita.
+    if ((erro as { code?: string }).code === 'P2025') {
+      throw erroNaoEncontrado('Notificação não encontrada.');
+    }
+    throw erro;
+  }
   publicarAtualizacao(destinatarioId);
   return notificacao;
 }

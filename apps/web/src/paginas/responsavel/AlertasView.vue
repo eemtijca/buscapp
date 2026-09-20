@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch, nextTick } from 'vue';
+import { computed, ref } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import {
   useAlertasResponsavel,
@@ -12,13 +12,28 @@ import type { AlertaResponsavel } from '@/tipos/componentes';
 
 const router = useRouter();
 const route = useRoute();
-const { alertas, pendente, atualizando, recarregar } = useAlertasResponsavel();
+const { alertas, pendente, atualizando, erro, recarregar } = useAlertasResponsavel();
 const { justificativas } = useJustificativasPendentes();
 const { tags } = useTags();
 
 const alertaSelecionado = ref<AlertaResponsavel | null>(null);
 const mostrarModal = ref(false);
 const anexoSelecionado = ref<{ id: string; nome: string; mime?: string } | null>(null);
+const mensagemErro = ref<string | null>(null);
+
+/** Deep-link da notificação: mostra apenas os alertas do aluno informado. */
+const alunoFiltro = computed(() => (route.query.aluno as string | undefined) || null);
+const alertasVisiveis = computed(() =>
+  alunoFiltro.value ? alertas.value.filter((alerta) => alerta.alunoId === alunoFiltro.value) : alertas.value,
+);
+const nomeAlunoFiltro = computed(() => {
+  const alerta = alertas.value.find((registro) => registro.alunoId === alunoFiltro.value);
+  return alerta?.titulo ?? null;
+});
+
+function limparFiltroAluno() {
+  void router.replace({ path: '/responsavel/alertas' });
+}
 
 const tagsMap = computed<Record<string, { rotulo: string; icone: string }>>(() => {
   const mapa: Record<string, { rotulo: string; icone: string }> = {};
@@ -49,7 +64,11 @@ function verAnexo(alertaId: string) {
   const alerta = alertas.value.find((a) => a.id === alertaId);
   if (!alerta?.anexoPath) return;
   const anexoId = anexoIdPorPath.value.get(alerta.anexoPath);
-  if (!anexoId) return;
+  if (!anexoId) {
+    mensagemErro.value = 'O anexo ainda não está disponível. Tente atualizar a lista.';
+    setTimeout(() => (mensagemErro.value = null), 5000);
+    return;
+  }
   anexoSelecionado.value = {
     id: anexoId,
     nome: alerta.anexoNome ?? 'anexo',
@@ -70,32 +89,9 @@ function fecharModal() {
   alertaSelecionado.value = null;
 }
 
-/** Destaca os alertas via ?aluno= (deep-link da notificação). */
-function destacarAlertaDeepLink() {
-  const alunoId = route.query.aluno as string | undefined;
-  if (!alunoId || !alertas.value.length) return;
-  // Se houver filtro por aluno, destaca o primeiro card visível
-  const primeiro = document.querySelector('.row.g-3 .col-12');
-  if (primeiro) {
-    primeiro.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    primeiro.classList.add('ring', 'ring-primary');
-    setTimeout(() => primeiro.classList.remove('ring', 'ring-primary'), 2500);
-  }
-}
-
 async function atualizarManual() {
   await recarregar();
 }
-
-// O destaque por deep-link depende dos alertas já renderizados.
-watch(alertas, () => void nextTick(destacarAlertaDeepLink));
-
-watch(
-  () => route.query.aluno,
-  () => {
-    void nextTick(() => destacarAlertaDeepLink());
-  },
-);
 </script>
 
 <template>
@@ -143,24 +139,64 @@ watch(
       </div>
     </div>
 
-    <div v-else-if="!alertas.length" class="text-center py-5 text-body-secondary">
-      <span
-        class="d-inline-flex align-items-center justify-content-center rounded-circle bg-success-subtle mb-3"
-        style="width: 72px; height: 72px"
-      >
-        <i class="bi bi-check-circle fs-4 text-success" aria-hidden="true"></i>
+    <div
+      v-else-if="erro && !alertas.length"
+      class="alert alert-danger d-flex align-items-center justify-content-between gap-3"
+      role="alert"
+    >
+      <span>
+        <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>
+        Não foi possível carregar os alertas. Verifique a conexão e tente novamente.
       </span>
-      <p class="mb-0 small">Nenhum alerta no momento. Seu filho está com frequência regular.</p>
+      <button type="button" class="btn btn-sm btn-outline-danger" @click="recarregar">
+        Tentar novamente
+      </button>
     </div>
 
-    <div v-else class="row g-3">
-      <div v-for="alerta in alertas" :key="alerta.id" class="col-12 col-md-6">
-        <CartaoAlertaResponsavel
-          :alerta="alerta"
-          @enviar-justificativa="abrirJustificativa"
-          @ver-anexo="verAnexo"
-          @ver-detalhes="verDetalhes"
-        />
+    <div v-else>
+      <div v-if="mensagemErro" class="alert alert-warning py-2 small" role="alert">
+        <i class="bi bi-exclamation-circle me-1" aria-hidden="true"></i>
+        {{ mensagemErro }}
+      </div>
+
+      <div
+        v-if="alunoFiltro && alertas.length"
+        class="alert alert-info d-flex align-items-center justify-content-between gap-2 py-2 small"
+        role="status"
+      >
+        <span>
+          Mostrando os alertas de <strong>{{ nomeAlunoFiltro ?? 'um dependente' }}</strong>.
+        </span>
+        <button type="button" class="btn btn-sm btn-outline-secondary" @click="limparFiltroAluno">
+          Ver todos
+        </button>
+      </div>
+
+      <div v-if="!alertasVisiveis.length" class="text-center py-5 text-body-secondary">
+        <span
+          class="d-inline-flex align-items-center justify-content-center rounded-circle bg-success-subtle mb-3"
+          style="width: 72px; height: 72px"
+        >
+          <i class="bi bi-check-circle fs-4 text-success" aria-hidden="true"></i>
+        </span>
+        <p class="mb-0 small">
+          {{
+            alunoFiltro
+              ? 'Nenhum alerta para este dependente no momento.'
+              : 'Nenhum alerta no momento. Seu filho está com frequência regular.'
+          }}
+        </p>
+      </div>
+
+      <div v-else class="row g-3">
+        <div v-for="alerta in alertasVisiveis" :key="alerta.id" class="col-12 col-md-6">
+          <CartaoAlertaResponsavel
+            :alerta="alerta"
+            @enviar-justificativa="abrirJustificativa"
+            @ver-anexo="verAnexo"
+            @ver-detalhes="verDetalhes"
+          />
+        </div>
       </div>
     </div>
 

@@ -25,6 +25,7 @@ interface ResumoConsulta {
   pendente: ComputedRef<boolean>;
   atualizando: ComputedRef<boolean>;
   atualizadoEm: ComputedRef<number | null>;
+  erro: ComputedRef<unknown>;
   recarregar: () => Promise<void>;
 }
 
@@ -38,6 +39,7 @@ function resumir(consultas: ResultadoConsulta<unknown>[]): ResumoConsulta {
         .filter((valor): valor is number => valor !== null);
       return tempos.length ? Math.max(...tempos) : null;
     }),
+    erro: computed(() => consultas.find((consulta) => consulta.erro.value)?.erro.value ?? null),
     recarregar: () =>
       Promise.all(consultas.map((consulta) => consulta.recarregar(true))).then(() => undefined),
   };
@@ -237,6 +239,7 @@ export function useRankingRisco(): {
   ranking: ComputedRef<AlunoRisco[]>;
   pendente: Ref<boolean>;
   atualizando: Ref<boolean>;
+  erro: ComputedRef<unknown>;
   recarregar: () => Promise<void>;
 } {
   const { configTermometro } = useConfiguracaoSistema();
@@ -521,6 +524,7 @@ export function useAlertasResponsavel(): {
   alertas: ComputedRef<AlertaResponsavel[]>;
   pendente: Ref<boolean>;
   atualizando: Ref<boolean>;
+  erro: ComputedRef<unknown>;
   recarregar: () => Promise<void>;
 } {
   const consultaFilhos = useConsulta(() => Consultas.alunos());
@@ -595,6 +599,7 @@ export function useAlertasResponsavel(): {
 
         lista.push({
           id: `freq-${ausencia.id}`,
+          alunoId: filho.id,
           tipo:
             ausencia.periodo === 'Dia completo' || !ausencia.periodo
               ? 'ausencia_escola'
@@ -617,6 +622,7 @@ export function useAlertasResponsavel(): {
         const { data } = formatarDataHorario(ocorrencia.created_at);
         lista.push({
           id: `oc-${ocorrencia.id}`,
+          alunoId: filho.id,
           tipo: ocorrencia.tipo.includes('suspensao') ? 'suspensao' : 'comunicado',
           titulo: filho.nome,
           descricao: ocorrencia.descricao,

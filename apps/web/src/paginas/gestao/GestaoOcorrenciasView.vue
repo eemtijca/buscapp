@@ -87,10 +87,6 @@ async function alternarBloqueio(ocorrenciaId: string) {
   }
 }
 
-function registrarSuspensao() {
-  mostrarSucesso('Encaminhado para formalização de suspensão.');
-}
-
 function alternarFormulario() {
   if (mostrarFormulario.value && temDadosOcorrencia.value) {
     confirmarCancelar.value = true;
@@ -328,7 +324,6 @@ async function registrarOcorrencia() {
           v-else
           :ocorrencias="ocorrencias"
           @bloquear-retorno="alternarBloqueio"
-          @registrar-suspensao="registrarSuspensao"
         />
       </div>
     </div>

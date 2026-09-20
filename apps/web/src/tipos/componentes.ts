@@ -187,6 +187,7 @@ export interface EstatisticaPainel {
 /** Alerta exibido no painel do responsável. */
 export interface AlertaResponsavel {
   id: string;
+  alunoId: string;
   tipo: 'ausencia_escola' | 'ausencia_aula' | 'suspensao' | 'comunicado';
   titulo: string;
   descricao: string;

@@ -7,7 +7,7 @@ import CartaoAlunoRisco from '@/componentes/CartaoAlunoRisco.vue';
 import type { AlunoRisco } from '@/tipos/componentes';
 
 const router = useRouter();
-const { ranking, pendente, atualizando, recarregar } = useRankingRisco();
+const { ranking, pendente, atualizando, erro, recarregar } = useRankingRisco();
 
 const filtroRisco = ref<'todos' | 'alto' | 'medio' | 'baixo'>('todos');
 const buscaAluno = ref('');
@@ -52,6 +52,11 @@ async function abrirChat(alunoId: string) {
 }
 
 async function registrarFalta(alunoId: string) {
+  await router.push({ path: '/gestao/infrequencias', query: { aluno: alunoId } });
+}
+
+/** O ranking não tem tela de detalhes própria: leva ao histórico de infrequências do aluno. */
+async function abrirDetalhes(alunoId: string) {
   await router.push({ path: '/gestao/infrequencias', query: { aluno: alunoId } });
 }
 </script>
@@ -172,6 +177,16 @@ async function registrarFalta(alunoId: string) {
       <p class="mt-2 text-body-secondary small mb-0">Calculando prioridades...</p>
     </div>
 
+    <div v-else-if="erro && !ranking.length" class="alert alert-danger d-flex align-items-center justify-content-between gap-3">
+      <span>
+        <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>
+        Não foi possível carregar o ranking. Verifique a conexão e tente novamente.
+      </span>
+      <button type="button" class="btn btn-sm btn-outline-danger" @click="recarregar">
+        Tentar novamente
+      </button>
+    </div>
+
     <div v-else-if="!ranking.length" class="text-center py-5 text-body-secondary">
       <span
         class="d-inline-flex align-items-center justify-content-center rounded-circle bg-body-tertiary mb-3"
@@ -199,6 +214,7 @@ async function registrarFalta(alunoId: string) {
         :aluno="aluno"
         @chat="abrirChat"
         @registrar-falta="registrarFalta"
+        @ver-detalhes="abrirDetalhes"
       />
     </div>
   </div>

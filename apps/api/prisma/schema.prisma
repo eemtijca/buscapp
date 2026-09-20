@@ -613,6 +613,16 @@ model pontuacao_turmas {
   @@index([ano_letivo_id, mes_referencia, pontos_total(sort: Desc)], map: "idx_pontuacao_ranking")
 }
 
+/// Contadores operacionais do rate limiting, compartilhados entre instâncias.
+/// Sem dado pessoal e sem RLS: também é consultado em contexto anônimo (login).
+model rate_limit_contadores {
+  chave     String   @id
+  contagem  Int      @default(0)
+  expira_em DateTime @db.Timestamptz(6)
+
+  @@index([expira_em], map: "idx_rate_limit_expira")
+}
+
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model registro_comportamento_tags {

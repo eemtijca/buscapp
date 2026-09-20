@@ -25,6 +25,7 @@ export const rotasAnexos: FastifyPluginAsyncZod = async (app) => {
     '/api/anexos/upload',
     {
       preHandler: [autenticar, exigirPapel('gestao', 'responsavel', 'professor')],
+      config: { rateLimit: { max: 20, timeWindow: '1 hour' } },
       schema: {
         tags: ['anexos'],
         summary: 'Gera URL pré-assinada para envio direto de um anexo ao provedor',
@@ -62,6 +63,7 @@ export const rotasAnexos: FastifyPluginAsyncZod = async (app) => {
     '/api/anexos/confirmar',
     {
       preHandler: [autenticar, exigirPapel('gestao', 'responsavel', 'professor')],
+      config: { rateLimit: { max: 20, timeWindow: '1 hour' } },
       schema: {
         tags: ['anexos'],
         summary: 'Confirma um anexo enviado direto ao provedor e registra os metadados',
@@ -124,6 +126,7 @@ export const rotasAnexos: FastifyPluginAsyncZod = async (app) => {
     '/api/anexos',
     {
       preHandler: [autenticar, exigirPapel('gestao', 'responsavel', 'professor')],
+      config: { rateLimit: { max: 20, timeWindow: '1 hour' } },
       schema: {
         tags: ['anexos'],
         summary: 'Envia um anexo (imagem ou PDF)',

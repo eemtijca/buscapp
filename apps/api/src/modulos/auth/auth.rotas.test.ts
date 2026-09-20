@@ -53,6 +53,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await prisma.sessoes.deleteMany({ where: { perfil_id: { in: [gestaoId, profId, pendenteId] } } });
   await prisma.notificacoes.deleteMany({ where: { destinatario_id: gestaoId } });
+  await prisma.$executeRawUnsafe('delete from public.rate_limit_contadores');
   await prisma.codigos_redefinicao.deleteMany({
     where: { perfil_id: { in: [gestaoId, profId, pendenteId] } },
   });
@@ -120,6 +121,27 @@ describe('POST /api/auth/login', () => {
     });
     expect(resposta.statusCode).toBe(403);
     expect(resposta.json().erro.codigo).toBe('conta_pendente');
+  });
+
+  it('bloqueia tentativas repetidas de login', async () => {
+    const email = `limite.${marcador}@escola.edu.br`;
+
+    for (let tentativa = 0; tentativa < 10; tentativa += 1) {
+      const resposta = await app.inject({
+        method: 'POST',
+        url: '/api/auth/login',
+        payload: { email, senha: 'Errada1!' },
+      });
+      expect(resposta.statusCode).toBe(401);
+    }
+
+    const bloqueada = await app.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      payload: { email, senha: 'Errada1!' },
+    });
+    expect(bloqueada.statusCode).toBe(429);
+    expect(bloqueada.json().erro.codigo).toBe('muitas_requisicoes');
   });
 });
 

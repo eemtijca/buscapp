@@ -4,6 +4,7 @@ import cookie from '@fastify/cookie';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import multipart from '@fastify/multipart';
+import rateLimit from '@fastify/rate-limit';
 import fastifyStatic from '@fastify/static';
 import Fastify, { type FastifyError, type FastifyInstance } from 'fastify';
 import {
@@ -15,6 +16,7 @@ import { ambiente, origensPermitidas } from './ambiente.js';
 import { contextoBanco } from './nucleo/banco/contexto.js';
 import { registrarCacheHttp } from './nucleo/http/etag.js';
 import { ErroHttp } from './nucleo/http/erros.js';
+import { StoreRateLimitPostgres } from './nucleo/rate-limit/store-postgres.js';
 import { rotasEventos } from './nucleo/http/rotas-eventos.js';
 import { rotasSaude } from './nucleo/http/rotas-saude.js';
 import { rotasAlunos } from './modulos/alunos/alunos.rotas.js';
@@ -148,6 +150,20 @@ export async function construirApp(): Promise<FastifyInstance> {  const app = Fa
     maxAge: 86_400,
   });
   await app.register(multipart, { limits: { fileSize: 10 * 1024 * 1024, files: 1 } });
+  await app.register(rateLimit, {
+    // O limitador é opt-in por rota; apenas autenticação e uploads usam o store.
+    global: false,
+    hook: 'preHandler',
+    store: StoreRateLimitPostgres,
+    // Indisponibilidade do store não derruba a API; o erro é registrado e a requisição segue.
+    skipOnError: true,
+    errorResponseBuilder: (_pedido, contexto) => ({
+      erro: {
+        codigo: 'muitas_requisicoes',
+        mensagem: `Muitas requisições. Tente novamente em ${contexto.after}.`,
+      },
+    }),
+  });
   await app.register(rotasSaude);
   await app.register(rotasEventos);
   await app.register(rotasAuth);

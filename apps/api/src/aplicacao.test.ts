@@ -84,3 +84,24 @@ describe('cabeçalhos de segurança', () => {
     expect(String(resposta.headers['content-security-policy'])).toContain("frame-ancestors 'none'");
   });
 });
+
+describe('saúde, correlação e métricas', () => {
+  it('responde readiness com o banco disponível', async () => {
+    const resposta = await app.inject({ method: 'GET', url: '/api/saude/pronto' });
+
+    expect(resposta.statusCode).toBe(200);
+    expect(resposta.json()).toEqual({ status: 'ok', banco: 'ok' });
+  });
+
+  it('devolve x-request-id na resposta', async () => {
+    const resposta = await app.inject({ method: 'GET', url: '/api/saude' });
+
+    expect(resposta.headers['x-request-id']).toBeTruthy();
+  });
+
+  it('protege as métricas para usuários anônimos', async () => {
+    const resposta = await app.inject({ method: 'GET', url: '/api/saude/metricas' });
+
+    expect(resposta.statusCode).toBe(401);
+  });
+});

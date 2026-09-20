@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { prismaAdmin as prisma } from './nucleo/banco/cliente.js';
+import { prisma as prismaRuntime, prismaAdmin as prisma } from './nucleo/banco/cliente.js';
 
 const marcador = Date.now();
 const anoAId = randomUUID();
@@ -145,5 +145,31 @@ describe('restrições de integridade', () => {
     await expect(
       prisma.turmas.update({ where: { id: turmaId }, data: { ano_letivo_id: anoBId } }),
     ).rejects.toThrow(/Não é possível alterar o ano letivo/);
+  });
+});
+
+describe('RLS e privilégios do papel de runtime', () => {
+  it('nega a leitura de senha_hash', async () => {
+    await expect(
+      prismaRuntime.$queryRawUnsafe('select senha_hash from public.perfis limit 1'),
+    ).rejects.toThrow(/permission denied/i);
+  });
+
+  it('esconde perfis sem contexto de sessão', async () => {
+    const linhas = await prismaRuntime.$queryRawUnsafe<Array<{ id: string }>>(
+      'select id from public.perfis limit 1',
+    );
+    expect(linhas).toHaveLength(0);
+  });
+
+  it('permite a leitura autenticada de perfis', async () => {
+    const linhas = await prismaRuntime.$transaction(async (tx) => {
+      await tx.$executeRawUnsafe("select set_config('app.usuario_id', $1, true)", perfilId);
+      return tx.$queryRawUnsafe<Array<{ id: string }>>(
+        'select id from public.perfis where id = $1',
+        perfilId,
+      );
+    });
+    expect(linhas).toHaveLength(1);
   });
 });

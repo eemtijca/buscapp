@@ -179,6 +179,11 @@ export async function encerrarBarramento(): Promise<void> {
   iniciado = false;
 }
 
+/** Quantidade de conexões SSE abertas nesta instância. */
+export function contarConexoes(): number {
+  return conexoes.size;
+}
+
 export function conectarEventos(
   usuarioId: string,
   resposta: FastifyReply,

@@ -17,6 +17,7 @@ import { contextoBanco } from './nucleo/banco/contexto.js';
 import { registrarCacheHttp } from './nucleo/http/etag.js';
 import { ErroHttp } from './nucleo/http/erros.js';
 import { encerrarBarramento, iniciarBarramento } from './nucleo/eventos/barramento.js';
+import { registrarRequisicao } from './nucleo/http/metricas.js';
 import { StoreRateLimitPostgres } from './nucleo/rate-limit/store-postgres.js';
 import { rotasEventos } from './nucleo/http/rotas-eventos.js';
 import { rotasSaude } from './nucleo/http/rotas-saude.js';
@@ -60,11 +61,17 @@ export async function construirApp(): Promise<FastifyInstance> {  const app = Fa
     // Sem timeout de requisição: o SSE permanece aberto e é encerrado pela função ou pelo cliente.
     requestTimeout: 0,
     pluginTimeout: 10_000,
+    requestIdHeader: 'x-request-id',
     logger:
       ambiente.NODE_ENV === 'test'
         ? false
         : {
             level: ambiente.NODE_ENV === 'production' ? 'info' : 'debug',
+            redact: [
+              'req.headers.cookie',
+              'req.headers.authorization',
+              'res.headers["set-cookie"]',
+            ],
           },
   }).withTypeProvider<ZodTypeProvider>();
 
@@ -89,6 +96,18 @@ export async function construirApp(): Promise<FastifyInstance> {  const app = Fa
     return resposta.status(403).send({
       erro: { codigo: 'origem_invalida', mensagem: 'Origem não autorizada.' },
     });
+  });
+
+  // Identificador de correlação em todas as respostas, útil para rastrear logs.
+  app.addHook('onSend', (_pedido, resposta, payload, concluir) => {
+    resposta.header('x-request-id', resposta.request.id);
+    concluir(null, payload);
+  });
+
+  // Métricas mínimas por resposta: volume, erros e latência média.
+  app.addHook('onResponse', (pedido, resposta, concluir) => {
+    registrarRequisicao(resposta.statusCode, resposta.elapsedTime);
+    concluir();
   });
 
   app.setErrorHandler((erro: FastifyError, _pedido, resposta) => {

@@ -412,4 +412,17 @@ describe('sessões ativas', () => {
     expect(eu.statusCode).toBe(200);
     expect(eu.json().perfil).toBeNull();
   });
+
+  it('expõe as métricas operacionais para a gestão', async () => {
+    const token = await entrar(emailGestao);
+    const resposta = await app.inject({
+      method: 'GET',
+      url: '/api/saude/metricas',
+      cookies: { buscapp_sessao: token },
+    });
+
+    expect(resposta.statusCode).toBe(200);
+    expect(resposta.json().requisicoes.total).toBeGreaterThan(0);
+    expect(resposta.json().conexoes_sse).toBe(0);
+  });
 });

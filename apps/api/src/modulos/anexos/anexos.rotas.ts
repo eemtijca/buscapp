@@ -136,16 +136,25 @@ export const rotasAnexos: FastifyPluginAsyncZod = async (app) => {
         );
       }
 
-      const anexo = await prisma.anexos.create({
-        data: {
-          storage_path: chave,
-          nome_arquivo: dados.nome_arquivo,
-          mime_type: dados.mime_type,
-          tamanho_bytes: info.tamanho,
-          criado_por: usuarioAtual(pedido).id,
-          expurgo_em: await expurgoEm(),
-        },
-      });
+      const anexo = await prisma.anexos
+        .create({
+          data: {
+            storage_path: chave,
+            nome_arquivo: dados.nome_arquivo,
+            mime_type: dados.mime_type,
+            tamanho_bytes: info.tamanho,
+            criado_por: usuarioAtual(pedido).id,
+            expurgo_em: await expurgoEm(),
+          },
+        })
+        .catch(async (erro: unknown) => {
+          // Corrida na confirmação: o índice único de storage_path devolve o registro vencedor.
+          if ((erro as { code?: string }).code === 'P2002') {
+            const vencedor = await prisma.anexos.findFirst({ where: { storage_path: chave } });
+            if (vencedor) return vencedor;
+          }
+          throw erro;
+        });
 
       await auditar({
         usuarioId: usuarioAtual(pedido).id,

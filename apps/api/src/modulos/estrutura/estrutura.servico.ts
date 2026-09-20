@@ -392,7 +392,16 @@ export async function atualizarAnoLetivo(
 }
 
 export async function ativarAnoLetivo(id: string, usuarioId: string): Promise<AnoLetivo> {
-  const resultado = await executarAtivacaoAnoLetivo(id, usuarioId);
+  let resultado;
+  try {
+    resultado = await executarAtivacaoAnoLetivo(id, usuarioId);
+  } catch (erro) {
+    // O índice único do ano ativo impede duas viradas concorrentes.
+    if ((erro as { code?: string }).code === 'P2002') {
+      throw new ErroHttp(409, 'virada_concorrente', 'Outro ano letivo foi ativado em paralelo.');
+    }
+    throw erro;
+  }
 
   if (resultado.tipo === 'nao_encontrado') throw erroNaoEncontrado('Ano letivo não encontrado.');
   if (resultado.tipo === 'ja_ativo') throw erroValidacao('Este ano letivo já está ativo.');

@@ -66,7 +66,7 @@ beforeAll(async () => {
     data: {
       id: anoId,
       ano: 2099,
-      status: 'ativo',
+      status: 'planejado',
       data_inicio: new Date('2099-02-01'),
       data_fim: new Date('2099-12-20'),
       ativo: false,

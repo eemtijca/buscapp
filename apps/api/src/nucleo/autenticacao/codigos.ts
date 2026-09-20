@@ -129,23 +129,31 @@ export async function gerarCodigoRedefinicao(
   const validadeMinutos = config?.minutos_validade_codigo ?? 60;
   const agora = new Date();
 
-  await db.codigos_redefinicao.updateMany({
-    where: { email, usado_em: null, revogado_em: null, expira_em: { gt: agora } },
-    data: { revogado_em: agora, expira_em: agora },
-  });
+  // Duas gerações concorrentes disputam o índice único de código ativo; a segunda tenta de novo.
+  for (let tentativa = 0; tentativa < 2; tentativa += 1) {
+    await db.codigos_redefinicao.updateMany({
+      where: { email, usado_em: null, revogado_em: null, expira_em: { gt: agora } },
+      data: { revogado_em: agora, expira_em: agora },
+    });
 
-  const codigo = gerarCodigo();
-  await db.codigos_redefinicao.create({
-    data: {
-      email,
-      perfil_id: perfil.id,
-      codigo_hash: hashCodigo(email, codigo),
-      criado_por: criadoPor ?? null,
-      expira_em: new Date(agora.getTime() + validadeMinutos * 60 * 1000),
-    },
-  });
+    const codigo = gerarCodigo();
+    try {
+      await db.codigos_redefinicao.create({
+        data: {
+          email,
+          perfil_id: perfil.id,
+          codigo_hash: hashCodigo(email, codigo),
+          criado_por: criadoPor ?? null,
+          expira_em: new Date(agora.getTime() + validadeMinutos * 60 * 1000),
+        },
+      });
+      return codigo;
+    } catch (erro) {
+      if ((erro as { code?: string }).code !== 'P2002' || tentativa === 1) throw erro;
+    }
+  }
 
-  return codigo;
+  throw new Error('Não foi possível gerar o código de redefinição.');
 }
 
 export interface DadosRedefinicao {

@@ -44,7 +44,7 @@ model alunos {
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model anexos {
   id                   String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  storage_path         String
+  storage_path         String                 @unique(map: "uq_anexos_storage_path")
   nome_arquivo         String
   mime_type            String
   tamanho_bytes        Int
@@ -81,6 +81,8 @@ model anos_letivos {
   pontuacao_turmas        pontuacao_turmas[]
   registros_comportamento registros_comportamento[]
   turmas                  turmas[]
+
+  @@unique([ativo], map: "uq_anos_letivo_ativo", where: raw("ativo"))
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
@@ -143,6 +145,7 @@ model codigos_redefinicao {
 
   @@index([email], map: "idx_codigos_redefinicao_email")
   @@index([email, codigo], map: "idx_codigos_redefinicao_email_codigo")
+  @@unique([email], map: "uq_codigo_ativo_email", where: raw("(usado_em IS NULL AND revogado_em IS NULL)"))
 }
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments

@@ -8,6 +8,7 @@ import type {
 } from '@buscapp/contratos';
 import type { PerfilAutenticado } from '../../nucleo/autenticacao/tipos.js';
 import { ambiente } from '../../ambiente.js';
+import { prisma } from '../../nucleo/banco/cliente.js';
 import { publicarEvento } from '../../nucleo/eventos/barramento.js';
 import { partesNaEscola } from '../../nucleo/tempo/fuso.js';
 import {
@@ -183,6 +184,28 @@ async function hidratar(conversas: ConversaBruta[], usuarioId: string): Promise<
   );
 }
 
+/** Participantes da conversa (responsável, gestão ativa e professores da turma). */
+async function destinatariosDaConversa(conversa: ConversaBruta): Promise<string[]> {
+  const [gestao, professores] = await Promise.all([
+    prisma.perfis.findMany({
+      where: { papel: 'gestao', status: 'ativo' },
+      select: { id: true },
+    }),
+    prisma.atribuicoes_professores.findMany({
+      where: { turma_id: conversa.turma_id, ativo: true },
+      select: { professor_id: true },
+    }),
+  ]);
+
+  return [
+    ...new Set([
+      conversa.responsavel_id,
+      ...gestao.map((perfil) => perfil.id),
+      ...professores.map((atribuicao) => atribuicao.professor_id),
+    ]),
+  ];
+}
+
 async function participa(usuario: PerfilAutenticado, conversa: ConversaBruta): Promise<boolean> {
   if (usuario.papel === 'gestao') return true;
   if (usuario.papel === 'responsavel') return conversa.responsavel_id === usuario.id;
@@ -337,8 +360,9 @@ export async function enviarMensagem(
 
     await registrarMensagemNaConversa(conversaId, new Date());
 
-    publicarEvento({ tabela: 'mensagens', escopo: { conversa_id: conversaId } });
-    publicarEvento({ tabela: 'conversas' });
+    const destinatarios = await destinatariosDaConversa(conversa);
+    publicarEvento({ tabela: 'mensagens', escopo: { conversa_id: conversaId }, destinatarios });
+    publicarEvento({ tabela: 'conversas', destinatarios });
 
     return { mensagem: paraMensagem(mensagem), criada: true };
   } catch (erro) {
@@ -361,7 +385,11 @@ export async function marcarLidas(usuario: PerfilAutenticado, conversaId: string
 
   const atualizadas = await marcarMensagensLidas(conversaId, usuario.id, new Date());
   if (atualizadas > 0) {
-    publicarEvento({ tabela: 'mensagens', escopo: { conversa_id: conversaId } });
+    publicarEvento({
+      tabela: 'mensagens',
+      escopo: { conversa_id: conversaId },
+      destinatarios: await destinatariosDaConversa(conversa),
+    });
   }
   return atualizadas;
 }
@@ -378,7 +406,7 @@ export async function atualizar(
   await garantirParticipacao(usuario, conversa);
 
   const atualizada = await atualizarConversaAtiva(conversaId, dados.ativa);
-  publicarEvento({ tabela: 'conversas' });
+  publicarEvento({ tabela: 'conversas', destinatarios: await destinatariosDaConversa(conversa) });
 
   const [hidratada] = await hidratar([atualizada], usuario.id);
   return hidratada!;

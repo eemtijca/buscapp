@@ -16,6 +16,7 @@ import { ambiente, origensPermitidas } from './ambiente.js';
 import { contextoBanco } from './nucleo/banco/contexto.js';
 import { registrarCacheHttp } from './nucleo/http/etag.js';
 import { ErroHttp } from './nucleo/http/erros.js';
+import { encerrarBarramento, iniciarBarramento } from './nucleo/eventos/barramento.js';
 import { StoreRateLimitPostgres } from './nucleo/rate-limit/store-postgres.js';
 import { rotasEventos } from './nucleo/http/rotas-eventos.js';
 import { rotasSaude } from './nucleo/http/rotas-saude.js';
@@ -193,6 +194,11 @@ export async function construirApp(): Promise<FastifyInstance> {  const app = Fa
       resposta.sendFile('index.html');
     });
   }
+
+  await iniciarBarramento();
+  app.addHook('onClose', async () => {
+    await encerrarBarramento();
+  });
 
   return app;
 }

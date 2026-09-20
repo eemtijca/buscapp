@@ -175,7 +175,8 @@ describe('POST /api/auth/login', () => {
   });
 });
 
-describe('status da conta em rotas privadas', () => {  it('rejeita sessão de perfil pendente', async () => {
+describe('status da conta em rotas privadas', () => {
+  it('rejeita sessão de perfil pendente', async () => {
     const { token } = await criarSessao(pendenteId, { lembrar: false });
     const resposta = await app.inject({
       method: 'GET',
@@ -253,6 +254,29 @@ describe('redefinição por código', () => {
       where: { destinatario_id: gestaoId, tipo: 'codigo_redefinicao', lida: false },
     });
     expect(notificacao).not.toBeNull();
+  });
+
+  it('deduplica solicitações pendentes da mesma conta', async () => {
+    await app.inject({
+      method: 'POST',
+      url: '/api/auth/solicitar-codigo',
+      payload: { email: emailPendente },
+    });
+    await app.inject({
+      method: 'POST',
+      url: '/api/auth/solicitar-codigo',
+      payload: { email: emailPendente },
+    });
+
+    const pendentes = await prisma.notificacoes.count({
+      where: {
+        destinatario_id: gestaoId,
+        tipo: 'codigo_redefinicao',
+        lida: false,
+        dedupe_key: `codigo_redefinicao:${emailPendente}`,
+      },
+    });
+    expect(pendentes).toBe(1);
   });
 
   it('redefine a senha, ativa perfil pendente e revoga sessões', async () => {

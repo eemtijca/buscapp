@@ -45,28 +45,18 @@ export async function solicitarCodigoRedefinicao(email: string): Promise<void> {
     select: { id: true },
   });
 
-  for (const gestor of gestores) {
-    const pendente = await prismaAdmin.notificacoes.findFirst({
-      where: {
-        destinatario_id: gestor.id,
-        tipo: 'codigo_redefinicao',
-        lida: false,
-        metadados: { path: ['perfil_id'], equals: perfil.id },
-      },
-      select: { id: true },
-    });
-    if (pendente) continue;
-
-    await prismaAdmin.notificacoes.create({
-      data: {
-        destinatario_id: gestor.id,
-        tipo: 'codigo_redefinicao',
-        titulo: 'Solicitação de código de redefinição',
-        corpo: `${perfil.nome} solicitou um código de redefinição de senha.`,
-        metadados: { perfil_id: perfil.id, email: emailNormalizado },
-      },
-    });
-  }
+  // `skipDuplicates` usa ON CONFLICT DO NOTHING e o índice parcial ignora notificações já lidas.
+  await prismaAdmin.notificacoes.createMany({
+    data: gestores.map((gestor) => ({
+      destinatario_id: gestor.id,
+      tipo: 'codigo_redefinicao' as const,
+      titulo: 'Solicitação de código de redefinição',
+      corpo: `${perfil.nome} solicitou um código de redefinição de senha.`,
+      metadados: { perfil_id: perfil.id, email: emailNormalizado },
+      dedupe_key: `codigo_redefinicao:${emailNormalizado}`,
+    })),
+    skipDuplicates: true,
+  });
 }
 
 export async function bloqueadoPorTentativas(email: string): Promise<boolean> {

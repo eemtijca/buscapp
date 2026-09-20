@@ -37,6 +37,7 @@ model alunos {
 
   @@index([matricula], map: "idx_alunos_matricula")
   @@index([nome(ops: raw("gin_trgm_ops"))], map: "idx_alunos_nome_trgm", type: Gin)
+  @@index([documentos_recebidos], map: "idx_alunos_documentos_gin", type: Gin)
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
@@ -344,6 +345,8 @@ model frequencias {
   @@index([professor_id], map: "idx_frequencias_professor")
   @@index([status], map: "idx_frequencias_status")
   @@index([turma_id, data_aula], map: "idx_frequencias_turma_data")
+  @@index([periodo], map: "idx_frequencias_periodo")
+  @@index([motivos_ausencia], map: "idx_frequencias_motivos_gin", type: Gin)
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
@@ -533,6 +536,7 @@ model ocorrencias {
   @@index([aluno_id], map: "idx_ocorrencias_presenca_pendente", where: raw("(exige_presenca_responsavel AND (NOT presenca_responsavel_confirmada))"))
   @@index([status], map: "idx_ocorrencias_status")
   @@index([turma_id], map: "idx_ocorrencias_turma")
+  @@index([tipo], map: "idx_ocorrencias_tipo_gin", type: Gin)
 }
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
@@ -593,6 +597,7 @@ model perfis {
   vinculos_responsaveis                                              vinculos_responsaveis[]
 
   @@index([papel], map: "idx_perfis_papel", where: raw("(status = 'ativo'::status_perfil)"))
+  @@index([acesso_modulos], map: "idx_perfis_modulos_gin", type: Gin)
 }
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments

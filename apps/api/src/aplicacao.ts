@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import cookie from '@fastify/cookie';
 import cors from '@fastify/cors';
+import helmet from '@fastify/helmet';
 import multipart from '@fastify/multipart';
 import fastifyStatic from '@fastify/static';
 import Fastify, { type FastifyError, type FastifyInstance } from 'fastify';
@@ -74,6 +75,19 @@ export async function construirApp(): Promise<FastifyInstance> {  const app = Fa
     contextoBanco.run({ usuarioId: null, emTransacao: false }, concluir);
   });
 
+  // Defesa em profundidade contra CSRF: métodos mutantes precisam vir de origem autorizada.
+  app.addHook('onRequest', async (pedido, resposta) => {
+    if (!pedido.url.startsWith('/api/')) return;
+    if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(pedido.method)) return;
+
+    const origem = pedido.headers.origin;
+    if (!origem || origensPermitidas.includes(origem)) return;
+
+    return resposta.status(403).send({
+      erro: { codigo: 'origem_invalida', mensagem: 'Origem não autorizada.' },
+    });
+  });
+
   app.setErrorHandler((erro: FastifyError, _pedido, resposta) => {
     if (erro instanceof ErroHttp) {
       resposta.status(erro.status).send({
@@ -105,6 +119,27 @@ export async function construirApp(): Promise<FastifyInstance> {  const app = Fa
   });
 
   await app.register(cookie);
+  await app.register(helmet, {
+    contentSecurityPolicy: {
+      useDefaults: false,
+      directives: {
+        'default-src': ["'self'"],
+        'script-src': ["'self'"],
+        'style-src': ["'self'", "'unsafe-inline'"],
+        'img-src': ["'self'", 'data:', 'blob:'],
+        'font-src': ["'self'"],
+        'connect-src': ["'self'"],
+        'object-src': ["'none'"],
+        'base-uri': ["'self'"],
+        'form-action': ["'self'"],
+        'frame-ancestors': ["'none'"],
+        // O upgrade só faz sentido em HTTPS de produção; em desenvolvimento quebraria o localhost.
+        ...(ambiente.NODE_ENV === 'production'
+          ? { 'upgrade-insecure-requests': [] as string[] }
+          : {}),
+      },
+    },
+  });
   await app.register(cors, {
     origin: origensPermitidas,
     credentials: true,

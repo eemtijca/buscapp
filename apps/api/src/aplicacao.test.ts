@@ -49,3 +49,38 @@ describe('envelope de erro do Fastify', () => {
     expect(resposta.json().erro.codigo).toBe('tipo_nao_suportado');
   });
 });
+
+describe('verificação de origem', () => {
+  it('rejeita método mutante de origem não autorizada', async () => {
+    const resposta = await app.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      headers: { origin: 'https://malicioso.example' },
+      payload: { email: 'a@b.com', senha: 'x' },
+    });
+
+    expect(resposta.statusCode).toBe(403);
+    expect(resposta.json().erro.codigo).toBe('origem_invalida');
+  });
+
+  it('aceita método mutante da origem permitida', async () => {
+    const resposta = await app.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      headers: { origin: 'http://localhost:5173' },
+      payload: { email: 'ninguem@escola.edu.br', senha: 'Errada1!' },
+    });
+
+    expect(resposta.statusCode).toBe(401);
+  });
+});
+
+describe('cabeçalhos de segurança', () => {
+  it('responde com nosniff e CSP na API', async () => {
+    const resposta = await app.inject({ method: 'GET', url: '/api/saude' });
+
+    expect(resposta.headers['x-content-type-options']).toBe('nosniff');
+    expect(String(resposta.headers['content-security-policy'])).toContain("default-src 'self'");
+    expect(String(resposta.headers['content-security-policy'])).toContain("frame-ancestors 'none'");
+  });
+});

@@ -24,6 +24,7 @@ import { ambiente } from '../../ambiente.js';
 import {
   autenticar as autenticarServico,
   ErroContaInativa,
+  ErroContaPendente,
   ErroCredenciaisInvalidas,
 } from './auth.servico.js';
 
@@ -58,6 +59,9 @@ export const rotasAuth: FastifyPluginAsyncZod = async (app) => {
         }
         if (erro instanceof ErroContaInativa) {
           throw new ErroHttp(403, 'conta_inativa', erro.message);
+        }
+        if (erro instanceof ErroContaPendente) {
+          throw new ErroHttp(403, 'conta_pendente', erro.message);
         }
         throw erro;
       }

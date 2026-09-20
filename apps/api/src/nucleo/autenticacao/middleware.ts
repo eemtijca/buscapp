@@ -1,7 +1,7 @@
 import type { FastifyRequest } from 'fastify';
 import { ambiente } from '../../ambiente.js';
 import { contextoBanco } from '../banco/contexto.js';
-import { erroNaoAutenticado, erroNaoAutorizado } from '../http/erros.js';
+import { erroNaoAutenticado, erroNaoAutorizado, ErroHttp } from '../http/erros.js';
 import { perfilDaSessao } from './sessoes.js';
 import type { PerfilAutenticado } from './tipos.js';
 
@@ -31,10 +31,22 @@ export async function autenticarOpcional(
   return perfil;
 }
 
-/** PreHandler de rotas autenticadas: valida a sessão e carrega o perfil. */
+/** PreHandler de rotas autenticadas: valida a sessão, o status da conta e carrega o perfil. */
 export async function autenticar(pedido: FastifyRequest): Promise<void> {
   const perfil = await autenticarOpcional(pedido);
   if (!perfil) throw erroNaoAutenticado();
+
+  // Sessão de conta pendente ou inativa não acessa rotas privadas, mesmo com cookie válido.
+  if (perfil.status !== 'ativo') {
+    if (perfil.status === 'pendente') {
+      throw new ErroHttp(
+        403,
+        'conta_pendente',
+        'Conta pendente de ativação. Use o código de primeiro acesso para definir a senha.',
+      );
+    }
+    throw new ErroHttp(403, 'conta_inativa', 'Conta inativa.');
+  }
 }
 
 export function usuarioAtual(pedido: FastifyRequest): PerfilAutenticado {

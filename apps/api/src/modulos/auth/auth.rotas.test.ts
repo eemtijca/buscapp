@@ -3,6 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { construirApp } from '../../aplicacao.js';
 import { prismaAdmin as prisma } from '../../nucleo/banco/cliente.js';
+import { criarSessao } from '../../nucleo/autenticacao/sessoes.js';
 import { gerarHashSenha } from '../../nucleo/autenticacao/senhas.js';
 import { gerarCodigoRedefinicao } from '../../nucleo/autenticacao/codigos.js';
 
@@ -107,6 +108,43 @@ describe('POST /api/auth/login', () => {
       payload: { email: emailProf, senha: 'SenhaAtual1!' },
     });
     expect(resposta.statusCode).toBe(403);
+    expect(resposta.json().erro.codigo).toBe('conta_inativa');
+    await prisma.perfis.update({ where: { id: profId }, data: { status: 'ativo' } });
+  });
+
+  it('bloqueia conta pendente com erro próprio', async () => {
+    const resposta = await app.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      payload: { email: emailPendente, senha: 'SenhaAtual1!' },
+    });
+    expect(resposta.statusCode).toBe(403);
+    expect(resposta.json().erro.codigo).toBe('conta_pendente');
+  });
+});
+
+describe('status da conta em rotas privadas', () => {
+  it('rejeita sessão de perfil pendente', async () => {
+    const { token } = await criarSessao(pendenteId, { lembrar: false });
+    const resposta = await app.inject({
+      method: 'GET',
+      url: '/api/alunos',
+      cookies: { buscapp_sessao: token },
+    });
+    expect(resposta.statusCode).toBe(403);
+    expect(resposta.json().erro.codigo).toBe('conta_pendente');
+  });
+
+  it('rejeita sessão de perfil inativo', async () => {
+    await prisma.perfis.update({ where: { id: profId }, data: { status: 'inativo' } });
+    const { token } = await criarSessao(profId, { lembrar: false });
+    const resposta = await app.inject({
+      method: 'GET',
+      url: '/api/alunos',
+      cookies: { buscapp_sessao: token },
+    });
+    expect(resposta.statusCode).toBe(403);
+    expect(resposta.json().erro.codigo).toBe('conta_inativa');
     await prisma.perfis.update({ where: { id: profId }, data: { status: 'ativo' } });
   });
 });

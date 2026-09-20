@@ -67,7 +67,7 @@ afterAll(async () => {
 });
 
 describe('POST /api/usuarios', () => {
-  it('cria usuário pendente com código e senha temporária utilizável', async () => {
+  it('cria usuário pendente com código e senha temporária sem liberar login', async () => {
     const email = `novo.usuarios.${marcador}@escola.edu.br`;
     const resposta = await app.inject({
       method: 'POST',
@@ -82,12 +82,14 @@ describe('POST /api/usuarios', () => {
     expect(corpo.codigo).toMatch(/^\d{6}$/);
     criados.push(corpo.usuario.id);
 
+    // O primeiro acesso é pelo código de redefinição, não pelo login com a senha temporária.
     const novoSessao = await app.inject({
       method: 'POST',
       url: '/api/auth/login',
       payload: { email, senha: corpo.senha_temporaria },
     });
-    expect(novoSessao.statusCode).toBe(200);
+    expect(novoSessao.statusCode).toBe(403);
+    expect(novoSessao.json().erro.codigo).toBe('conta_pendente');
 
     const duplicado = await app.inject({
       method: 'POST',

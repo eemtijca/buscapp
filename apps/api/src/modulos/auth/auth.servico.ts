@@ -22,6 +22,13 @@ export class ErroContaInativa extends Error {
   }
 }
 
+export class ErroContaPendente extends Error {
+  constructor() {
+    super('Conta pendente de ativação. Use o código de primeiro acesso para definir a senha.');
+    this.name = 'ErroContaPendente';
+  }
+}
+
 interface PerfilBruto {
   id: string;
   nome: string;
@@ -65,6 +72,7 @@ export async function autenticar(dados: DadosLogin) {
   const senhaConfere = await verificarSenha(dados.senha, hash);
   if (!perfil || !perfil.senha_hash || !senhaConfere) throw new ErroCredenciaisInvalidas();
   if (perfil.status === 'inativo') throw new ErroContaInativa();
+  if (perfil.status === 'pendente') throw new ErroContaPendente();
 
   if (precisaRehash(perfil.senha_hash)) {
     const novoSenhaHash = await gerarHashSenha(dados.senha);

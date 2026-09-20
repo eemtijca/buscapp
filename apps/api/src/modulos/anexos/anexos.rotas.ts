@@ -18,6 +18,17 @@ import { garantirAcessoAnexo, gerarChaveAnexo, paraAnexo } from './anexos.servic
 
 const TIPOS_PERMITIDOS: readonly string[] = MIMES_ANEXO;
 const TAMANHO_MAXIMO = 10 * 1024 * 1024;
+const DIA_MS = 24 * 60 * 60 * 1000;
+
+/** Data de expurgo do anexo conforme a retenção configurada. */
+async function expurgoEm(): Promise<Date> {
+  const config = await prisma.configuracoes_sistema.findUnique({
+    where: { id: 1 },
+    select: { dias_expurgo_anexos: true },
+  });
+  const dias = config?.dias_expurgo_anexos ?? 30;
+  return new Date(Date.now() + dias * DIA_MS);
+}
 
 function limiteUploadDireto(): string {
   return `${Math.round(ambiente.UPLOAD_DIRETO_MAX_BYTES / (1024 * 1024))} MB`;
@@ -132,6 +143,7 @@ export const rotasAnexos: FastifyPluginAsyncZod = async (app) => {
           mime_type: dados.mime_type,
           tamanho_bytes: info.tamanho,
           criado_por: usuarioAtual(pedido).id,
+          expurgo_em: await expurgoEm(),
         },
       });
 
@@ -200,6 +212,7 @@ export const rotasAnexos: FastifyPluginAsyncZod = async (app) => {
           mime_type: arquivo.mimetype,
           tamanho_bytes: conteudo.length,
           criado_por: usuario.id,
+          expurgo_em: await expurgoEm(),
         },
       });
 

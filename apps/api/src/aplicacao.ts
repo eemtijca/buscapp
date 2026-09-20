@@ -33,6 +33,7 @@ import { rotasJustificativas } from './modulos/justificativas/justificativas.rot
 import { rotasLgpd } from './modulos/lgpd/lgpd.rotas.js';
 import { rotasNotificacoes } from './modulos/notificacoes/notificacoes.rotas.js';
 import { rotasOcorrencias } from './modulos/ocorrencias/ocorrencias.rotas.js';
+import { rotasTarefas } from './modulos/tarefas/tarefas.rotas.js';
 import { rotasUsuarios } from './modulos/usuarios/usuarios.rotas.js';
 import { rotasVinculos } from './modulos/vinculos/vinculos.rotas.js';
 
@@ -208,6 +209,7 @@ export async function construirApp(): Promise<FastifyInstance> {  const app = Fa
   await app.register(rotasNotificacoes);
   await app.register(rotasConfiguracoes);
   await app.register(rotasLgpd);
+  await app.register(rotasTarefas);
 
   const distWeb = path.resolve(process.cwd(), ambiente.WEB_DIST);
   if (existsSync(path.join(distWeb, 'index.html'))) {

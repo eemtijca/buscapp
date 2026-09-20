@@ -12,5 +12,6 @@ export * from './lgpd.js';
 export * from './monitoramento.js';
 export * from './notificacoes.js';
 export * from './ocorrencias.js';
+export * from './tarefas.js';
 export * from './usuarios.js';
 export * from './vinculos.js';

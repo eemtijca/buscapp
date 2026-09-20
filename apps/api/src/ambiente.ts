@@ -54,6 +54,8 @@ const esquema = z
     REDIS_URL: z.string().min(1, 'REDIS_URL é obrigatória para o barramento de eventos.'),
     // Conexão de sessão usada no LISTEN; sem ela, cai para MIGRATE_DATABASE_URL ou DATABASE_URL.
     DATABASE_URL_ESCUTA: z.string().optional(),
+    // Segredo do agendador do expurgo; sem ele, a rota fica desabilitada.
+    CRON_SECRET: z.string().optional(),
   })
   .superRefine((valores, contexto) => {
     if (valores.NODE_ENV === 'production' && valores.AUTH_PEPPER.length < 32) {

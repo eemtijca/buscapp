@@ -367,13 +367,15 @@ export function useRankingRisco(): {
 }
 
 /** Ocorrências graves formatadas para a central da gestão. */
-export function useOcorrenciasGraves(): {
+export function useOcorrenciasGraves(limite?: () => number): {
   ocorrencias: ComputedRef<OcorrenciaGrave[]>;
   pendente: Ref<boolean>;
   atualizando: Ref<boolean>;
   recarregar: () => Promise<void>;
 } {
-  const consultaOcorrencias = useConsulta(() => Consultas.ocorrencias());
+  const consultaOcorrencias = useConsulta(() =>
+    Consultas.ocorrencias({ limite: limite ? String(limite()) : undefined }),
+  );
   const consultaAlunos = useConsulta(() => Consultas.alunos());
 
   const ocorrencias = computed<OcorrenciaGrave[]>(() => {

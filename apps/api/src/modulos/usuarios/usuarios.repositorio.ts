@@ -36,6 +36,8 @@ export async function listarUsuarios(consulta: ListarUsuarios) {
     },
     select: SELECT_PERFIL,
     orderBy: { nome: 'asc' },
+    take: consulta.limite,
+    skip: consulta.offset,
   });
 }
 

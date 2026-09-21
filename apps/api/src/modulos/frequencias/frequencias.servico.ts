@@ -285,6 +285,8 @@ export async function listar(
     status: consulta.status,
     tipoRegistro: consulta.tipo_registro,
     incluirDeletadas: consulta.incluir_deletadas,
+    limite: consulta.limite,
+    offset: consulta.offset,
   });
 
   return frequencias.map(paraFrequencia);

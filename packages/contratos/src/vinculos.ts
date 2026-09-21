@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { uuidSchema } from './comuns.js';
+import { paginacaoSchema, uuidSchema } from './comuns.js';
 
 export const vinculoResponsavelSchema = z.object({
   id: uuidSchema,
@@ -31,6 +31,7 @@ export const listarVinculosSchema = z.object({
   aluno_id: uuidSchema.optional(),
   responsavel_id: uuidSchema.optional(),
   ativo: z.enum(['true', 'false']).optional(),
+  ...paginacaoSchema.shape,
 });
 
 export type CriarVinculo = z.infer<typeof criarVinculoSchema>;

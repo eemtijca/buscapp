@@ -13,13 +13,18 @@ const INCLUSAO_MENSAGEM = {
 export interface FiltroConversas {
   responsavel_id?: string;
   turma_id?: { in: string[] };
+  limite?: number;
+  offset?: number;
 }
 
 export async function listarConversas(filtro: FiltroConversas) {
+  const { limite, offset, ...where } = filtro;
   return prisma.conversas.findMany({
-    where: filtro,
+    where,
     include: INCLUSAO_CONVERSA,
     orderBy: [{ ultima_mensagem_em: { sort: 'desc', nulls: 'last' } }, { created_at: 'desc' }],
+    ...(limite !== undefined ? { take: limite } : {}),
+    ...(offset !== undefined ? { skip: offset } : {}),
   });
 }
 
@@ -60,12 +65,23 @@ export async function registrarMensagemNaConversa(conversaId: string, agora: Dat
   });
 }
 
-export async function listarMensagens(conversaId: string) {
-  return prisma.mensagens.findMany({
+/**
+ * Mensagens visíveis em ordem crescente. Sem cursor devolve as mais recentes;
+ * com cursor (id de uma mensagem) devolve as anteriores a ela.
+ */
+export async function listarMensagens(
+  conversaId: string,
+  opcoes: { limite: number; cursor?: string },
+) {
+  const mensagens = await prisma.mensagens.findMany({
     where: { conversa_id: conversaId, deleted_at: null },
     include: INCLUSAO_MENSAGEM,
-    orderBy: { created_at: 'asc' },
+    orderBy: [{ created_at: 'desc' }, { id: 'desc' }],
+    take: opcoes.limite,
+    ...(opcoes.cursor ? { cursor: { id: opcoes.cursor }, skip: 1 } : {}),
   });
+
+  return mensagens.reverse();
 }
 
 export async function buscarMensagemPorClientRequestId(clientRequestId: string) {

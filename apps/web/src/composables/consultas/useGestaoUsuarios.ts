@@ -27,6 +27,7 @@ export function useUsuarios(
     papel?: string;
     status?: string;
     busca?: string;
+    limite?: number;
   },
 ): {
   usuarios: ComputedRef<UsuarioItem[]>;
@@ -40,6 +41,7 @@ export function useUsuarios(
       papel: valores.papel && valores.papel !== 'todos' ? valores.papel : undefined,
       status: valores.status && valores.status !== 'todos' ? valores.status : undefined,
       busca: valores.busca || undefined,
+      limite: valores.limite ? String(valores.limite) : undefined,
     });
   });
 
@@ -67,7 +69,7 @@ export function useUsuarios(
 }
 
 /** Alunos da gestão com a turma vigente anexada. */
-export function useAlunos(filtros?: () => { status?: string; busca?: string }): {
+export function useAlunos(filtros?: () => { status?: string; busca?: string; limite?: number }): {
   alunos: ComputedRef<AlunoItem[]>;
   pendente: Ref<boolean>;
   atualizando: Ref<boolean>;
@@ -78,6 +80,7 @@ export function useAlunos(filtros?: () => { status?: string; busca?: string }): 
     return Consultas.alunos({
       status: valores.status && valores.status !== 'todos' ? valores.status : undefined,
       busca: valores.busca || undefined,
+      limite: valores.limite ? String(valores.limite) : undefined,
     });
   });
   const consultaEnturmacoes = useConsulta(() => Consultas.enturmacoes({ status: 'matriculado' }));

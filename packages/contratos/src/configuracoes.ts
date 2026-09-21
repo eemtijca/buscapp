@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { uuidSchema } from './comuns.js';
+import { paginacaoSchema, uuidSchema } from './comuns.js';
 
 /** Tipos de decaimento aceitos para o cálculo do termômetro. */
 export const decaimentoOcorrenciaTipoSchema = z.enum(['nenhum', 'janela', 'exponencial']);
@@ -108,6 +108,7 @@ export type AtualizarOpcaoConfiguracao = z.infer<typeof atualizarOpcaoConfigurac
 export const listarOpcoesConfiguracaoSchema = z.object({
   tipo: z.string().trim().min(1).optional(),
   ativo: booleanoTexto.optional(),
+  ...paginacaoSchema.shape,
 });
 
 export type ListarOpcoesConfiguracao = z.infer<typeof listarOpcoesConfiguracaoSchema>;
@@ -208,6 +209,7 @@ export type AtualizarStatusTagComportamento = z.infer<typeof atualizarStatusTagC
 
 export const listarTagsComportamentoSchema = z.object({
   ativo: booleanoTexto.optional(),
+  ...paginacaoSchema.shape,
 });
 
 export type ListarTagsComportamento = z.infer<typeof listarTagsComportamentoSchema>;

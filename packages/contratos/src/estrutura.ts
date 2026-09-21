@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { uuidSchema } from './comuns.js';
+import { paginacaoSchema, uuidSchema } from './comuns.js';
 
 /** Booleano aceito em query string (`?ativo=true|false|1|0`). */
 export const booleanQuerySchema = z.stringbool();
@@ -23,6 +23,7 @@ export type Turma = z.infer<typeof turmaSchema>;
 export const listarTurmasSchema = z.object({
   ativo: booleanQuerySchema.optional(),
   ano_letivo_id: uuidSchema.optional(),
+  ...paginacaoSchema.shape,
 });
 
 export type ListarTurmas = z.infer<typeof listarTurmasSchema>;
@@ -62,6 +63,7 @@ export type Disciplina = z.infer<typeof disciplinaSchema>;
 
 export const listarDisciplinasSchema = z.object({
   ativo: booleanQuerySchema.optional(),
+  ...paginacaoSchema.shape,
 });
 
 export type ListarDisciplinas = z.infer<typeof listarDisciplinasSchema>;
@@ -106,6 +108,7 @@ export const listarAtribuicoesSchema = z.object({
   professor_id: uuidSchema.optional(),
   turma_id: uuidSchema.optional(),
   ativo: booleanQuerySchema.optional(),
+  ...paginacaoSchema.shape,
 });
 
 export type ListarAtribuicoes = z.infer<typeof listarAtribuicoesSchema>;
@@ -190,6 +193,7 @@ export const listarEnturmacoesSchema = z.object({
   aluno_id: uuidSchema.optional(),
   turma_id: uuidSchema.optional(),
   status: z.string().trim().min(1).optional(),
+  ...paginacaoSchema.shape,
 });
 
 export type ListarEnturmacoes = z.infer<typeof listarEnturmacoesSchema>;

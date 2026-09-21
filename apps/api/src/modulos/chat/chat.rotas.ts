@@ -3,8 +3,10 @@ import {
   conversaSchema,
   criarConversaSchema,
   enviarMensagemSchema,
+  listarMensagensSchema,
   marcarMensagensLidasRespostaSchema,
   mensagemSchema,
+  paginacaoSchema,
   uuidSchema,
 } from '@buscapp/contratos';
 import type { FastifyRequest } from 'fastify';
@@ -44,10 +46,11 @@ export const rotasChat: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['chat'],
         summary: 'Lista as conversas visíveis para o usuário autenticado',
+        querystring: paginacaoSchema,
         response: { 200: z.object({ conversas: z.array(conversaSchema) }) },
       },
     },
-    async (pedido) => ({ conversas: await listar(usuarioAtual(pedido)) }),
+    async (pedido) => ({ conversas: await listar(usuarioAtual(pedido), pedido.query) }),
   );
 
   app.post(
@@ -77,13 +80,14 @@ export const rotasChat: FastifyPluginAsyncZod = async (app) => {
       preHandler: [autenticar, podeParticipar, exigirModuloChatDoResponsavel],
       schema: {
         tags: ['chat'],
-        summary: 'Lista as mensagens não deletadas de uma conversa',
+        summary: 'Lista as mensagens não deletadas de uma conversa (cursor para as anteriores)',
         params: parametrosConversa,
+        querystring: listarMensagensSchema,
         response: { 200: z.object({ mensagens: z.array(mensagemSchema) }) },
       },
     },
     async (pedido) => ({
-      mensagens: await listarMensagens(usuarioAtual(pedido), pedido.params.id),
+      mensagens: await listarMensagens(usuarioAtual(pedido), pedido.params.id, pedido.query),
     }),
   );
 

@@ -3,6 +3,7 @@ import type {
   Conversa,
   CriarConversa,
   EnviarMensagem,
+  ListarMensagens,
   Mensagem,
   PapelAutorMensagem,
 } from '@buscapp/contratos';
@@ -253,7 +254,10 @@ async function resolverResponsavel(
   return usuario.id;
 }
 
-export async function listar(usuario: PerfilAutenticado): Promise<Conversa[]> {
+export async function listar(
+  usuario: PerfilAutenticado,
+  consulta: { limite?: number; offset?: number } = {},
+): Promise<Conversa[]> {
   const filtro =
     usuario.papel === 'gestao'
       ? {}
@@ -261,7 +265,7 @@ export async function listar(usuario: PerfilAutenticado): Promise<Conversa[]> {
         ? { responsavel_id: usuario.id }
         : { turma_id: { in: await listarTurmasDoProfessor(usuario.id) } };
 
-  const conversas = await listarConversas(filtro);
+  const conversas = await listarConversas({ ...filtro, ...consulta });
   return hidratar(conversas, usuario.id);
 }
 
@@ -313,12 +317,16 @@ export async function criar(
 export async function listarMensagens(
   usuario: PerfilAutenticado,
   conversaId: string,
+  consulta: ListarMensagens,
 ): Promise<Mensagem[]> {
   const conversa = await buscarConversaPorId(conversaId);
   if (!conversa) throw erroNaoEncontrado('Conversa não encontrada.');
 
   await garantirParticipacao(usuario, conversa);
-  const mensagens = await buscarMensagens(conversaId);
+  const mensagens = await buscarMensagens(conversaId, {
+    limite: consulta.limite,
+    cursor: consulta.cursor,
+  });
   return mensagens.map(paraMensagem);
 }
 

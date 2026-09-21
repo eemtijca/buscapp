@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { uuidSchema } from './comuns.js';
+import { paginacaoSchema, uuidSchema } from './comuns.js';
 
 export const statusAlunoSchema = z.enum(['ativo', 'egresso', 'transferido', 'inativo']);
 
@@ -44,6 +44,7 @@ export type AtualizarAluno = z.infer<typeof atualizarAlunoSchema>;
 export const listarAlunosSchema = z.object({
   busca: z.string().trim().min(1).optional(),
   status: statusAlunoSchema.optional(),
+  ...paginacaoSchema.shape,
 });
 
 export type ListarAlunos = z.infer<typeof listarAlunosSchema>;

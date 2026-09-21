@@ -1,4 +1,4 @@
-import { codigoRedefinicaoSchema, uuidSchema } from '@buscapp/contratos';
+import { codigoRedefinicaoSchema, paginacaoSchema, uuidSchema } from '@buscapp/contratos';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { autenticar, exigirPapel, usuarioAtual } from '../../nucleo/autenticacao/middleware.js';
@@ -14,10 +14,11 @@ export const rotasCodigos: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['codigos'],
         summary: 'Lista os códigos de redefinição',
+        querystring: paginacaoSchema,
         response: { 200: z.object({ codigos: z.array(codigoRedefinicaoSchema) }) },
       },
     },
-    async () => ({ codigos: await listar() }),
+    async (pedido) => ({ codigos: await listar(pedido.query) }),
   );
 
   app.post(

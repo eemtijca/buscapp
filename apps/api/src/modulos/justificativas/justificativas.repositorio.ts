@@ -26,6 +26,8 @@ export interface FiltroJustificativas {
   status?: 'pendente' | 'aceita' | 'recusada';
   dataInicio?: Date;
   dataFim?: Date;
+  limite?: number;
+  offset?: number;
 }
 
 export async function listarJustificativas(filtro: FiltroJustificativas) {
@@ -50,6 +52,8 @@ export async function listarJustificativas(filtro: FiltroJustificativas) {
     },
     include: INCLUSAO_JUSTIFICATIVA,
     orderBy: { created_at: 'desc' },
+    ...(filtro.limite !== undefined ? { take: filtro.limite } : {}),
+    ...(filtro.offset !== undefined ? { skip: filtro.offset } : {}),
   });
 }
 

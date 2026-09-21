@@ -1,4 +1,4 @@
-import type { CodigoRedefinicao } from '@buscapp/contratos';
+import type { CodigoRedefinicao, Paginacao } from '@buscapp/contratos';
 import { gerarCodigoRedefinicao } from '../../nucleo/autenticacao/codigos.js';
 import { prismaAdmin } from '../../nucleo/banco/cliente.js';
 import { publicarEvento } from '../../nucleo/eventos/barramento.js';
@@ -12,10 +12,10 @@ import {
   revogarCodigo,
 } from './codigos.repositorio.js';
 
-export async function listar(): Promise<CodigoRedefinicao[]> {
+export async function listar(consulta: Paginacao): Promise<CodigoRedefinicao[]> {
   const agora = new Date();
   const [codigos, tentativas] = await Promise.all([
-    listarCodigos(),
+    listarCodigos(consulta),
     // Tabela administrativa: só o cliente administrativo lê as tentativas.
     prismaAdmin.codigos_redefinicao_tentativas.findMany({
       where: { bloqueado_ate: { gt: agora } },

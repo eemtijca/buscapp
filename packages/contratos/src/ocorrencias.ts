@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { uuidSchema } from './comuns.js';
+import { paginacaoSchema, uuidSchema } from './comuns.js';
 
 /** Status possíveis de uma ocorrência, espelhando o enum `status_ocorrencia` do banco. */
 export const statusOcorrenciaSchema = z.enum(['aberta', 'em_andamento', 'resolvida', 'arquivada']);
@@ -70,6 +70,7 @@ export const listarOcorrenciasSchema = z.object({
   status: statusOcorrenciaSchema.optional(),
   tipo: listaTextoQuerySchema.optional(),
   exige_presenca_pendente: booleanoQuerySchema.optional(),
+  ...paginacaoSchema.shape,
 });
 export type ListarOcorrencias = z.infer<typeof listarOcorrenciasSchema>;
 
@@ -129,5 +130,6 @@ export const listarRegistrosComportamentoSchema = z.object({
   aluno_id: uuidSchema.optional(),
   data_inicio: z.string().date('Data inicial inválida.').optional(),
   data_fim: z.string().date('Data final inválida.').optional(),
+  ...paginacaoSchema.shape,
 });
 export type ListarRegistrosComportamento = z.infer<typeof listarRegistrosComportamentoSchema>;

@@ -10,6 +10,8 @@ export async function listarVinculos(filtros: ListarVinculos) {
     },
     include: { perfis: { select: { nome: true } } },
     orderBy: [{ contato_prioritario: 'desc' }, { created_at: 'asc' }],
+    take: filtros.limite,
+    skip: filtros.offset,
   });
 }
 

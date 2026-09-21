@@ -38,10 +38,12 @@ export function paraCodigo(
   };
 }
 
-export async function listarCodigos() {
+export async function listarCodigos(consulta: { limite: number; offset: number }) {
   return prisma.codigos_redefinicao.findMany({
     include: { perfis_codigos_redefinicao_perfil_idToperfis: { select: { nome: true } } },
     orderBy: { created_at: 'desc' },
+    take: consulta.limite,
+    skip: consulta.offset,
   });
 }
 

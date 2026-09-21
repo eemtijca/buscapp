@@ -89,6 +89,8 @@ export async function listar(
     status: consulta.status,
     dataInicio: consulta.data_inicio ? paraData(consulta.data_inicio) : undefined,
     dataFim: consulta.data_fim ? paraData(consulta.data_fim) : undefined,
+    limite: consulta.limite,
+    offset: consulta.offset,
   });
   return registros.map(paraJustificativa);
 }

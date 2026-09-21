@@ -10,7 +10,7 @@ Rotas HTTP da API Fastify. Todas ficam sob `/api` e respondem JSON, exceto o dow
 - **Escopo:** toda leitura filtra pelos alunos visíveis ao perfil. Recurso fora do escopo responde `404`, para não revelar a existência.
 - **Idempotência:** frequências, mensagens e registros de comportamento aceitam `client_request_id` com índice único parcial.
 - **Datas:** datas civis usam `yyyy-mm-dd` e timestamps usam ISO 8601.
-- **Listas:** os endpoints de listagem devolvem arrays completos nomeados pela coleção. A única paginação é a de notificações (`limite`, de 1 a 100, padrão 20).
+- **Listas:** os endpoints de listagem devolvem arrays nomeados pela coleção e aceitam `limite` (1 a 200, padrão 50) e `offset` (a partir de 0) com ordenação estável. As mensagens do chat usam `limite` e `cursor` (id de uma mensagem): sem cursor, devolvem as mais recentes; com cursor, as anteriores a ela. A paginação de notificações usa `limite` (1 a 100, padrão 20).
 - **Cache HTTP:** respostas de sucesso sob `/api` usam `Cache-Control: private, no-store` e, em `GET` e `HEAD` 2xx, ganham ETag próprio. O cliente revalida com `If-None-Match` e recebe `304` quando o corpo não mudou. Erros, streams de anexo e o SSE não geram ETag. Ver [ADR-008](adr/008-cache-de-dados-cliente.md).
 - **Uploads:** `multipart/form-data` no endpoint clássico ou URL pré-assinada no fluxo direto. Ver [modulos.md](modulos.md).
 - **Rate limiting:** login (10/min, contando apenas falhas), `solicitar-codigo` (3/5 min), `redefinir-senha` (5/15 min) e uploads (20/h) respondem `429` com `muitas_requisicoes` ao exceder.

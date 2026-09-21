@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { uuidSchema } from './comuns.js';
+import { paginacaoSchema, uuidSchema } from './comuns.js';
 
 /** Formas de coleta da frequência: chamada da aula, entrada pelo portão e saída. */
 export const tipoRegistroFrequenciaSchema = z.enum(['chamada_aula', 'entrada_portao', 'saida']);
@@ -95,6 +95,7 @@ export const listarFrequenciasSchema = z.object({
     .union([z.boolean(), z.enum(['true', 'false'])])
     .optional()
     .transform((valor) => valor === true || valor === 'true'),
+  ...paginacaoSchema.shape,
 });
 
 export type ListarFrequencias = z.infer<typeof listarFrequenciasSchema>;

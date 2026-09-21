@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { uuidSchema } from './comuns.js';
+import { paginacaoSchema, uuidSchema } from './comuns.js';
 
 /** Fluxo de avaliação da justificativa, espelhando o enum `status_justificativa`. */
 export const statusJustificativaSchema = z.enum(['pendente', 'aceita', 'recusada']);
@@ -43,6 +43,7 @@ export const listarJustificativasSchema = z.object({
   aluno_id: uuidSchema.optional(),
   data_inicio: z.string().date('Data inicial inválida.').optional(),
   data_fim: z.string().date('Data final inválida.').optional(),
+  ...paginacaoSchema.shape,
 });
 
 export type ListarJustificativas = z.infer<typeof listarJustificativasSchema>;

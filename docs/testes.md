@@ -64,7 +64,7 @@ npm run test:e2e
 | `qualidade.yml`  | `npm ci`, `type-check`, `lint` e `build-only` em push para `main` e pull requests.                     |
 | `testes.yml`     | `docker compose up -d --build`, espera `/api/saude` e roda `npm run test:unit` com PostgreSQL e Redis. |
 | `migracoes.yml`  | `prisma migrate deploy` e aplicação da senha do papel em push para `main` com mudanças no schema.      |
-| `publicacao.yml` | Build da imagem e push para o GHCR em push para `main` e tags `v*`.                                    |
+| `publicacao.yml` | Build da imagem e push para o GHCR ao publicar um release estável, além de dispatch manual.            |
 | `codeql.yml`     | Análise CodeQL para javascript-typescript em push, pull request e agenda semanal.                      |
 
 > [!WARNING]

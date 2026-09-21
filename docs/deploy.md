@@ -6,7 +6,7 @@ A aplicação pode ser publicada de três formas: imagem Docker (GHCR), Docker C
 
 | Alvo                | Configuração                                     | Resultado                                                     |
 | ------------------- | ------------------------------------------------ | ------------------------------------------------------------- |
-| Imagem Docker       | `infra/docker/Dockerfile`, workflow `publicacao` | `ghcr.io/<repo>:latest` e `:<sha>`                            |
+| Imagem Docker       | `infra/docker/Dockerfile`, workflow `publicacao` | `ghcr.io/<repo>:latest`, `:<sha>` e `:<tag do release>`       |
 | Docker Compose      | `compose.yaml`                                   | App e PostgreSQL 17 com migrações no start                    |
 | Vercel SPA separada | Projeto com root em `apps/web`                   | SPA estática apontando para uma API em outro host             |
 | Vercel Services     | `vercel.json` na raiz, framework Services        | SPA e API no mesmo domínio, sem Docker e sem backend separado |
@@ -16,7 +16,7 @@ A aplicação pode ser publicada de três formas: imagem Docker (GHCR), Docker C
 - `qualidade.yml`: type-check, lint e build da SPA.
 - `testes.yml`: sobe o Compose, espera `/api/saude` e derruba o ambiente.
 - `migracoes.yml`: aplica `prisma migrate deploy` com `DATABASE_URL` vindo do secret `DIRECT_URL_PROD` e, em seguida, define a senha do papel `buscapp_api` com `APP_DB_PASSWORD_PROD`.
-- `publicacao.yml`: build e push da imagem para o GHCR.
+- `publicacao.yml`: build e push da imagem para o GHCR ao publicar um release estável (e por dispatch manual).
 - `codeql.yml`: análise estática de javascript-typescript.
 - Todas as Actions são fixadas por SHA (comentário com a versão) e o Dependabot mantém as atualizações.
 

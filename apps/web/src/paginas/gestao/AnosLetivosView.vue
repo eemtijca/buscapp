@@ -10,6 +10,7 @@ import {
 } from '@/utils/mensagemExplicita';
 import CampoFormulario from '@/componentes/CampoFormulario.vue';
 import ModalBase from '@/componentes/ModalBase.vue';
+import ModalConfirmacao from '@/componentes/ModalConfirmacao.vue';
 import type { AnoLetivo } from '@/tipos/database';
 
 const router = useRouter();
@@ -170,12 +171,24 @@ async function salvar() {
   }
 }
 
-async function ativar(ano: AnoLetivo) {
+const anoParaAtivar = ref<AnoLetivo | null>(null);
+const avisoAtivacao = computed(() => {
+  const ano = anoParaAtivar.value;
+  if (!ano) return '';
   const anterior = anos.value.find((a) => a.status === 'ativo' && a.ativo);
-  const aviso = anterior
+  return anterior
     ? `Ao ativar ${ano.ano}, o ano letivo ${anterior.ano} será arquivado e deixará de estar ativo. Deseja continuar?`
     : `Ativar o ano letivo ${ano.ano}?`;
-  if (!window.confirm(aviso)) return;
+});
+
+function ativar(ano: AnoLetivo) {
+  anoParaAtivar.value = ano;
+}
+
+async function confirmarAtivacao() {
+  const ano = anoParaAtivar.value;
+  anoParaAtivar.value = null;
+  if (!ano) return;
 
   salvando.value = true;
   try {
@@ -400,4 +413,15 @@ async function ativar(ano: AnoLetivo) {
       </template>
     </ModalBase>
   </div>
+
+    <ModalConfirmacao
+      :visivel="!!anoParaAtivar"
+      titulo="Ativar ano letivo"
+      :mensagem="avisoAtivacao"
+      rotulo-confirmar="Ativar"
+      icone="calendar-check"
+      variante="warning"
+      @confirmar="confirmarAtivacao"
+      @cancelar="anoParaAtivar = null"
+    />
 </template>

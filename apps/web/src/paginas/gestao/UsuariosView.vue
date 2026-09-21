@@ -7,12 +7,13 @@ import {
   useUsuarios,
 } from '@/composables/consultas/useGestaoUsuarios';
 import ModalConfirmacao from '@/componentes/ModalConfirmacao.vue';
+import EstadoErro from '@/componentes/EstadoErro.vue';
 import type { UsuarioItem } from '@/tipos/componentes';
 
 const router = useRouter();
 const route = useRoute();
 const limite = ref(50);
-const { usuarios, pendente, atualizando, recarregar } = useUsuarios(() => ({ limite: limite.value }));
+const { usuarios, pendente, atualizando, erro, recarregar } = useUsuarios(() => ({ limite: limite.value }));
 
 const busca = ref((route.query.busca as string) ?? '');
 const filtroPapel = ref<'todos' | 'professor' | 'responsavel'>(
@@ -277,7 +278,13 @@ async function executarToggleAtivacao() {
       </div>
     </div>
 
-    <div v-if="pendente && !usuarios.length" class="text-center py-5" aria-busy="true">
+    <EstadoErro
+      v-if="erro"
+      mensagem="Não foi possível carregar os usuários."
+      @tentar-novamente="recarregar()"
+    />
+
+    <div v-else-if="pendente && !usuarios.length" class="text-center py-5" aria-busy="true">
       <div class="spinner-border text-primary" role="status">
         <span class="visually-hidden">Carregando...</span>
       </div>

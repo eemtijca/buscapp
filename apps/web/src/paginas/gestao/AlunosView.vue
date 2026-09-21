@@ -2,11 +2,12 @@
 import { computed, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAlunos } from '@/composables/consultas/useGestaoUsuarios';
+import EstadoErro from '@/componentes/EstadoErro.vue';
 
 const router = useRouter();
 const route = useRoute();
 const limite = ref(50);
-const { alunos, pendente, atualizando, recarregar } = useAlunos(() => ({ limite: limite.value }));
+const { alunos, pendente, atualizando, erro, recarregar } = useAlunos(() => ({ limite: limite.value }));
 
 const busca = ref((route.query.busca as string) ?? '');
 const filtroStatus = ref<'todos' | 'ativo' | 'egresso' | 'transferido' | 'inativo'>(
@@ -146,7 +147,13 @@ const statusBadge = (status: string) => {
       </div>
     </div>
 
-    <div v-if="pendente && !alunos.length" class="text-center py-5">
+    <EstadoErro
+      v-if="erro"
+      mensagem="Não foi possível carregar os alunos."
+      @tentar-novamente="recarregar()"
+    />
+
+    <div v-else-if="pendente && !alunos.length" class="text-center py-5">
       <div class="spinner-border text-primary" role="status">
         <span class="visually-hidden">Carregando...</span>
       </div>

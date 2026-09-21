@@ -15,6 +15,8 @@ import CampoFormulario from '@/componentes/CampoFormulario.vue';
 import Combobox from '@/componentes/Combobox.vue';
 import type { OpcaoCombobox } from '@/componentes/Combobox.vue';
 import ModalBase from '@/componentes/ModalBase.vue';
+import ModalConfirmacao from '@/componentes/ModalConfirmacao.vue';
+import EstadoErro from '@/componentes/EstadoErro.vue';
 import type { AtribuicaoProfessor } from '@/tipos/database';
 
 interface AtribuicaoItem extends AtribuicaoProfessor {
@@ -36,6 +38,14 @@ const consultaProfessores = useUsuarios(() => ({ papel: 'professor' }));
 const consultaTurmas = useTurmas(() => ({ ativo: 'true' }));
 const consultaDisciplinas = useDisciplinas(() => ({ ativo: 'true' }));
 const { opcoes: opcoesPapel } = useOpcoes(() => 'papel_atribuicao');
+
+const erro = computed(
+  () =>
+    consultaAtribuicoes.erro.value ??
+    consultaProfessores.erro.value ??
+    consultaTurmas.erro.value ??
+    consultaDisciplinas.erro.value,
+);
 
 const atribuicoes = computed<AtribuicaoItem[]>(() =>
   (consultaAtribuicoes.dados.value?.atribuicoes ?? []).map((atribuicao) => ({
@@ -114,13 +124,22 @@ const papelOpcoes = computed<OpcaoCombobox[]>(() =>
   opcoesPapel.value.map((o) => ({ valor: o.valor, rotulo: o.rotulo, icone: o.icone })),
 );
 
-onBeforeRouteLeave((_to, _from, next) => {
-  if (formDirty.value && modalAberto.value && !carregando.value) {
-    const confirmar = window.confirm('Há alterações não salvas. Deseja realmente sair?');
-    if (!confirmar) return next(false);
-  }
-  next();
+const confirmacaoSaida = ref(false);
+let resolverSaida: ((permitir: boolean) => void) | null = null;
+
+onBeforeRouteLeave(async () => {
+  if (!(formDirty.value && modalAberto.value && !carregando.value)) return true;
+  confirmacaoSaida.value = true;
+  return new Promise<boolean>((resolver) => {
+    resolverSaida = resolver;
+  });
 });
+
+function responderSaida(permitir: boolean): void {
+  confirmacaoSaida.value = false;
+  resolverSaida?.(permitir);
+  resolverSaida = null;
+}
 
 watch(
   [
@@ -327,7 +346,13 @@ const papelBadge = (papel: string) => {
       ></button>
     </div>
 
-    <div v-if="carregando && !atribuicoes.length" class="text-center py-5">
+    <EstadoErro
+      v-if="erro"
+      mensagem="Não foi possível carregar as atribuições."
+      @tentar-novamente="recarregar()"
+    />
+
+    <div v-else-if="carregando && !atribuicoes.length" class="text-center py-5">
       <div class="spinner-border text-primary" role="status">
         <span class="visually-hidden">Carregando...</span>
       </div>
@@ -497,4 +522,15 @@ const papelBadge = (papel: string) => {
       </template>
     </ModalBase>
   </div>
+
+    <ModalConfirmacao
+      :visivel="confirmacaoSaida"
+      titulo="Alterações não salvas"
+      mensagem="Há alterações não salvas. Deseja realmente sair?"
+      rotulo-confirmar="Sair sem salvar"
+      icone="exclamation-triangle"
+      variante="warning"
+      @confirmar="responderSaida(true)"
+      @cancelar="responderSaida(false)"
+    />
 </template>

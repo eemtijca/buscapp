@@ -57,6 +57,7 @@ export function configTermometroDe(
 export function useOpcoes(tipo: () => string): {
   opcoes: ComputedRef<OpcaoCheckbox[]>;
   pendente: Ref<boolean>;
+  erro: Ref<unknown>;
   garantirDados: () => Promise<void>;
   recarregar: () => Promise<void>;
 } {
@@ -76,6 +77,7 @@ export function useOpcoes(tipo: () => string): {
   return {
     opcoes,
     pendente: consulta.pendente,
+    erro: consulta.erro,
     // Aguarda a primeira leitura quando ainda não há dados, sem forçar revalidação.
     garantirDados: () => consulta.recarregar(false),
     recarregar: () => consulta.recarregar(true),
@@ -86,6 +88,7 @@ export function useOpcoes(tipo: () => string): {
 export function useTags(): {
   tags: ComputedRef<TagComportamento[]>;
   pendente: Ref<boolean>;
+  erro: Ref<unknown>;
   recarregar: () => Promise<void>;
 } {
   const consulta = useConsulta(() => Consultas.tags());
@@ -93,6 +96,7 @@ export function useTags(): {
   return {
     tags,
     pendente: consulta.pendente,
+    erro: consulta.erro,
     recarregar: () => consulta.recarregar(true),
   };
 }
@@ -101,6 +105,7 @@ export function useTags(): {
 export function useTurmas(filtros?: () => Record<string, string | undefined>): {
   turmas: ComputedRef<Turma[]>;
   pendente: Ref<boolean>;
+  erro: Ref<unknown>;
   recarregar: () => Promise<void>;
 } {
   const consulta = useConsulta(() => Consultas.turmas(filtros?.()));
@@ -112,6 +117,7 @@ export function useTurmas(filtros?: () => Record<string, string | undefined>): {
   return {
     turmas,
     pendente: consulta.pendente,
+    erro: consulta.erro,
     recarregar: () => consulta.recarregar(true),
   };
 }
@@ -120,6 +126,7 @@ export function useTurmas(filtros?: () => Record<string, string | undefined>): {
 export function useDisciplinas(filtros?: () => Record<string, string | undefined>): {
   disciplinas: ComputedRef<Disciplina[]>;
   pendente: Ref<boolean>;
+  erro: Ref<unknown>;
   recarregar: () => Promise<void>;
 } {
   const consulta = useConsulta(() => Consultas.disciplinas(filtros?.()));
@@ -129,6 +136,7 @@ export function useDisciplinas(filtros?: () => Record<string, string | undefined
   return {
     disciplinas,
     pendente: consulta.pendente,
+    erro: consulta.erro,
     recarregar: () => consulta.recarregar(true),
   };
 }
@@ -152,6 +160,7 @@ export function useAnosLetivos(): {
 export function useHorariosLetivos(): {
   horarios: ComputedRef<HorarioLetivo[]>;
   pendente: Ref<boolean>;
+  erro: Ref<unknown>;
   recarregar: () => Promise<void>;
 } {
   const consulta = useConsulta(() => Consultas.horarios());
@@ -159,6 +168,7 @@ export function useHorariosLetivos(): {
   return {
     horarios,
     pendente: consulta.pendente,
+    erro: consulta.erro,
     recarregar: () => consulta.recarregar(true),
   };
 }
@@ -167,6 +177,7 @@ export function useHorariosLetivos(): {
 export function useOpcoesConfiguracao(tipo: () => string): {
   opcoes: ComputedRef<OpcaoConfiguracao[]>;
   pendente: Ref<boolean>;
+  erro: Ref<unknown>;
   recarregar: () => Promise<void>;
 } {
   const consulta = useConsulta(() => ({
@@ -179,6 +190,7 @@ export function useOpcoesConfiguracao(tipo: () => string): {
   return {
     opcoes,
     pendente: consulta.pendente,
+    erro: consulta.erro,
     recarregar: () => consulta.recarregar(true),
   };
 }

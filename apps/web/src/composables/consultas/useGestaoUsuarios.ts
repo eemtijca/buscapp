@@ -71,6 +71,7 @@ export function useUsuarios(
   usuarios: ComputedRef<UsuarioItem[]>;
   pendente: Ref<boolean>;
   atualizando: Ref<boolean>;
+  erro: Ref<unknown>;
   recarregar: () => Promise<void>;
 } {
   const consulta = useConsulta(() => {
@@ -102,6 +103,7 @@ export function useUsuarios(
     usuarios,
     pendente: consulta.pendente,
     atualizando: consulta.atualizando,
+    erro: consulta.erro,
     recarregar: () => consulta.recarregar(true),
   };
 }
@@ -111,6 +113,7 @@ export function useAlunos(filtros?: () => { status?: string; busca?: string; lim
   alunos: ComputedRef<AlunoItem[]>;
   pendente: Ref<boolean>;
   atualizando: Ref<boolean>;
+  erro: Ref<unknown>;
   recarregar: () => Promise<void>;
 } {
   const consultaAlunos = useConsulta(() => {
@@ -150,6 +153,7 @@ export function useAlunos(filtros?: () => { status?: string; busca?: string; lim
 
   return {
     alunos,
+    erro: consultaAlunos.erro,
     pendente: computed(() => consultaAlunos.pendente.value || consultaEnturmacoes.pendente.value),
     atualizando: computed(
       () => consultaAlunos.atualizando.value || consultaEnturmacoes.atualizando.value,
@@ -338,6 +342,7 @@ export function useCodigosGerados(): {
   pendente: Ref<boolean>;
   atualizando: Ref<boolean>;
   atualizadoEm: Ref<number | null>;
+  erro: Ref<unknown>;
   recarregar: () => Promise<void>;
 } {
   const consulta = useConsulta(() => Consultas.codigos());
@@ -363,6 +368,7 @@ export function useCodigosGerados(): {
     pendente: consulta.pendente,
     atualizando: consulta.atualizando,
     atualizadoEm: consulta.atualizadoEm,
+    erro: consulta.erro,
     recarregar: () => consulta.recarregar(true),
   };
 }
@@ -371,6 +377,7 @@ export function useCodigosGerados(): {
 export function useSolicitacoesCodigo(): {
   solicitacoes: ComputedRef<SolicitacaoCodigo[]>;
   pendente: Ref<boolean>;
+  erro: Ref<unknown>;
   recarregar: () => Promise<void>;
 } {
   const consultaNotificacoes = useConsulta(() =>
@@ -413,6 +420,7 @@ export function useSolicitacoesCodigo(): {
     pendente: computed(
       () => consultaNotificacoes.pendente.value || consultaUsuarios.pendente.value,
     ),
+    erro: computed(() => consultaNotificacoes.erro.value ?? consultaUsuarios.erro.value),
     recarregar: () =>
       Promise.all([consultaNotificacoes.recarregar(true), consultaUsuarios.recarregar(true)]).then(
         () => undefined,

@@ -7,9 +7,11 @@ import Combobox from '@/componentes/Combobox.vue';
 import type { OpcaoCombobox } from '@/componentes/Combobox.vue';
 import ModalBase from '@/componentes/ModalBase.vue';
 import SeletorIcone from '@/componentes/SeletorIcone.vue';
+import ModalConfirmacao from '@/componentes/ModalConfirmacao.vue';
+import EstadoErro from '@/componentes/EstadoErro.vue';
 import type { TagComportamento } from '@/tipos/database';
 
-const { tags: catalogoTags, pendente, recarregar } = useTags();
+const { tags: catalogoTags, pendente, recarregar, erro } = useTags();
 const tags = computed(() => catalogoTags.value);
 const salvando = ref(false);
 const carregando = computed(() => pendente.value || salvando.value);
@@ -137,10 +139,22 @@ async function alternarAtivo(item: TagComportamento) {
   }
 }
 
-async function excluir(id: string) {
-  const item = tags.value.find((t) => t.id === id);
-  if (!item) return;
-  if (!confirm(`Excluir a tag "${item.nome}"?`)) return;
+const tagParaExcluir = ref<string | null>(null);
+const nomeTagParaExcluir = computed(
+  () => tags.value.find((t) => t.id === tagParaExcluir.value)?.nome ?? '',
+);
+const mensagemExclusaoTag = computed(() =>
+  nomeTagParaExcluir.value ? `Excluir a tag "${nomeTagParaExcluir.value}"?` : '',
+);
+
+function excluir(id: string) {
+  tagParaExcluir.value = id;
+}
+
+async function confirmarExclusao() {
+  const id = tagParaExcluir.value;
+  tagParaExcluir.value = null;
+  if (!id) return;
   try {
     await api(`/api/tags-comportamento/${id}`, { metodo: 'DELETE' });
     mostrarSucesso('Tag excluída.');
@@ -180,7 +194,9 @@ async function excluir(id: string) {
       <button type="button" class="btn-close" @click="mensagemErro = null"></button>
     </div>
 
-    <div v-if="carregando" class="text-center py-4">
+    <EstadoErro v-if="erro" mensagem="Não foi possível carregar as tags." @tentar-novamente="recarregar()" />
+
+    <div v-else-if="carregando" class="text-center py-4">
       <div class="spinner-border text-success" role="status"></div>
     </div>
 
@@ -317,4 +333,14 @@ async function excluir(id: string) {
       </template>
     </ModalBase>
   </div>
+
+    <ModalConfirmacao
+      :visivel="!!tagParaExcluir"
+      titulo="Excluir tag"
+      :mensagem="mensagemExclusaoTag"
+      rotulo-confirmar="Excluir"
+      icone="trash"
+      @confirmar="confirmarExclusao"
+      @cancelar="tagParaExcluir = null"
+    />
 </template>

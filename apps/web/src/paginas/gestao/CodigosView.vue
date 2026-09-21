@@ -11,12 +11,15 @@ import {
 } from '@/composables/consultas/useGestaoUsuarios';
 import { useStatusConexao } from '@/composables/useStatusConexao';
 import ModalBase from '@/componentes/ModalBase.vue';
+import EstadoErro from '@/componentes/EstadoErro.vue';
 import type { SolicitacaoCodigo, CodigoGerado } from '@/tipos/componentes';
 
 const router = useRouter();
 const route = useRoute();
 const consultaSolicitacoes = useSolicitacoesCodigo();
 const consultaCodigos = useCodigosGerados();
+const erroSolicitacoes = consultaSolicitacoes.erro;
+const erroCodigos = consultaCodigos.erro;
 const { status: statusConexao } = useStatusConexao();
 
 const solicitacoes = consultaSolicitacoes.solicitacoes;
@@ -407,7 +410,13 @@ onUnmounted(() => {
       role="tabpanel"
       aria-labelledby="aba-solicitacoes"
     >
-      <div v-if="pendente && !solicitacoes.length" class="text-center py-5">
+      <EstadoErro
+        v-if="erroSolicitacoes"
+        mensagem="Não foi possível carregar as solicitações."
+        @tentar-novamente="consultaSolicitacoes.recarregar()"
+      />
+
+      <div v-else-if="pendente && !solicitacoes.length" class="text-center py-5">
         <div class="spinner-border text-primary" role="status">
           <span class="visually-hidden">Carregando...</span>
         </div>
@@ -512,7 +521,13 @@ onUnmounted(() => {
         </button>
       </div>
 
-      <div v-if="pendente && !codigosGerados.length" class="text-center py-5">
+      <EstadoErro
+        v-if="erroCodigos"
+        mensagem="Não foi possível carregar os códigos."
+        @tentar-novamente="consultaCodigos.recarregar()"
+      />
+
+      <div v-else-if="pendente && !codigosGerados.length" class="text-center py-5">
         <div class="spinner-border text-primary" role="status">
           <span class="visually-hidden">Carregando...</span>
         </div>

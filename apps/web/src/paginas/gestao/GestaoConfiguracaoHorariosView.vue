@@ -6,6 +6,8 @@ import CampoFormulario from '@/componentes/CampoFormulario.vue';
 import Combobox from '@/componentes/Combobox.vue';
 import type { OpcaoCombobox } from '@/componentes/Combobox.vue';
 import ModalBase from '@/componentes/ModalBase.vue';
+import ModalConfirmacao from '@/componentes/ModalConfirmacao.vue';
+import EstadoErro from '@/componentes/EstadoErro.vue';
 import type { HorarioLetivo } from '@/tipos/database';
 
 const diasSemana = [
@@ -18,7 +20,7 @@ const diasSemana = [
   { valor: 6, rotulo: 'Sábado' },
 ];
 
-const { horarios, pendente, recarregar } = useHorariosLetivos();
+const { horarios, pendente, recarregar, erro } = useHorariosLetivos();
 const salvando = ref(false);
 const carregando = computed(() => pendente.value || salvando.value);
 const mensagemSucesso = ref<string | null>(null);
@@ -126,8 +128,16 @@ async function alternarAtivo(item: HorarioLetivo) {
   }
 }
 
+const horarioParaExcluir = ref<string | null>(null);
+
 async function excluir(id: string) {
-  if (!confirm('Excluir este horário?')) return;
+  horarioParaExcluir.value = id;
+}
+
+async function confirmarExclusao() {
+  const id = horarioParaExcluir.value;
+  horarioParaExcluir.value = null;
+  if (!id) return;
   try {
     await api(`/api/horarios/${id}`, { metodo: 'DELETE' });
     mostrarSucesso('Horário excluído.');
@@ -172,7 +182,9 @@ async function excluir(id: string) {
       <button type="button" class="btn-close" @click="mensagemErro = null"></button>
     </div>
 
-    <div v-if="carregando" class="text-center py-4">
+    <EstadoErro v-if="erro" mensagem="Não foi possível carregar os horários." @tentar-novamente="recarregar()" />
+
+    <div v-else-if="carregando" class="text-center py-4">
       <div class="spinner-border text-success" role="status"></div>
     </div>
 
@@ -279,4 +291,14 @@ async function excluir(id: string) {
       </template>
     </ModalBase>
   </div>
+
+    <ModalConfirmacao
+      :visivel="!!horarioParaExcluir"
+      titulo="Excluir horário"
+      mensagem="Excluir este horário?"
+      rotulo-confirmar="Excluir"
+      icone="trash"
+      @confirmar="confirmarExclusao"
+      @cancelar="horarioParaExcluir = null"
+    />
 </template>

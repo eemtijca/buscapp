@@ -10,10 +10,12 @@ import {
 } from '@/utils/mensagemExplicita';
 import CampoFormulario from '@/componentes/CampoFormulario.vue';
 import ModalBase from '@/componentes/ModalBase.vue';
+import ModalConfirmacao from '@/componentes/ModalConfirmacao.vue';
+import EstadoErro from '@/componentes/EstadoErro.vue';
 import type { Disciplina } from '@/tipos/database';
 
 const router = useRouter();
-const { disciplinas, pendente, recarregar: recarregarDisciplinas } = useDisciplinas();
+const { disciplinas, pendente, erro, recarregar: recarregarDisciplinas } = useDisciplinas();
 const salvando = ref(false);
 const carregando = computed(() => pendente.value || salvando.value);
 const mensagemSucesso = ref<string | null>(null);
@@ -42,13 +44,22 @@ const {
 let timerSucesso: ReturnType<typeof setTimeout> | null = null;
 let timerErro: ReturnType<typeof setTimeout> | null = null;
 
-onBeforeRouteLeave((_to, _from, next) => {
-  if (formDirty.value && modalAberto.value && !carregando.value) {
-    const confirmar = window.confirm('Há alterações não salvas. Deseja realmente sair?');
-    if (!confirmar) return next(false);
-  }
-  next();
+const confirmacaoSaida = ref(false);
+let resolverSaida: ((permitir: boolean) => void) | null = null;
+
+onBeforeRouteLeave(async () => {
+  if (!(formDirty.value && modalAberto.value && !carregando.value)) return true;
+  confirmacaoSaida.value = true;
+  return new Promise<boolean>((resolver) => {
+    resolverSaida = resolver;
+  });
 });
+
+function responderSaida(permitir: boolean): void {
+  confirmacaoSaida.value = false;
+  resolverSaida?.(permitir);
+  resolverSaida = null;
+}
 
 watch([formNome, formCodigoSige, formCargaHoraria, formAtivo], () => {
   if (snapshotPausado.value) return;
@@ -238,7 +249,13 @@ async function alternarAtivo(disciplina: Disciplina) {
       ></button>
     </div>
 
-    <div v-if="carregando && !disciplinas.length" class="text-center py-5">
+    <EstadoErro
+      v-if="erro"
+      mensagem="Não foi possível carregar as disciplinas."
+      @tentar-novamente="recarregarDisciplinas()"
+    />
+
+    <div v-else-if="carregando && !disciplinas.length" class="text-center py-5">
       <div class="spinner-border text-primary" role="status">
         <span class="visually-hidden">Carregando...</span>
       </div>
@@ -375,4 +392,15 @@ async function alternarAtivo(disciplina: Disciplina) {
       </template>
     </ModalBase>
   </div>
+
+    <ModalConfirmacao
+      :visivel="confirmacaoSaida"
+      titulo="Alterações não salvas"
+      mensagem="Há alterações não salvas. Deseja realmente sair?"
+      rotulo-confirmar="Sair sem salvar"
+      icone="exclamation-triangle"
+      variante="warning"
+      @confirmar="responderSaida(true)"
+      @cancelar="responderSaida(false)"
+    />
 </template>

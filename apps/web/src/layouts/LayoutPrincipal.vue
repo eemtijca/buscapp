@@ -13,6 +13,7 @@ import NotificacoesPopover from '@/componentes/NotificacoesPopover.vue';
 
 const router = useRouter();
 const { usuario, logout } = useAutenticacao();
+const conteudoPrincipal = ref<HTMLElement | null>(null);
 const { status } = useStatusConexao();
 const { naoLidasMensagens, iniciar, parar } = useNotificacoes();
 const { iniciar: iniciarStatusConta, parar: pararStatusConta } = useStatusConta();
@@ -39,6 +40,11 @@ onUnmounted(() => {
   parar();
   pararStatusConta();
   pararVerificacao();
+});
+
+// O container de conteúdo mantém a posição entre rotas; cada navegação volta ao topo.
+router.afterEach(() => {
+  conteudoPrincipal.value?.scrollTo({ top: 0 });
 });
 
 async function handleLogout(): Promise<void> {
@@ -139,7 +145,13 @@ const papelChat = () => {
       </template>
     </CabecalhoNavegacao>
 
-    <main id="conteudoPrincipal" class="flex-grow-1 overflow-y-auto" role="main" tabindex="-1">
+    <main
+      id="conteudoPrincipal"
+      ref="conteudoPrincipal"
+      class="flex-grow-1 overflow-y-auto"
+      role="main"
+      tabindex="-1"
+    >
       <router-view />
     </main>
 

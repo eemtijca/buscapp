@@ -12,6 +12,8 @@ import CampoFormulario from '@/componentes/CampoFormulario.vue';
 import Combobox from '@/componentes/Combobox.vue';
 import type { OpcaoCombobox } from '@/componentes/Combobox.vue';
 import ModalBase from '@/componentes/ModalBase.vue';
+import ModalConfirmacao from '@/componentes/ModalConfirmacao.vue';
+import EstadoErro from '@/componentes/EstadoErro.vue';
 import type { Turma } from '@/tipos/database';
 
 const router = useRouter();
@@ -19,7 +21,7 @@ const router = useRouter();
 const { opcoes: opcoesSerie } = useOpcoes(() => 'serie_turma');
 const { opcoes: opcoesLetra } = useOpcoes(() => 'letra_turma');
 const { anoAtivo } = useAnoLetivoAtivo();
-const { turmas, pendente, recarregar } = useTurmas();
+const { turmas, pendente, erro, recarregar } = useTurmas();
 const salvando = ref(false);
 const carregando = computed(() => pendente.value || salvando.value);
 const mensagemSucesso = ref<string | null>(null);
@@ -55,13 +57,22 @@ const letraOpcoes = computed<OpcaoCombobox[]>(() =>
   opcoesLetra.value.map((o) => ({ valor: o.valor, rotulo: o.rotulo, icone: o.icone })),
 );
 
-onBeforeRouteLeave((_to, _from, next) => {
-  if (formDirty.value && modalAberto.value && !carregando.value) {
-    const confirmar = window.confirm('Há alterações não salvas. Deseja realmente sair?');
-    if (!confirmar) return next(false);
-  }
-  next();
+const confirmacaoSaida = ref(false);
+let resolverSaida: ((permitir: boolean) => void) | null = null;
+
+onBeforeRouteLeave(async () => {
+  if (!(formDirty.value && modalAberto.value && !carregando.value)) return true;
+  confirmacaoSaida.value = true;
+  return new Promise<boolean>((resolver) => {
+    resolverSaida = resolver;
+  });
 });
+
+function responderSaida(permitir: boolean): void {
+  confirmacaoSaida.value = false;
+  resolverSaida?.(permitir);
+  resolverSaida = null;
+}
 
 watch([formSerie, formLetra, formCapacidade, formAtivo], () => {
   // snapshot cuida do dirty; watch apenas para compatibilidade futura
@@ -262,7 +273,13 @@ async function alternarAtivo(turma: Turma) {
       ></button>
     </div>
 
-    <div v-if="carregando && !turmas.length" class="text-center py-5">
+    <EstadoErro
+      v-if="erro"
+      mensagem="Não foi possível carregar as turmas."
+      @tentar-novamente="recarregar()"
+    />
+
+    <div v-else-if="carregando && !turmas.length" class="text-center py-5">
       <div class="spinner-border text-primary" role="status">
         <span class="visually-hidden">Carregando...</span>
       </div>
@@ -403,4 +420,15 @@ async function alternarAtivo(turma: Turma) {
       </template>
     </ModalBase>
   </div>
+
+    <ModalConfirmacao
+      :visivel="confirmacaoSaida"
+      titulo="Alterações não salvas"
+      mensagem="Há alterações não salvas. Deseja realmente sair?"
+      rotulo-confirmar="Sair sem salvar"
+      icone="exclamation-triangle"
+      variante="warning"
+      @confirmar="responderSaida(true)"
+      @cancelar="responderSaida(false)"
+    />
 </template>

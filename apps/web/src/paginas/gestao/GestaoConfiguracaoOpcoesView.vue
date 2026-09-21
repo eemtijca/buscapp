@@ -7,13 +7,15 @@ import { useAlturaUniformeCards } from '@/composables/useAlturaUniformeCards';
 import CampoFormulario from '@/componentes/CampoFormulario.vue';
 import CartaoSelecao from '@/componentes/CartaoSelecao.vue';
 import ModalBase from '@/componentes/ModalBase.vue';
+import ModalConfirmacao from '@/componentes/ModalConfirmacao.vue';
+import EstadoErro from '@/componentes/EstadoErro.vue';
 import { obterRegra, gerarChave } from '@/utils/opcoesConfiguracao';
 import type { OpcaoConfiguracao } from '@/tipos/database';
 import Sortable from 'sortablejs';
 
 const route = useRoute();
 const tipo = computed(() => route.params.tipo as string);
-const { opcoes: opcoesRemotas, pendente, recarregar } = useOpcoesConfiguracao(() => tipo.value);
+const { opcoes: opcoesRemotas, pendente, recarregar, erro } = useOpcoesConfiguracao(() => tipo.value);
 
 const regra = computed(() => obterRegra(tipo.value));
 const tituloPagina = computed(() => regra.value.titulo);
@@ -302,13 +304,25 @@ async function alternarAtivo(item: OpcaoConfiguracao) {
   }
 }
 
-async function excluir(id: string) {
-  const item = opcoes.value.find((o) => o.id === id);
-  if (!item) return;
-  if (!confirm(`Excluir "${item.rotulo}"?`)) return;
+const opcaoParaExcluir = ref<string | null>(null);
+const rotuloOpcaoParaExcluir = computed(
+  () => opcoes.value.find((o) => o.id === opcaoParaExcluir.value)?.rotulo ?? '',
+);
+const mensagemExclusaoOpcao = computed(() =>
+  rotuloOpcaoParaExcluir.value ? `Excluir "${rotuloOpcaoParaExcluir.value}"?` : '',
+);
+
+function excluir(id: string) {
+  opcaoParaExcluir.value = id;
+}
+
+async function confirmarExclusao() {
+  const id = opcaoParaExcluir.value;
+  opcaoParaExcluir.value = null;
+  if (!id) return;
   try {
     await api(`/api/opcoes/${id}`, { metodo: 'DELETE' });
-    mostrarSucesso(`"${item.rotulo}" excluído.`);
+    mostrarSucesso('Opção excluída.');
     await recarregar();
   } catch (e) {
     mostrarErro(e instanceof Error ? e.message : String(e));
@@ -373,7 +387,9 @@ onUnmounted(() => {
       }}<button type="button" class="btn-close" @click="mensagemErro = null"></button>
     </div>
 
-    <div v-if="carregando && !opcoes.length" class="text-center py-4">
+    <EstadoErro v-if="erro" mensagem="Não foi possível carregar as opções." @tentar-novamente="recarregar()" />
+
+    <div v-else-if="carregando && !opcoes.length" class="text-center py-4">
       <div class="spinner-border text-success"></div>
     </div>
 
@@ -540,4 +556,14 @@ onUnmounted(() => {
       </template>
     </ModalBase>
   </div>
+
+    <ModalConfirmacao
+      :visivel="!!opcaoParaExcluir"
+      titulo="Excluir opção"
+      :mensagem="mensagemExclusaoOpcao"
+      rotulo-confirmar="Excluir"
+      icone="trash"
+      @confirmar="confirmarExclusao"
+      @cancelar="opcaoParaExcluir = null"
+    />
 </template>

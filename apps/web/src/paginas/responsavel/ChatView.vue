@@ -26,7 +26,7 @@ const { contatos, pendente: carregandoContatos } = useContatosChat(
 );
 
 const conversaAtivaId = ref<string | null>(null);
-const { mensagens } = useConversaDetalhe(
+const { mensagens, temAnteriores, carregandoAnteriores, carregarAnteriores } = useConversaDetalhe(
   () => conversaAtivaId.value,
   () => usuario.value?.id,
 );
@@ -134,8 +134,11 @@ function handleVoltar() {
         'Coordenação Escolar' + (horarioAtivo ? ' · Online agora' : ' · Fora do horário')
       "
       :contato-selecionado="contatoAtivo"
+      :tem-mensagens-anteriores="temAnteriores"
+      :carregando-anteriores="carregandoAnteriores"
       @selecionar-conversa="selecionarConversa"
       @enviar-mensagem="handleEnviarMensagem"
+      @carregar-anteriores="carregarAnteriores"
       @voltar="handleVoltar"
     />
   </div>

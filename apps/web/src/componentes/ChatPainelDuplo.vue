@@ -20,6 +20,8 @@ const props = withDefaults(
     mostrarBotaoFechar?: boolean;
     contatoSelecionado?: ContatoChat | null;
     mostrarChatInicialmente?: boolean;
+    temMensagensAnteriores?: boolean;
+    carregandoAnteriores?: boolean;
   }>(),
   {
     podeEnviar: true,
@@ -29,6 +31,8 @@ const props = withDefaults(
     mostrarBotaoFechar: false,
     contatoSelecionado: null,
     mostrarChatInicialmente: false,
+    temMensagensAnteriores: false,
+    carregandoAnteriores: false,
   },
 );
 
@@ -38,6 +42,7 @@ const emit = defineEmits<{
   fecharConversa: [];
   voltar: [];
   ocultar: [conversaId: string];
+  carregarAnteriores: [];
 }>();
 
 const mobileMostraChat = ref(props.mostrarChatInicialmente);
@@ -92,7 +97,10 @@ function handleVoltar() {
         :pode-enviar="podeEnviar"
         :mostrar-botao-voltar="mobileMostraChat"
         :mostrar-botao-fechar="mostrarBotaoFechar"
+        :tem-mensagens-anteriores="temMensagensAnteriores"
+        :carregando-anteriores="carregandoAnteriores"
         @enviar-mensagem="emit('enviarMensagem', $event)"
+        @carregar-anteriores="emit('carregarAnteriores')"
         @voltar="handleVoltar"
         @fechar-conversa="emit('fecharConversa')"
       />

@@ -5,7 +5,8 @@ import { useAlunos } from '@/composables/consultas/useGestaoUsuarios';
 
 const router = useRouter();
 const route = useRoute();
-const { alunos, pendente, atualizando, recarregar } = useAlunos();
+const limite = ref(50);
+const { alunos, pendente, atualizando, recarregar } = useAlunos(() => ({ limite: limite.value }));
 
 const busca = ref((route.query.busca as string) ?? '');
 const filtroStatus = ref<'todos' | 'ativo' | 'egresso' | 'transferido' | 'inativo'>(
@@ -240,6 +241,23 @@ const statusBadge = (status: string) => {
             </tr>
           </tbody>
         </table>
+      </div>
+
+      <div v-if="alunos.length >= limite" class="text-center mt-3">
+        <button
+          type="button"
+          class="btn btn-sm btn-outline-secondary"
+          :disabled="atualizando"
+          @click="limite += 50"
+        >
+          <span
+            v-if="atualizando"
+            class="spinner-border spinner-border-sm me-1"
+            role="status"
+            aria-hidden="true"
+          ></span>
+          Carregar mais alunos
+        </button>
       </div>
     </div>
   </div>

@@ -11,7 +11,8 @@ import type { UsuarioItem } from '@/tipos/componentes';
 
 const router = useRouter();
 const route = useRoute();
-const { usuarios, pendente, atualizando, recarregar } = useUsuarios();
+const limite = ref(50);
+const { usuarios, pendente, atualizando, recarregar } = useUsuarios(() => ({ limite: limite.value }));
 
 const busca = ref((route.query.busca as string) ?? '');
 const filtroPapel = ref<'todos' | 'professor' | 'responsavel'>(
@@ -385,6 +386,23 @@ async function executarToggleAtivacao() {
             </tr>
           </tbody>
         </table>
+      </div>
+
+      <div v-if="usuarios.length >= limite" class="text-center mt-3">
+        <button
+          type="button"
+          class="btn btn-sm btn-outline-secondary"
+          :disabled="atualizando"
+          @click="limite += 50"
+        >
+          <span
+            v-if="atualizando"
+            class="spinner-border spinner-border-sm me-1"
+            role="status"
+            aria-hidden="true"
+          ></span>
+          Carregar mais usuários
+        </button>
       </div>
     </div>
 

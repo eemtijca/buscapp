@@ -19,13 +19,14 @@ import type { OpcaoCheckbox } from '@/tipos/componentes';
 
 const router = useRouter();
 const { usuario } = useAutenticacao();
-const { ocorrencias, pendente, atualizando, recarregar } = useOcorrenciasGraves();
+const { ocorrencias, pendente, atualizando, recarregar } = useOcorrenciasGraves(() => limite.value);
 const { alunos } = useAlunosFrequencia(() => '');
 const { opcoes: opcoesTipo } = useOpcoes(() => 'tipo_ocorrencia');
 const { tags: catalogoTags } = useTags();
 
 const mensagemSucesso = ref<string | null>(null);
 const mensagemErro = ref<string | null>(null);
+const limite = ref(50);
 
 // Registro de ocorrência pela gestão (mesmo fluxo do professor).
 const mostrarFormulario = ref(false);
@@ -321,6 +322,22 @@ async function registrarOcorrencia() {
           </div>
         </div>
         <ListaOcorrencias v-else :ocorrencias="ocorrencias" @bloquear-retorno="alternarBloqueio" />
+      </div>
+      <div v-if="ocorrencias.length >= limite" class="text-center mt-3">
+        <button
+          type="button"
+          class="btn btn-sm btn-outline-secondary"
+          :disabled="atualizando"
+          @click="limite += 50"
+        >
+          <span
+            v-if="atualizando"
+            class="spinner-border spinner-border-sm me-1"
+            role="status"
+            aria-hidden="true"
+          ></span>
+          Carregar mais ocorrências
+        </button>
       </div>
     </div>
     <ModalConfirmacao

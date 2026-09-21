@@ -14,6 +14,8 @@ const props = withDefaults(
     podeEnviar?: boolean;
     mostrarBotaoVoltar?: boolean;
     mostrarBotaoFechar?: boolean;
+    temMensagensAnteriores?: boolean;
+    carregandoAnteriores?: boolean;
   }>(),
   {
     mensagemForaHorario: '',
@@ -23,6 +25,8 @@ const props = withDefaults(
     podeEnviar: true,
     mostrarBotaoVoltar: false,
     mostrarBotaoFechar: false,
+    temMensagensAnteriores: false,
+    carregandoAnteriores: false,
   },
 );
 
@@ -30,6 +34,7 @@ const emit = defineEmits<{
   'enviar-mensagem': [texto: string];
   voltar: [];
   'fechar-conversa': [];
+  'carregar-anteriores': [];
 }>();
 
 const texto = ref('');
@@ -134,6 +139,24 @@ watch(
       aria-live="polite"
       aria-label="Histórico de mensagens"
     >
+      <div v-if="temMensagensAnteriores" class="text-center mb-2">
+        <button
+          type="button"
+          class="btn btn-sm btn-outline-secondary"
+          :disabled="carregandoAnteriores"
+          @click="emit('carregar-anteriores')"
+        >
+          <span
+            v-if="carregandoAnteriores"
+            class="spinner-border spinner-border-sm me-1"
+            role="status"
+            aria-hidden="true"
+          ></span>
+          <i v-else class="bi bi-arrow-up-circle me-1" aria-hidden="true"></i>
+          Carregar mensagens anteriores
+        </button>
+      </div>
+
       <div v-if="!grupos.length" class="text-body-secondary text-center my-auto py-4">
         <span
           class="d-inline-flex align-items-center justify-content-center rounded-circle bg-body-tertiary mb-3"

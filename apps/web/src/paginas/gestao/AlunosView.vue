@@ -1,13 +1,26 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
-import { useRouter } from 'vue-router';
+import { computed, ref, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { useAlunos } from '@/composables/consultas/useGestaoUsuarios';
 
 const router = useRouter();
+const route = useRoute();
 const { alunos, pendente, atualizando, recarregar } = useAlunos();
 
-const busca = ref('');
-const filtroStatus = ref<'todos' | 'ativo' | 'egresso' | 'transferido' | 'inativo'>('todos');
+const busca = ref((route.query.busca as string) ?? '');
+const filtroStatus = ref<'todos' | 'ativo' | 'egresso' | 'transferido' | 'inativo'>(
+  (route.query.status as 'ativo' | 'egresso' | 'transferido' | 'inativo') ?? 'todos',
+);
+
+// Filtros ficam na URL para preservar o contexto no refresh e permitir link direto.
+watch([busca, filtroStatus], () => {
+  void router.replace({
+    query: {
+      ...(busca.value ? { busca: busca.value } : {}),
+      ...(filtroStatus.value !== 'todos' ? { status: filtroStatus.value } : {}),
+    },
+  });
+});
 
 const alunosFiltrados = computed(() => {
   let lista = alunos.value;

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import {
   gerarCodigoRedefinicao,
   limparCodigosNaoAtivos,
@@ -14,6 +14,7 @@ import ModalBase from '@/componentes/ModalBase.vue';
 import type { SolicitacaoCodigo, CodigoGerado } from '@/tipos/componentes';
 
 const router = useRouter();
+const route = useRoute();
 const consultaSolicitacoes = useSolicitacoesCodigo();
 const consultaCodigos = useCodigosGerados();
 const { status: statusConexao } = useStatusConexao();
@@ -45,7 +46,14 @@ let timerGlobal: ReturnType<typeof setInterval> | null = null;
 
 const codigosVisiveis = ref<Set<string>>(new Set());
 const codigosSessao = ref<Record<string, string>>({});
-const guiaAtiva = ref<'pendentes' | 'recentes'>('pendentes');
+const guiaAtiva = ref<'pendentes' | 'recentes'>(
+  route.query.aba === 'codigos' ? 'recentes' : 'pendentes',
+);
+
+// A aba fica na URL para preservar o contexto no refresh e permitir link direto.
+watch(guiaAtiva, (aba) => {
+  void router.replace({ query: aba === 'recentes' ? { aba: 'codigos' } : {} });
+});
 
 const filtroBusca = ref('');
 const paginaAtual = ref(1);

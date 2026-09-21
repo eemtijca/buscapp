@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { useAutenticacao } from '@/composables/useAutenticacao';
 import {
   enviarMensagem,
@@ -15,6 +15,7 @@ import { useNotificacoes } from '@/composables/useNotificacoes';
 import ChatPainelDuplo from '@/componentes/ChatPainelDuplo.vue';
 
 const router = useRouter();
+const route = useRoute();
 const { usuario } = useAutenticacao();
 const { filhos } = useFilhosResponsavel();
 const { marcarNotificacoesConversaLidas } = useNotificacoes();
@@ -53,6 +54,11 @@ watch(
 watch(
   contatos,
   (lista) => {
+    const inicial = route.query.conversa as string | undefined;
+    if (!conversaAtivaId.value && inicial && lista.some((c) => c.conversaId === inicial)) {
+      void selecionarConversa(inicial);
+      return;
+    }
     if (!conversaAtivaId.value && lista.length) void selecionarConversa(lista[0]!.conversaId);
   },
   { immediate: true },
@@ -60,6 +66,8 @@ watch(
 
 async function selecionarConversa(conversaId: string) {
   conversaAtivaId.value = conversaId;
+  // A conversa ativa fica na URL para sobreviver ao refresh e permitir link direto.
+  void router.replace({ query: { conversa: conversaId } });
   await Promise.all([
     marcarMensagensComoLidas(conversaId),
     marcarNotificacoesConversaLidas(conversaId),

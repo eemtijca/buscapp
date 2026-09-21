@@ -1,16 +1,29 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
-import { useRouter } from 'vue-router';
+import { computed, ref, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { useRankingRisco } from '@/composables/consultas/useMonitoramento';
 import { abrirConversaDoAluno } from '@/composables/consultas/useChat';
 import CartaoAlunoRisco from '@/componentes/CartaoAlunoRisco.vue';
 import type { AlunoRisco } from '@/tipos/componentes';
 
 const router = useRouter();
+const route = useRoute();
 const { ranking, pendente, atualizando, erro, recarregar } = useRankingRisco();
 
-const filtroRisco = ref<'todos' | 'alto' | 'medio' | 'baixo'>('todos');
-const buscaAluno = ref('');
+const filtroRisco = ref<'todos' | 'alto' | 'medio' | 'baixo'>(
+  (route.query.risco as 'alto' | 'medio' | 'baixo') ?? 'todos',
+);
+const buscaAluno = ref((route.query.busca as string) ?? '');
+
+// Filtros ficam na URL para preservar o contexto no refresh e permitir link direto.
+watch([filtroRisco, buscaAluno], () => {
+  void router.replace({
+    query: {
+      ...(filtroRisco.value !== 'todos' ? { risco: filtroRisco.value } : {}),
+      ...(buscaAluno.value ? { busca: buscaAluno.value } : {}),
+    },
+  });
+});
 const mensagemInfo = ref<string | null>(null);
 
 let timeoutInfo: ReturnType<typeof setTimeout> | null = null;

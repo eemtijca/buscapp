@@ -60,6 +60,8 @@ function mostrarStatus(msg: string) {
 async function selecionarConversa(conversaId: string) {
   conversaAtivaId.value = conversaId;
   confirmandoExcluir.value = false;
+  // A conversa ativa fica na URL para sobreviver ao refresh e permitir link direto.
+  void router.replace({ query: { conversa: conversaId } });
   await Promise.all([
     marcarMensagensComoLidas(conversaId),
     marcarNotificacoesConversaLidas(conversaId),

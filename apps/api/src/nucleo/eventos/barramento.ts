@@ -18,10 +18,14 @@ interface MensagemEvento {
 
 interface Conexao {
   usuarioId: string;
+  criadaEm: number;
   enviar: (dados: string) => void;
+  encerrar: () => void;
 }
 
 const conexoes = new Set<Conexao>();
+/** Conexões simultâneas por usuário; a mais antiga cede lugar para a nova. */
+export const MAX_CONEXOES_POR_USUARIO = 3;
 const CANAL = 'buscapp_eventos';
 /** Limite de payload do `pg_notify`. */
 const LIMITE_PAYLOAD = 7_000;
@@ -184,6 +188,50 @@ export function contarConexoes(): number {
   return conexoes.size;
 }
 
+/** Quantidade de conexões SSE abertas para um usuário. */
+export function contarConexoesPorUsuario(usuarioId: string): number {
+  let total = 0;
+  for (const conexao of conexoes) {
+    if (conexao.usuarioId === usuarioId) total += 1;
+  }
+  return total;
+}
+
+/** Encerra todas as conexões SSE abertas e devolve quantas foram fechadas. */
+export function encerrarConexoes(): number {
+  const abertas = [...conexoes];
+  for (const conexao of abertas) {
+    try {
+      conexao.enviar(
+        `event: aviso\ndata: ${JSON.stringify({ codigo: 'servidor_encerrando' })}\n\n`,
+      );
+    } catch {
+      /* conexão já encerrada */
+    }
+    conexao.encerrar();
+  }
+  return abertas.length;
+}
+
+/** Avisa e encerra a conexão mais antiga do usuário quando o limite é atingido. */
+function liberarVaga(usuarioId: string): void {
+  let maisAntiga: Conexao | null = null;
+  for (const conexao of conexoes) {
+    if (conexao.usuarioId !== usuarioId) continue;
+    if (!maisAntiga || conexao.criadaEm < maisAntiga.criadaEm) maisAntiga = conexao;
+  }
+  if (!maisAntiga) return;
+
+  try {
+    maisAntiga.enviar(
+      `event: aviso\ndata: ${JSON.stringify({ codigo: 'limite_conexoes', maximo: MAX_CONEXOES_POR_USUARIO })}\n\n`,
+    );
+  } catch {
+    /* conexão já encerrada */
+  }
+  maisAntiga.encerrar();
+}
+
 export function conectarEventos(
   usuarioId: string,
   resposta: FastifyReply,
@@ -207,7 +255,23 @@ export function conectarEventos(
   });
   bruto.write(': conectado\n\n');
 
-  const conexao: Conexao = { usuarioId, enviar: (dados) => bruto.write(dados) };
+  let encerrada = false;
+  const encerrar = () => {
+    if (encerrada) return;
+    encerrada = true;
+    clearInterval(heartbeat);
+    conexoes.delete(conexao);
+    bruto.end();
+  };
+
+  if (contarConexoesPorUsuario(usuarioId) >= MAX_CONEXOES_POR_USUARIO) liberarVaga(usuarioId);
+
+  const conexao: Conexao = {
+    usuarioId,
+    criadaEm: Date.now(),
+    enviar: (dados) => bruto.write(dados),
+    encerrar,
+  };
   conexoes.add(conexao);
 
   const heartbeat = setInterval(() => {
@@ -217,12 +281,6 @@ export function conectarEventos(
       /* conexão encerrando */
     }
   }, 25_000);
-
-  const encerrar = () => {
-    clearInterval(heartbeat);
-    conexoes.delete(conexao);
-    bruto.end();
-  };
 
   bruto.on('close', encerrar);
   bruto.on('error', encerrar);

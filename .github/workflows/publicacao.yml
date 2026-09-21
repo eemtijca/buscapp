@@ -1,4 +1,4 @@
-name: Publicação
+name: Publicação da imagem (GHCR)
 
 on:
   push:

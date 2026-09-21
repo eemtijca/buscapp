@@ -10,6 +10,7 @@
     "type-check": "npm run build -w @buscapp/contratos && prisma generate && tsc --noEmit",
     "generate": "prisma generate",
     "migrate:deploy": "prisma migrate deploy",
+    "pretest": "prisma generate",
     "test": "vitest run",
     "test:watch": "vitest",
     "seed": "tsx prisma/seeds/dev.ts",

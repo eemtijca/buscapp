@@ -1,4 +1,4 @@
-name: Qualidade
+name: Qualidade (tipos, lint e build)
 
 on:
   push:

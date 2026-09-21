@@ -229,12 +229,17 @@ async function excluir(id: string) {
                   class="form-check-input"
                   type="checkbox"
                   :checked="item.ativo"
+                  :aria-label="`Ativo: ${item.nome}`"
                   @change="alternarAtivo(item)"
                 />
               </div>
             </td>
             <td class="text-end">
-              <button class="btn btn-outline-primary btn-sm me-1" @click="abrirEditar(item)">
+              <button
+                class="btn btn-outline-primary btn-sm me-1"
+                :aria-label="`Editar tag ${item.nome}`"
+                @click="abrirEditar(item)"
+              >
                 <i class="bi bi-pencil"></i>
               </button>
               <button class="btn btn-outline-danger btn-sm" @click="excluir(item.id)">

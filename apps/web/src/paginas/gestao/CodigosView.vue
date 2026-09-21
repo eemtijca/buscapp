@@ -354,12 +354,16 @@ onUnmounted(() => {
       {{ mensagemErro }}
     </div>
 
-    <ul class="nav nav-tabs mb-3">
-      <li class="nav-item">
+    <ul class="nav nav-tabs mb-3" role="tablist">
+      <li class="nav-item" role="presentation">
         <button
+          id="aba-solicitacoes"
           type="button"
+          role="tab"
           class="nav-link small"
           :class="{ active: guiaAtiva === 'pendentes' }"
+          :aria-selected="guiaAtiva === 'pendentes'"
+          aria-controls="painel-solicitacoes"
           @click="guiaAtiva = 'pendentes'"
         >
           <i class="bi bi-inbox me-1" aria-hidden="true"></i>
@@ -369,11 +373,15 @@ onUnmounted(() => {
           }}</span>
         </button>
       </li>
-      <li class="nav-item">
+      <li class="nav-item" role="presentation">
         <button
+          id="aba-codigos"
           type="button"
+          role="tab"
           class="nav-link small"
           :class="{ active: guiaAtiva === 'recentes' }"
+          :aria-selected="guiaAtiva === 'recentes'"
+          aria-controls="painel-codigos"
           @click="guiaAtiva = 'recentes'"
         >
           <i class="bi bi-clock-history me-1" aria-hidden="true"></i>
@@ -385,7 +393,7 @@ onUnmounted(() => {
       </li>
     </ul>
 
-    <div v-if="guiaAtiva === 'pendentes'">
+    <div v-if="guiaAtiva === 'pendentes'" id="painel-solicitacoes" role="tabpanel" aria-labelledby="aba-solicitacoes">
       <div v-if="pendente && !solicitacoes.length" class="text-center py-5">
         <div class="spinner-border text-primary" role="status">
           <span class="visually-hidden">Carregando...</span>
@@ -444,7 +452,7 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <div v-else>
+    <div v-else id="painel-codigos" role="tabpanel" aria-labelledby="aba-codigos">
       <div class="mb-3 d-flex gap-2">
         <div class="input-group input-group-sm flex-grow-1">
           <span class="input-group-text bg-body-tertiary border-end-0">

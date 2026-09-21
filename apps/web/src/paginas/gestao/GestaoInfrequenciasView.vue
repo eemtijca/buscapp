@@ -353,9 +353,10 @@ watch(dataAula, () => {
           </div>
 
           <div class="mb-3">
-            <label class="form-label small fw-medium mb-2">Períodos</label>
+            <span class="form-label small fw-medium mb-2 d-block">Períodos</span>
             <GrupoCheckbox
               nome="periodoChamadaGestao"
+              rotulo="Períodos"
               :opcoes="opcoesPeriodos"
               :modelo="periodosChamada"
               :colunas="4"

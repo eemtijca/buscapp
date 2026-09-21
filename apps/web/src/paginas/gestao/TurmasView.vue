@@ -309,6 +309,7 @@ async function alternarAtivo(turma: Turma) {
                     type="button"
                     class="btn btn-sm btn-outline-success"
                     :disabled="carregando"
+                    :aria-label="'Editar turma ' + turma.nome_completo"
                     @click="abrirEditar(turma)"
                   >
                     <i class="bi bi-pencil" aria-hidden="true"></i>

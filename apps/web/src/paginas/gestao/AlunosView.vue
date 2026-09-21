@@ -219,6 +219,7 @@ const statusBadge = (status: string) => {
                 <router-link
                   :to="'/gestao/alunos/' + aluno.id"
                   class="btn btn-sm btn-outline-success"
+                  :aria-label="'Editar aluno ' + aluno.nome"
                 >
                   <i class="bi bi-pencil" aria-hidden="true"></i>
                 </router-link>

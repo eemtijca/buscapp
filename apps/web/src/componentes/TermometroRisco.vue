@@ -38,7 +38,13 @@ const configNivel: Record<
 };
 
 // O nível alto é exibido como Risco alto para responsáveis e como Crítico na gestão, mantendo a mesma regra de negócio com linguagem suavizada.
-const config = computed(() => configNivel[props.termometro.nivel]);
+const config = computed(() => configNivel[props.termometro.nivel] ?? configNivel.baixo);
+
+/** Limites de faltas com padrões seguros quando a API não os informa. */
+const limites = computed(() => ({
+  preventivo: props.termometro.limites?.preventivo ?? 10,
+  critico: props.termometro.limites?.critico ?? 25,
+}));
 
 /** Limiares do score utilizados como referência para as faixas amarela e vermelha. */
 const pctMedio = computed(() => props.termometro.limites?.medio ?? 40);
@@ -183,11 +189,11 @@ const tendenciaInfo = computed(() => {
             <tbody class="text-body-secondary">
               <tr>
                 <th scope="row" class="fw-normal">Atenção</th>
-                <td>A partir de {{ termometro.limites.preventivo }} faltas injustificadas</td>
+                <td>A partir de {{ limites.preventivo }} faltas injustificadas</td>
               </tr>
               <tr>
                 <th scope="row" class="fw-normal">Alerta máximo</th>
-                <td>A partir de {{ termometro.limites.critico }} faltas injustificadas</td>
+                <td>A partir de {{ limites.critico }} faltas injustificadas</td>
               </tr>
               <tr>
                 <th scope="row" class="fw-normal">
@@ -219,12 +225,12 @@ const tendenciaInfo = computed(() => {
       <details class="mt-3 termometro-detalhe">
         <summary class="small text-body-secondary">Como melhorar?</summary>
         <ul class="small text-body-secondary mt-2 mb-0 ps-3 termometro-fatores">
-          <li v-if="termometro.totalAusencias >= termometro.limites.preventivo">
+          <li v-if="termometro.totalAusencias >= limites.preventivo">
             Reduza faltas injustificadas para voltar ao verde (faltam
-            {{ termometro.totalAusencias - termometro.limites.preventivo + 1 }}).
+            {{ termometro.totalAusencias - limites.preventivo + 1 }}).
           </li>
           <li v-else>
-            Faltam {{ termometro.limites.preventivo - termometro.totalAusencias }} falta(s) para
+            Faltam {{ limites.preventivo - termometro.totalAusencias }} falta(s) para
             atingir o nível de atenção — mantenha a frequência.
           </li>
           <li v-if="termometro.totalOcorrencias > 0">

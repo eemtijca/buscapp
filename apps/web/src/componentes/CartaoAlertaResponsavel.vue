@@ -38,7 +38,7 @@ const configTipo: Record<
   },
 };
 
-const config = computed(() => configTipo[props.alerta.tipo]);
+const config = computed(() => configTipo[props.alerta.tipo] ?? configTipo.comunicado);
 
 const classeBorda = computed(() => {
   if (props.alerta.urgente) return 'border-danger border-2';

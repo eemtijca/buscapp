@@ -66,8 +66,8 @@ const inicialAluno = computed(() =>
             <span v-if="aluno.ultimaAusencia"> · Última falta: {{ aluno.ultimaAusencia }}</span>
           </div>
           <div class="d-flex flex-wrap gap-2 mt-1">
-            <span class="badge" :class="classeBadge[aluno.nivel]">
-              {{ rotuloNivel[aluno.nivel] }}
+            <span class="badge" :class="classeBadge[aluno.nivel] ?? 'text-bg-secondary'">
+              {{ rotuloNivel[aluno.nivel] ?? aluno.nivel }}
             </span>
             <span v-if="aluno.totalAusencias > 0" class="badge text-bg-light border">
               <i class="bi bi-calendar-x me-1" aria-hidden="true"></i>

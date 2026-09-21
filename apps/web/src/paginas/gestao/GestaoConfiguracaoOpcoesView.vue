@@ -425,7 +425,11 @@ onUnmounted(() => {
               </div>
             </td>
             <td v-if="!modoReordenar" class="text-end">
-              <button class="btn btn-outline-primary btn-sm me-1" @click="abrirEditar(item)">
+              <button
+                class="btn btn-outline-primary btn-sm me-1"
+                :aria-label="`Editar opção ${item.rotulo}`"
+                @click="abrirEditar(item)"
+              >
                 <i class="bi bi-pencil"></i>
               </button>
               <button class="btn btn-outline-danger btn-sm" @click="excluir(item.id)">

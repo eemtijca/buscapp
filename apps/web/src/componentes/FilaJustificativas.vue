@@ -40,8 +40,8 @@ const rotuloStatus: Record<JustificativaPendente['status'], string> = {
           </small>
         </div>
         <div class="d-flex align-items-center gap-2">
-          <span class="badge" :class="classeStatus[just.status]">{{
-            rotuloStatus[just.status]
+          <span class="badge" :class="classeStatus[just.status] ?? 'text-bg-secondary'">{{
+            rotuloStatus[just.status] ?? just.status
           }}</span>
           <small class="text-body-secondary">
             {{ just.dataAusencia

@@ -341,6 +341,7 @@ async function executarToggleAtivacao() {
                   <router-link
                     :to="'/gestao/usuarios/' + usuario.id"
                     class="btn btn-sm btn-outline-success"
+                    :aria-label="'Editar usuário ' + usuario.nome"
                   >
                     <i class="bi bi-pencil" aria-hidden="true"></i>
                   </router-link>

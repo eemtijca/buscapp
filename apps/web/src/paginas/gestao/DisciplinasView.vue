@@ -286,6 +286,7 @@ async function alternarAtivo(disciplina: Disciplina) {
                     type="button"
                     class="btn btn-sm btn-outline-success"
                     :disabled="carregando"
+                    :aria-label="'Editar disciplina ' + disciplina.nome"
                     @click="abrirEditar(disciplina)"
                   >
                     <i class="bi bi-pencil" aria-hidden="true"></i>

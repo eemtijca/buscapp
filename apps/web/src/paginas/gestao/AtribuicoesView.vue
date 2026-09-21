@@ -382,6 +382,7 @@ const papelBadge = (papel: string) => {
                     type="button"
                     class="btn btn-sm btn-outline-success"
                     :disabled="carregando"
+                    :aria-label="'Editar atribuição de ' + a.professor_nome"
                     @click="abrirEditar(a)"
                   >
                     <i class="bi bi-pencil" aria-hidden="true"></i>

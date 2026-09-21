@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, useId } from 'vue';
 import type { OpcaoCheckbox } from '@/tipos/componentes';
 
 const props = withDefaults(
@@ -9,6 +9,8 @@ const props = withDefaults(
     colunas?: 1 | 2 | 3 | 4;
     desabilitado?: boolean;
     nome?: string;
+    /** Nome acessível do grupo; renderizado como legenda oculta no fieldset. */
+    rotulo?: string;
     mostrarSelecionarTodos?: boolean;
     rotuloSelecionarTodos?: string;
   }>(),
@@ -16,6 +18,7 @@ const props = withDefaults(
     colunas: 1,
     desabilitado: false,
     nome: '',
+    rotulo: '',
     mostrarSelecionarTodos: false,
     rotuloSelecionarTodos: 'Selecionar todos',
   },
@@ -24,6 +27,10 @@ const props = withDefaults(
 const emit = defineEmits<{
   'update:modelo': [valor: string[]];
 }>();
+
+// Identificador único por instância: evita colisão de ids entre grupos na mesma tela.
+const idBase = `cb-${useId()}`;
+const prefixo = computed(() => (props.nome ? `${idBase}-${props.nome}` : idBase));
 
 const classeColuna = computed(() => {
   const tamanho = Math.max(1, Math.floor(12 / props.colunas));
@@ -66,44 +73,47 @@ function alternarTodosItens() {
 </script>
 
 <template>
-  <div
-    v-if="mostrarSelecionarTodos && opcoes.length > 1"
-    class="form-check mb-2 border-bottom pb-2"
-  >
-    <input
-      :id="`${nome || 'cb'}-todos`"
-      :checked="todosSelecionados"
-      :indeterminate="indeterminado"
-      type="checkbox"
-      class="form-check-input"
-      :disabled="desabilitado"
-      @change="alternarTodosItens"
-    />
-    <label :for="`${nome || 'cb'}-todos`" class="form-check-label small fw-semibold">
-      {{ rotuloSelecionarTodos }}
-    </label>
-  </div>
-  <div class="row g-2">
-    <div v-for="opcao in opcoes" :key="opcao.valor" :class="classeColuna">
-      <div class="form-check">
-        <input
-          :id="`${nome || 'cb'}-${opcao.valor}`"
-          :checked="modelo.includes(opcao.valor)"
-          type="checkbox"
-          class="form-check-input"
-          :disabled="desabilitado || opcao.desabilitado"
-          :aria-disabled="desabilitado || opcao.desabilitado"
-          @change="alternar(opcao.valor)"
-        />
-        <label
-          :for="`${nome || 'cb'}-${opcao.valor}`"
-          class="form-check-label small"
-          :class="{ 'text-body-secondary': desabilitado || opcao.desabilitado }"
-        >
-          <i v-if="opcao.icone" :class="`bi bi-${opcao.icone} me-1`" aria-hidden="true"></i>
-          {{ opcao.rotulo }}
-        </label>
+  <fieldset class="border-0 p-0 m-0">
+    <legend v-if="rotulo" class="visually-hidden">{{ rotulo }}</legend>
+    <div
+      v-if="mostrarSelecionarTodos && opcoes.length > 1"
+      class="form-check mb-2 border-bottom pb-2"
+    >
+      <input
+        :id="`${prefixo}-todos`"
+        :checked="todosSelecionados"
+        :indeterminate="indeterminado"
+        type="checkbox"
+        class="form-check-input"
+        :disabled="desabilitado"
+        @change="alternarTodosItens"
+      />
+      <label :for="`${prefixo}-todos`" class="form-check-label small fw-semibold">
+        {{ rotuloSelecionarTodos }}
+      </label>
+    </div>
+    <div class="row g-2">
+      <div v-for="opcao in opcoes" :key="opcao.valor" :class="classeColuna">
+        <div class="form-check">
+          <input
+            :id="`${prefixo}-${opcao.valor}`"
+            :checked="modelo.includes(opcao.valor)"
+            type="checkbox"
+            class="form-check-input"
+            :disabled="desabilitado || opcao.desabilitado"
+            :aria-disabled="desabilitado || opcao.desabilitado"
+            @change="alternar(opcao.valor)"
+          />
+          <label
+            :for="`${prefixo}-${opcao.valor}`"
+            class="form-check-label small"
+            :class="{ 'text-body-secondary': desabilitado || opcao.desabilitado }"
+          >
+            <i v-if="opcao.icone" :class="`bi bi-${opcao.icone} me-1`" aria-hidden="true"></i>
+            {{ opcao.rotulo }}
+          </label>
+        </div>
       </div>
     </div>
-  </div>
+  </fieldset>
 </template>

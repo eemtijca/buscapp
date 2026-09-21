@@ -15,11 +15,7 @@ export type TipoOcorrencia = 'grave' | 'suspensao';
 export type StatusOcorrencia = 'aberta' | 'em_andamento' | 'resolvida' | 'arquivada';
 export type TipoContatoBusca = 'telefone' | 'whatsapp' | 'presencial' | 'carta' | 'outro';
 export type StatusMonitoramento =
-  | 'pendente'
-  | 'em_andamento'
-  | 'realizado'
-  | 'sem_contato'
-  | 'cancelado';
+  'pendente' | 'em_andamento' | 'realizado' | 'sem_contato' | 'cancelado';
 export type StatusJustificativa = 'pendente' | 'aceita' | 'recusada';
 export type TipoNotificacao =
   | 'ausencia_portao'
@@ -51,13 +47,14 @@ export interface ConfiguracaoSistema {
   id: number;
   limite_critico_faltas: number;
   limite_preventivo_faltas: number;
-  dias_expurgo_anexos: number;
+  /** Parâmetros operacionais: presentes apenas para a gestão. */
+  dias_expurgo_anexos?: number;
   escola_nome: string;
   mensagem_fora_horario: string;
-  minutos_validade_codigo: number;
-  max_tentativas_codigo: number;
-  minutos_bloqueio_codigo: number;
-  dias_retencao_codigos: number;
+  minutos_validade_codigo?: number;
+  max_tentativas_codigo?: number;
+  minutos_bloqueio_codigo?: number;
+  dias_retencao_codigos?: number;
   peso_falta: number;
   peso_ocorrencia: number;
   peso_recencia: number;
@@ -73,6 +70,8 @@ export interface ConfiguracaoSistema {
   janela_positivo_dias: number;
   bonus_presenca_confirmada: number;
   updated_at: string;
+  /** Fornecido pela API a partir de `TZ_ESCOLA`; não é persistido no banco. */
+  fuso_horario?: string;
 }
 
 export interface OpcaoConfiguracao {

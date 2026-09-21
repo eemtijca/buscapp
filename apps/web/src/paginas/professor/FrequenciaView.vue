@@ -7,6 +7,7 @@ import {
   useAlunosFrequencia,
 } from '@/composables/consultas/useMonitoramento';
 import { useOpcoes } from '@/composables/consultas/useCatalogos';
+import { hojeIso } from '@/utils/datas';
 import CartaoAlunoFrequencia from '@/componentes/CartaoAlunoFrequencia.vue';
 import GrupoCheckbox from '@/componentes/GrupoCheckbox.vue';
 import ModalConfirmacao from '@/componentes/ModalConfirmacao.vue';
@@ -15,7 +16,7 @@ import type { AlunoFrequencia } from '@/tipos/componentes';
 const router = useRouter();
 const { usuario } = useAutenticacao();
 const buscaAluno = ref('');
-const dataAula = ref(new Date().toISOString().slice(0, 10));
+const dataAula = ref(hojeIso());
 const { alunos: alunosRemotos, pendente, recarregar } = useAlunosFrequencia(() => dataAula.value);
 const alunos = ref<AlunoFrequencia[]>([]);
 const salvando = ref(false);
@@ -42,6 +43,19 @@ const confirmarCancelar = ref(false);
 /** Verifica se há faltas marcadas para confirmação ao cancelar. */
 const temDados = computed(() => alunos.value.some((a) => a.ausente));
 const mensagemSucesso = ref<string | null>(null);
+const mensagemErro = ref<string | null>(null);
+
+function mostrarSucesso(mensagem: string) {
+  mensagemErro.value = null;
+  mensagemSucesso.value = mensagem;
+  setTimeout(() => (mensagemSucesso.value = null), 4000);
+}
+
+function mostrarErro(mensagem: string) {
+  mensagemSucesso.value = null;
+  mensagemErro.value = mensagem;
+  setTimeout(() => (mensagemErro.value = null), 4000);
+}
 
 const { opcoes: opcoesPeriodos } = useOpcoes(() => 'periodo');
 
@@ -81,13 +95,11 @@ function alternarAusencia(alunoId: string) {
 function solicitarSalvarFrequencia() {
   if (!usuario.value || salvando.value) return;
   if (!temDados.value) {
-    mensagemSucesso.value = 'Todos os alunos estão presentes. Nenhuma ausência registrada.';
-    setTimeout(() => (mensagemSucesso.value = null), 4000);
+    mostrarSucesso('Todos os alunos estão presentes. Nenhuma ausência registrada.');
     return;
   }
   if (!periodosSelecionados.value.length) {
-    mensagemSucesso.value = 'Selecione pelo menos um período.';
-    setTimeout(() => (mensagemSucesso.value = null), 4000);
+    mostrarErro('Selecione pelo menos um período para registrar a chamada.');
     return;
   }
   confirmarSalvar.value = true;
@@ -111,18 +123,17 @@ async function salvarFrequencia() {
   await recarregar();
   salvando.value = false;
   if (errMsg) {
-    mensagemSucesso.value = errMsg;
+    mostrarErro(errMsg);
   } else if (registradas > 0) {
-    mensagemSucesso.value = `${registradas} ausência(s) registrada(s) com sucesso.`;
+    mostrarSucesso(`${registradas} ausência(s) registrada(s) com sucesso.`);
   } else {
-    mensagemSucesso.value = 'Todos os alunos estão presentes. Nenhuma ausência registrada.';
+    mostrarSucesso('Todos os alunos estão presentes. Nenhuma ausência registrada.');
   }
   await nextTick();
   requestAnimationFrame(() => {
-    const alerta = document.querySelector('.alert-success');
+    const alerta = document.querySelector('.alert-success, .alert-danger');
     if (alerta) alerta.scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
-  setTimeout(() => (mensagemSucesso.value = null), 4000);
 }
 
 watch(dataAula, () => {
@@ -182,10 +193,16 @@ watch(dataAula, () => {
           {{ mensagemSucesso }}
         </div>
 
+        <div v-if="mensagemErro" class="alert alert-danger py-2 mb-3 small" role="alert">
+          <i class="bi bi-exclamation-circle me-1" aria-hidden="true"></i>
+          {{ mensagemErro }}
+        </div>
+
         <div class="mb-3">
-          <label class="form-label small fw-medium mb-2">Períodos</label>
+          <span class="form-label small fw-medium mb-2 d-block">Períodos</span>
           <GrupoCheckbox
             nome="periodoFreq"
+            rotulo="Períodos"
             :opcoes="opcoesPeriodos"
             :modelo="periodosSelecionados"
             :colunas="4"

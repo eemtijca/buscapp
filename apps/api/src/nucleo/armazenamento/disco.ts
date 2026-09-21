@@ -1,5 +1,5 @@
 import { createReadStream } from 'node:fs';
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, open, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { ambiente } from '../../ambiente.js';
 import { normalizarChave, type Armazenamento } from './tipos.js';
@@ -26,6 +26,16 @@ export function criarArmazenamentoDisco(diretorio = ambiente.UPLOAD_DIR): Armaze
     },
     async lerFluxo(chave) {
       return createReadStream(caminhoAbsoluto(chave));
+    },
+    async lerTrecho(chave, bytes) {
+      const arquivo = await open(caminhoAbsoluto(chave), 'r');
+      try {
+        const buffer = Buffer.alloc(bytes);
+        const { bytesRead } = await arquivo.read(buffer, 0, bytes, 0);
+        return buffer.subarray(0, bytesRead);
+      } finally {
+        await arquivo.close();
+      }
     },
     async remover(chave) {
       await rm(caminhoAbsoluto(chave), { force: true });

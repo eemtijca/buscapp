@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import {
   gerarCodigoRedefinicao,
   limparCodigosNaoAtivos,
@@ -10,11 +10,17 @@ import {
   useSolicitacoesCodigo,
 } from '@/composables/consultas/useGestaoUsuarios';
 import { useStatusConexao } from '@/composables/useStatusConexao';
+import ModalBase from '@/componentes/ModalBase.vue';
+import EstadoErro from '@/componentes/EstadoErro.vue';
+import { formatarDataHoraCurta } from '@/utils/datas';
 import type { SolicitacaoCodigo, CodigoGerado } from '@/tipos/componentes';
 
 const router = useRouter();
+const route = useRoute();
 const consultaSolicitacoes = useSolicitacoesCodigo();
 const consultaCodigos = useCodigosGerados();
+const erroSolicitacoes = consultaSolicitacoes.erro;
+const erroCodigos = consultaCodigos.erro;
 const { status: statusConexao } = useStatusConexao();
 
 const solicitacoes = consultaSolicitacoes.solicitacoes;
@@ -44,7 +50,14 @@ let timerGlobal: ReturnType<typeof setInterval> | null = null;
 
 const codigosVisiveis = ref<Set<string>>(new Set());
 const codigosSessao = ref<Record<string, string>>({});
-const guiaAtiva = ref<'pendentes' | 'recentes'>('pendentes');
+const guiaAtiva = ref<'pendentes' | 'recentes'>(
+  route.query.aba === 'codigos' ? 'recentes' : 'pendentes',
+);
+
+// A aba fica na URL para preservar o contexto no refresh e permitir link direto.
+watch(guiaAtiva, (aba) => {
+  void router.replace({ query: aba === 'recentes' ? { aba: 'codigos' } : {} });
+});
 
 const filtroBusca = ref('');
 const paginaAtual = ref(1);
@@ -56,6 +69,7 @@ const modalRevogar = ref(false);
 const modalLimpar = ref(false);
 const solicitacaoSelecionada = ref<SolicitacaoCodigo | null>(null);
 const codigoGeradoAtual = ref<string | null>(null);
+const codigoGeradoExpira = ref<string | null>(null);
 const codigoParaRevogar = ref<CodigoGerado | null>(null);
 const gerandoCodigo = ref(false);
 const limpandoCodigos = ref(false);
@@ -102,12 +116,7 @@ const codigoStatusBadge = (status: string) => {
 };
 
 function formatarDataCurta(data: string) {
-  return new Date(data).toLocaleDateString('pt-BR', {
-    day: '2-digit',
-    month: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  return formatarDataHoraCurta(data);
 }
 
 function toggleVisibilidade(codigoId: string) {
@@ -170,10 +179,11 @@ async function confirmarGerar() {
   modalConfirmacaoGerar.value = false;
   gerandoCodigo.value = true;
   try {
-    const codigo = await gerarCodigoRedefinicao(solicitacao.perfil_id);
-    if (codigo) {
-      codigoGeradoAtual.value = codigo;
-      codigosSessao.value = { ...codigosSessao.value, [solicitacao.email]: codigo };
+    const resultado = await gerarCodigoRedefinicao(solicitacao.perfil_id);
+    if (resultado) {
+      codigoGeradoAtual.value = resultado.codigo;
+      codigoGeradoExpira.value = resultado.expiraEm;
+      codigosSessao.value = { ...codigosSessao.value, [solicitacao.email]: resultado.codigo };
       modalCodigoGerado.value = true;
       // A geração atende a solicitação pendente; a invalidação remove a entrada.
       await marcarNotificacaoLida(solicitacao.id);
@@ -282,6 +292,7 @@ async function atualizarManual() {
 function fecharModalCodigo() {
   modalCodigoGerado.value = false;
   codigoGeradoAtual.value = null;
+  codigoGeradoExpira.value = null;
 }
 
 onMounted(() => {
@@ -350,12 +361,16 @@ onUnmounted(() => {
       {{ mensagemErro }}
     </div>
 
-    <ul class="nav nav-tabs mb-3">
-      <li class="nav-item">
+    <ul class="nav nav-tabs mb-3" role="tablist">
+      <li class="nav-item" role="presentation">
         <button
+          id="aba-solicitacoes"
           type="button"
+          role="tab"
           class="nav-link small"
           :class="{ active: guiaAtiva === 'pendentes' }"
+          :aria-selected="guiaAtiva === 'pendentes'"
+          aria-controls="painel-solicitacoes"
           @click="guiaAtiva = 'pendentes'"
         >
           <i class="bi bi-inbox me-1" aria-hidden="true"></i>
@@ -365,11 +380,15 @@ onUnmounted(() => {
           }}</span>
         </button>
       </li>
-      <li class="nav-item">
+      <li class="nav-item" role="presentation">
         <button
+          id="aba-codigos"
           type="button"
+          role="tab"
           class="nav-link small"
           :class="{ active: guiaAtiva === 'recentes' }"
+          :aria-selected="guiaAtiva === 'recentes'"
+          aria-controls="painel-codigos"
           @click="guiaAtiva = 'recentes'"
         >
           <i class="bi bi-clock-history me-1" aria-hidden="true"></i>
@@ -381,8 +400,19 @@ onUnmounted(() => {
       </li>
     </ul>
 
-    <div v-if="guiaAtiva === 'pendentes'">
-      <div v-if="pendente && !solicitacoes.length" class="text-center py-5">
+    <div
+      v-if="guiaAtiva === 'pendentes'"
+      id="painel-solicitacoes"
+      role="tabpanel"
+      aria-labelledby="aba-solicitacoes"
+    >
+      <EstadoErro
+        v-if="erroSolicitacoes"
+        mensagem="Não foi possível carregar as solicitações."
+        @tentar-novamente="consultaSolicitacoes.recarregar()"
+      />
+
+      <div v-else-if="pendente && !solicitacoes.length" class="text-center py-5">
         <div class="spinner-border text-primary" role="status">
           <span class="visually-hidden">Carregando...</span>
         </div>
@@ -440,7 +470,7 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <div v-else>
+    <div v-else id="painel-codigos" role="tabpanel" aria-labelledby="aba-codigos">
       <div class="mb-3 d-flex gap-2">
         <div class="input-group input-group-sm flex-grow-1">
           <span class="input-group-text bg-body-tertiary border-end-0">
@@ -487,7 +517,13 @@ onUnmounted(() => {
         </button>
       </div>
 
-      <div v-if="pendente && !codigosGerados.length" class="text-center py-5">
+      <EstadoErro
+        v-if="erroCodigos"
+        mensagem="Não foi possível carregar os códigos."
+        @tentar-novamente="consultaCodigos.recarregar()"
+      />
+
+      <div v-else-if="pendente && !codigosGerados.length" class="text-center py-5">
         <div class="spinner-border text-primary" role="status">
           <span class="visually-hidden">Carregando...</span>
         </div>
@@ -657,253 +693,187 @@ onUnmounted(() => {
       </template>
     </div>
 
-    <div
-      v-if="modalConfirmacaoGerar && solicitacaoSelecionada"
-      class="modal d-block"
-      tabindex="-1"
-      style="background-color: rgba(0, 0, 0, 0.5)"
+    <ModalBase
+      :visivel="modalConfirmacaoGerar && !!solicitacaoSelecionada"
+      titulo="Confirmar geração"
+      icone="shield-exclamation"
+      cor-icone="text-success"
+      @update:visivel="(aberto) => !aberto && (modalConfirmacaoGerar = false)"
     >
-      <div class="modal-dialog modal-dialog-centered modal-md">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title small fw-bold">
-              <i class="bi bi-shield-exclamation text-success me-1" aria-hidden="true"></i>
-              Confirmar geração
-            </h5>
-            <button
-              type="button"
-              class="btn-close"
-              @click="modalConfirmacaoGerar = false"
-              aria-label="Fechar"
-            ></button>
-          </div>
-          <div class="modal-body">
-            <p class="small mb-2">Gerar código de acesso para:</p>
-            <div class="border rounded p-2 small bg-body-tertiary mb-0">
-              <p class="fw-medium mb-1">{{ solicitacaoSelecionada.nome }}</p>
-              <p class="text-body-secondary mb-1">{{ solicitacaoSelecionada.email }}</p>
-              <span class="badge" :class="'text-bg-' + papelBadge(solicitacaoSelecionada.papel)">
-                {{ papelLabel(solicitacaoSelecionada.papel) }}
-              </span>
-            </div>
-          </div>
-          <div class="modal-footer">
-            <button
-              type="button"
-              class="btn btn-sm btn-outline-secondary"
-              @click="modalConfirmacaoGerar = false"
-            >
-              Cancelar
-            </button>
-            <button type="button" class="btn btn-sm btn-success" @click="confirmarGerar">
-              <i class="bi bi-key me-1" aria-hidden="true"></i>
-              Sim, gerar
-            </button>
-          </div>
-        </div>
+      <p class="small mb-2">Gerar código de acesso para:</p>
+      <div class="border rounded p-2 small bg-body-tertiary mb-0">
+        <p class="fw-medium mb-1">{{ solicitacaoSelecionada?.nome }}</p>
+        <p class="text-body-secondary mb-1">{{ solicitacaoSelecionada?.email }}</p>
+        <span class="badge" :class="'text-bg-' + papelBadge(solicitacaoSelecionada?.papel ?? '')">
+          {{ papelLabel(solicitacaoSelecionada?.papel ?? '') }}
+        </span>
       </div>
-    </div>
 
-    <div
-      v-if="modalCodigoGerado && codigoGeradoAtual"
-      class="modal d-block"
-      tabindex="-1"
-      style="background-color: rgba(0, 0, 0, 0.5)"
-    >
-      <div class="modal-dialog modal-dialog-centered modal-md">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title small fw-bold">
-              <i class="bi bi-key text-success me-1" aria-hidden="true"></i>
-              Código gerado
-            </h5>
-            <button
-              type="button"
-              class="btn-close"
-              @click="fecharModalCodigo"
-              aria-label="Fechar"
-            ></button>
-          </div>
-          <div class="modal-body text-center py-4">
-            <p class="small text-body-secondary mb-2">
-              Código de acesso para {{ solicitacaoSelecionada?.nome ?? 'usuário' }}
-            </p>
-            <div class="position-relative d-inline-block mb-3">
-              <code
-                class="d-inline-block fs-1 fw-bold font-monospace text-primary bg-body-tertiary px-3 py-2 rounded user-select-all"
-                role="button"
-                tabindex="0"
-                title="Clique para copiar"
-                style="letter-spacing: 0.15em; cursor: pointer"
-                @click="copiarCodigo"
-                @keydown.enter="copiarCodigo"
-              >
-                {{ codigoGeradoAtual }}
-              </code>
-              <span
-                v-if="codigoCopiado"
-                class="position-absolute top-0 end-0 translate-middle badge rounded-pill text-bg-success small"
-              >
-                <i class="bi bi-check2 me-1" aria-hidden="true"></i>Copiado
-              </span>
-            </div>
-            <div
-              v-if="solicitacaoSelecionada"
-              class="small"
-              :class="tempoRestanteFormatado(new Date(Date.now() + 3600000).toISOString()).classe"
-            >
-              <i class="bi bi-hourglass-split me-1" aria-hidden="true"></i>
-              Expira em 59:59
-            </div>
-            <div class="d-flex gap-2 justify-content-center mt-3">
-              <button type="button" class="btn btn-sm btn-outline-secondary" @click="copiarCodigo">
-                <i class="bi bi-clipboard me-1" aria-hidden="true"></i>
-                Copiar
-              </button>
-              <button type="button" class="btn btn-sm btn-success" @click="abrirWhatsApp">
-                <i class="bi bi-whatsapp me-1" aria-hidden="true"></i>
-                WhatsApp
-              </button>
-            </div>
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-sm btn-success" @click="fecharModalCodigo">
-              Concluído
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
+      <template #rodape>
+        <button
+          type="button"
+          class="btn btn-sm btn-outline-secondary"
+          @click="modalConfirmacaoGerar = false"
+        >
+          Cancelar
+        </button>
+        <button type="button" class="btn btn-sm btn-success" @click="confirmarGerar">
+          <i class="bi bi-key me-1" aria-hidden="true"></i>
+          Sim, gerar
+        </button>
+      </template>
+    </ModalBase>
 
-    <div
-      v-if="modalRevogar && codigoParaRevogar"
-      class="modal d-block"
-      tabindex="-1"
-      style="background-color: rgba(0, 0, 0, 0.5)"
+    <ModalBase
+      :visivel="modalCodigoGerado && !!codigoGeradoAtual"
+      titulo="Código gerado"
+      icone="key"
+      cor-icone="text-success"
+      @update:visivel="(aberto) => !aberto && fecharModalCodigo()"
     >
-      <div class="modal-dialog modal-dialog-centered modal-md">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title small fw-bold">
-              <i class="bi bi-exclamation-triangle text-danger me-1" aria-hidden="true"></i>
-              Revogar código
-            </h5>
-            <button
-              type="button"
-              class="btn-close"
-              @click="modalRevogar = false"
-              aria-label="Fechar"
-            ></button>
-          </div>
-          <div class="modal-body">
-            <p class="small mb-2">
-              Tem certeza que deseja revogar o código de
-              <strong>{{ codigoParaRevogar.nome }}</strong
-              >?
-            </p>
-            <div class="border rounded p-2 small bg-body-tertiary mb-0">
-              <p class="mb-1">
-                <span class="text-body-secondary">Status:</span>
-                <span class="badge text-bg-success ms-1">Ativo</span>
-              </p>
-              <p class="mb-1">
-                <span class="text-body-secondary">Expira em:</span>
-                <span class="ms-1">{{
-                  tempoRestanteFormatado(codigoParaRevogar.expira_em).texto
-                }}</span>
-              </p>
-              <p class="mb-0">
-                <span class="text-body-secondary">Código:</span>
-                <code class="ms-1 text-primary">{{
-                  codigoExibivel(codigoParaRevogar) || '—'
-                }}</code>
-              </p>
-            </div>
-            <p class="small text-danger mt-2 mb-0">
-              <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
-              Após revogar, o código não poderá mais ser utilizado.
-            </p>
-          </div>
-          <div class="modal-footer">
-            <button
-              type="button"
-              class="btn btn-sm btn-outline-secondary"
-              @click="modalRevogar = false"
-            >
-              Cancelar
-            </button>
-            <button type="button" class="btn btn-sm btn-danger" @click="confirmarRevogar">
-              <i class="bi bi-x-circle me-1" aria-hidden="true"></i>
-              Sim, revogar
-            </button>
-          </div>
+      <div class="text-center py-2">
+        <p class="small text-body-secondary mb-2">
+          Código de acesso para {{ solicitacaoSelecionada?.nome ?? 'usuário' }}
+        </p>
+        <div class="position-relative d-inline-block mb-3">
+          <code
+            class="d-inline-block fs-1 fw-bold font-monospace text-primary bg-body-tertiary px-3 py-2 rounded user-select-all"
+            role="button"
+            tabindex="0"
+            title="Clique para copiar"
+            style="letter-spacing: 0.15em; cursor: pointer"
+            @click="copiarCodigo"
+            @keydown.enter="copiarCodigo"
+          >
+            {{ codigoGeradoAtual }}
+          </code>
+          <span
+            v-if="codigoCopiado"
+            class="position-absolute top-0 end-0 translate-middle badge rounded-pill text-bg-success small"
+          >
+            <i class="bi bi-check2 me-1" aria-hidden="true"></i>Copiado
+          </span>
+        </div>
+        <div
+          v-if="codigoGeradoExpira"
+          class="small"
+          :class="tempoRestanteFormatado(codigoGeradoExpira).classe"
+        >
+          <i class="bi bi-hourglass-split me-1" aria-hidden="true"></i>
+          Expira em {{ tempoRestanteFormatado(codigoGeradoExpira).texto }}
+        </div>
+        <div class="d-flex gap-2 justify-content-center mt-3">
+          <button type="button" class="btn btn-sm btn-outline-secondary" @click="copiarCodigo">
+            <i class="bi bi-clipboard me-1" aria-hidden="true"></i>
+            Copiar
+          </button>
+          <button type="button" class="btn btn-sm btn-success" @click="abrirWhatsApp">
+            <i class="bi bi-whatsapp me-1" aria-hidden="true"></i>
+            WhatsApp
+          </button>
         </div>
       </div>
-    </div>
 
-    <div
-      v-if="modalLimpar"
-      class="modal d-block"
-      tabindex="-1"
-      style="background-color: rgba(0, 0, 0, 0.5)"
+      <template #rodape>
+        <button type="button" class="btn btn-sm btn-success" @click="fecharModalCodigo">
+          Concluído
+        </button>
+      </template>
+    </ModalBase>
+
+    <ModalBase
+      :visivel="modalRevogar && !!codigoParaRevogar"
+      titulo="Revogar código"
+      icone="exclamation-triangle"
+      cor-icone="text-danger"
+      @update:visivel="(aberto) => !aberto && (modalRevogar = false)"
     >
-      <div class="modal-dialog modal-dialog-centered modal-md">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title small fw-bold">
-              <i class="bi bi-trash text-danger me-1" aria-hidden="true"></i>
-              Limpar códigos não ativos
-            </h5>
-            <button
-              type="button"
-              class="btn-close"
-              @click="modalLimpar = false"
-              aria-label="Fechar"
-            ></button>
-          </div>
-          <div class="modal-body">
-            <p class="small mb-2">
-              Tem certeza que deseja remover permanentemente
-              <strong>{{ codigosNaoAtivos }}</strong>
-              código{{ codigosNaoAtivos !== 1 ? 's' : '' }} não ativo{{
-                codigosNaoAtivos !== 1 ? 's' : ''
-              }}
-              (usado{{ codigosNaoAtivos !== 1 ? 's' : '' }}, expirado{{
-                codigosNaoAtivos !== 1 ? 's' : ''
-              }}
-              ou revogado{{ codigosNaoAtivos !== 1 ? 's' : '' }})?
-            </p>
-            <p class="small text-danger mb-0">
-              <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
-              Os códigos ativos serão preservados. O histórico permanece na auditoria.
-            </p>
-          </div>
-          <div class="modal-footer">
-            <button
-              type="button"
-              class="btn btn-sm btn-outline-secondary"
-              @click="modalLimpar = false"
-            >
-              Cancelar
-            </button>
-            <button
-              type="button"
-              class="btn btn-sm btn-danger"
-              :disabled="limpandoCodigos"
-              @click="confirmarLimpar"
-            >
-              <span
-                v-if="limpandoCodigos"
-                class="spinner-border spinner-border-sm me-1"
-                role="status"
-                aria-hidden="true"
-              ></span>
-              <i v-else class="bi bi-trash me-1" aria-hidden="true"></i>
-              Sim, limpar
-            </button>
-          </div>
-        </div>
+      <p class="small mb-2">
+        Tem certeza que deseja revogar o código de
+        <strong>{{ codigoParaRevogar?.nome }}</strong
+        >?
+      </p>
+      <div class="border rounded p-2 small bg-body-tertiary mb-0">
+        <p class="mb-1">
+          <span class="text-body-secondary">Status:</span>
+          <span class="badge text-bg-success ms-1">Ativo</span>
+        </p>
+        <p class="mb-1">
+          <span class="text-body-secondary">Expira em:</span>
+          <span class="ms-1">{{
+            codigoParaRevogar ? tempoRestanteFormatado(codigoParaRevogar.expira_em).texto : '—'
+          }}</span>
+        </p>
+        <p class="mb-0">
+          <span class="text-body-secondary">Código:</span>
+          <code class="ms-1 text-primary">{{
+            codigoParaRevogar ? codigoExibivel(codigoParaRevogar) || '—' : '—'
+          }}</code>
+        </p>
       </div>
-    </div>
+      <p class="small text-danger mt-2 mb-0">
+        <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
+        Após revogar, o código não poderá mais ser utilizado.
+      </p>
+
+      <template #rodape>
+        <button
+          type="button"
+          class="btn btn-sm btn-outline-secondary"
+          @click="modalRevogar = false"
+        >
+          Cancelar
+        </button>
+        <button type="button" class="btn btn-sm btn-danger" @click="confirmarRevogar">
+          <i class="bi bi-x-circle me-1" aria-hidden="true"></i>
+          Sim, revogar
+        </button>
+      </template>
+    </ModalBase>
+
+    <ModalBase
+      :visivel="modalLimpar"
+      titulo="Limpar códigos não ativos"
+      icone="trash"
+      cor-icone="text-danger"
+      @update:visivel="(aberto) => !aberto && (modalLimpar = false)"
+    >
+      <p class="small mb-2">
+        Tem certeza que deseja remover permanentemente
+        <strong>{{ codigosNaoAtivos }}</strong>
+        código{{ codigosNaoAtivos !== 1 ? 's' : '' }} não ativo{{
+          codigosNaoAtivos !== 1 ? 's' : ''
+        }}
+        (usado{{ codigosNaoAtivos !== 1 ? 's' : '' }}, expirado{{
+          codigosNaoAtivos !== 1 ? 's' : ''
+        }}
+        ou revogado{{ codigosNaoAtivos !== 1 ? 's' : '' }})?
+      </p>
+      <p class="small text-danger mb-0">
+        <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
+        Os códigos ativos serão preservados. O histórico permanece na auditoria.
+      </p>
+
+      <template #rodape>
+        <button type="button" class="btn btn-sm btn-outline-secondary" @click="modalLimpar = false">
+          Cancelar
+        </button>
+        <button
+          type="button"
+          class="btn btn-sm btn-danger"
+          :disabled="limpandoCodigos"
+          @click="confirmarLimpar"
+        >
+          <span
+            v-if="limpandoCodigos"
+            class="spinner-border spinner-border-sm me-1"
+            role="status"
+            aria-hidden="true"
+          ></span>
+          <i v-else class="bi bi-trash me-1" aria-hidden="true"></i>
+          Sim, limpar
+        </button>
+      </template>
+    </ModalBase>
   </div>
 </template>

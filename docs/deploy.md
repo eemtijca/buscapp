@@ -6,7 +6,7 @@ A aplicação pode ser publicada de três formas: imagem Docker (GHCR), Docker C
 
 | Alvo                | Configuração                                     | Resultado                                                     |
 | ------------------- | ------------------------------------------------ | ------------------------------------------------------------- |
-| Imagem Docker       | `infra/docker/Dockerfile`, workflow `publicacao` | `ghcr.io/<repo>:latest` e `:<sha>`                            |
+| Imagem Docker       | `infra/docker/Dockerfile`, workflow `publicacao` | `ghcr.io/<repo>:latest`, `:<sha>` e `:<tag do release>`       |
 | Docker Compose      | `compose.yaml`                                   | App e PostgreSQL 17 com migrações no start                    |
 | Vercel SPA separada | Projeto com root em `apps/web`                   | SPA estática apontando para uma API em outro host             |
 | Vercel Services     | `vercel.json` na raiz, framework Services        | SPA e API no mesmo domínio, sem Docker e sem backend separado |
@@ -16,8 +16,13 @@ A aplicação pode ser publicada de três formas: imagem Docker (GHCR), Docker C
 - `qualidade.yml`: type-check, lint e build da SPA.
 - `testes.yml`: sobe o Compose, espera `/api/saude` e derruba o ambiente.
 - `migracoes.yml`: aplica `prisma migrate deploy` com `DATABASE_URL` vindo do secret `DIRECT_URL_PROD` e, em seguida, define a senha do papel `buscapp_api` com `APP_DB_PASSWORD_PROD`.
-- `publicacao.yml`: build e push da imagem para o GHCR.
+- `publicacao.yml`: build e push da imagem para o GHCR ao publicar um release estável (e por dispatch manual).
 - `codeql.yml`: análise estática de javascript-typescript.
+- Todas as Actions são fixadas por SHA (comentário com a versão) e o Dependabot mantém as atualizações.
+
+A imagem Docker roda como usuário `node` (não-root), com o diretório de uploads próprio, e declara `HEALTHCHECK` contra `/api/saude` (intervalo de 30 s, 30 s de carência). A base `node:24-slim` é fixada por digest para builds reproduzíveis.
+
+O schema engine do Prisma (usado por `prisma migrate deploy` no entrypoint) é baixado durante o build da imagem e tem a escrita liberada para o usuário `node`; o container não precisa de rede para migrar. A aplicação sobe como `node` e o ensaio local do container cobre migrações, login, RLS, upload com remoção de EXIF e leitura da auditoria.
 
 Ver [testes.md](testes.md) para as lacunas de cobertura do CI.
 
@@ -69,7 +74,8 @@ Limites do perfil serverless:
 
 - As Functions limitam corpo de requisição e resposta a 4,5 MB. Por isso o anexo usa URL pré-assinada para envio e streaming no download.
 - A duração padrão de 300 segundos encerra o stream SSE periodicamente. O `EventSource` reconecta sozinho e dispara recarga.
-- O barramento SSE é em memória; eventos podem não cruzar instâncias diferentes. As telas continuam se atualizando ao reconectar, ao voltar para a aba e pelo polling de notificações.
+- O barramento SSE distribui os eventos por Redis pub/sub, com fallback de `LISTEN/NOTIFY`, e as telas também se atualizam ao reconectar, ao voltar para a aba e pelo polling de notificações.
+- O `sharp` adiciona binários nativos ao bundle da função (dezenas de MB). As imagens são regravadas na confirmação do upload direto, com download e novo envio ao bucket; se o processamento falhar, o original é mantido e um aviso é registrado. `PROCESSAR_IMAGENS=false` desliga o processamento e reduz o cold start.
 
 Para desenvolver com a mesma topologia:
 
@@ -116,6 +122,13 @@ node apps/api/dist/src/server.js
 - As migrações rodam no workflow `migracoes.yml` em push para `main` quando há mudança em `apps/api/prisma/**` ou no schema, usando a conexão de sessão ou direta de produção no secret `DIRECT_URL_PROD`.
 - O mesmo workflow aplica a senha do papel `buscapp_api` com o secret `APP_DB_PASSWORD_PROD`, via `infra/docker/role.mjs`.
 - O build da Vercel não migra. Garanta a ordem: migrar e, se necessário, fazer deploy compatível com a versão anterior do schema.
+- Desde o ADR-009, a migração de RLS em `perfis` exige o código novo no ar antes de ser aplicada.
+
+## Redis e cron
+
+- `REDIS_URL` é obrigatória em todos os ambientes; o Redis atende apenas ao pub/sub do SSE, com fallback por `LISTEN/NOTIFY` na conexão de sessão.
+- O expurgo é agendado externamente com `CRON_SECRET`; o `vercel.json` atual não declara `crons`, então use o agendador do provedor, uma chamada HTTP externa ou o GitHub Actions.
+- Os cabeçalhos da SPA ficam no topo do `vercel.json`, aplicados às rotas fora de `/api`.
 
 ## Verificação pós-deploy
 

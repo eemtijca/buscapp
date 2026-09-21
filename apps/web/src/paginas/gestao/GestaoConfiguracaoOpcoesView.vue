@@ -6,13 +6,21 @@ import { useOpcoesConfiguracao } from '@/composables/consultas/useCatalogos';
 import { useAlturaUniformeCards } from '@/composables/useAlturaUniformeCards';
 import CampoFormulario from '@/componentes/CampoFormulario.vue';
 import CartaoSelecao from '@/componentes/CartaoSelecao.vue';
+import ModalBase from '@/componentes/ModalBase.vue';
+import ModalConfirmacao from '@/componentes/ModalConfirmacao.vue';
+import EstadoErro from '@/componentes/EstadoErro.vue';
 import { obterRegra, gerarChave } from '@/utils/opcoesConfiguracao';
 import type { OpcaoConfiguracao } from '@/tipos/database';
 import Sortable from 'sortablejs';
 
 const route = useRoute();
 const tipo = computed(() => route.params.tipo as string);
-const { opcoes: opcoesRemotas, pendente, recarregar } = useOpcoesConfiguracao(() => tipo.value);
+const {
+  opcoes: opcoesRemotas,
+  pendente,
+  recarregar,
+  erro,
+} = useOpcoesConfiguracao(() => tipo.value);
 
 const regra = computed(() => obterRegra(tipo.value));
 const tituloPagina = computed(() => regra.value.titulo);
@@ -25,6 +33,7 @@ const salvando = ref(false);
 const carregando = computed(() => pendente.value || salvando.value);
 const mensagemSucesso = ref<string | null>(null);
 const mensagemErro = ref<string | null>(null);
+const erroModal = ref<string | null>(null);
 
 const modalAberto = ref(false);
 const modoEdicao = ref(false);
@@ -237,6 +246,7 @@ function cancelarReordenar() {
 function abrirNovo() {
   resetForm();
   modalAberto.value = true;
+  erroModal.value = null;
 }
 
 function abrirEditar(item: OpcaoConfiguracao) {
@@ -283,7 +293,7 @@ async function salvar() {
     modalAberto.value = false;
     await recarregar();
   } catch (e) {
-    mostrarErro(e instanceof Error ? e.message : String(e));
+    erroModal.value = e instanceof Error ? e.message : String(e);
   } finally {
     salvando.value = false;
   }
@@ -301,13 +311,25 @@ async function alternarAtivo(item: OpcaoConfiguracao) {
   }
 }
 
-async function excluir(id: string) {
-  const item = opcoes.value.find((o) => o.id === id);
-  if (!item) return;
-  if (!confirm(`Excluir "${item.rotulo}"?`)) return;
+const opcaoParaExcluir = ref<string | null>(null);
+const rotuloOpcaoParaExcluir = computed(
+  () => opcoes.value.find((o) => o.id === opcaoParaExcluir.value)?.rotulo ?? '',
+);
+const mensagemExclusaoOpcao = computed(() =>
+  rotuloOpcaoParaExcluir.value ? `Excluir "${rotuloOpcaoParaExcluir.value}"?` : '',
+);
+
+function excluir(id: string) {
+  opcaoParaExcluir.value = id;
+}
+
+async function confirmarExclusao() {
+  const id = opcaoParaExcluir.value;
+  opcaoParaExcluir.value = null;
+  if (!id) return;
   try {
     await api(`/api/opcoes/${id}`, { metodo: 'DELETE' });
-    mostrarSucesso(`"${item.rotulo}" excluído.`);
+    mostrarSucesso('Opção excluída.');
     await recarregar();
   } catch (e) {
     mostrarErro(e instanceof Error ? e.message : String(e));
@@ -372,7 +394,13 @@ onUnmounted(() => {
       }}<button type="button" class="btn-close" @click="mensagemErro = null"></button>
     </div>
 
-    <div v-if="carregando && !opcoes.length" class="text-center py-4">
+    <EstadoErro
+      v-if="erro"
+      mensagem="Não foi possível carregar as opções."
+      @tentar-novamente="recarregar()"
+    />
+
+    <div v-else-if="carregando && !opcoes.length" class="text-center py-4">
       <div class="spinner-border text-success"></div>
     </div>
 
@@ -424,7 +452,11 @@ onUnmounted(() => {
               </div>
             </td>
             <td v-if="!modoReordenar" class="text-end">
-              <button class="btn btn-outline-primary btn-sm me-1" @click="abrirEditar(item)">
+              <button
+                class="btn btn-outline-primary btn-sm me-1"
+                :aria-label="`Editar opção ${item.rotulo}`"
+                @click="abrirEditar(item)"
+              >
                 <i class="bi bi-pencil"></i>
               </button>
               <button class="btn btn-outline-danger btn-sm" @click="excluir(item.id)">
@@ -441,108 +473,111 @@ onUnmounted(() => {
       </table>
     </div>
 
-    <div v-if="modalAberto" class="modal d-block" tabindex="-1" @click.self="modalAberto = false">
-      <div class="modal-dialog">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">{{ modoEdicao ? 'Editar' : 'Nova' }} opção</h5>
-            <button type="button" class="btn-close" @click="modalAberto = false"></button>
-          </div>
-          <div class="modal-body">
-            <CampoFormulario :id="'campo-picker'" :label="labelNome" :obrigatorio="true">
-              <div class="border rounded p-2 mb-2 overflow-auto" style="max-height: 200px">
-                <div
-                  class="row g-2"
-                  ref="gridPickerRef"
-                  :style="{ '--altura-cartao': alturaCartao ? `${alturaCartao}px` : undefined }"
-                >
-                  <div v-for="op in opcoesPicker" :key="op.id" class="col-6 col-md-4">
-                    <CartaoSelecao
-                      :selecionado="opcaoSelecionada === op.id"
-                      :desabilitado="carregando"
-                      @click="selecionarOpcao(op.id)"
-                    >
-                      <i v-if="op.icone" :class="`bi bi-${op.icone} me-1`" aria-hidden="true"></i>
-                      {{ op.rotulo }}
-                    </CartaoSelecao>
-                  </div>
-                  <div class="col-6 col-md-4">
-                    <CartaoSelecao
-                      :selecionado="mostrarCustom"
-                      :tracejado="!mostrarCustom"
-                      :desabilitado="carregando"
-                      @click="selecionarOutra"
-                    >
-                      <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>
-                      Outra...
-                    </CartaoSelecao>
-                  </div>
-                </div>
-              </div>
-            </CampoFormulario>
-
-            <template v-if="mostrarAreaEntrada">
-              <CampoFormulario
-                :id="'campo-nome'"
-                :label="labelNome"
-                :erro="erroValidacao"
-                :obrigatorio="true"
+    <ModalBase
+      :visivel="modalAberto"
+      :titulo="(modoEdicao ? 'Editar' : 'Nova') + ' opção'"
+      largura="md"
+      @update:visivel="(aberto) => !aberto && (modalAberto = false)"
+    >
+      <div v-if="erroModal" class="alert alert-danger py-2 small mb-3" role="alert">
+        {{ erroModal }}
+      </div>
+      <CampoFormulario :id="'campo-picker'" :label="labelNome" :obrigatorio="true">
+        <div class="border rounded p-2 mb-2 overflow-auto" style="max-height: 200px">
+          <div
+            class="row g-2"
+            ref="gridPickerRef"
+            :style="{ '--altura-cartao': alturaCartao ? `${alturaCartao}px` : undefined }"
+          >
+            <div v-for="op in opcoesPicker" :key="op.id" class="col-6 col-md-4">
+              <CartaoSelecao
+                :selecionado="opcaoSelecionada === op.id"
+                :desabilitado="carregando"
+                @click="selecionarOpcao(op.id)"
               >
-                <div v-if="regra.campo === 'ordinal'" class="input-group">
-                  <input
-                    :id="'campo-nome'"
-                    :value="digitosSerie"
-                    type="text"
-                    inputmode="numeric"
-                    class="form-control"
-                    :class="{ 'is-invalid': erroValidacao }"
-                    :placeholder="placeholderNome"
-                    :disabled="carregando"
-                    :maxlength="regra.maxlength"
-                    @input="aoDigitarSerie($event)"
-                  />
-                  <span class="input-group-text">ª</span>
-                </div>
-                <input
-                  v-else
-                  :id="'campo-nome'"
-                  :value="formNome"
-                  type="text"
-                  class="form-control"
-                  :class="{ 'is-invalid': erroValidacao }"
-                  :placeholder="placeholderNome"
-                  :disabled="carregando"
-                  :maxlength="regra.maxlength"
-                  @input="aoDigitar($event)"
-                />
-              </CampoFormulario>
-              <div class="form-check form-switch mt-3">
-                <input
-                  class="form-check-input"
-                  type="checkbox"
-                  id="campo-ativo"
-                  v-model="formAtivo"
-                />
-                <label class="form-check-label" for="campo-ativo">Ativo</label>
-              </div>
-            </template>
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-outline-secondary" @click="modalAberto = false">
-              Cancelar
-            </button>
-            <button
-              type="button"
-              class="btn btn-success"
-              @click="salvar"
-              :disabled="!mostrarAreaEntrada || erroValidacao !== null || carregando"
-            >
-              <span v-if="carregando" class="spinner-border spinner-border-sm me-1"></span> Salvar
-            </button>
+                <i v-if="op.icone" :class="`bi bi-${op.icone} me-1`" aria-hidden="true"></i>
+                {{ op.rotulo }}
+              </CartaoSelecao>
+            </div>
+            <div class="col-6 col-md-4">
+              <CartaoSelecao
+                :selecionado="mostrarCustom"
+                :tracejado="!mostrarCustom"
+                :desabilitado="carregando"
+                @click="selecionarOutra"
+              >
+                <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>
+                Outra...
+              </CartaoSelecao>
+            </div>
           </div>
         </div>
-      </div>
-    </div>
-    <div v-if="modalAberto" class="modal-backdrop fade show"></div>
+      </CampoFormulario>
+
+      <template v-if="mostrarAreaEntrada">
+        <CampoFormulario
+          :id="'campo-nome'"
+          :label="labelNome"
+          :erro="erroValidacao"
+          :obrigatorio="true"
+        >
+          <div v-if="regra.campo === 'ordinal'" class="input-group">
+            <input
+              :id="'campo-nome'"
+              :value="digitosSerie"
+              type="text"
+              inputmode="numeric"
+              class="form-control"
+              :class="{ 'is-invalid': erroValidacao }"
+              :placeholder="placeholderNome"
+              :disabled="carregando"
+              :maxlength="regra.maxlength"
+              @input="aoDigitarSerie($event)"
+            />
+            <span class="input-group-text">ª</span>
+          </div>
+          <input
+            v-else
+            :id="'campo-nome'"
+            :value="formNome"
+            type="text"
+            class="form-control"
+            :class="{ 'is-invalid': erroValidacao }"
+            :placeholder="placeholderNome"
+            :disabled="carregando"
+            :maxlength="regra.maxlength"
+            @input="aoDigitar($event)"
+          />
+        </CampoFormulario>
+        <div class="form-check form-switch mt-3">
+          <input class="form-check-input" type="checkbox" id="campo-ativo" v-model="formAtivo" />
+          <label class="form-check-label" for="campo-ativo">Ativo</label>
+        </div>
+      </template>
+
+      <template #rodape>
+        <button type="button" class="btn btn-outline-secondary" @click="modalAberto = false">
+          Cancelar
+        </button>
+        <button
+          type="button"
+          class="btn btn-success"
+          @click="salvar"
+          :disabled="!mostrarAreaEntrada || erroValidacao !== null || carregando"
+        >
+          <span v-if="carregando" class="spinner-border spinner-border-sm me-1"></span> Salvar
+        </button>
+      </template>
+    </ModalBase>
   </div>
+
+  <ModalConfirmacao
+    :visivel="!!opcaoParaExcluir"
+    titulo="Excluir opção"
+    :mensagem="mensagemExclusaoOpcao"
+    rotulo-confirmar="Excluir"
+    icone="trash"
+    @confirmar="confirmarExclusao"
+    @cancelar="opcaoParaExcluir = null"
+  />
 </template>

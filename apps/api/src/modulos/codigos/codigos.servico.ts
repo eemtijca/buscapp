@@ -1,6 +1,6 @@
-import type { CodigoRedefinicao } from '@buscapp/contratos';
+import type { CodigoRedefinicao, Paginacao } from '@buscapp/contratos';
 import { gerarCodigoRedefinicao } from '../../nucleo/autenticacao/codigos.js';
-import { prisma } from '../../nucleo/banco/cliente.js';
+import { prismaAdmin } from '../../nucleo/banco/cliente.js';
 import { publicarEvento } from '../../nucleo/eventos/barramento.js';
 import { erroNaoEncontrado } from '../../nucleo/http/erros.js';
 import {
@@ -12,11 +12,12 @@ import {
   revogarCodigo,
 } from './codigos.repositorio.js';
 
-export async function listar(): Promise<CodigoRedefinicao[]> {
+export async function listar(consulta: Paginacao): Promise<CodigoRedefinicao[]> {
   const agora = new Date();
   const [codigos, tentativas] = await Promise.all([
-    listarCodigos(),
-    prisma.codigos_redefinicao_tentativas.findMany({
+    listarCodigos(consulta),
+    // Tabela administrativa: só o cliente administrativo lê as tentativas.
+    prismaAdmin.codigos_redefinicao_tentativas.findMany({
       where: { bloqueado_ate: { gt: agora } },
       select: { email: true },
     }),
@@ -26,11 +27,14 @@ export async function listar(): Promise<CodigoRedefinicao[]> {
   return codigos.map((codigo) => paraCodigo(codigo, agora, bloqueados.has(codigo.email)));
 }
 
-export async function gerar(perfilId: string, criadoPor: string): Promise<string> {
-  const codigo = await gerarCodigoRedefinicao(perfilId, criadoPor);
+export async function gerar(
+  perfilId: string,
+  criadoPor: string,
+): Promise<{ codigo: string; expiraEm: Date }> {
+  const resultado = await gerarCodigoRedefinicao(perfilId, criadoPor);
   await codigoGeradoParaAuditoria(perfilId, criadoPor);
   publicarEvento({ tabela: 'codigos_redefinicao' });
-  return codigo;
+  return resultado;
 }
 
 export async function revogar(id: string, usuarioId: string): Promise<CodigoRedefinicao> {

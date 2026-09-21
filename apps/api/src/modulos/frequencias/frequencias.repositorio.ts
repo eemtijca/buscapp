@@ -11,6 +11,8 @@ export interface FiltroFrequencias {
   status?: 'presente' | 'ausente' | 'justificado';
   tipoRegistro?: 'chamada_aula' | 'entrada_portao' | 'saida';
   incluirDeletadas?: boolean;
+  limite?: number;
+  offset?: number;
 }
 
 export interface ContextoLoteFrequencia {
@@ -48,6 +50,8 @@ export async function listarFrequencias(filtro: FiltroFrequencias) {
       ...(filtro.incluirDeletadas ? {} : { deleted_at: null }),
     },
     orderBy: [{ data_aula: 'desc' }, { periodo: 'asc' }, { created_at: 'desc' }],
+    ...(filtro.limite !== undefined ? { take: filtro.limite } : {}),
+    ...(filtro.offset !== undefined ? { skip: filtro.offset } : {}),
   });
 }
 

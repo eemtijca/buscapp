@@ -96,6 +96,8 @@ export async function listarOpcoes(consulta: ListarOpcoesConfiguracao) {
       ...(ativo !== undefined ? { ativo } : {}),
     },
     orderBy: [{ ordem: 'asc' }, { created_at: 'asc' }],
+    take: consulta.limite,
+    skip: consulta.offset,
   });
 }
 
@@ -238,6 +240,8 @@ export async function listarTags(consulta: ListarTagsComportamento) {
   return prisma.tags_comportamento.findMany({
     where: ativo !== undefined ? { ativo } : {},
     orderBy: { nome: 'asc' },
+    take: consulta.limite,
+    skip: consulta.offset,
   });
 }
 

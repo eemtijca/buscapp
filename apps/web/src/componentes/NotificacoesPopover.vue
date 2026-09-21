@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useNotificacoes } from '@/composables/useNotificacoes';
 
@@ -9,16 +9,35 @@ const { naoLidasOutros, notificacoes, marcarTodasComoLidas, limparTodas, marcarL
 
 const aberto = ref(false);
 const confirmandoLimpar = ref(false);
+const container = ref<HTMLElement | null>(null);
+const menu = ref<HTMLElement | null>(null);
 
 function toggle() {
   aberto.value = !aberto.value;
 }
 
 function handleClickOutside(e: MouseEvent) {
-  if (aberto.value && !(e.target as HTMLElement)?.closest('.notif-popover')) {
-    aberto.value = false;
-  }
+  if (!aberto.value) return;
+  const alvo = e.target as Node | null;
+  if (container.value?.contains(alvo) || menu.value?.contains(alvo)) return;
+  aberto.value = false;
 }
+
+function aoTeclar(evento: KeyboardEvent) {
+  if (evento.key !== 'Escape') return;
+  if (confirmandoLimpar.value) confirmandoLimpar.value = false;
+  else aberto.value = false;
+}
+
+onMounted(() => {
+  document.addEventListener('click', handleClickOutside);
+  document.addEventListener('keydown', aoTeclar);
+});
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleClickOutside);
+  document.removeEventListener('keydown', aoTeclar);
+});
 
 async function navegar(n: { id: string; rota: string; lida: boolean }) {
   if (!n.lida) void marcarLida(n.id);
@@ -35,18 +54,20 @@ async function handleLimparTodas() {
   await limparTodas();
   confirmandoLimpar.value = false;
 }
-
-if (typeof document !== 'undefined') {
-  document.addEventListener('click', handleClickOutside);
-}
 </script>
 
 <template>
-  <div class="notif-popover d-inline-block position-relative">
+  <div ref="container" class="notif-popover d-inline-block position-relative">
     <button
       type="button"
       class="btn btn-outline-light btn-sm position-relative me-1"
-      aria-label="Notificações"
+      :aria-label="
+        naoLidasOutros > 0
+          ? `Notificações: ${naoLidasOutros} não lidas`
+          : 'Notificações: nenhuma não lida'
+      "
+      aria-haspopup="true"
+      :aria-expanded="aberto"
       @click="toggle"
     >
       <i class="bi bi-bell" aria-hidden="true"></i>
@@ -63,7 +84,10 @@ if (typeof document !== 'undefined') {
     <Teleport to="body">
       <div
         v-if="aberto"
+        ref="menu"
         class="notif-menu shadow rounded-1 bg-body border overflow-y-auto"
+        role="dialog"
+        aria-label="Notificações"
         @mousedown.prevent
       >
         <div

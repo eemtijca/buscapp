@@ -8,18 +8,20 @@ import {
   useAlunosFrequencia,
 } from '@/composables/consultas/useMonitoramento';
 import { useOpcoes } from '@/composables/consultas/useCatalogos';
+import { hojeIso } from '@/utils/datas';
 import CartaoAlunoFrequencia from '@/componentes/CartaoAlunoFrequencia.vue';
 import CampoFormulario from '@/componentes/CampoFormulario.vue';
 import Combobox from '@/componentes/Combobox.vue';
 import type { OpcaoCombobox } from '@/componentes/Combobox.vue';
 import GrupoCheckbox from '@/componentes/GrupoCheckbox.vue';
 import ModalConfirmacao from '@/componentes/ModalConfirmacao.vue';
+import { formatarData } from '@/utils/datas';
 import type { AlunoFrequencia } from '@/tipos/componentes';
 
 const route = useRoute();
 const { usuario } = useAutenticacao();
 const abaAtiva = ref<'turma' | 'individual'>('turma');
-const dataAula = ref(new Date().toISOString().slice(0, 10));
+const dataAula = ref(hojeIso());
 const { alunos: alunosRemotos, pendente, recarregar } = useAlunosFrequencia(() => dataAula.value);
 const alunos = ref<AlunoFrequencia[]>([]);
 const carregando = computed(() => pendente.value || salvandoChamada.value);
@@ -352,9 +354,10 @@ watch(dataAula, () => {
           </div>
 
           <div class="mb-3">
-            <label class="form-label small fw-medium mb-2">Períodos</label>
+            <span class="form-label small fw-medium mb-2 d-block">Períodos</span>
             <GrupoCheckbox
               nome="periodoChamadaGestao"
+              rotulo="Períodos"
               :opcoes="opcoesPeriodos"
               :modelo="periodosChamada"
               :colunas="4"
@@ -550,7 +553,7 @@ watch(dataAula, () => {
         'Registrar ' +
         totalAusentesMarcados +
         ' ausência(s) na turma selecionada em ' +
-        new Date(dataAula + 'T12:00:00').toLocaleDateString('pt-BR') +
+        formatarData(dataAula) +
         '?'
       "
       rotulo-confirmar="Registrar faltas"
@@ -562,7 +565,7 @@ watch(dataAula, () => {
     <ModalConfirmacao
       :visivel="confirmarIndividual"
       titulo="Registrar ausência"
-      :mensagem="`Registrar ${periodosIndividuais.length} ausência(s) para o aluno selecionado em ${new Date(dataAula + 'T12:00:00').toLocaleDateString('pt-BR')}?`"
+      :mensagem="`Registrar ${periodosIndividuais.length} ausência(s) para o aluno selecionado em ${formatarData(dataAula)}?`"
       rotulo-confirmar="Registrar"
       icone="person-dash"
       variante="warning"

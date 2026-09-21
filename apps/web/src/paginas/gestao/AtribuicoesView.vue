@@ -14,6 +14,9 @@ import {
 import CampoFormulario from '@/componentes/CampoFormulario.vue';
 import Combobox from '@/componentes/Combobox.vue';
 import type { OpcaoCombobox } from '@/componentes/Combobox.vue';
+import ModalBase from '@/componentes/ModalBase.vue';
+import ModalConfirmacao from '@/componentes/ModalConfirmacao.vue';
+import EstadoErro from '@/componentes/EstadoErro.vue';
 import type { AtribuicaoProfessor } from '@/tipos/database';
 
 interface AtribuicaoItem extends AtribuicaoProfessor {
@@ -35,6 +38,14 @@ const consultaProfessores = useUsuarios(() => ({ papel: 'professor' }));
 const consultaTurmas = useTurmas(() => ({ ativo: 'true' }));
 const consultaDisciplinas = useDisciplinas(() => ({ ativo: 'true' }));
 const { opcoes: opcoesPapel } = useOpcoes(() => 'papel_atribuicao');
+
+const erro = computed(
+  () =>
+    consultaAtribuicoes.erro.value ??
+    consultaProfessores.erro.value ??
+    consultaTurmas.erro.value ??
+    consultaDisciplinas.erro.value,
+);
 
 const atribuicoes = computed<AtribuicaoItem[]>(() =>
   (consultaAtribuicoes.dados.value?.atribuicoes ?? []).map((atribuicao) => ({
@@ -113,13 +124,22 @@ const papelOpcoes = computed<OpcaoCombobox[]>(() =>
   opcoesPapel.value.map((o) => ({ valor: o.valor, rotulo: o.rotulo, icone: o.icone })),
 );
 
-onBeforeRouteLeave((_to, _from, next) => {
-  if (formDirty.value && modalAberto.value && !carregando.value) {
-    const confirmar = window.confirm('Há alterações não salvas. Deseja realmente sair?');
-    if (!confirmar) return next(false);
-  }
-  next();
+const confirmacaoSaida = ref(false);
+let resolverSaida: ((permitir: boolean) => void) | null = null;
+
+onBeforeRouteLeave(async () => {
+  if (!(formDirty.value && modalAberto.value && !carregando.value)) return true;
+  confirmacaoSaida.value = true;
+  return new Promise<boolean>((resolver) => {
+    resolverSaida = resolver;
+  });
 });
+
+function responderSaida(permitir: boolean): void {
+  confirmacaoSaida.value = false;
+  resolverSaida?.(permitir);
+  resolverSaida = null;
+}
 
 watch(
   [
@@ -326,7 +346,13 @@ const papelBadge = (papel: string) => {
       ></button>
     </div>
 
-    <div v-if="carregando && !atribuicoes.length" class="text-center py-5">
+    <EstadoErro
+      v-if="erro"
+      mensagem="Não foi possível carregar as atribuições."
+      @tentar-novamente="recarregar()"
+    />
+
+    <div v-else-if="carregando && !atribuicoes.length" class="text-center py-5">
       <div class="spinner-border text-primary" role="status">
         <span class="visually-hidden">Carregando...</span>
       </div>
@@ -381,6 +407,7 @@ const papelBadge = (papel: string) => {
                     type="button"
                     class="btn btn-sm btn-outline-success"
                     :disabled="carregando"
+                    :aria-label="'Editar atribuição de ' + a.professor_nome"
                     @click="abrirEditar(a)"
                   >
                     <i class="bi bi-pencil" aria-hidden="true"></i>
@@ -406,117 +433,104 @@ const papelBadge = (papel: string) => {
       </div>
     </div>
 
-    <div
-      v-if="modalAberto"
-      class="modal d-block"
-      tabindex="-1"
-      style="background-color: rgba(0, 0, 0, 0.5)"
+    <ModalBase
+      :visivel="modalAberto"
+      :titulo="modoEdicao ? 'Editar atribuição' : 'Nova atribuição'"
+      icone="people"
+      cor-icone="text-primary"
+      largura="md"
+      @update:visivel="(aberto) => !aberto && (modalAberto = false)"
     >
-      <div class="modal-dialog modal-dialog-centered modal-fullscreen-sm-down">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title small fw-bold">
-              <i class="bi bi-people text-primary me-1" aria-hidden="true"></i>
-              {{ modoEdicao ? 'Editar atribuição' : 'Nova atribuição' }}
-            </h5>
-            <button
-              type="button"
-              class="btn-close"
-              @click="modalAberto = false"
-              aria-label="Fechar"
-            ></button>
+      <form @submit.prevent="salvar">
+        <CampoFormulario id="campoProfessor" label="Professor" :obrigatorio="true">
+          <Combobox
+            id="campoProfessor"
+            v-model="formProfessorId"
+            :opcoes="professorOpcoes"
+            placeholder="Selecione um professor"
+            tamanho="sm"
+          />
+        </CampoFormulario>
+        <CampoFormulario id="campoTurma" label="Turma" :obrigatorio="true">
+          <Combobox
+            id="campoTurma"
+            v-model="formTurmaId"
+            :opcoes="turmaOpcoes"
+            placeholder="Selecione uma turma"
+            tamanho="sm"
+          />
+        </CampoFormulario>
+        <CampoFormulario id="campoDisciplina" label="Disciplina">
+          <Combobox
+            id="campoDisciplina"
+            v-model="formDisciplinaId"
+            :opcoes="disciplinaOpcoes"
+            placeholder="Selecione uma disciplina"
+            tamanho="sm"
+          />
+        </CampoFormulario>
+        <CampoFormulario id="campoPapel" label="Papel" :obrigatorio="true">
+          <Combobox
+            id="campoPapel"
+            v-model="formPapel"
+            :opcoes="papelOpcoes"
+            placeholder="Selecione o papel"
+            tamanho="sm"
+          />
+        </CampoFormulario>
+        <CampoFormulario id="campoDataInicio" label="Data início" :obrigatorio="true">
+          <input
+            id="campoDataInicio"
+            v-model="formDataInicio"
+            type="date"
+            class="form-control form-control-sm"
+            required
+            autocomplete="off"
+          />
+        </CampoFormulario>
+        <CampoFormulario id="campoDataFim" label="Data fim">
+          <input
+            id="campoDataFim"
+            v-model="formDataFim"
+            type="date"
+            class="form-control form-control-sm"
+            autocomplete="off"
+          />
+        </CampoFormulario>
+        <div class="mb-0">
+          <div class="form-check">
+            <input id="campoAtivo" v-model="formAtivo" type="checkbox" class="form-check-input" />
+            <label class="form-check-label small fw-medium" for="campoAtivo">Ativo</label>
           </div>
-          <form @submit.prevent="salvar">
-            <div class="modal-body">
-              <CampoFormulario id="campoProfessor" label="Professor" :obrigatorio="true">
-                <Combobox
-                  id="campoProfessor"
-                  v-model="formProfessorId"
-                  :opcoes="professorOpcoes"
-                  placeholder="Selecione um professor"
-                  tamanho="sm"
-                />
-              </CampoFormulario>
-              <CampoFormulario id="campoTurma" label="Turma" :obrigatorio="true">
-                <Combobox
-                  id="campoTurma"
-                  v-model="formTurmaId"
-                  :opcoes="turmaOpcoes"
-                  placeholder="Selecione uma turma"
-                  tamanho="sm"
-                />
-              </CampoFormulario>
-              <CampoFormulario id="campoDisciplina" label="Disciplina">
-                <Combobox
-                  id="campoDisciplina"
-                  v-model="formDisciplinaId"
-                  :opcoes="disciplinaOpcoes"
-                  placeholder="Selecione uma disciplina"
-                  tamanho="sm"
-                />
-              </CampoFormulario>
-              <CampoFormulario id="campoPapel" label="Papel" :obrigatorio="true">
-                <Combobox
-                  id="campoPapel"
-                  v-model="formPapel"
-                  :opcoes="papelOpcoes"
-                  placeholder="Selecione o papel"
-                  tamanho="sm"
-                />
-              </CampoFormulario>
-              <CampoFormulario id="campoDataInicio" label="Data início" :obrigatorio="true">
-                <input
-                  id="campoDataInicio"
-                  v-model="formDataInicio"
-                  type="date"
-                  class="form-control form-control-sm"
-                  required
-                  autocomplete="off"
-                />
-              </CampoFormulario>
-              <CampoFormulario id="campoDataFim" label="Data fim">
-                <input
-                  id="campoDataFim"
-                  v-model="formDataFim"
-                  type="date"
-                  class="form-control form-control-sm"
-                  autocomplete="off"
-                />
-              </CampoFormulario>
-              <div class="mb-0">
-                <div class="form-check">
-                  <input
-                    id="campoAtivo"
-                    v-model="formAtivo"
-                    type="checkbox"
-                    class="form-check-input"
-                  />
-                  <label class="form-check-label small fw-medium" for="campoAtivo">Ativo</label>
-                </div>
-              </div>
-            </div>
-            <div class="modal-footer">
-              <button
-                type="button"
-                class="btn btn-sm btn-outline-secondary"
-                @click="modalAberto = false"
-              >
-                Cancelar
-              </button>
-              <button type="submit" class="btn btn-sm btn-success" :disabled="carregando">
-                <span
-                  v-if="carregando"
-                  class="spinner-border spinner-border-sm me-1"
-                  role="status"
-                  aria-hidden="true"
-                ></span>
-                <i v-else class="bi bi-check-lg me-1" aria-hidden="true"></i>
-                {{ modoEdicao ? 'Salvar' : 'Criar' }}
-              </button>
-            </div>
-          </form>
         </div>
-      </div>
-    </div>
+      </form>
+
+      <template #rodape>
+        <button type="button" class="btn btn-sm btn-outline-secondary" @click="modalAberto = false">
+          Cancelar
+        </button>
+        <button type="button" class="btn btn-sm btn-success" :disabled="carregando" @click="salvar">
+          <span
+            v-if="carregando"
+            class="spinner-border spinner-border-sm me-1"
+            role="status"
+            aria-hidden="true"
+          ></span>
+          <i v-else class="bi bi-check-lg me-1" aria-hidden="true"></i>
+          {{ modoEdicao ? 'Salvar' : 'Criar' }}
+        </button>
+      </template>
+    </ModalBase>
   </div>
+
+  <ModalConfirmacao
+    :visivel="confirmacaoSaida"
+    titulo="Alterações não salvas"
+    mensagem="Há alterações não salvas. Deseja realmente sair?"
+    rotulo-confirmar="Sair sem salvar"
+    icone="exclamation-triangle"
+    variante="warning"
+    @confirmar="responderSaida(true)"
+    @cancelar="responderSaida(false)"
+  />
 </template>

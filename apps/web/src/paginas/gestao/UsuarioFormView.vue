@@ -18,6 +18,7 @@ import CampoFormulario from '@/componentes/CampoFormulario.vue';
 import Combobox from '@/componentes/Combobox.vue';
 import type { OpcaoCombobox } from '@/componentes/Combobox.vue';
 import GrupoCheckbox from '@/componentes/GrupoCheckbox.vue';
+import ModalConfirmacao from '@/componentes/ModalConfirmacao.vue';
 import type {
   PapelPerfil,
   StatusPerfil,
@@ -178,13 +179,22 @@ function limparDraft() {
   }
 }
 
-onBeforeRouteLeave((_to, _from, next) => {
-  if (formDirty.value && !salvando.value) {
-    const confirmar = window.confirm('Há alterações não salvas. Deseja realmente sair?');
-    if (!confirmar) return next(false);
-  }
-  next();
+const confirmacaoSaida = ref(false);
+let resolverSaida: ((permitir: boolean) => void) | null = null;
+
+onBeforeRouteLeave(async () => {
+  if (!(formDirty.value && !salvando.value)) return true;
+  confirmacaoSaida.value = true;
+  return new Promise<boolean>((resolver) => {
+    resolverSaida = resolver;
+  });
 });
+
+function responderSaida(permitir: boolean): void {
+  confirmacaoSaida.value = false;
+  resolverSaida?.(permitir);
+  resolverSaida = null;
+}
 
 watch(
   [nome, email, telefone, cargo, notificacoesAtivas, acessoModulos, papel, status],
@@ -598,9 +608,10 @@ async function salvar() {
             <input
               id="campoTelefone"
               v-model="telefone"
-              type="text"
+              type="tel"
+              inputmode="tel"
+              autocomplete="tel"
               class="form-control form-control-sm"
-              autocomplete="off"
             />
           </CampoFormulario>
 
@@ -735,4 +746,15 @@ async function salvar() {
       </div>
     </form>
   </div>
+
+  <ModalConfirmacao
+    :visivel="confirmacaoSaida"
+    titulo="Alterações não salvas"
+    mensagem="Há alterações não salvas. Deseja realmente sair?"
+    rotulo-confirmar="Sair sem salvar"
+    icone="exclamation-triangle"
+    variante="warning"
+    @confirmar="responderSaida(true)"
+    @cancelar="responderSaida(false)"
+  />
 </template>

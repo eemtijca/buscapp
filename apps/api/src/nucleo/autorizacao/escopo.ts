@@ -1,13 +1,28 @@
 import { prisma } from '../banco/cliente.js';
+import { contextoBanco } from '../banco/contexto.js';
 import { erroNaoAutorizado } from '../http/erros.js';
 import type { PerfilAutenticado } from '../autenticacao/tipos.js';
 
 /**
  * Escopo de visibilidade de alunos por papel, espelhando as políticas RLS originais:
  * gestão vê todos; professor vê alunos das turmas em que leciona; responsável vê
- * apenas os alunos vinculados a ele.
+ * apenas os alunos vinculados a ele. O resultado é memorizado por requisição.
  */
 export async function idsDeAlunosVisiveis(usuario: PerfilAutenticado): Promise<string[] | null> {
+  const contexto = contextoBanco.getStore();
+  if (contexto?.escopoAlunosResolvido) return contexto.escopoAlunos ?? null;
+
+  const ids = await calcularEscopo(usuario);
+
+  if (contexto) {
+    contexto.escopoAlunos = ids;
+    contexto.escopoAlunosResolvido = true;
+  }
+
+  return ids;
+}
+
+async function calcularEscopo(usuario: PerfilAutenticado): Promise<string[] | null> {
   if (usuario.papel === 'gestao') return null;
 
   if (usuario.papel === 'professor') {

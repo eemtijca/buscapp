@@ -26,9 +26,9 @@ begin
   select count(*) into v_tabelas
   from information_schema.tables
   where table_schema = 'public' and table_type = 'BASE TABLE';
-  -- 31 tabelas de domínio + sessoes + _prisma_migrations
-  if v_tabelas <> 33 then
-    raise exception 'Esperadas 33 tabelas em public, encontradas %', v_tabelas;
+  -- 32 tabelas de domínio e operação + sessoes + _prisma_migrations
+  if v_tabelas <> 34 then
+    raise exception 'Esperadas 34 tabelas em public, encontradas %', v_tabelas;
   end if;
 
   select count(*) into v_checks

@@ -1,4 +1,5 @@
 import { createHmac, randomInt, timingSafeEqual } from 'node:crypto';
+import type { Prisma } from '../../../generated/prisma/client.js';
 import { ambiente } from '../../ambiente.js';
 import { prismaAdmin } from '../banco/cliente.js';
 import { gerarHashSenha } from './senhas.js';
@@ -44,28 +45,18 @@ export async function solicitarCodigoRedefinicao(email: string): Promise<void> {
     select: { id: true },
   });
 
-  for (const gestor of gestores) {
-    const pendente = await prismaAdmin.notificacoes.findFirst({
-      where: {
-        destinatario_id: gestor.id,
-        tipo: 'codigo_redefinicao',
-        lida: false,
-        metadados: { path: ['perfil_id'], equals: perfil.id },
-      },
-      select: { id: true },
-    });
-    if (pendente) continue;
-
-    await prismaAdmin.notificacoes.create({
-      data: {
-        destinatario_id: gestor.id,
-        tipo: 'codigo_redefinicao',
-        titulo: 'Solicitação de código de redefinição',
-        corpo: `${perfil.nome} solicitou um código de redefinição de senha.`,
-        metadados: { perfil_id: perfil.id, email: emailNormalizado },
-      },
-    });
-  }
+  // `skipDuplicates` usa ON CONFLICT DO NOTHING e o índice parcial ignora notificações já lidas.
+  await prismaAdmin.notificacoes.createMany({
+    data: gestores.map((gestor) => ({
+      destinatario_id: gestor.id,
+      tipo: 'codigo_redefinicao' as const,
+      titulo: 'Solicitação de código de redefinição',
+      corpo: `${perfil.nome} solicitou um código de redefinição de senha.`,
+      metadados: { perfil_id: perfil.id, email: emailNormalizado },
+      dedupe_key: `codigo_redefinicao:${emailNormalizado}`,
+    })),
+    skipDuplicates: true,
+  });
 }
 
 export async function bloqueadoPorTentativas(email: string): Promise<boolean> {
@@ -117,32 +108,45 @@ export async function limparTentativas(email: string): Promise<void> {
 export async function gerarCodigoRedefinicao(
   perfilId: string,
   criadoPor?: string,
-): Promise<string> {
-  const perfil = await prismaAdmin.perfis.findUnique({ where: { id: perfilId } });
+  cliente?: Prisma.TransactionClient,
+): Promise<{ codigo: string; expiraEm: Date }> {
+  const db = (cliente ?? prismaAdmin) as Prisma.TransactionClient;
+  const perfil = await db.perfis.findUnique({ where: { id: perfilId } });
   if (!perfil?.email) throw new Error('Perfil sem email não pode receber código de redefinição.');
 
   const email = perfil.email.toLowerCase();
-  const config = await prismaAdmin.configuracoes_sistema.findUnique({ where: { id: 1 } });
+  const config = await db.configuracoes_sistema.findUnique({ where: { id: 1 } });
   const validadeMinutos = config?.minutos_validade_codigo ?? 60;
   const agora = new Date();
 
-  await prismaAdmin.codigos_redefinicao.updateMany({
-    where: { email, usado_em: null, revogado_em: null, expira_em: { gt: agora } },
-    data: { revogado_em: agora, expira_em: agora },
-  });
+  // Duas gerações concorrentes disputam o índice único de código ativo; a segunda tenta de novo.
+  for (let tentativa = 0; tentativa < 2; tentativa += 1) {
+    // Revoga qualquer código anterior ainda não consumido, inclusive os expirados:
+    // o índice único considera ativo todo registro sem uso e sem revogação.
+    await db.codigos_redefinicao.updateMany({
+      where: { email, usado_em: null, revogado_em: null },
+      data: { revogado_em: agora, expira_em: agora },
+    });
 
-  const codigo = gerarCodigo();
-  await prismaAdmin.codigos_redefinicao.create({
-    data: {
-      email,
-      perfil_id: perfil.id,
-      codigo_hash: hashCodigo(email, codigo),
-      criado_por: criadoPor ?? null,
-      expira_em: new Date(agora.getTime() + validadeMinutos * 60 * 1000),
-    },
-  });
+    const codigo = gerarCodigo();
+    const expiraEm = new Date(agora.getTime() + validadeMinutos * 60 * 1000);
+    try {
+      await db.codigos_redefinicao.create({
+        data: {
+          email,
+          perfil_id: perfil.id,
+          codigo_hash: hashCodigo(email, codigo),
+          criado_por: criadoPor ?? null,
+          expira_em: expiraEm,
+        },
+      });
+      return { codigo, expiraEm };
+    } catch (erro) {
+      if ((erro as { code?: string }).code !== 'P2002' || tentativa === 1) throw erro;
+    }
+  }
 
-  return codigo;
+  throw new Error('Não foi possível gerar o código de redefinição.');
 }
 
 export interface DadosRedefinicao {

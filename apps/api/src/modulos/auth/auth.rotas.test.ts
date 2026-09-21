@@ -3,6 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { construirApp } from '../../aplicacao.js';
 import { prismaAdmin as prisma } from '../../nucleo/banco/cliente.js';
+import { criarSessao } from '../../nucleo/autenticacao/sessoes.js';
 import { gerarHashSenha } from '../../nucleo/autenticacao/senhas.js';
 import { gerarCodigoRedefinicao } from '../../nucleo/autenticacao/codigos.js';
 
@@ -52,13 +53,21 @@ beforeAll(async () => {
 afterAll(async () => {
   await prisma.sessoes.deleteMany({ where: { perfil_id: { in: [gestaoId, profId, pendenteId] } } });
   await prisma.notificacoes.deleteMany({ where: { destinatario_id: gestaoId } });
+  await prisma.$executeRawUnsafe('delete from public.rate_limit_contadores');
   await prisma.codigos_redefinicao.deleteMany({
     where: { perfil_id: { in: [gestaoId, profId, pendenteId] } },
   });
   await prisma.codigos_redefinicao_tentativas.deleteMany({
     where: { email: { in: [emailProf, emailPendente, emailGestao] } },
   });
-  await prisma.auditoria.deleteMany({ where: { entidade_id: pendenteId } });
+  await prisma.auditoria.deleteMany({
+    where: {
+      OR: [
+        { usuario_id: { in: [gestaoId, profId, pendenteId] } },
+        { entidade_id: { in: [gestaoId, profId, pendenteId] } },
+      ],
+    },
+  });
   await prisma.perfis.deleteMany({ where: { id: { in: [gestaoId, profId, pendenteId] } } });
   await prisma.configuracoes_sistema.deleteMany({ where: { id: { not: 1 } } });
   await app.close();
@@ -107,6 +116,87 @@ describe('POST /api/auth/login', () => {
       payload: { email: emailProf, senha: 'SenhaAtual1!' },
     });
     expect(resposta.statusCode).toBe(403);
+    expect(resposta.json().erro.codigo).toBe('conta_inativa');
+    await prisma.perfis.update({ where: { id: profId }, data: { status: 'ativo' } });
+  });
+
+  it('bloqueia conta pendente com erro próprio', async () => {
+    const resposta = await app.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      payload: { email: emailPendente, senha: 'SenhaAtual1!' },
+    });
+    expect(resposta.statusCode).toBe(403);
+    expect(resposta.json().erro.codigo).toBe('conta_pendente');
+  });
+
+  it('registra a auditoria de login e de falha', async () => {
+    await app.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      payload: { email: emailGestao, senha: 'SenhaAtual1!' },
+    });
+    await app.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      payload: { email: emailGestao, senha: 'Errada1!' },
+    });
+
+    const sucessos = await prisma.auditoria.count({
+      where: { usuario_id: gestaoId, acao: 'LOGIN' },
+    });
+    expect(sucessos).toBeGreaterThan(0);
+
+    const falhas = await prisma.auditoria.count({
+      where: { acao: 'LOGIN_FALHA', entidade_id: gestaoId },
+    });
+    expect(falhas).toBeGreaterThan(0);
+  });
+
+  it('bloqueia tentativas repetidas de login', async () => {
+    const email = `limite.${marcador}@escola.edu.br`;
+
+    for (let tentativa = 0; tentativa < 10; tentativa += 1) {
+      const resposta = await app.inject({
+        method: 'POST',
+        url: '/api/auth/login',
+        payload: { email, senha: 'Errada1!' },
+      });
+      expect(resposta.statusCode).toBe(401);
+    }
+
+    const bloqueada = await app.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      payload: { email, senha: 'Errada1!' },
+    });
+    expect(bloqueada.statusCode).toBe(429);
+    expect(bloqueada.json().erro.codigo).toBe('muitas_requisicoes');
+  });
+});
+
+describe('status da conta em rotas privadas', () => {
+  it('rejeita sessão de perfil pendente', async () => {
+    const { token } = await criarSessao(pendenteId, { lembrar: false });
+    const resposta = await app.inject({
+      method: 'GET',
+      url: '/api/alunos',
+      cookies: { buscapp_sessao: token },
+    });
+    expect(resposta.statusCode).toBe(403);
+    expect(resposta.json().erro.codigo).toBe('conta_pendente');
+  });
+
+  it('rejeita sessão de perfil inativo', async () => {
+    await prisma.perfis.update({ where: { id: profId }, data: { status: 'inativo' } });
+    const { token } = await criarSessao(profId, { lembrar: false });
+    const resposta = await app.inject({
+      method: 'GET',
+      url: '/api/alunos',
+      cookies: { buscapp_sessao: token },
+    });
+    expect(resposta.statusCode).toBe(403);
+    expect(resposta.json().erro.codigo).toBe('conta_inativa');
     await prisma.perfis.update({ where: { id: profId }, data: { status: 'ativo' } });
   });
 });
@@ -166,6 +256,29 @@ describe('redefinição por código', () => {
     expect(notificacao).not.toBeNull();
   });
 
+  it('deduplica solicitações pendentes da mesma conta', async () => {
+    await app.inject({
+      method: 'POST',
+      url: '/api/auth/solicitar-codigo',
+      payload: { email: emailPendente },
+    });
+    await app.inject({
+      method: 'POST',
+      url: '/api/auth/solicitar-codigo',
+      payload: { email: emailPendente },
+    });
+
+    const pendentes = await prisma.notificacoes.count({
+      where: {
+        destinatario_id: gestaoId,
+        tipo: 'codigo_redefinicao',
+        lida: false,
+        dedupe_key: `codigo_redefinicao:${emailPendente}`,
+      },
+    });
+    expect(pendentes).toBe(1);
+  });
+
   it('redefine a senha, ativa perfil pendente e revoga sessões', async () => {
     const login = await app.inject({
       method: 'POST',
@@ -174,7 +287,7 @@ describe('redefinição por código', () => {
     });
     const tokenAntigo = extrairCookie(login.headers['set-cookie']);
 
-    const codigo = await gerarCodigoRedefinicao(pendenteId);
+    const { codigo } = await gerarCodigoRedefinicao(pendenteId);
     const resposta = await app.inject({
       method: 'POST',
       url: '/api/auth/redefinir-senha',
@@ -244,5 +357,98 @@ describe('redefinição por código', () => {
       payload: { email: emailProf, codigo: '123456', novaSenha: 'fraca' },
     });
     expect(resposta.statusCode).toBe(400);
+  });
+});
+
+describe('sessões ativas', () => {
+  async function entrar(email: string): Promise<string> {
+    const resposta = await app.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      payload: { email, senha: 'SenhaAtual1!' },
+    });
+    expect(resposta.statusCode).toBe(200);
+    return extrairCookie(resposta.headers['set-cookie']);
+  }
+
+  it('lista as sessões e revoga as outras', async () => {
+    // Limpa sessões herdadas de outros testes antes de montar o cenário.
+    const tokenBase = await entrar(emailProf);
+    await app.inject({
+      method: 'DELETE',
+      url: '/api/auth/sessoes',
+      cookies: { buscapp_sessao: tokenBase },
+    });
+    await app.inject({
+      method: 'POST',
+      url: '/api/auth/logout',
+      cookies: { buscapp_sessao: tokenBase },
+    });
+
+    const token1 = await entrar(emailProf);
+    const token2 = await entrar(emailProf);
+
+    const lista = await app.inject({
+      method: 'GET',
+      url: '/api/auth/sessoes',
+      cookies: { buscapp_sessao: token2 },
+    });
+    expect(lista.statusCode).toBe(200);
+    expect(lista.json().sessoes).toHaveLength(2);
+    expect(lista.json().sessoes.filter((sessao: { atual: boolean }) => sessao.atual)).toHaveLength(
+      1,
+    );
+
+    const revogacao = await app.inject({
+      method: 'DELETE',
+      url: '/api/auth/sessoes',
+      cookies: { buscapp_sessao: token2 },
+    });
+    expect(revogacao.statusCode).toBe(200);
+    expect(revogacao.json().revogadas).toBe(1);
+
+    const depois = await app.inject({
+      method: 'GET',
+      url: '/api/auth/sessoes',
+      cookies: { buscapp_sessao: token2 },
+    });
+    expect(depois.json().sessoes).toHaveLength(1);
+
+    // A sessão revogada deixa de valer; a atual segue ativa.
+    const revogada = await app.inject({
+      method: 'GET',
+      url: '/api/auth/me',
+      cookies: { buscapp_sessao: token1 },
+    });
+    expect(revogada.json().perfil).toBeNull();
+  });
+
+  it('expira a sessão por inatividade', async () => {
+    const token = await entrar(emailProf);
+    await prisma.sessoes.updateMany({
+      where: { perfil_id: profId },
+      data: { ultimo_uso_em: new Date(Date.now() - 3 * 60 * 60 * 1000) },
+    });
+
+    const eu = await app.inject({
+      method: 'GET',
+      url: '/api/auth/me',
+      cookies: { buscapp_sessao: token },
+    });
+    expect(eu.statusCode).toBe(200);
+    expect(eu.json().perfil).toBeNull();
+  });
+
+  it('expõe as métricas operacionais para a gestão', async () => {
+    const token = await entrar(emailGestao);
+    const resposta = await app.inject({
+      method: 'GET',
+      url: '/api/saude/metricas',
+      cookies: { buscapp_sessao: token },
+    });
+
+    expect(resposta.statusCode).toBe(200);
+    expect(resposta.json().requisicoes.total).toBeGreaterThan(0);
+    expect(resposta.json().conexoes_sse).toBe(0);
   });
 });

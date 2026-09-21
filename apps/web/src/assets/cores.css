@@ -16,6 +16,41 @@ body {
   font-family: var(--bs-font-sans-serif);
 }
 
+/* Usuários sensíveis a movimento não recebem animações nem transições. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Mobile: respeita recortes do aparelho e evita o auto-zoom do iOS nos campos. */
+header.navbar {
+  padding-top: max(0.5rem, env(safe-area-inset-top));
+}
+
+footer {
+  padding-bottom: max(0.25rem, env(safe-area-inset-bottom));
+}
+
+@media (max-width: 767.98px) {
+  .form-control,
+  .form-select,
+  .form-control.form-control-sm,
+  .form-select.form-select-sm {
+    font-size: 16px;
+  }
+
+  /* Alvos de toque confortáveis nas ações primárias. */
+  main .btn-sm {
+    min-height: 44px;
+  }
+}
+
 .btn-primary {
   --bs-btn-color: #fff;
   --bs-btn-bg: #008241;

@@ -13,6 +13,7 @@ import type {
 } from '@/tipos/database';
 import type {
   AtribuicaoApi,
+  AuditoriaApi,
   ConversaApi,
   CodigoApi,
   EnturmacaoApi,
@@ -90,6 +91,15 @@ export const Consultas = {
     ttl: TTL_REFERENCIA,
     tabelas: ['configuracoes_sistema'],
     executar: (etag) => buscar('/api/configuracoes', undefined, etag),
+  }),
+
+  configuracoesPublicas: (): OpcoesConsulta<{ configuracao: ConfiguracaoSistema }> => ({
+    chave: 'configuracoes-publicas',
+    staleTime: TEMPOS.referencia,
+    persistir: true,
+    ttl: TTL_REFERENCIA,
+    tabelas: ['configuracoes_sistema'],
+    executar: (etag) => buscar('/api/configuracoes/publicas', undefined, etag),
   }),
 
   horarios: (): OpcoesConsulta<{ horarios: HorarioLetivo[] }> => ({
@@ -266,5 +276,14 @@ export const Consultas = {
     staleTime: TEMPOS.operacional,
     tabelas: ['codigos_redefinicao'],
     executar: (etag) => buscar('/api/codigos', undefined, etag),
+  }),
+
+  auditoria: (
+    parametros?: Record<string, string | undefined>,
+  ): OpcoesConsulta<{ auditoria: AuditoriaApi[] }> => ({
+    chave: chaveConsulta('auditoria', parametros),
+    staleTime: TEMPOS.operacional,
+    tabelas: ['auditoria'],
+    executar: (etag) => buscar('/api/auditoria', parametros, etag),
   }),
 };

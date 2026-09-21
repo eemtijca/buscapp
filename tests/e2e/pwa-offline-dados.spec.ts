@@ -33,7 +33,9 @@ test.describe('PWA - dados persistidos', () => {
     await expect(page.getByRole('heading', { name: 'Anos letivos' })).toBeVisible();
 
     await page.evaluate(() => navigator.serviceWorker.ready);
-    await expect.poll(() => consultaPersistida(page, 'anos-letivos'), { timeout: 15_000 }).toBe(true);
+    await expect
+      .poll(() => consultaPersistida(page, 'anos-letivos'), { timeout: 15_000 })
+      .toBe(true);
 
     await page.context().setOffline(true);
     await page.reload();
@@ -52,7 +54,9 @@ test.describe('PWA - dados persistidos', () => {
     await expect(page.locator('table')).toBeVisible();
 
     await page.evaluate(() => navigator.serviceWorker.ready);
-    await expect.poll(() => consultaPersistida(page, 'anos-letivos'), { timeout: 15_000 }).toBe(true);
+    await expect
+      .poll(() => consultaPersistida(page, 'anos-letivos'), { timeout: 15_000 })
+      .toBe(true);
 
     const status: number[] = [];
     page.on('response', (resposta) => {

@@ -4,45 +4,41 @@ import { api } from '@/servicos/api';
 export type StatusConexao = 'verificando' | 'conectado' | 'desconectado';
 
 const INTERVALO_VERIFICACAO_MS = 30_000;
-const TIMEOUT_VERIFICACAO_MS = 5_000;
 
 const status: Ref<StatusConexao> = ref('verificando');
-let iniciado = false;
-
-/** Rejeita a promessa após o limite de tempo para manter o indicador responsivo. */
-function comTimeout<T>(promessa: Promise<T>, ms: number): Promise<T> {
-  return new Promise<T>((resolver, rejeitar) => {
-    const timer = setTimeout(() => rejeitar(new Error('Tempo limite excedido.')), ms);
-    promessa.then(
-      (valor) => {
-        clearTimeout(timer);
-        resolver(valor);
-      },
-      (erro: unknown) => {
-        clearTimeout(timer);
-        rejeitar(erro);
-      },
-    );
-  });
-}
+let timerVerificacao: ReturnType<typeof setInterval> | null = null;
+let controladorAtual: AbortController | null = null;
 
 async function verificar(): Promise<void> {
+  // Cancela a verificação anterior antes de iniciar outra.
+  controladorAtual?.abort();
+  const controlador = new AbortController();
+  controladorAtual = controlador;
+
   try {
-    const resposta = await comTimeout(
-      api<{ status: string }>('/api/saude'),
-      TIMEOUT_VERIFICACAO_MS,
-    );
+    const resposta = await api<{ status: string }>('/api/saude', { signal: controlador.signal });
     status.value = resposta.status === 'ok' ? 'conectado' : 'desconectado';
   } catch {
     status.value = 'desconectado';
+  } finally {
+    if (controladorAtual === controlador) controladorAtual = null;
   }
 }
 
 function iniciarVerificacao(): void {
-  if (iniciado) return;
-  iniciado = true;
+  if (timerVerificacao) return;
   void verificar();
-  setInterval(() => void verificar(), INTERVALO_VERIFICACAO_MS);
+  timerVerificacao = setInterval(() => void verificar(), INTERVALO_VERIFICACAO_MS);
+}
+
+/** Interrompe o polling e a requisição pendente (usado ao desmontar o layout). */
+export function pararVerificacao(): void {
+  if (timerVerificacao) {
+    clearInterval(timerVerificacao);
+    timerVerificacao = null;
+  }
+  controladorAtual?.abort();
+  controladorAtual = null;
 }
 
 export function useStatusConexao() {

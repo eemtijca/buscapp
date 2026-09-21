@@ -57,18 +57,18 @@ test.describe('Gestão - Usuários - Salvamento limpa estado de edição', () =>
     await input.fill('Usuario Dirty 2 Temporário');
     await page.waitForTimeout(500);
 
-    let dialogMessage = '';
-    page.on('dialog', async (d) => {
-      dialogMessage = d.message();
-      await d.dismiss();
-    });
+    // Primeira tentativa: o modal de confirmação segura a navegação.
     await page.locator('a[href="/gestao"]').first().click();
-    await page.waitForTimeout(800);
-    expect(dialogMessage).toContain('Há alterações não salvas');
-    page.removeAllListeners('dialog');
+    const modal = page.locator('.modal.show');
+    await expect(modal).toBeVisible();
+    await expect(modal).toContainText('alterações não salvas');
+    await modal.getByRole('button', { name: 'Cancelar' }).click();
+    await expect(modal).toBeHidden();
+    await expect(page).toHaveURL(/\/gestao\/usuarios\//);
 
-    page.once('dialog', async (d) => await d.accept());
+    // Segunda tentativa: sair sem salvar navega.
     await page.locator('a[href="/gestao"]').first().click();
+    await page.locator('.modal.show').getByRole('button', { name: 'Sair sem salvar' }).click();
     await expect(page).toHaveURL(/\/gestao$/);
 
     await deletarUsuario(id);
@@ -104,7 +104,9 @@ test.describe('Gestão - Usuários - Salvamento limpa estado de edição', () =>
 });
 
 test.describe('Navegação - cache de dados', () => {
-  test('CT-Cache-1: reabrir rota visitada não espera a rede nem exibe overlay', async ({ page }) => {
+  test('CT-Cache-1: reabrir rota visitada não espera a rede nem exibe overlay', async ({
+    page,
+  }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/usuarios');
     await page.waitForSelector('table');

@@ -37,6 +37,7 @@ model alunos {
 
   @@index([matricula], map: "idx_alunos_matricula")
   @@index([nome(ops: raw("gin_trgm_ops"))], map: "idx_alunos_nome_trgm", type: Gin)
+  @@index([documentos_recebidos], map: "idx_alunos_documentos_gin", type: Gin)
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
@@ -44,7 +45,7 @@ model alunos {
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model anexos {
   id                   String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  storage_path         String
+  storage_path         String                 @unique(map: "uq_anexos_storage_path")
   nome_arquivo         String
   mime_type            String
   tamanho_bytes        Int
@@ -81,6 +82,8 @@ model anos_letivos {
   pontuacao_turmas        pontuacao_turmas[]
   registros_comportamento registros_comportamento[]
   turmas                  turmas[]
+
+  @@unique([ativo], map: "uq_anos_letivo_ativo", where: raw("ativo"))
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
@@ -143,6 +146,7 @@ model codigos_redefinicao {
 
   @@index([email], map: "idx_codigos_redefinicao_email")
   @@index([email, codigo], map: "idx_codigos_redefinicao_email_codigo")
+  @@unique([email], map: "uq_codigo_ativo_email", where: raw("(usado_em IS NULL AND revogado_em IS NULL)"))
 }
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
@@ -341,6 +345,8 @@ model frequencias {
   @@index([professor_id], map: "idx_frequencias_professor")
   @@index([status], map: "idx_frequencias_status")
   @@index([turma_id, data_aula], map: "idx_frequencias_turma_data")
+  @@index([periodo], map: "idx_frequencias_periodo")
+  @@index([motivos_ausencia], map: "idx_frequencias_motivos_gin", type: Gin)
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
@@ -476,10 +482,12 @@ model notificacoes {
   metadados       Json?
   lida            Boolean          @default(false)
   lida_em         DateTime?        @db.Timestamptz(6)
+  dedupe_key      String?
   created_at      DateTime         @default(now()) @db.Timestamptz(6)
   perfis          perfis           @relation(fields: [destinatario_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([destinatario_id, lida, created_at(sort: Desc)], map: "idx_notificacoes_destinatario")
+  @@unique([destinatario_id, dedupe_key], map: "uq_notificacao_dedupe", where: raw("(dedupe_key IS NOT NULL AND NOT lida)"))
 }
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
@@ -530,6 +538,7 @@ model ocorrencias {
   @@index([aluno_id], map: "idx_ocorrencias_presenca_pendente", where: raw("(exige_presenca_responsavel AND (NOT presenca_responsavel_confirmada))"))
   @@index([status], map: "idx_ocorrencias_status")
   @@index([turma_id], map: "idx_ocorrencias_turma")
+  @@index([tipo], map: "idx_ocorrencias_tipo_gin", type: Gin)
 }
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
@@ -590,6 +599,7 @@ model perfis {
   vinculos_responsaveis                                              vinculos_responsaveis[]
 
   @@index([papel], map: "idx_perfis_papel", where: raw("(status = 'ativo'::status_perfil)"))
+  @@index([acesso_modulos], map: "idx_perfis_modulos_gin", type: Gin)
 }
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
@@ -611,6 +621,16 @@ model pontuacao_turmas {
 
   @@unique([turma_id, ano_letivo_id, mes_referencia], map: "uq_pontuacao_turma_mes")
   @@index([ano_letivo_id, mes_referencia, pontos_total(sort: Desc)], map: "idx_pontuacao_ranking")
+}
+
+/// Contadores operacionais do rate limiting, compartilhados entre instâncias.
+/// Sem dado pessoal e sem RLS: também é consultado em contexto anônimo (login).
+model rate_limit_contadores {
+  chave     String   @id
+  contagem  Int      @default(0)
+  expira_em DateTime @db.Timestamptz(6)
+
+  @@index([expira_em], map: "idx_rate_limit_expira")
 }
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments

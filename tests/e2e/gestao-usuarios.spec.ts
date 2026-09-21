@@ -16,7 +16,7 @@ test.describe('Gestão - Usuários', () => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/usuarios');
     await page.click('label:has-text("Professores")');
-    await expect(page.getByRole('cell', { name: 'Ana Professora' })).toBeVisible();
+    await expect(page.getByRole('cell', { name: 'Ana Professora', exact: true })).toBeVisible();
     await expect(page.getByText('Maria Silva')).not.toBeVisible();
   });
 

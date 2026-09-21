@@ -1,10 +1,8 @@
-name: Publicação
+name: Publicação da imagem (GHCR)
 
 on:
-  push:
-    branches: [main]
-    tags:
-      - 'v*'
+  release:
+    types: [published]
   workflow_dispatch:
 
 concurrency:
@@ -14,29 +12,48 @@ concurrency:
 jobs:
   imagem:
     runs-on: ubuntu-latest
+    # Publica só releases estáveis; o dispatch manual ignora a checagem de pré-release.
+    if: github.event_name != 'release' || github.event.release.prerelease == false
 
     permissions:
       contents: read
       packages: write
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
-      - uses: docker/login-action@v3
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: docker/build-push-action@v6
+      # Sempre :latest e :<sha>; quando o ref for uma tag, publica também a tag da versão.
+      - name: Define as tags da imagem
+        id: tags
+        env:
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          {
+            echo 'valor<<EOF'
+            echo "ghcr.io/$REPO:latest"
+            echo "ghcr.io/$REPO:$SHA"
+            if [ "$REF_TYPE" = "tag" ]; then
+              echo "ghcr.io/$REPO:$REF_NAME"
+            fi
+            echo EOF
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: .
           file: infra/docker/Dockerfile
           push: true
-          tags: |
-            ghcr.io/${{ github.repository }}:latest
-            ghcr.io/${{ github.repository }}:${{ github.sha }}
+          tags: ${{ steps.tags.outputs.valor }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

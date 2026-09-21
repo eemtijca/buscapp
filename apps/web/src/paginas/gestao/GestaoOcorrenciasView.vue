@@ -19,7 +19,9 @@ import type { OpcaoCheckbox } from '@/tipos/componentes';
 
 const router = useRouter();
 const { usuario } = useAutenticacao();
-const { ocorrencias, pendente, atualizando, recarregar } = useOcorrenciasGraves();
+// Declarado antes do composable: a consulta é montada de imediato e lê o valor.
+const limite = ref(50);
+const { ocorrencias, pendente, atualizando, recarregar } = useOcorrenciasGraves(() => limite.value);
 const { alunos } = useAlunosFrequencia(() => '');
 const { opcoes: opcoesTipo } = useOpcoes(() => 'tipo_ocorrencia');
 const { tags: catalogoTags } = useTags();
@@ -85,10 +87,6 @@ async function alternarBloqueio(ocorrenciaId: string) {
   } else {
     mostrarErro('Falha ao atualizar bloqueio.');
   }
-}
-
-function registrarSuspensao() {
-  mostrarSucesso('Encaminhado para formalização de suspensão.');
 }
 
 function alternarFormulario() {
@@ -324,12 +322,23 @@ async function registrarOcorrencia() {
             <span class="visually-hidden">Carregando ocorrências</span>
           </div>
         </div>
-        <ListaOcorrencias
-          v-else
-          :ocorrencias="ocorrencias"
-          @bloquear-retorno="alternarBloqueio"
-          @registrar-suspensao="registrarSuspensao"
-        />
+        <ListaOcorrencias v-else :ocorrencias="ocorrencias" @bloquear-retorno="alternarBloqueio" />
+      </div>
+      <div v-if="ocorrencias.length >= limite" class="text-center mt-3">
+        <button
+          type="button"
+          class="btn btn-sm btn-outline-secondary"
+          :disabled="atualizando"
+          @click="limite += 50"
+        >
+          <span
+            v-if="atualizando"
+            class="spinner-border spinner-border-sm me-1"
+            role="status"
+            aria-hidden="true"
+          ></span>
+          Carregar mais ocorrências
+        </button>
       </div>
     </div>
     <ModalConfirmacao

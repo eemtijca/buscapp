@@ -7,8 +7,6 @@ defineProps<{
 
 const emit = defineEmits<{
   'bloquear-retorno': [ocorrenciaId: string];
-  'ver-anexo': [ocorrenciaId: string];
-  'registrar-suspensao': [ocorrenciaId: string];
 }>();
 
 const classeTipo: Record<string, string> = {
@@ -87,27 +85,6 @@ const rotuloTag: Record<string, string> = {
       </div>
 
       <div class="d-flex flex-wrap gap-2 justify-content-end">
-        <button
-          v-if="oc.anexoPath"
-          type="button"
-          class="btn btn-sm btn-outline-secondary"
-          @click="emit('ver-anexo', oc.id)"
-        >
-          <i class="bi bi-file-earmark-pdf me-1" aria-hidden="true"></i>
-          Ver documento
-          <span v-if="oc.anexoNome" class="text-body-secondary">({{ oc.anexoNome }})</span>
-        </button>
-
-        <button
-          v-if="oc.tipo.includes('grave')"
-          type="button"
-          class="btn btn-sm btn-outline-dark"
-          @click="emit('registrar-suspensao', oc.id)"
-        >
-          <i class="bi bi-shield-lock me-1" aria-hidden="true"></i>
-          Formalizar suspensão
-        </button>
-
         <button
           type="button"
           class="btn btn-sm"

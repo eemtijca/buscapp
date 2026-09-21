@@ -3,8 +3,9 @@ import { api, ErroApi } from '@/servicos/api';
 import { invalidarChave, invalidarTabela } from '@/servicos/cache';
 import { Consultas } from '@/servicos/consultas';
 import { useConsulta } from '@/composables/useConsulta';
+import { hojeIso } from '@/utils/datas';
 import type { Disciplina, Turma } from '@/tipos/database';
-import type { CodigoApi, UsuarioApi } from '@/tipos/api';
+import type { CodigoApi, AuditoriaApi, UsuarioApi } from '@/tipos/api';
 import type {
   AlunoItem,
   CodigoGerado,
@@ -20,8 +21,42 @@ function mensagemDeErro(erroCapturado: unknown, padrao: string): string {
   return padrao;
 }
 
-function hojeIso(): string {
-  return new Date().toISOString().slice(0, 10);
+/** Eventos de auditoria consultados pela gestão, com filtros e paginação. */
+export function useAuditoria(
+  filtros?: () => {
+    acao?: string;
+    entidade?: string;
+    usuario_id?: string;
+    data_inicio?: string;
+    data_fim?: string;
+    limite?: number;
+  },
+): {
+  eventos: ComputedRef<AuditoriaApi[]>;
+  pendente: Ref<boolean>;
+  atualizando: Ref<boolean>;
+  erro: Ref<unknown>;
+  recarregar: () => Promise<void>;
+} {
+  const consulta = useConsulta(() => {
+    const valores = filtros?.() ?? {};
+    return Consultas.auditoria({
+      acao: valores.acao || undefined,
+      entidade: valores.entidade || undefined,
+      usuario_id: valores.usuario_id || undefined,
+      data_inicio: valores.data_inicio || undefined,
+      data_fim: valores.data_fim || undefined,
+      limite: valores.limite ? String(valores.limite) : undefined,
+    });
+  });
+
+  return {
+    eventos: computed(() => consulta.dados.value?.auditoria ?? []),
+    pendente: consulta.pendente,
+    atualizando: consulta.atualizando,
+    erro: consulta.erro,
+    recarregar: () => consulta.recarregar(true),
+  };
 }
 
 /** Usuários da gestão filtrados por papel, status e busca. */
@@ -30,11 +65,13 @@ export function useUsuarios(
     papel?: string;
     status?: string;
     busca?: string;
+    limite?: number;
   },
 ): {
   usuarios: ComputedRef<UsuarioItem[]>;
   pendente: Ref<boolean>;
   atualizando: Ref<boolean>;
+  erro: Ref<unknown>;
   recarregar: () => Promise<void>;
 } {
   const consulta = useConsulta(() => {
@@ -43,6 +80,7 @@ export function useUsuarios(
       papel: valores.papel && valores.papel !== 'todos' ? valores.papel : undefined,
       status: valores.status && valores.status !== 'todos' ? valores.status : undefined,
       busca: valores.busca || undefined,
+      limite: valores.limite ? String(valores.limite) : undefined,
     });
   });
 
@@ -65,15 +103,17 @@ export function useUsuarios(
     usuarios,
     pendente: consulta.pendente,
     atualizando: consulta.atualizando,
+    erro: consulta.erro,
     recarregar: () => consulta.recarregar(true),
   };
 }
 
 /** Alunos da gestão com a turma vigente anexada. */
-export function useAlunos(filtros?: () => { status?: string; busca?: string }): {
+export function useAlunos(filtros?: () => { status?: string; busca?: string; limite?: number }): {
   alunos: ComputedRef<AlunoItem[]>;
   pendente: Ref<boolean>;
   atualizando: Ref<boolean>;
+  erro: Ref<unknown>;
   recarregar: () => Promise<void>;
 } {
   const consultaAlunos = useConsulta(() => {
@@ -81,6 +121,7 @@ export function useAlunos(filtros?: () => { status?: string; busca?: string }): 
     return Consultas.alunos({
       status: valores.status && valores.status !== 'todos' ? valores.status : undefined,
       busca: valores.busca || undefined,
+      limite: valores.limite ? String(valores.limite) : undefined,
     });
   });
   const consultaEnturmacoes = useConsulta(() => Consultas.enturmacoes({ status: 'matriculado' }));
@@ -112,6 +153,7 @@ export function useAlunos(filtros?: () => { status?: string; busca?: string }): 
 
   return {
     alunos,
+    erro: consultaAlunos.erro,
     pendente: computed(() => consultaAlunos.pendente.value || consultaEnturmacoes.pendente.value),
     atualizando: computed(
       () => consultaAlunos.atualizando.value || consultaEnturmacoes.atualizando.value,
@@ -300,6 +342,7 @@ export function useCodigosGerados(): {
   pendente: Ref<boolean>;
   atualizando: Ref<boolean>;
   atualizadoEm: Ref<number | null>;
+  erro: Ref<unknown>;
   recarregar: () => Promise<void>;
 } {
   const consulta = useConsulta(() => Consultas.codigos());
@@ -325,6 +368,7 @@ export function useCodigosGerados(): {
     pendente: consulta.pendente,
     atualizando: consulta.atualizando,
     atualizadoEm: consulta.atualizadoEm,
+    erro: consulta.erro,
     recarregar: () => consulta.recarregar(true),
   };
 }
@@ -333,6 +377,7 @@ export function useCodigosGerados(): {
 export function useSolicitacoesCodigo(): {
   solicitacoes: ComputedRef<SolicitacaoCodigo[]>;
   pendente: Ref<boolean>;
+  erro: Ref<unknown>;
   recarregar: () => Promise<void>;
 } {
   const consultaNotificacoes = useConsulta(() =>
@@ -375,6 +420,7 @@ export function useSolicitacoesCodigo(): {
     pendente: computed(
       () => consultaNotificacoes.pendente.value || consultaUsuarios.pendente.value,
     ),
+    erro: computed(() => consultaNotificacoes.erro.value ?? consultaUsuarios.erro.value),
     recarregar: () =>
       Promise.all([consultaNotificacoes.recarregar(true), consultaUsuarios.recarregar(true)]).then(
         () => undefined,
@@ -382,13 +428,16 @@ export function useSolicitacoesCodigo(): {
   };
 }
 
-export async function gerarCodigoRedefinicao(perfilId: string): Promise<string | null> {
+export async function gerarCodigoRedefinicao(
+  perfilId: string,
+): Promise<{ codigo: string; expiraEm: string } | null> {
   try {
-    const { codigo } = await api<{ codigo: string }>(`/api/codigos/perfil/${perfilId}`, {
-      metodo: 'POST',
-    });
+    const resposta = await api<{ codigo: string; expira_em: string }>(
+      `/api/codigos/perfil/${perfilId}`,
+      { metodo: 'POST' },
+    );
     invalidarTabela('codigos_redefinicao', undefined, false);
-    return codigo;
+    return { codigo: resposta.codigo, expiraEm: resposta.expira_em };
   } catch (erro) {
     console.error('[useGestaoUsuarios] Erro ao gerar código:', mensagemDeErro(erro, ''));
     return null;

@@ -1,6 +1,19 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import { login } from '../suporte/sessao.js';
 import { SENHA_PROF } from '../suporte/dados.js';
+
+/**
+ * A confirmação de frequência só aparece quando há faltas marcadas; quando a chamada
+ * já foi registrada por outro teste, o clique leva direto ao alerta de sucesso.
+ */
+async function confirmarSeNecessario(page: Page): Promise<void> {
+  const confirmar = page.getByRole('button', { name: 'Registrar faltas' });
+  const visivel = await confirmar
+    .waitFor({ state: 'visible', timeout: 2_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (visivel) await confirmar.click();
+}
 
 test.describe('Professor - Funcionalidades básicas', () => {
   test('CT18 - Home do professor mostra cards de navegação', async ({ page }) => {
@@ -24,6 +37,7 @@ test.describe('Professor - Frequência', () => {
     await login(page, 'prof1@escola.edu.br', SENHA_PROF);
     await page.goto('/professor/frequencia');
     await page.waitForSelector('.card-body .card');
+    await page.getByRole('checkbox', { name: 'Selecionar todos' }).check();
     const botoes = page.locator('button[aria-label*="Marcar"]');
     const primeiro = botoes.first();
     const label = await primeiro.getAttribute('aria-label');
@@ -31,6 +45,7 @@ test.describe('Professor - Frequência', () => {
       await primeiro.click();
     }
     await page.click('button:has-text("Salvar frequência")');
+    await confirmarSeNecessario(page);
     await expect(page.locator('.alert-success').first()).toBeVisible({ timeout: 10000 });
   });
 
@@ -46,6 +61,7 @@ test.describe('Professor - Frequência', () => {
     await login(page, 'prof1@escola.edu.br', SENHA_PROF);
     await page.goto('/professor/frequencia');
     await page.waitForSelector('.card-body .card');
+    await page.getByRole('checkbox', { name: 'Selecionar todos' }).check();
     const botoes = page.locator('button[aria-label*="Marcar"]');
     const primeiro = botoes.first();
     const label = await primeiro.getAttribute('aria-label');
@@ -53,6 +69,7 @@ test.describe('Professor - Frequência', () => {
       await primeiro.click();
     }
     await page.click('button:has-text("Salvar frequência")');
+    await confirmarSeNecessario(page);
     await expect(page.locator('.alert-success').first()).toBeVisible({ timeout: 10000 });
     await page.goto('/professor');
     await page.goto('/professor/frequencia');

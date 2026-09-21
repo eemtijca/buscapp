@@ -44,6 +44,8 @@ export async function listarOcorrencias(alunoIds: string[] | null, consulta: Lis
     },
     include: INCLUSAO_OCORRENCIA,
     orderBy: { created_at: 'desc' },
+    take: consulta.limite,
+    skip: consulta.offset,
   });
 }
 
@@ -137,6 +139,8 @@ export async function listarRegistros(
     },
     include: INCLUSAO_REGISTRO,
     orderBy: { data_hora: 'desc' },
+    take: consulta.limite,
+    skip: consulta.offset,
   });
 }
 

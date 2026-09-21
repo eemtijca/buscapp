@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
+import sharp from 'sharp';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { construirApp } from '../../aplicacao.js';
 import { prismaAdmin as prisma } from '../../nucleo/banco/cliente.js';
@@ -63,6 +64,9 @@ afterAll(async () => {
   }
   await prisma.anexos.deleteMany({ where: { criado_por: gestaoId } });
   await prisma.sessoes.deleteMany({ where: { perfil_id: gestaoId } });
+  await prisma.auditoria.deleteMany({ where: { usuario_id: gestaoId } });
+  // Zera o rate limiting para que execuções repetidas da suíte não estourem o limite de 20/h.
+  await prisma.$executeRawUnsafe('delete from public.rate_limit_contadores');
   await prisma.perfis.deleteMany({ where: { id: gestaoId } });
   await app.close();
   await prisma.$disconnect();
@@ -117,7 +121,10 @@ describe('upload direto de anexos', () => {
 
 describe('anexo multipart', () => {
   it('envia, lê em streaming e remove o arquivo', async () => {
-    const conteudo = Buffer.from('conteudo-pdf-de-teste-com-streaming');
+    const conteudo = Buffer.concat([
+      Buffer.from('%PDF-1.7\n'),
+      Buffer.from('conteudo-pdf-de-teste-com-streaming'),
+    ]);
     const { boundary, payload } = corpoMultipart('teste.pdf', 'application/pdf', conteudo);
 
     const envio = await app.inject({
@@ -140,7 +147,16 @@ describe('anexo multipart', () => {
     });
     expect(leitura.statusCode).toBe(200);
     expect(leitura.headers['content-type']).toContain('application/pdf');
+    expect(leitura.headers['x-content-type-options']).toBe('nosniff');
+    expect(leitura.headers['content-security-policy']).toBe('sandbox');
+    expect(String(leitura.headers['content-disposition'])).toContain('attachment');
     expect(leitura.rawPayload.equals(conteudo)).toBe(true);
+
+    const downloadAuditado = await prisma.auditoria.findFirst({
+      where: { usuario_id: gestaoId, acao: 'BAIXAR_ANEXO', entidade_id: anexo.id },
+    });
+    expect(downloadAuditado).not.toBeNull();
+    expect(downloadAuditado?.ip_origem).toBeTruthy();
 
     const remocao = await app.inject({
       method: 'DELETE',
@@ -155,5 +171,60 @@ describe('anexo multipart', () => {
       cookies: { buscapp_sessao: cookieGestao },
     });
     expect(apagado.statusCode).toBe(404);
+  });
+
+  it('remove o EXIF da imagem enviada no multipart', async () => {
+    const original = await sharp({
+      create: { width: 2400, height: 1200, channels: 3, background: '#0a7' },
+    })
+      .jpeg()
+      .withMetadata({ exif: { IFD0: { Make: 'BuscApp', Software: 'Teste EXIF' } } })
+      .toBuffer();
+    expect((await sharp(original).metadata()).exif).toBeDefined();
+
+    const { boundary, payload } = corpoMultipart('foto.jpg', 'image/jpeg', original);
+    const envio = await app.inject({
+      method: 'POST',
+      url: '/api/anexos',
+      cookies: { buscapp_sessao: cookieGestao },
+      headers: { 'content-type': `multipart/form-data; boundary=${boundary}` },
+      payload,
+    });
+
+    expect(envio.statusCode).toBe(201);
+    const anexo = envio.json().anexo as {
+      id: string;
+      tamanho_bytes: number;
+      processado_em: string | null;
+    };
+    expect(anexo.processado_em).not.toBeNull();
+
+    const leitura = await app.inject({
+      method: 'GET',
+      url: `/api/anexos/${anexo.id}/arquivo`,
+      cookies: { buscapp_sessao: cookieGestao },
+    });
+    expect(leitura.statusCode).toBe(200);
+    expect(leitura.rawPayload.length).toBe(anexo.tamanho_bytes);
+
+    const metadados = await sharp(leitura.rawPayload).metadata();
+    expect(metadados.exif).toBeUndefined();
+    expect(metadados.width).toBe(1600);
+  });
+
+  it('recusa conteúdo que não corresponde ao tipo declarado', async () => {
+    const conteudo = Buffer.from('<html><script>alert(1)</script></html>');
+    const { boundary, payload } = corpoMultipart('falsa.png', 'image/png', conteudo);
+
+    const envio = await app.inject({
+      method: 'POST',
+      url: '/api/anexos',
+      cookies: { buscapp_sessao: cookieGestao },
+      headers: { 'content-type': `multipart/form-data; boundary=${boundary}` },
+      payload,
+    });
+
+    expect(envio.statusCode).toBe(400);
+    expect(envio.json().erro.codigo).toBe('tipo_invalido');
   });
 });

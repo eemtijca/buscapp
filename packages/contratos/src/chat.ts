@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { uuidSchema } from './comuns.js';
+import { paginacaoCursorSchema, uuidSchema } from './comuns.js';
 import { papelPerfilSchema } from './usuarios.js';
 
 /** Resumo enxuto de um participante (responsável ou aluno) usado na listagem do chat. */
@@ -72,6 +72,11 @@ export const mensagemSchema = z.object({
 });
 
 export type Mensagem = z.infer<typeof mensagemSchema>;
+
+/** Listagem de mensagens por cursor: a conversa cresce sem parar. */
+export const listarMensagensSchema = paginacaoCursorSchema;
+
+export type ListarMensagens = z.infer<typeof listarMensagensSchema>;
 
 export const enviarMensagemSchema = z.object({
   conteudo: z.string().trim().min(1, 'Informe a mensagem.').max(2000),

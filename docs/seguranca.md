@@ -36,23 +36,23 @@ As ameaças consideradas incluem enumeração de contas, força bruta de senhas 
 ## Requisições
 
 - CORS com credenciais restrito a `APP_URL` e `APP_ORIGINS`.
-- Não há token CSRF explícito nem verificação de `Origin` ou `Referer`. A proteção atual é o cookie `SameSite=Lax` combinado com CORS restrito. `COOKIE_SAMESITE=none` remove essa proteção principal e exige `Secure`.
-- Não há limitação de tentativas por IP nas rotas de autenticação. A única mitigação de força bruta é o bloqueio por email no fluxo de código.
-- Não há cabeçalhos de segurança adicionais (CSP, HSTS, `X-Content-Type-Options`, `X-Frame-Options` e `Referrer-Policy`). As respostas recebem apenas os cabeçalhos funcionais.
+- Não há token CSRF explícito. A proteção é a verificação de `Origin` em métodos mutantes sob `/api` (403 quando não confere), somada ao cookie `SameSite=Lax` e ao CORS restrito. `COOKIE_SAMESITE=none` remove a proteção principal e exige `Secure`. Ver [ADR-012](adr/012-cabecalhos-de-seguranca-e-origem.md).
+- `@fastify/rate-limit` com store no Postgres limita login (10/min, com chave por IP e email), solicitação de código (3/5 min) e redefinição de senha (5/15 min), além do upload de anexos (20/h). O bloqueio por email no fluxo de código complementa a defesa.
+- `@fastify/helmet` aplica CSP, HSTS, `X-Content-Type-Options`, `X-Frame-Options` e `Referrer-Policy`; a SPA recebe os mesmos cabeçalhos pelo `vercel.json`. Ver [ADR-012](adr/012-cabecalhos-de-seguranca-e-origem.md).
 - `TRUST_PROXY` controla o uso de `X-Forwarded-For` para o IP real do cliente, necessário atrás de proxy.
 
 ## Dados e arquivos
 
 - Uploads aceitam JPEG, PNG, WEBP e PDF, com limite de 10 MB no multipart e de `UPLOAD_DIRETO_MAX_BYTES` (padrão 20 MB) no envio direto.
-- O tipo declarado é validado contra a lista permitida, sem inspeção de bytes mágicos. Não há antivírus nem remoção de metadados no servidor.
+- O tipo é validado contra a lista permitida e conferido por bytes mágicos, tanto no multipart quanto no upload direto. Imagens são regravadas sem EXIF com `sharp`; não há antivírus nem varredura de conteúdo.
 - No envio direto, a chave é prefixada pelo id do usuário e a confirmação exige essa correspondência, além de conferir tamanho e tipo no provedor.
 - O download de anexo é autenticado e autorizado por criador, gestão ou aluno visível; nenhum caminho de armazenamento é exposto na URL.
 - Chaves de armazenamento são normalizadas, e o driver de disco valida que o caminho permanece dentro do diretório base.
 
 ## Auditoria e logs
 
-- A tabela `auditoria` registra geração, revogação, uso e limpeza de códigos, além da virada de ano letivo. Não há registro de login, de operações sobre alunos e usuários ou de uploads.
-- O logger do Fastify não possui `redact`. O erro interno é registrado por completo e a resposta ao cliente usa mensagem genérica.
+- A tabela `auditoria` registra login, falhas de login, logout, revogação de sessões, geração, revogação, uso e limpeza de códigos, CRUD de usuários e alunos, criação, remoção e download de anexos, expurgo, anonimização e viradas de ano, sempre com `ip_origem`.
+- O logger do Fastify tem `redact` para cookie, `authorization` e `set-cookie`. O erro interno é registrado por completo e a resposta ao cliente usa mensagem genérica.
 - Segredos não são impressos pelo entrypoint, e as variáveis ficam fora do repositório.
 
 ## Segredos
@@ -63,11 +63,20 @@ As ameaças consideradas incluem enumeração de contas, força bruta de senhas 
 
 ## Lacunas conhecidas
 
-1. Sem CSRF explícito e sem cabeçalhos de segurança.
-2. Sem limite de tentativas por IP na autenticação.
-3. Upload sem inspeção de conteúdo e sem varredura.
-4. Auditoria parcial, sem leitura pela interface.
-5. Sessão sem rotação de token e sem limite de sessões simultâneas.
+1. Sem token CSRF explícito; a defesa é a verificação de `Origin`, o `SameSite=Lax` e o CORS restrito.
+2. Upload sem antivírus nem varredura de conteúdo; a validação é por bytes mágicos.
+3. Sessão sem rotação de token e sem limite de sessões simultâneas. A expiração por inatividade é de 2 horas, com teto de 12 horas (ou 30 dias com `lembrar`), e o usuário pode listar e revogar as outras sessões.
+
+## Controles adicionados
+
+- **Rate limiting:** `@fastify/rate-limit` com store no Postgres, nas rotas de login (10/min, contando só falhas), solicitação de código (3/5 min), redefinição de senha (5/15 min) e upload de anexos (20/h).
+- **Cabeçalhos:** CSP, `nosniff`, `Referrer-Policy`, `X-Frame-Options` e HSTS, além da verificação de `Origin` em métodos mutáveis.
+- **Uploads:** validação de bytes mágicos, `ContentLength` na URL pré-assinada e download com `attachment`, sandbox e `nosniff`.
+- **Auditoria:** login, falhas de login, logout, revogação de sessões, CRUD de usuários e alunos, anexos (criação, remoção e download), expurgo e anonimização, com `ip_origem`.
+- **LGPD:** exportação e anonimização de dados do titular, restritas à gestão e auditadas.
+- **Retenção:** expurgo agendado de anexos, códigos, sessões encerradas e contadores de rate limiting.
+- **Sessão expirada no cliente:** requisições autenticadas que recebem 401 recarregam a SPA no login com `?destino=` (aceito apenas se for caminho interno), voltando à rota de origem após autenticar. O cliente HTTP usa timeout de 15 s, repetição com backoff apenas em GET (até 3 tentativas) e não repete métodos com efeito.
+- **Metadados de imagem:** no envio, imagens são regravadas no servidor com `sharp` (orientação aplicada, lado máximo de 1600 px) e sem EXIF, removendo geolocalização e dados de câmera. Em falha, o original é mantido e o caso é registrado no log.
 
 ## Resposta a incidentes
 

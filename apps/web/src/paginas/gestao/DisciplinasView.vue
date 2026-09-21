@@ -9,10 +9,13 @@ import {
   mensagemErroExplicita,
 } from '@/utils/mensagemExplicita';
 import CampoFormulario from '@/componentes/CampoFormulario.vue';
+import ModalBase from '@/componentes/ModalBase.vue';
+import ModalConfirmacao from '@/componentes/ModalConfirmacao.vue';
+import EstadoErro from '@/componentes/EstadoErro.vue';
 import type { Disciplina } from '@/tipos/database';
 
 const router = useRouter();
-const { disciplinas, pendente, recarregar: recarregarDisciplinas } = useDisciplinas();
+const { disciplinas, pendente, erro, recarregar: recarregarDisciplinas } = useDisciplinas();
 const salvando = ref(false);
 const carregando = computed(() => pendente.value || salvando.value);
 const mensagemSucesso = ref<string | null>(null);
@@ -41,13 +44,22 @@ const {
 let timerSucesso: ReturnType<typeof setTimeout> | null = null;
 let timerErro: ReturnType<typeof setTimeout> | null = null;
 
-onBeforeRouteLeave((_to, _from, next) => {
-  if (formDirty.value && modalAberto.value && !carregando.value) {
-    const confirmar = window.confirm('Há alterações não salvas. Deseja realmente sair?');
-    if (!confirmar) return next(false);
-  }
-  next();
+const confirmacaoSaida = ref(false);
+let resolverSaida: ((permitir: boolean) => void) | null = null;
+
+onBeforeRouteLeave(async () => {
+  if (!(formDirty.value && modalAberto.value && !carregando.value)) return true;
+  confirmacaoSaida.value = true;
+  return new Promise<boolean>((resolver) => {
+    resolverSaida = resolver;
+  });
 });
+
+function responderSaida(permitir: boolean): void {
+  confirmacaoSaida.value = false;
+  resolverSaida?.(permitir);
+  resolverSaida = null;
+}
 
 watch([formNome, formCodigoSige, formCargaHoraria, formAtivo], () => {
   if (snapshotPausado.value) return;
@@ -237,7 +249,13 @@ async function alternarAtivo(disciplina: Disciplina) {
       ></button>
     </div>
 
-    <div v-if="carregando && !disciplinas.length" class="text-center py-5">
+    <EstadoErro
+      v-if="erro"
+      mensagem="Não foi possível carregar as disciplinas."
+      @tentar-novamente="recarregarDisciplinas()"
+    />
+
+    <div v-else-if="carregando && !disciplinas.length" class="text-center py-5">
       <div class="spinner-border text-primary" role="status">
         <span class="visually-hidden">Carregando...</span>
       </div>
@@ -285,6 +303,7 @@ async function alternarAtivo(disciplina: Disciplina) {
                     type="button"
                     class="btn btn-sm btn-outline-success"
                     :disabled="carregando"
+                    :aria-label="'Editar disciplina ' + disciplina.nome"
                     @click="abrirEditar(disciplina)"
                   >
                     <i class="bi bi-pencil" aria-hidden="true"></i>
@@ -310,91 +329,78 @@ async function alternarAtivo(disciplina: Disciplina) {
       </div>
     </div>
 
-    <div
-      v-if="modalAberto"
-      class="modal d-block"
-      tabindex="-1"
-      style="background-color: rgba(0, 0, 0, 0.5)"
+    <ModalBase
+      :visivel="modalAberto"
+      :titulo="modoEdicao ? 'Editar disciplina' : 'Nova disciplina'"
+      icone="bookmark-star"
+      cor-icone="text-primary"
+      largura="md"
+      @update:visivel="(aberto) => !aberto && (modalAberto = false)"
     >
-      <div class="modal-dialog modal-dialog-centered modal-fullscreen-sm-down">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title small fw-bold">
-              <i class="bi bi-bookmark-star text-primary me-1" aria-hidden="true"></i>
-              {{ modoEdicao ? 'Editar disciplina' : 'Nova disciplina' }}
-            </h5>
-            <button
-              type="button"
-              class="btn-close"
-              @click="modalAberto = false"
-              aria-label="Fechar"
-            ></button>
+      <form @submit.prevent="salvar">
+        <CampoFormulario id="campoNome" label="Nome" :obrigatorio="true">
+          <input
+            id="campoNome"
+            v-model="formNome"
+            type="text"
+            class="form-control form-control-sm"
+            required
+            autocomplete="off"
+          />
+        </CampoFormulario>
+        <CampoFormulario id="campoCodigoSige" label="Código SIGE">
+          <input
+            id="campoCodigoSige"
+            v-model="formCodigoSige"
+            type="text"
+            class="form-control form-control-sm"
+            autocomplete="off"
+          />
+        </CampoFormulario>
+        <CampoFormulario id="campoCargaHoraria" label="Carga horária">
+          <input
+            id="campoCargaHoraria"
+            v-model.number="formCargaHoraria"
+            type="number"
+            min="0"
+            class="form-control form-control-sm"
+            autocomplete="off"
+          />
+        </CampoFormulario>
+        <div class="mb-0">
+          <div class="form-check">
+            <input id="campoAtivo" v-model="formAtivo" type="checkbox" class="form-check-input" />
+            <label class="form-check-label small fw-medium" for="campoAtivo">Ativo</label>
           </div>
-          <form @submit.prevent="salvar">
-            <div class="modal-body">
-              <CampoFormulario id="campoNome" label="Nome" :obrigatorio="true">
-                <input
-                  id="campoNome"
-                  v-model="formNome"
-                  type="text"
-                  class="form-control form-control-sm"
-                  required
-                  autocomplete="off"
-                />
-              </CampoFormulario>
-              <CampoFormulario id="campoCodigoSige" label="Código SIGE">
-                <input
-                  id="campoCodigoSige"
-                  v-model="formCodigoSige"
-                  type="text"
-                  class="form-control form-control-sm"
-                  autocomplete="off"
-                />
-              </CampoFormulario>
-              <CampoFormulario id="campoCargaHoraria" label="Carga horária">
-                <input
-                  id="campoCargaHoraria"
-                  v-model.number="formCargaHoraria"
-                  type="number"
-                  min="0"
-                  class="form-control form-control-sm"
-                  autocomplete="off"
-                />
-              </CampoFormulario>
-              <div class="mb-0">
-                <div class="form-check">
-                  <input
-                    id="campoAtivo"
-                    v-model="formAtivo"
-                    type="checkbox"
-                    class="form-check-input"
-                  />
-                  <label class="form-check-label small fw-medium" for="campoAtivo">Ativo</label>
-                </div>
-              </div>
-            </div>
-            <div class="modal-footer">
-              <button
-                type="button"
-                class="btn btn-sm btn-outline-secondary"
-                @click="modalAberto = false"
-              >
-                Cancelar
-              </button>
-              <button type="submit" class="btn btn-sm btn-success" :disabled="carregando">
-                <span
-                  v-if="carregando"
-                  class="spinner-border spinner-border-sm me-1"
-                  role="status"
-                  aria-hidden="true"
-                ></span>
-                <i v-else class="bi bi-check-lg me-1" aria-hidden="true"></i>
-                {{ modoEdicao ? 'Salvar' : 'Criar' }}
-              </button>
-            </div>
-          </form>
         </div>
-      </div>
-    </div>
+      </form>
+
+      <template #rodape>
+        <button type="button" class="btn btn-sm btn-outline-secondary" @click="modalAberto = false">
+          Cancelar
+        </button>
+        <button type="button" class="btn btn-sm btn-success" :disabled="carregando" @click="salvar">
+          <span
+            v-if="carregando"
+            class="spinner-border spinner-border-sm me-1"
+            role="status"
+            aria-hidden="true"
+          ></span>
+          <i v-else class="bi bi-check-lg me-1" aria-hidden="true"></i>
+          {{ modoEdicao ? 'Salvar' : 'Criar' }}
+        </button>
+      </template>
+    </ModalBase>
   </div>
+
+  <ModalConfirmacao
+    :visivel="confirmacaoSaida"
+    titulo="Alterações não salvas"
+    mensagem="Há alterações não salvas. Deseja realmente sair?"
+    rotulo-confirmar="Sair sem salvar"
+    icone="exclamation-triangle"
+    variante="warning"
+    @confirmar="responderSaida(true)"
+    @cancelar="responderSaida(false)"
+  />
 </template>

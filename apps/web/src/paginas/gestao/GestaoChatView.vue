@@ -24,7 +24,7 @@ const { contatos, pendente: carregandoContatos } = useContatosChat(
 );
 
 const conversaAtivaId = ref<string | null>(null);
-const { mensagens } = useConversaDetalhe(
+const { mensagens, temAnteriores, carregandoAnteriores, carregarAnteriores } = useConversaDetalhe(
   () => conversaAtivaId.value,
   () => usuario.value?.id,
 );
@@ -60,6 +60,8 @@ function mostrarStatus(msg: string) {
 async function selecionarConversa(conversaId: string) {
   conversaAtivaId.value = conversaId;
   confirmandoExcluir.value = false;
+  // A conversa ativa fica na URL para sobreviver ao refresh e permitir link direto.
+  void router.replace({ query: { conversa: conversaId } });
   await Promise.all([
     marcarMensagensComoLidas(conversaId),
     marcarNotificacoesConversaLidas(conversaId),
@@ -188,8 +190,11 @@ function handleVoltar() {
       :mostrar-botao-fechar="false"
       :contato-selecionado="contatoAtivo"
       :mostrar-chat-inicialmente="!!route.query.conversa"
+      :tem-mensagens-anteriores="temAnteriores"
+      :carregando-anteriores="carregandoAnteriores"
       @selecionar-conversa="selecionarConversa"
       @enviar-mensagem="handleEnviarMensagem"
+      @carregar-anteriores="carregarAnteriores"
       @voltar="handleVoltar"
       @ocultar="confirmarOcultar"
     />

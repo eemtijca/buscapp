@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { onUnmounted, watch } from 'vue';
+import ModalBase from '@/componentes/ModalBase.vue';
 
-const props = withDefaults(
+withDefaults(
   defineProps<{
     visivel: boolean;
     titulo: string;
@@ -22,85 +22,44 @@ const emit = defineEmits<{
   cancelar: [];
 }>();
 
-function aoTeclar(evento: KeyboardEvent) {
-  if (evento.key === 'Escape') emit('cancelar');
+function classeIcone(variante: 'danger' | 'success' | 'warning'): string {
+  if (variante === 'success') return 'text-success';
+  if (variante === 'warning') return 'text-warning-emphasis';
+  return 'text-danger';
 }
 
-watch(
-  () => props.visivel,
-  (aberto) => {
-    if (aberto) {
-      window.addEventListener('keydown', aoTeclar);
-    } else {
-      window.removeEventListener('keydown', aoTeclar);
-    }
-  },
-);
-
-onUnmounted(() => {
-  window.removeEventListener('keydown', aoTeclar);
-});
+function classeBotao(variante: 'danger' | 'success' | 'warning'): string {
+  if (variante === 'success') return 'btn-success';
+  if (variante === 'warning') return 'btn-warning';
+  return 'btn-danger';
+}
 </script>
 
 <template>
-  <div
-    v-if="visivel"
-    class="modal d-block"
-    tabindex="-1"
-    role="dialog"
-    aria-modal="true"
-    :aria-label="titulo"
-    style="background-color: rgba(0, 0, 0, 0.5)"
+  <ModalBase
+    :visivel="visivel"
+    :titulo="titulo"
+    largura="sm"
+    @update:visivel="(aberto) => !aberto && emit('cancelar')"
   >
-    <div class="modal-dialog modal-dialog-centered modal-sm">
-      <div class="modal-content">
-        <div class="modal-header py-2">
-          <h5 class="modal-title small fw-bold">
-            <i
-              :class="
-                'bi bi-' +
-                icone +
-                ' me-1 ' +
-                (variante === 'success'
-                  ? 'text-success'
-                  : variante === 'warning'
-                    ? 'text-warning-emphasis'
-                    : 'text-danger')
-              "
-              aria-hidden="true"
-            ></i>
-            {{ titulo }}
-          </h5>
-          <button
-            type="button"
-            class="btn-close"
-            aria-label="Fechar"
-            @click="emit('cancelar')"
-          ></button>
-        </div>
-        <div class="modal-body small">
-          <p class="mb-0">{{ mensagem }}</p>
-        </div>
-        <div class="modal-footer py-2">
-          <button type="button" class="btn btn-sm btn-outline-secondary" @click="emit('cancelar')">
-            Cancelar
-          </button>
-          <button
-            type="button"
-            class="btn btn-sm"
-            :class="
-              variante === 'success'
-                ? 'btn-success'
-                : variante === 'warning'
-                  ? 'btn-warning'
-                  : 'btn-danger'
-            "
-            @click="emit('confirmar')"
-          >
-            {{ rotuloConfirmar }}
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
+    <p class="mb-0 d-flex align-items-start gap-2">
+      <i :class="'bi bi-' + icone + ' ' + classeIcone(variante)" aria-hidden="true"></i>
+      <span>{{ mensagem }}</span>
+    </p>
+
+    <template #rodape>
+      <button type="button" class="btn btn-sm btn-outline-secondary" @click="emit('cancelar')">
+        Cancelar
+      </button>
+      <button
+        type="button"
+        class="btn btn-sm"
+        :class="classeBotao(variante)"
+        autofocus
+        @click="emit('confirmar')"
+      >
+        {{ rotuloConfirmar }}
+      </button>
+    </template>
+  </ModalBase>
 </template>

@@ -1,13 +1,30 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
-import { useRouter } from 'vue-router';
+import { computed, ref, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { useAlunos } from '@/composables/consultas/useGestaoUsuarios';
+import EstadoErro from '@/componentes/EstadoErro.vue';
 
 const router = useRouter();
-const { alunos, pendente, atualizando, recarregar } = useAlunos();
+const route = useRoute();
+const limite = ref(50);
+const { alunos, pendente, atualizando, erro, recarregar } = useAlunos(() => ({
+  limite: limite.value,
+}));
 
-const busca = ref('');
-const filtroStatus = ref<'todos' | 'ativo' | 'egresso' | 'transferido' | 'inativo'>('todos');
+const busca = ref((route.query.busca as string) ?? '');
+const filtroStatus = ref<'todos' | 'ativo' | 'egresso' | 'transferido' | 'inativo'>(
+  (route.query.status as 'ativo' | 'egresso' | 'transferido' | 'inativo') ?? 'todos',
+);
+
+// Filtros ficam na URL para preservar o contexto no refresh e permitir link direto.
+watch([busca, filtroStatus], () => {
+  void router.replace({
+    query: {
+      ...(busca.value ? { busca: busca.value } : {}),
+      ...(filtroStatus.value !== 'todos' ? { status: filtroStatus.value } : {}),
+    },
+  });
+});
 
 const alunosFiltrados = computed(() => {
   let lista = alunos.value;
@@ -132,7 +149,13 @@ const statusBadge = (status: string) => {
       </div>
     </div>
 
-    <div v-if="pendente && !alunos.length" class="text-center py-5">
+    <EstadoErro
+      v-if="erro"
+      mensagem="Não foi possível carregar os alunos."
+      @tentar-novamente="recarregar()"
+    />
+
+    <div v-else-if="pendente && !alunos.length" class="text-center py-5">
       <div class="spinner-border text-primary" role="status">
         <span class="visually-hidden">Carregando...</span>
       </div>
@@ -219,6 +242,7 @@ const statusBadge = (status: string) => {
                 <router-link
                   :to="'/gestao/alunos/' + aluno.id"
                   class="btn btn-sm btn-outline-success"
+                  :aria-label="'Editar aluno ' + aluno.nome"
                 >
                   <i class="bi bi-pencil" aria-hidden="true"></i>
                 </router-link>
@@ -226,6 +250,23 @@ const statusBadge = (status: string) => {
             </tr>
           </tbody>
         </table>
+      </div>
+
+      <div v-if="alunos.length >= limite" class="text-center mt-3">
+        <button
+          type="button"
+          class="btn btn-sm btn-outline-secondary"
+          :disabled="atualizando"
+          @click="limite += 50"
+        >
+          <span
+            v-if="atualizando"
+            class="spinner-border spinner-border-sm me-1"
+            role="status"
+            aria-hidden="true"
+          ></span>
+          Carregar mais alunos
+        </button>
       </div>
     </div>
   </div>

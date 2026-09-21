@@ -1,20 +1,41 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
-import { useRouter } from 'vue-router';
+import { computed, ref, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import {
   ativarUsuario,
   desativarUsuario,
   useUsuarios,
 } from '@/composables/consultas/useGestaoUsuarios';
 import ModalConfirmacao from '@/componentes/ModalConfirmacao.vue';
+import EstadoErro from '@/componentes/EstadoErro.vue';
 import type { UsuarioItem } from '@/tipos/componentes';
 
 const router = useRouter();
-const { usuarios, pendente, atualizando, recarregar } = useUsuarios();
+const route = useRoute();
+const limite = ref(50);
+const { usuarios, pendente, atualizando, erro, recarregar } = useUsuarios(() => ({
+  limite: limite.value,
+}));
 
-const busca = ref('');
-const filtroPapel = ref<'todos' | 'professor' | 'responsavel'>('todos');
-const filtroStatus = ref<'todos' | 'ativo' | 'pendente' | 'inativo'>('todos');
+const busca = ref((route.query.busca as string) ?? '');
+const filtroPapel = ref<'todos' | 'professor' | 'responsavel'>(
+  (route.query.papel as 'professor' | 'responsavel') ?? 'todos',
+);
+const filtroStatus = ref<'todos' | 'ativo' | 'pendente' | 'inativo'>(
+  (route.query.status as 'ativo' | 'pendente' | 'inativo') ?? 'todos',
+);
+
+// Filtros ficam na URL para preservar o contexto no refresh e permitir link direto.
+watch([busca, filtroPapel, filtroStatus], () => {
+  void router.replace({
+    query: {
+      ...(busca.value ? { busca: busca.value } : {}),
+      ...(filtroPapel.value !== 'todos' ? { papel: filtroPapel.value } : {}),
+      ...(filtroStatus.value !== 'todos' ? { status: filtroStatus.value } : {}),
+    },
+  });
+});
+
 const mensagemSucesso = ref<string | null>(null);
 const mensagemErro = ref<string | null>(null);
 const confirmacaoPendente = ref<{ usuario: UsuarioItem; acao: 'ativar' | 'desativar' } | null>(
@@ -259,7 +280,13 @@ async function executarToggleAtivacao() {
       </div>
     </div>
 
-    <div v-if="pendente && !usuarios.length" class="text-center py-5" aria-busy="true">
+    <EstadoErro
+      v-if="erro"
+      mensagem="Não foi possível carregar os usuários."
+      @tentar-novamente="recarregar()"
+    />
+
+    <div v-else-if="pendente && !usuarios.length" class="text-center py-5" aria-busy="true">
       <div class="spinner-border text-primary" role="status">
         <span class="visually-hidden">Carregando...</span>
       </div>
@@ -341,6 +368,7 @@ async function executarToggleAtivacao() {
                   <router-link
                     :to="'/gestao/usuarios/' + usuario.id"
                     class="btn btn-sm btn-outline-success"
+                    :aria-label="'Editar usuário ' + usuario.nome"
                   >
                     <i class="bi bi-pencil" aria-hidden="true"></i>
                   </router-link>
@@ -367,6 +395,23 @@ async function executarToggleAtivacao() {
             </tr>
           </tbody>
         </table>
+      </div>
+
+      <div v-if="usuarios.length >= limite" class="text-center mt-3">
+        <button
+          type="button"
+          class="btn btn-sm btn-outline-secondary"
+          :disabled="atualizando"
+          @click="limite += 50"
+        >
+          <span
+            v-if="atualizando"
+            class="spinner-border spinner-border-sm me-1"
+            role="status"
+            aria-hidden="true"
+          ></span>
+          Carregar mais usuários
+        </button>
       </div>
     </div>
 

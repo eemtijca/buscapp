@@ -9,6 +9,8 @@ import {
   mensagemErroExplicita,
 } from '@/utils/mensagemExplicita';
 import CampoFormulario from '@/componentes/CampoFormulario.vue';
+import ModalBase from '@/componentes/ModalBase.vue';
+import ModalConfirmacao from '@/componentes/ModalConfirmacao.vue';
 import type { AnoLetivo } from '@/tipos/database';
 
 const router = useRouter();
@@ -169,12 +171,24 @@ async function salvar() {
   }
 }
 
-async function ativar(ano: AnoLetivo) {
+const anoParaAtivar = ref<AnoLetivo | null>(null);
+const avisoAtivacao = computed(() => {
+  const ano = anoParaAtivar.value;
+  if (!ano) return '';
   const anterior = anos.value.find((a) => a.status === 'ativo' && a.ativo);
-  const aviso = anterior
+  return anterior
     ? `Ao ativar ${ano.ano}, o ano letivo ${anterior.ano} será arquivado e deixará de estar ativo. Deseja continuar?`
     : `Ativar o ano letivo ${ano.ano}?`;
-  if (!window.confirm(aviso)) return;
+});
+
+function ativar(ano: AnoLetivo) {
+  anoParaAtivar.value = ano;
+}
+
+async function confirmarAtivacao() {
+  const ano = anoParaAtivar.value;
+  anoParaAtivar.value = null;
+  if (!ano) return;
 
   salvando.value = true;
   try {
@@ -340,82 +354,74 @@ async function ativar(ano: AnoLetivo) {
       </div>
     </div>
 
-    <div
-      v-if="modalAberto"
-      class="modal d-block"
-      tabindex="-1"
-      style="background-color: rgba(0, 0, 0, 0.5)"
+    <ModalBase
+      :visivel="modalAberto"
+      :titulo="modoEdicao ? 'Editar ano letivo' : 'Novo ano letivo'"
+      icone="calendar3"
+      cor-icone="text-primary"
+      largura="md"
+      @update:visivel="(aberto) => !aberto && (modalAberto = false)"
     >
-      <div class="modal-dialog modal-dialog-centered modal-fullscreen-sm-down">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title small fw-bold">
-              <i class="bi bi-calendar3 text-primary me-1" aria-hidden="true"></i>
-              {{ modoEdicao ? 'Editar ano letivo' : 'Novo ano letivo' }}
-            </h5>
-            <button
-              type="button"
-              class="btn-close"
-              @click="modalAberto = false"
-              aria-label="Fechar"
-            ></button>
-          </div>
-          <form @submit.prevent="salvar">
-            <div class="modal-body">
-              <CampoFormulario id="campoAno" label="Ano" :obrigatorio="true">
-                <input
-                  id="campoAno"
-                  v-model.number="formAno"
-                  type="number"
-                  min="2000"
-                  max="2100"
-                  class="form-control form-control-sm"
-                  autocomplete="off"
-                />
-              </CampoFormulario>
-              <CampoFormulario id="campoDataInicio" label="Data de início" :obrigatorio="true">
-                <input
-                  id="campoDataInicio"
-                  v-model="formDataInicio"
-                  type="date"
-                  class="form-control form-control-sm"
-                />
-              </CampoFormulario>
-              <CampoFormulario id="campoDataFim" label="Data de fim" :obrigatorio="true">
-                <input
-                  id="campoDataFim"
-                  v-model="formDataFim"
-                  type="date"
-                  class="form-control form-control-sm"
-                />
-              </CampoFormulario>
-              <p v-if="!modoEdicao" class="text-body-secondary small mb-0 mt-2">
-                O novo ano é criado como <strong>planejado</strong>. A ativação ocorre pelo botão
-                "Ativar", que arquiva o ano vigente (virada de ano).
-              </p>
-            </div>
-            <div class="modal-footer">
-              <button
-                type="button"
-                class="btn btn-sm btn-outline-secondary"
-                @click="modalAberto = false"
-              >
-                Cancelar
-              </button>
-              <button type="submit" class="btn btn-sm btn-success" :disabled="carregando">
-                <span
-                  v-if="carregando"
-                  class="spinner-border spinner-border-sm me-1"
-                  role="status"
-                  aria-hidden="true"
-                ></span>
-                <i v-else class="bi bi-check-lg me-1" aria-hidden="true"></i>
-                {{ modoEdicao ? 'Salvar' : 'Criar' }}
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
+      <form @submit.prevent="salvar">
+        <CampoFormulario id="campoAno" label="Ano" :obrigatorio="true">
+          <input
+            id="campoAno"
+            v-model.number="formAno"
+            type="number"
+            min="2000"
+            max="2100"
+            class="form-control form-control-sm"
+            autocomplete="off"
+          />
+        </CampoFormulario>
+        <CampoFormulario id="campoDataInicio" label="Data de início" :obrigatorio="true">
+          <input
+            id="campoDataInicio"
+            v-model="formDataInicio"
+            type="date"
+            class="form-control form-control-sm"
+          />
+        </CampoFormulario>
+        <CampoFormulario id="campoDataFim" label="Data de fim" :obrigatorio="true">
+          <input
+            id="campoDataFim"
+            v-model="formDataFim"
+            type="date"
+            class="form-control form-control-sm"
+          />
+        </CampoFormulario>
+        <p v-if="!modoEdicao" class="text-body-secondary small mb-0 mt-2">
+          O novo ano é criado como <strong>planejado</strong>. A ativação ocorre pelo botão
+          "Ativar", que arquiva o ano vigente (virada de ano).
+        </p>
+      </form>
+
+      <template #rodape>
+        <button type="button" class="btn btn-sm btn-outline-secondary" @click="modalAberto = false">
+          Cancelar
+        </button>
+        <button type="button" class="btn btn-sm btn-success" :disabled="carregando" @click="salvar">
+          <span
+            v-if="carregando"
+            class="spinner-border spinner-border-sm me-1"
+            role="status"
+            aria-hidden="true"
+          ></span>
+          <i v-else class="bi bi-check-lg me-1" aria-hidden="true"></i>
+          {{ modoEdicao ? 'Salvar' : 'Criar' }}
+        </button>
+      </template>
+    </ModalBase>
   </div>
+
+  <ModalConfirmacao
+    :visivel="!!anoParaAtivar"
+    titulo="Ativar ano letivo"
+    :mensagem="avisoAtivacao"
+    rotulo-confirmar="Ativar"
+    icone="calendar-check"
+    variante="warning"
+    @confirmar="confirmarAtivacao"
+    @cancelar="anoParaAtivar = null"
+  />
 </template>

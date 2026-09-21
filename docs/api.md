@@ -5,91 +5,108 @@ Rotas HTTP da API Fastify. Todas ficam sob `/api` e respondem JSON, exceto o dow
 ## Convenções
 
 - **Sessão:** rotas privadas resolvem o usuário pelo cookie `buscapp_sessao` (HttpOnly). Sem sessão válida respondem `401` com `{ erro: { codigo: 'nao_autenticado', mensagem } }`. A exceção é `GET /api/auth/me`, uma sonda que sempre responde `200` com `perfil: null` quando não há sessão, para o frontend descobrir o estado sem gerar erro. O frontend usa `credentials: 'include'`.
-- **Erros:** envelope único `{ "erro": { "codigo": "string", "mensagem": "string" } }`. O status indica a categoria: `400` validação ou regra de negócio, `401` sem sessão, `403` sem permissão, `404` recurso ausente ou fora do escopo, `413` arquivo grande e `429` tentativas de código excedidas.
+- **Erros:** envelope único `{ "erro": { "codigo": "string", "mensagem": "string", "detalhes": ... } }`, com `detalhes` opcional. O status indica a categoria: `400` validação ou regra de negócio, `401` sem sessão, `403` sem permissão, `404` recurso ausente ou fora do escopo, `409` conflito de recurso em uso, `413` arquivo grande e `429` tentativas de código excedidas.
 - **Papel e módulo:** `exigirPapel` valida o papel e `exigirModulo` aplica `acesso_modulos` com semântica fail-closed. A gestão não passa por módulos; professor e responsável dependem dos módulos habilitados.
 - **Escopo:** toda leitura filtra pelos alunos visíveis ao perfil. Recurso fora do escopo responde `404`, para não revelar a existência.
-- **Idempotência:** frequências, mensagens e registros de comportamento aceitam `client_request_id` com índice único parcial.
+- **Idempotência:** frequências e mensagens aceitam `client_request_id`, com índice único.
 - **Datas:** datas civis usam `yyyy-mm-dd` e timestamps usam ISO 8601.
-- **Listas:** os endpoints de listagem devolvem arrays completos nomeados pela coleção. A única paginação é a de notificações (`limite`, de 1 a 100, padrão 20).
+- **Listas:** os endpoints de listagem devolvem arrays nomeados pela coleção e aceitam `limite` (1 a 200, padrão 50) e `offset` (a partir de 0) com ordenação estável. As mensagens do chat usam `limite` e `cursor` (id de uma mensagem): sem cursor, devolvem as mais recentes; com cursor, as anteriores a ela. A paginação de notificações usa `limite` (1 a 100, padrão 20). `GET /api/anos-letivos` e `GET /api/horarios` devolvem a coleção completa, sem paginação.
 - **Cache HTTP:** respostas de sucesso sob `/api` usam `Cache-Control: private, no-store` e, em `GET` e `HEAD` 2xx, ganham ETag próprio. O cliente revalida com `If-None-Match` e recebe `304` quando o corpo não mudou. Erros, streams de anexo e o SSE não geram ETag. Ver [ADR-008](adr/008-cache-de-dados-cliente.md).
 - **Uploads:** `multipart/form-data` no endpoint clássico ou URL pré-assinada no fluxo direto. Ver [modulos.md](modulos.md).
+- **Rate limiting:** login (10/min, contando apenas credenciais inválidas), `solicitar-codigo` (3/5 min), `redefinir-senha` (5/15 min) e uploads (20/h) respondem `429` com `muitas_requisicoes` ao exceder.
+- **Auditoria e LGPD:** login, falhas, CRUD, anexos, expurgo e anonimização ficam na trilha de auditoria; exportação e anonimização do titular são restritas à gestão.
 
 ## Resumo das rotas
 
-| Método                 | Caminho                                                  | Acesso                            | Descrição                                                                  |
-| ---------------------- | -------------------------------------------------------- | --------------------------------- | -------------------------------------------------------------------------- |
-| GET                    | `/api/saude`                                             | Público                           | Liveness da API, sem consulta ao banco                                     |
-| GET                    | `/api/eventos`                                           | Sessão                            | Stream SSE de invalidação                                                  |
-| POST                   | `/api/auth/login`                                        | Público                           | Inicia a sessão                                                            |
-| POST                   | `/api/auth/logout`                                       | Público                           | Revoga a sessão e limpa o cookie                                           |
-| GET                    | `/api/auth/me`                                           | Público (sonda)                   | Perfil da sessão ou `null`                                                 |
-| POST                   | `/api/auth/solicitar-codigo`                             | Público                           | Solicita código, notificando a gestão                                      |
-| POST                   | `/api/auth/redefinir-senha`                              | Público                           | Define a senha com o código                                                |
-| GET                    | `/api/usuarios`                                          | Gestão                            | Lista perfis com filtros `papel`, `status` e `busca`                       |
-| GET                    | `/api/usuarios/:id`                                      | Gestão                            | Consulta um perfil                                                         |
-| POST                   | `/api/usuarios`                                          | Gestão                            | Cria perfil pendente com código e senha temporária                         |
-| PUT                    | `/api/usuarios/:id`                                      | Gestão                            | Atualiza dados e módulos de acesso                                         |
-| PATCH                  | `/api/usuarios/:id/status`                               | Gestão                            | Ativa ou inativa perfil                                                    |
-| GET                    | `/api/alunos`                                            | Todos                             | Lista alunos visíveis, com `busca` e `status`                              |
-| GET                    | `/api/alunos/:id`                                        | Todos                             | Consulta aluno visível                                                     |
-| POST                   | `/api/alunos`                                            | Gestão                            | Cria aluno                                                                 |
-| PUT                    | `/api/alunos/:id`                                        | Gestão                            | Atualiza aluno                                                             |
-| GET                    | `/api/turmas`                                            | Todos                             | Lista turmas, com `ativo` e `ano_letivo_id`                                |
-| POST, PUT              | `/api/turmas`, `/api/turmas/:id`                         | Gestão                            | Cria e atualiza turma                                                      |
-| PATCH                  | `/api/turmas/:id/status`                                 | Gestão                            | Ativa ou inativa turma                                                     |
-| GET, POST, PUT         | `/api/disciplinas`, `/api/disciplinas/:id`               | Consulta: todos; escrita: gestão  | Disciplinas                                                                |
-| PATCH                  | `/api/disciplinas/:id/status`                            | Gestão                            | Ativa ou inativa disciplina                                                |
-| GET, POST, PUT         | `/api/atribuicoes`, `/api/atribuicoes/:id`               | Gestão                            | Atribuições professor, turma e disciplina                                  |
-| PATCH                  | `/api/atribuicoes/:id/status`                            | Gestão                            | Ativa ou encerra atribuição                                                |
-| GET, POST, PUT         | `/api/anos-letivos`, `/api/anos-letivos/:id`             | Gestão                            | Anos letivos                                                               |
-| POST                   | `/api/anos-letivos/:id/ativar`                           | Gestão                            | Virada de ano, com auditoria                                               |
-| GET, POST, PUT         | `/api/enturmacoes`, `/api/enturmacoes/:id`               | Consulta: todos; escrita: gestão  | Enturmações                                                                |
-| GET, POST, PUT         | `/api/vinculos`, `/api/vinculos/:id`                     | Consulta: todos; escrita: gestão  | Vínculos responsável-aluno                                                 |
-| POST                   | `/api/frequencias/lote`                                  | Gestão e professor                | Chamada por exceção, idempotente                                           |
-| DELETE                 | `/api/frequencias/lote`                                  | Gestão e professor                | Desfaz a chamada do período                                                |
-| POST                   | `/api/frequencias`                                       | Gestão e professor                | Ausência individual, idempotente                                           |
-| GET                    | `/api/frequencias`                                       | Todos                             | Lista com filtros por aluno, turma, data, status e tipo                    |
-| GET                    | `/api/frequencias/:id`                                   | Todos                             | Consulta uma frequência                                                    |
-| GET                    | `/api/frequencias/resumo`                                | Todos                             | Resumo por aluno para os painéis                                           |
-| GET                    | `/api/ocorrencias`                                       | Todos                             | Lista com filtros `aluno_id`, `status`, `tipo` e `exige_presenca_pendente` |
-| GET                    | `/api/ocorrencias/:id`                                   | Todos                             | Consulta uma ocorrência                                                    |
-| POST                   | `/api/ocorrencias`                                       | Gestão e professor                | Cria ocorrência                                                            |
-| PATCH                  | `/api/ocorrencias/:id`                                   | Gestão                            | Atualiza status e presença do responsável                                  |
-| GET                    | `/api/registros-comportamento`                           | Todos                             | Lista registros com `aluno_id` e intervalo de datas                        |
-| POST                   | `/api/registros-comportamento`                           | Gestão e professor                | Cria registro de comportamento                                             |
-| GET                    | `/api/justificativas`                                    | Todos                             | Lista com filtros `status`, `aluno_id` e intervalo                         |
-| GET                    | `/api/justificativas/:id`                                | Todos                             | Consulta uma justificativa                                                 |
-| POST                   | `/api/justificativas`                                    | Gestão e responsável              | Cria justificativa, com `anexo_ids` opcionais                              |
-| PATCH                  | `/api/justificativas/:id`                                | Gestão                            | Aceita ou recusa, disparando a auto-justificativa                          |
-| GET                    | `/api/conversas`                                         | Todos                             | Lista conversas visíveis                                                   |
-| POST                   | `/api/conversas`                                         | Gestão e responsável              | Obtém ou cria conversa por aluno                                           |
-| GET                    | `/api/conversas/:id/mensagens`                           | Participantes                     | Lista mensagens não removidas                                              |
-| POST                   | `/api/conversas/:id/mensagens`                           | Participantes                     | Envia mensagem, com horário protegido para o responsável                   |
-| PATCH                  | `/api/conversas/:id/lidas`                               | Participantes                     | Marca as mensagens recebidas como lidas                                    |
-| PATCH                  | `/api/conversas/:id`                                     | Participantes                     | Oculta ou reexibe a conversa                                               |
-| GET                    | `/api/notificacoes`                                      | Sessão                            | Notificações do próprio usuário, com `limite` e `lida`                     |
-| PATCH                  | `/api/notificacoes/lidas`                                | Sessão                            | Marca todas como lidas                                                     |
-| PATCH                  | `/api/notificacoes/conversa/:conversaId/lidas`           | Sessão                            | Marca as notificações da conversa                                          |
-| PATCH                  | `/api/notificacoes/:id/lida`                             | Sessão                            | Marca uma notificação                                                      |
-| DELETE                 | `/api/notificacoes`                                      | Sessão                            | Remove todas as notificações do usuário                                    |
-| POST                   | `/api/anexos/upload`                                     | Todos                             | Gera URL pré-assinada para envio direto                                    |
-| POST                   | `/api/anexos/confirmar`                                  | Todos                             | Confirma o envio direto e registra os metadados                            |
-| POST                   | `/api/anexos`                                            | Todos                             | Envia anexo por multipart                                                  |
-| GET                    | `/api/anexos/:id/arquivo`                                | Todos                             | Baixa o anexo em streaming, com autorização                                |
-| DELETE                 | `/api/anexos/:id`                                        | Todos                             | Remove anexo do criador ou da gestão                                       |
-| GET                    | `/api/configuracoes`                                     | Sessão                            | Parâmetros do sistema                                                      |
-| PUT                    | `/api/configuracoes`                                     | Gestão                            | Atualiza parâmetros do sistema                                             |
-| GET, POST, PUT, DELETE | `/api/opcoes`, `/api/opcoes/:id`                         | Consulta: sessão; escrita: gestão | Catálogos genéricos                                                        |
-| PATCH                  | `/api/opcoes/reordenar`                                  | Gestão                            | Reordena opções em transação                                               |
-| GET, POST, PUT, DELETE | `/api/horarios`, `/api/horarios/:id`                     | Consulta: sessão; escrita: gestão | Janelas de horário do chat                                                 |
-| PATCH                  | `/api/horarios/:id/status`                               | Gestão                            | Ativa ou inativa horário                                                   |
-| GET                    | `/api/tags-comportamento`                                | Sessão                            | Lista tags, com `ativo`                                                    |
-| POST, PUT, DELETE      | `/api/tags-comportamento`, `/api/tags-comportamento/:id` | Gestão                            | Tags de comportamento                                                      |
-| PATCH                  | `/api/tags-comportamento/:id/status`                     | Gestão                            | Ativa ou inativa tag                                                       |
-| GET                    | `/api/codigos`                                           | Gestão                            | Lista códigos com status derivado e bloqueio                               |
-| POST                   | `/api/codigos/perfil/:perfilId`                          | Gestão                            | Gera código de 6 dígitos                                                   |
-| PATCH                  | `/api/codigos/:id/revogar`                               | Gestão                            | Revoga código                                                              |
-| POST                   | `/api/codigos/limpar`                                    | Gestão                            | Remove códigos usados, expirados e revogados                               |
+| Método            | Caminho                                                  | Acesso               | Descrição                                                                  |
+| ----------------- | -------------------------------------------------------- | -------------------- | -------------------------------------------------------------------------- |
+| GET               | `/api/saude`                                             | Público              | Liveness da API, sem consulta ao banco                                     |
+| GET               | `/api/saude/pronto`                                      | Público              | Readiness com consulta ao banco; responde `503` se o banco falha           |
+| GET               | `/api/saude/metricas`                                    | Gestão               | Resumo de requisições e conexões SSE                                       |
+| GET, DELETE       | `/api/auth/sessoes`                                      | Sessão               | Lista e revoga as outras sessões ativas                                    |
+| GET               | `/api/lgpd/alunos/:id/exportar`                          | Gestão               | Exporta os dados pessoais do aluno                                         |
+| POST              | `/api/lgpd/alunos/:id/anonimizar`                        | Gestão               | Anonimiza os dados e remove os anexos (irreversível)                       |
+| POST              | `/api/tarefas/expurgo`                                   | Segredo do agendador | Aplica a retenção de anexos, códigos, sessões e contadores                 |
+| GET               | `/api/eventos`                                           | Sessão               | Stream SSE de invalidação                                                  |
+| POST              | `/api/auth/login`                                        | Público              | Inicia a sessão                                                            |
+| POST              | `/api/auth/logout`                                       | Público              | Revoga a sessão e limpa o cookie                                           |
+| GET               | `/api/auth/me`                                           | Público (sonda)      | Perfil da sessão ou `null`                                                 |
+| POST              | `/api/auth/solicitar-codigo`                             | Público              | Solicita código, notificando a gestão                                      |
+| POST              | `/api/auth/redefinir-senha`                              | Público              | Define a senha com o código                                                |
+| GET               | `/api/usuarios`                                          | Gestão               | Lista perfis com filtros `papel`, `status` e `busca`                       |
+| GET               | `/api/usuarios/:id`                                      | Gestão               | Consulta um perfil                                                         |
+| POST              | `/api/usuarios`                                          | Gestão               | Cria perfil pendente com código e senha temporária                         |
+| PUT               | `/api/usuarios/:id`                                      | Gestão               | Atualiza dados, módulos de acesso e notificações                           |
+| PATCH             | `/api/usuarios/:id/status`                               | Gestão               | Ativa ou inativa perfil                                                    |
+| GET               | `/api/alunos`                                            | Todos                | Lista alunos visíveis, com `busca` e `status`                              |
+| GET               | `/api/alunos/:id`                                        | Todos                | Consulta aluno visível                                                     |
+| POST              | `/api/alunos`                                            | Gestão               | Cria aluno                                                                 |
+| PUT               | `/api/alunos/:id`                                        | Gestão               | Atualiza aluno                                                             |
+| GET               | `/api/turmas`                                            | Todos                | Lista turmas, com `ativo` e `ano_letivo_id`                                |
+| POST, PUT         | `/api/turmas`, `/api/turmas/:id`                         | Gestão               | Cria e atualiza turma                                                      |
+| PATCH             | `/api/turmas/:id/status`                                 | Gestão               | Ativa ou inativa turma                                                     |
+| GET               | `/api/disciplinas`                                       | Todos                | Lista disciplinas                                                          |
+| POST, PUT         | `/api/disciplinas`, `/api/disciplinas/:id`               | Gestão               | Cria e atualiza disciplina                                                 |
+| PATCH             | `/api/disciplinas/:id/status`                            | Gestão               | Ativa ou inativa disciplina                                                |
+| GET               | `/api/atribuicoes`                                       | Gestão               | Lista atribuições                                                          |
+| POST, PUT         | `/api/atribuicoes`, `/api/atribuicoes/:id`               | Gestão               | Cria e atualiza atribuição                                                 |
+| PATCH             | `/api/atribuicoes/:id/status`                            | Gestão               | Ativa ou encerra atribuição                                                |
+| GET               | `/api/anos-letivos`                                      | Gestão               | Lista anos letivos, sem paginação                                          |
+| POST, PUT         | `/api/anos-letivos`, `/api/anos-letivos/:id`             | Gestão               | Cria e atualiza ano letivo                                                 |
+| POST              | `/api/anos-letivos/:id/ativar`                           | Gestão               | Virada de ano, com auditoria                                               |
+| GET               | `/api/enturmacoes`                                       | Todos                | Lista enturmações                                                          |
+| POST, PUT         | `/api/enturmacoes`, `/api/enturmacoes/:id`               | Gestão               | Cria e atualiza enturmação                                                 |
+| GET               | `/api/vinculos`                                          | Todos                | Lista vínculos responsável-aluno                                           |
+| POST, PUT         | `/api/vinculos`, `/api/vinculos/:id`                     | Gestão               | Cria e atualiza vínculo                                                    |
+| POST              | `/api/frequencias/lote`                                  | Gestão e professor   | Chamada por exceção, idempotente                                           |
+| DELETE            | `/api/frequencias/lote`                                  | Gestão e professor   | Desfaz a chamada do período                                                |
+| POST              | `/api/frequencias`                                       | Gestão e professor   | Ausência individual, idempotente                                           |
+| GET               | `/api/frequencias`                                       | Todos                | Lista com filtros por aluno, turma, data, status e tipo                    |
+| GET               | `/api/frequencias/:id`                                   | Todos                | Consulta uma frequência                                                    |
+| GET               | `/api/frequencias/resumo`                                | Todos                | Resumo por aluno para os painéis                                           |
+| GET               | `/api/ocorrencias`                                       | Todos                | Lista com filtros `aluno_id`, `status`, `tipo` e `exige_presenca_pendente` |
+| GET               | `/api/ocorrencias/:id`                                   | Todos                | Consulta uma ocorrência                                                    |
+| POST              | `/api/ocorrencias`                                       | Gestão e professor   | Cria ocorrência                                                            |
+| PATCH             | `/api/ocorrencias/:id`                                   | Gestão               | Atualiza status e presença do responsável                                  |
+| GET               | `/api/registros-comportamento`                           | Todos                | Lista registros com `aluno_id` e intervalo de datas                        |
+| POST              | `/api/registros-comportamento`                           | Gestão e professor   | Cria registro de comportamento                                             |
+| GET               | `/api/justificativas`                                    | Todos                | Lista com filtros `status`, `aluno_id` e intervalo                         |
+| GET               | `/api/justificativas/:id`                                | Todos                | Consulta uma justificativa                                                 |
+| POST              | `/api/justificativas`                                    | Gestão e responsável | Cria justificativa, com `anexo_ids` opcionais                              |
+| PATCH             | `/api/justificativas/:id`                                | Gestão               | Aceita ou recusa, disparando a auto-justificativa                          |
+| GET               | `/api/conversas`                                         | Todos                | Lista conversas visíveis                                                   |
+| POST              | `/api/conversas`                                         | Gestão e responsável | Obtém ou cria conversa por aluno                                           |
+| GET               | `/api/conversas/:id/mensagens`                           | Participantes        | Lista mensagens não removidas                                              |
+| POST              | `/api/conversas/:id/mensagens`                           | Participantes        | Envia mensagem, com horário protegido para o responsável                   |
+| PATCH             | `/api/conversas/:id/lidas`                               | Participantes        | Marca as mensagens recebidas como lidas                                    |
+| PATCH             | `/api/conversas/:id`                                     | Participantes        | Oculta ou reexibe a conversa                                               |
+| GET               | `/api/notificacoes`                                      | Sessão               | Notificações do próprio usuário, com `limite` e `lida`                     |
+| PATCH             | `/api/notificacoes/lidas`                                | Sessão               | Marca todas como lidas                                                     |
+| PATCH             | `/api/notificacoes/conversa/:conversaId/lidas`           | Sessão               | Marca as notificações da conversa                                          |
+| PATCH             | `/api/notificacoes/:id/lida`                             | Sessão               | Marca uma notificação                                                      |
+| DELETE            | `/api/notificacoes`                                      | Sessão               | Remove todas as notificações do usuário                                    |
+| POST              | `/api/anexos/upload`                                     | Todos                | Gera URL pré-assinada para envio direto                                    |
+| POST              | `/api/anexos/confirmar`                                  | Todos                | Confirma o envio direto e registra os metadados                            |
+| POST              | `/api/anexos`                                            | Todos                | Envia anexo por multipart                                                  |
+| GET               | `/api/anexos/:id/arquivo`                                | Todos                | Baixa o anexo em streaming, com autorização                                |
+| DELETE            | `/api/anexos/:id`                                        | Todos                | Remove anexo do criador ou da gestão                                       |
+| GET               | `/api/configuracoes`                                     | Gestão               | Parâmetros completos do sistema                                            |
+| GET               | `/api/configuracoes/publicas`                            | Sessão               | Subconjunto público (termômetro, escola, fuso e mensagem fora de horário)  |
+| PUT               | `/api/configuracoes`                                     | Gestão               | Atualiza parâmetros do sistema                                             |
+| GET               | `/api/opcoes`                                            | Sessão               | Lista catálogos genéricos                                                  |
+| POST, PUT, DELETE | `/api/opcoes`, `/api/opcoes/:id`                         | Gestão               | Cria, atualiza e remove opção                                              |
+| PATCH             | `/api/opcoes/reordenar`                                  | Gestão               | Reordena opções em transação                                               |
+| GET               | `/api/horarios`                                          | Sessão               | Lista janelas de horário do chat, sem paginação                            |
+| POST, PUT, DELETE | `/api/horarios`, `/api/horarios/:id`                     | Gestão               | Cria, atualiza e remove horário                                            |
+| PATCH             | `/api/horarios/:id/status`                               | Gestão               | Ativa ou inativa horário                                                   |
+| GET               | `/api/tags-comportamento`                                | Sessão               | Lista tags, com `ativo`                                                    |
+| POST, PUT, DELETE | `/api/tags-comportamento`, `/api/tags-comportamento/:id` | Gestão               | Tags de comportamento                                                      |
+| PATCH             | `/api/tags-comportamento/:id/status`                     | Gestão               | Ativa ou inativa tag                                                       |
+| GET               | `/api/codigos`                                           | Gestão               | Lista códigos com status derivado e bloqueio                               |
+| POST              | `/api/codigos/perfil/:perfilId`                          | Gestão               | Gera código de 6 dígitos                                                   |
+| PATCH             | `/api/codigos/:id/revogar`                               | Gestão               | Revoga código                                                              |
+| GET               | `/api/auditoria`                                         | Gestão               | Lista eventos de auditoria com filtros e paginação                         |
+| POST              | `/api/codigos/limpar`                                    | Gestão               | Remove códigos usados, expirados e revogados                               |
 
 > [!NOTE]
 > Não existem rotas de agregação em `/api/monitoramento`. O ranking e o termômetro são calculados no frontend a partir das rotas de frequências, ocorrências, registros de comportamento e configurações. Ver [modulos.md](modulos.md).
@@ -108,7 +125,7 @@ Stream SSE autenticado. Envia `event: invalidar` com `{ tabela, escopo }`, além
 
 ### `POST /api/auth/login`
 
-Corpo: `email`, `senha` e `lembrar` opcional. Responde `200` com `{ perfil }` e grava o cookie de sessão. Credenciais inválidas respondem `401` com `credenciais_invalidas`; perfil inativo responde `403` com `conta_inativa`. O tempo de resposta é equalizado com um hash falso quando o email não existe.
+Corpo: `email`, `senha` e `lembrar` opcional. Responde `200` com `{ perfil }` e grava o cookie de sessão. Credenciais inválidas respondem `401` com `credenciais_invalidas`; perfil inativo responde `403` com `conta_inativa`; perfil pendente responde `403` com `conta_pendente`. O tempo de resposta é equalizado com um hash falso quando o email não existe, e apenas as credenciais inválidas contam para o rate limiting (contas inativa ou pendente não incrementam o contador).
 
 ### `POST /api/auth/logout`
 
@@ -124,7 +141,7 @@ Corpo: `email`. Sempre responde `200` com `{ ok: true }`, sem revelar se a conta
 
 ### `POST /api/auth/redefinir-senha`
 
-Corpo: `email`, `codigo` (6 dígitos) e `novaSenha`. Exige a política de senha forte (mínimo de 8 com maiúscula, minúscula, dígito e símbolo). Código inválido, expirado ou usado responde `400` com `codigo_invalido`; excesso de tentativas responde `429` com `muitas_tentativas`. No sucesso, revoga as sessões, ativa perfis pendentes e audita.
+Corpo: `email`, `codigo` (6 dígitos) e `novaSenha`. Exige a política de senha forte (mínimo de 8 com maiúscula, minúscula, dígito e símbolo); senha fora da política responde `400` com `senha_fraca`. Código inválido, expirado ou usado responde `400` com `codigo_invalido`; excesso de tentativas responde `429` com `muitas_tentativas`. No sucesso, revoga as sessões, ativa perfis pendentes e audita.
 
 ## Usuários e códigos
 
@@ -144,7 +161,7 @@ Gera um código de 6 dígitos para o perfil, revogando códigos ativos anteriore
 
 ### `POST /api/frequencias/lote`
 
-Chamada por exceção: envia apenas os ausentes. Corpo: `turma_id`, `data_aula` (`yyyy-mm-dd`), `periodo`, `tipo_registro` (`chamada_aula`, `entrada_portao` ou `saida`), `ausentes` (lista com `aluno_id`, `observacao` e `motivos_ausencia`) e `client_request_id`. Responde `201` com `{ registradas }` ou `200` com `{ idempotente: true }` quando o identificador já foi processado.
+Chamada por exceção: envia apenas os ausentes. Corpo: `turma_id`, `data_aula` (`yyyy-mm-dd`), `periodo`, `tipo_registro` (`chamada_aula`, `entrada_portao` ou `saida`), `ausentes` (lista com `aluno_id`, `observacao` e `motivos_ausencia`) e `client_request_id`. Responde `201` com `{ ok: true, registradas }` ou `200` com `{ ok: true, idempotente: true }` quando o identificador já foi processado.
 
 ### `DELETE /api/frequencias/lote`
 
@@ -152,7 +169,7 @@ Desfaz a chamada. Recebe `turma_id`, `data_aula`, `periodo` e `tipo_registro` na
 
 ### `GET /api/frequencias/resumo`
 
-Recebe `aluno_ids` (um ou vários) e intervalo opcional. Responde `200` com `{ resumos }`, cada um com `aluno_id`, `total_ausentes`, `total_justificados` e os registros do período.
+Recebe `aluno_ids` (um ou vários) e intervalo opcional. Responde `200` com `{ resumo }`, cada item com `aluno_id`, `total_ausentes`, `total_justificados` e os registros do período.
 
 ## Ocorrências e comportamento
 
@@ -188,6 +205,11 @@ Corpo: `conteudo` (até 2000 caracteres) e `client_request_id` opcional. Respond
 
 `GET /api/notificacoes` aceita `limite` (1 a 100, padrão 20) e `lida`. Responde `{ notificacoes, nao_lidas }`. As rotas `PATCH` marcam como lidas e `DELETE` remove todas as notificações do usuário, sempre restritas ao destinatário.
 
+## Auditoria
+
+- `GET /api/auditoria` devolve os eventos para a gestão, do mais recente para o mais antigo, com `limite`/`offset` e filtros por `acao`, `entidade`, `usuario_id`, `data_inicio` e `data_fim`.
+- Downloads de anexo são registrados como `BAIXAR_ANEXO`, com `ip_origem`.
+
 ## Anexos
 
 ### `POST /api/anexos/upload`
@@ -196,7 +218,7 @@ Corpo: `nome_arquivo`, `mime_type` (JPEG, PNG, WEBP ou PDF) e `tamanho_bytes`. R
 
 ### `POST /api/anexos/confirmar`
 
-Corpo: `chave`, `nome_arquivo`, `mime_type` e `tamanho_bytes`. Valida que a chave pertence ao usuário, confere tamanho e tipo no provedor e cria o registro. É idempotente por `storage_path`.
+Corpo: `chave`, `nome_arquivo`, `mime_type` e `tamanho_bytes`. Valida que a chave pertence ao usuário, confere tamanho e tipo no provedor e cria o registro. Responde `201` na criação e `200` quando o registro já existe (idempotência por `storage_path`).
 
 ### `POST /api/anexos`
 
@@ -204,11 +226,11 @@ Corpo: `chave`, `nome_arquivo`, `mime_type` e `tamanho_bytes`. Valida que a chav
 
 ### `GET /api/anexos/:id/arquivo`
 
-Baixa o conteúdo em streaming, com `Content-Type`, `Content-Length`, `Content-Disposition: inline` e `Cache-Control: private, no-store`. A autorização aceita o criador, a gestão ou quem pode ver o aluno associado.
+Baixa o conteúdo em streaming, com `Content-Type`, `Content-Length` e `Cache-Control: private, no-store`. O `Content-Disposition` é `inline` para imagens e `attachment` (com `filename`) para PDF, acompanhado de `Content-Security-Policy: sandbox` e `X-Content-Type-Options: nosniff`. A autorização aceita o criador, a gestão ou quem pode ver o aluno associado.
 
 ## Configurações e catálogos
 
-- `GET /api/configuracoes` devolve os parâmetros globais; `PUT` fica restrito à gestão.
+- `GET /api/configuracoes` devolve os parâmetros completos e `PUT` fica restrito à gestão. `GET /api/configuracoes/publicas` devolve o subconjunto visível a todos os perfis (parâmetros do termômetro, escola, fuso e mensagem fora de horário), sem os parâmetros operacionais (expurgo de anexos e política de códigos).
 - `/api/opcoes` cobre os catálogos genéricos, com reordenação em transação e bloqueio de exclusão de opções referenciadas.
 - `/api/horarios` define as janelas de atendimento do chat.
 - `/api/tags-comportamento` define o catálogo de tags usado em ocorrências e registros.

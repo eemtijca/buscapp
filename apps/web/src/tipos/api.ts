@@ -150,3 +150,17 @@ export interface MensagemApi {
 export interface RespostaFrequencias {
   frequencias: Frequencia[];
 }
+
+/** Evento de auditoria devolvido pela API (somente gestão). */
+export interface AuditoriaApi {
+  id: string;
+  usuario_id: string | null;
+  usuario_nome: string | null;
+  acao: string;
+  entidade: string;
+  entidade_id: string | null;
+  dados_anteriores: unknown;
+  dados_novos: unknown;
+  ip_origem: string | null;
+  created_at: string;
+}

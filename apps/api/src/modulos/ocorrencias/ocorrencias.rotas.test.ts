@@ -531,6 +531,17 @@ describe('PATCH /api/ocorrencias/:id', () => {
 describe('registros de comportamento', () => {
   let registroTurmaId: string;
 
+  it('professor sem o módulo de ocorrências não registra comportamento', async () => {
+    const resposta = await app.inject({
+      method: 'POST',
+      url: '/api/registros-comportamento',
+      cookies: { buscapp_sessao: cookieProfSem },
+      payload: { aluno_id: alunoTurmaId, descricao: 'Registro sem o módulo liberado.' },
+    });
+    expect(resposta.statusCode).toBe(403);
+    expect(resposta.json().erro.mensagem).toContain('ocorrencias');
+  });
+
   it('professor sem módulo não registra para aluno fora da turma', async () => {
     const resposta = await app.inject({
       method: 'POST',

@@ -34,7 +34,7 @@ test.describe('Notificações — 403 regression', () => {
 
     await login(page, 'resp1@email.com', SENHA_RESP);
     await page.goto('/responsavel');
-    await page.locator('button[aria-label="Notificações"]').click();
+    await page.locator('button[aria-label^="Notificações"]').click();
     const item = page.locator('.notif-menu').getByText(titulo);
     await expect(item).toBeVisible({ timeout: 10000 });
     await item.click();
@@ -58,7 +58,7 @@ test.describe('Notificações — 403 regression', () => {
     ]);
     await login(page, 'resp1@email.com', SENHA_RESP);
     await page.goto('/responsavel');
-    await page.locator('button[aria-label="Notificações"]').click();
+    await page.locator('button[aria-label^="Notificações"]').click();
     const item = page.locator('.notif-menu').getByText(titulo);
     await expect(item).toBeVisible({ timeout: 10000 });
     await item.click();
@@ -79,7 +79,7 @@ test.describe('Notificações — 403 regression', () => {
     ]);
     await login(page, 'resp1@email.com', SENHA_RESP);
     await page.goto('/responsavel');
-    await page.locator('button[aria-label="Notificações"]').click();
+    await page.locator('button[aria-label^="Notificações"]').click();
     const item = page.locator('.notif-menu').getByText(titulo);
     await expect(item).toBeVisible({ timeout: 10000 });
     await item.click();
@@ -103,7 +103,7 @@ test.describe('Notificações — 403 regression', () => {
     ]);
     await login(page, 'prof1@escola.edu.br', SENHA_PROF);
     await page.goto('/professor');
-    await page.locator('button[aria-label="Notificações"]').click();
+    await page.locator('button[aria-label^="Notificações"]').click();
     const item = page.locator('.notif-menu').getByText(titulo);
     await expect(item).toBeVisible({ timeout: 10000 });
     await item.click();
@@ -126,7 +126,7 @@ test.describe('Notificações — 403 regression', () => {
     ]);
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao');
-    await page.locator('button[aria-label="Notificações"]').click();
+    await page.locator('button[aria-label^="Notificações"]').click();
     const item = page.locator('.notif-menu').getByText(titulo);
     await expect(item).toBeVisible({ timeout: 10000 });
     await item.click();

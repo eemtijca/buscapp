@@ -10,6 +10,17 @@ const esquema = z
     NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
     PORT: z.coerce.number().int().positive().default(3001),
     HOST: z.string().default('0.0.0.0'),
+    TZ_ESCOLA: z
+      .string()
+      .default('America/Sao_Paulo')
+      .refine((fuso) => {
+        try {
+          new Intl.DateTimeFormat('en-US', { timeZone: fuso });
+          return true;
+        } catch {
+          return false;
+        }
+      }, 'TZ_ESCOLA deve ser um fuso horário IANA válido (ex.: America/Sao_Paulo).'),
     DATABASE_URL: z.string().min(1, 'DATABASE_URL é obrigatória'),
     MIGRATE_DATABASE_URL: z.string().optional(),
     APP_URL: z.string().url().default('http://localhost:5173'),
@@ -31,6 +42,11 @@ const esquema = z
       .int()
       .positive()
       .default(20 * 1024 * 1024),
+    // Re-encode de imagens no servidor (remove EXIF e limita o lado a 1600 px).
+    PROCESSAR_IMAGENS: z
+      .enum(['true', 'false'])
+      .default('true')
+      .transform((valor) => valor === 'true'),
     DB_POOL_MAX: z.coerce.number().int().positive().default(10),
     COOKIE_SECURE: z
       .enum(['true', 'false'])
@@ -40,6 +56,11 @@ const esquema = z
       .enum(['true', 'false'])
       .default('false')
       .transform((valor) => valor === 'true'),
+    REDIS_URL: z.string().min(1, 'REDIS_URL é obrigatória para o barramento de eventos.'),
+    // Conexão de sessão usada no LISTEN; sem ela, cai para MIGRATE_DATABASE_URL ou DATABASE_URL.
+    DATABASE_URL_ESCUTA: z.string().optional(),
+    // Segredo do agendador do expurgo; sem ele, a rota fica desabilitada.
+    CRON_SECRET: z.string().optional(),
   })
   .superRefine((valores, contexto) => {
     if (valores.NODE_ENV === 'production' && valores.AUTH_PEPPER.length < 32) {
@@ -49,6 +70,15 @@ const esquema = z
         message: 'AUTH_PEPPER deve ter ao menos 32 caracteres em produção',
       });
     }
+
+    const cookieSeguro = valores.COOKIE_SECURE ?? valores.NODE_ENV === 'production';
+    if (valores.COOKIE_SAMESITE === 'none' && !cookieSeguro) {
+      contexto.addIssue({
+        code: 'custom',
+        path: ['COOKIE_SECURE'],
+        message: 'COOKIE_SAMESITE=none exige COOKIE_SECURE=true',
+      });
+    }
   });
 
 export type Ambiente = z.infer<typeof esquema>;
@@ -56,6 +86,11 @@ export type Ambiente = z.infer<typeof esquema>;
 export const ambiente: Ambiente = esquema.parse(process.env);
 
 export const cookieSeguro = ambiente.COOKIE_SECURE ?? ambiente.NODE_ENV === 'production';
+
+/** Avisa quando produção roda atrás de proxy sem confiar no encaminhamento de IP. */
+export function deveAvisarTrustProxy(valores: Pick<Ambiente, 'NODE_ENV' | 'TRUST_PROXY'>): boolean {
+  return valores.NODE_ENV === 'production' && !valores.TRUST_PROXY;
+}
 
 /** Origens autorizadas a consumir a API com credenciais (CORS). */
 export const origensPermitidas = [

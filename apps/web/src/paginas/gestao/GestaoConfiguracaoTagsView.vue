@@ -5,15 +5,19 @@ import { useTags } from '@/composables/consultas/useCatalogos';
 import CampoFormulario from '@/componentes/CampoFormulario.vue';
 import Combobox from '@/componentes/Combobox.vue';
 import type { OpcaoCombobox } from '@/componentes/Combobox.vue';
+import ModalBase from '@/componentes/ModalBase.vue';
 import SeletorIcone from '@/componentes/SeletorIcone.vue';
+import ModalConfirmacao from '@/componentes/ModalConfirmacao.vue';
+import EstadoErro from '@/componentes/EstadoErro.vue';
 import type { TagComportamento } from '@/tipos/database';
 
-const { tags: catalogoTags, pendente, recarregar } = useTags();
+const { tags: catalogoTags, pendente, recarregar, erro } = useTags();
 const tags = computed(() => catalogoTags.value);
 const salvando = ref(false);
 const carregando = computed(() => pendente.value || salvando.value);
 const mensagemSucesso = ref<string | null>(null);
 const mensagemErro = ref<string | null>(null);
+const erroModal = ref<string | null>(null);
 
 const modalAberto = ref(false);
 const modoEdicao = ref(false);
@@ -55,6 +59,7 @@ function resetForm() {
 function abrirNovo() {
   resetForm();
   modalAberto.value = true;
+  erroModal.value = null;
 }
 
 function abrirEditar(item: TagComportamento) {
@@ -71,11 +76,11 @@ function abrirEditar(item: TagComportamento) {
 
 function validarPeso(): boolean {
   if (formPeso.value < -50) {
-    mostrarErro('O peso mínimo é -50.');
+    erroModal.value = 'O peso mínimo é -50.';
     return false;
   }
   if (formPeso.value > 50) {
-    mostrarErro('O peso máximo é +50.');
+    erroModal.value = 'O peso máximo é +50.';
     return false;
   }
   return true;
@@ -83,7 +88,7 @@ function validarPeso(): boolean {
 
 async function salvar() {
   if (!formNome.value.trim()) {
-    mostrarErro('Preencha o nome da tag.');
+    erroModal.value = 'Preencha o nome da tag.';
     return;
   }
   if (!validarPeso()) return;
@@ -118,7 +123,7 @@ async function salvar() {
     await recarregar();
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    mostrarErro(msg);
+    erroModal.value = msg;
   } finally {
     salvando.value = false;
   }
@@ -136,10 +141,22 @@ async function alternarAtivo(item: TagComportamento) {
   }
 }
 
-async function excluir(id: string) {
-  const item = tags.value.find((t) => t.id === id);
-  if (!item) return;
-  if (!confirm(`Excluir a tag "${item.nome}"?`)) return;
+const tagParaExcluir = ref<string | null>(null);
+const nomeTagParaExcluir = computed(
+  () => tags.value.find((t) => t.id === tagParaExcluir.value)?.nome ?? '',
+);
+const mensagemExclusaoTag = computed(() =>
+  nomeTagParaExcluir.value ? `Excluir a tag "${nomeTagParaExcluir.value}"?` : '',
+);
+
+function excluir(id: string) {
+  tagParaExcluir.value = id;
+}
+
+async function confirmarExclusao() {
+  const id = tagParaExcluir.value;
+  tagParaExcluir.value = null;
+  if (!id) return;
   try {
     await api(`/api/tags-comportamento/${id}`, { metodo: 'DELETE' });
     mostrarSucesso('Tag excluída.');
@@ -179,7 +196,13 @@ async function excluir(id: string) {
       <button type="button" class="btn-close" @click="mensagemErro = null"></button>
     </div>
 
-    <div v-if="carregando" class="text-center py-4">
+    <EstadoErro
+      v-if="erro"
+      mensagem="Não foi possível carregar as tags."
+      @tentar-novamente="recarregar()"
+    />
+
+    <div v-else-if="carregando" class="text-center py-4">
       <div class="spinner-border text-success" role="status"></div>
     </div>
 
@@ -228,12 +251,17 @@ async function excluir(id: string) {
                   class="form-check-input"
                   type="checkbox"
                   :checked="item.ativo"
+                  :aria-label="`Ativo: ${item.nome}`"
                   @change="alternarAtivo(item)"
                 />
               </div>
             </td>
             <td class="text-end">
-              <button class="btn btn-outline-primary btn-sm me-1" @click="abrirEditar(item)">
+              <button
+                class="btn btn-outline-primary btn-sm me-1"
+                :aria-label="`Editar tag ${item.nome}`"
+                @click="abrirEditar(item)"
+              >
                 <i class="bi bi-pencil"></i>
               </button>
               <button class="btn btn-outline-danger btn-sm" @click="excluir(item.id)">
@@ -250,70 +278,78 @@ async function excluir(id: string) {
       </table>
     </div>
 
-    <div v-if="modalAberto" class="modal d-block" tabindex="-1" @click.self="modalAberto = false">
-      <div class="modal-dialog">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">{{ modoEdicao ? 'Editar' : 'Nova' }} tag</h5>
-            <button type="button" class="btn-close" @click="modalAberto = false"></button>
-          </div>
-          <div class="modal-body">
-            <CampoFormulario id="tag-nome" label="Nome">
-              <input
-                id="tag-nome"
-                v-model="formNome"
-                type="text"
-                class="form-control"
-                placeholder="ex.: agressao_verbal"
-                :disabled="carregando"
-              />
-            </CampoFormulario>
-            <CampoFormulario id="tag-categoria" label="Categoria">
-              <Combobox
-                id="tag-categoria"
-                v-model="formCategoria"
-                :opcoes="categoriaOpcoes"
-                placeholder="Selecione a categoria"
-              />
-            </CampoFormulario>
-            <SeletorIcone v-model="formIcone" :desabilitado="carregando" />
-            <CampoFormulario id="tag-descricao" label="Descrição">
-              <input
-                id="tag-descricao"
-                v-model="formDescricao"
-                type="text"
-                class="form-control"
-                :disabled="carregando"
-              />
-            </CampoFormulario>
-            <CampoFormulario id="tag-peso" label="Peso/pontuação">
-              <input
-                id="tag-peso"
-                v-model.number="formPeso"
-                type="number"
-                class="form-control"
-                :disabled="carregando"
-                min="-50"
-                max="50"
-              />
-            </CampoFormulario>
-            <div class="form-check form-switch mt-3">
-              <input class="form-check-input" type="checkbox" id="tag-ativo" v-model="formAtivo" />
-              <label class="form-check-label" for="tag-ativo">Ativo</label>
-            </div>
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-outline-secondary" @click="modalAberto = false">
-              Cancelar
-            </button>
-            <button type="button" class="btn btn-success" @click="salvar" :disabled="carregando">
-              <span v-if="carregando" class="spinner-border spinner-border-sm me-1"></span>
-              Salvar
-            </button>
-          </div>
-        </div>
+    <ModalBase
+      :visivel="modalAberto"
+      :titulo="(modoEdicao ? 'Editar' : 'Nova') + ' tag'"
+      largura="md"
+      @update:visivel="(aberto) => !aberto && (modalAberto = false)"
+    >
+      <div v-if="erroModal" class="alert alert-danger py-2 small mb-3" role="alert">
+        {{ erroModal }}
       </div>
-    </div>
-    <div v-if="modalAberto" class="modal-backdrop fade show"></div>
+      <CampoFormulario id="tag-nome" label="Nome">
+        <input
+          id="tag-nome"
+          v-model="formNome"
+          type="text"
+          class="form-control"
+          placeholder="ex.: agressao_verbal"
+          :disabled="carregando"
+        />
+      </CampoFormulario>
+      <CampoFormulario id="tag-categoria" label="Categoria">
+        <Combobox
+          id="tag-categoria"
+          v-model="formCategoria"
+          :opcoes="categoriaOpcoes"
+          placeholder="Selecione a categoria"
+        />
+      </CampoFormulario>
+      <SeletorIcone v-model="formIcone" :desabilitado="carregando" />
+      <CampoFormulario id="tag-descricao" label="Descrição">
+        <input
+          id="tag-descricao"
+          v-model="formDescricao"
+          type="text"
+          class="form-control"
+          :disabled="carregando"
+        />
+      </CampoFormulario>
+      <CampoFormulario id="tag-peso" label="Peso/pontuação">
+        <input
+          id="tag-peso"
+          v-model.number="formPeso"
+          type="number"
+          class="form-control"
+          :disabled="carregando"
+          min="-50"
+          max="50"
+        />
+      </CampoFormulario>
+      <div class="form-check form-switch mt-3">
+        <input class="form-check-input" type="checkbox" id="tag-ativo" v-model="formAtivo" />
+        <label class="form-check-label" for="tag-ativo">Ativo</label>
+      </div>
+
+      <template #rodape>
+        <button type="button" class="btn btn-outline-secondary" @click="modalAberto = false">
+          Cancelar
+        </button>
+        <button type="button" class="btn btn-success" @click="salvar" :disabled="carregando">
+          <span v-if="carregando" class="spinner-border spinner-border-sm me-1"></span>
+          Salvar
+        </button>
+      </template>
+    </ModalBase>
   </div>
+
+  <ModalConfirmacao
+    :visivel="!!tagParaExcluir"
+    titulo="Excluir tag"
+    :mensagem="mensagemExclusaoTag"
+    rotulo-confirmar="Excluir"
+    icone="trash"
+    @confirmar="confirmarExclusao"
+    @cancelar="tagParaExcluir = null"
+  />
 </template>

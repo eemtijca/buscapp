@@ -7,7 +7,7 @@ defineProps<{
 </script>
 
 <template>
-  <span class="d-inline-flex align-items-center gap-1">
+  <span class="d-inline-flex align-items-center gap-1" role="status">
     <span
       class="rounded-circle d-inline-block"
       :class="{

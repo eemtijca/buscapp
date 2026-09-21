@@ -85,22 +85,10 @@ export interface Postagem {
 }
 
 export type CorBadge =
-  | 'primary'
-  | 'secondary'
-  | 'success'
-  | 'danger'
-  | 'warning'
-  | 'info'
-  | 'light'
-  | 'dark';
+  'primary' | 'secondary' | 'success' | 'danger' | 'warning' | 'info' | 'light' | 'dark';
 
 export type VarianteBadge =
-  | 'solida'
-  | 'sutil'
-  | 'borda'
-  | 'avatar'
-  | 'removivel'
-  | 'avatar-removivel';
+  'solida' | 'sutil' | 'borda' | 'avatar' | 'removivel' | 'avatar-removivel';
 
 /** Nível de risco calculado a partir do acúmulo de ausências e ocorrências graves. Usado pelo Termômetro de Atenção. */
 export type NivelRisco = 'baixo' | 'medio' | 'alto';
@@ -187,6 +175,7 @@ export interface EstatisticaPainel {
 /** Alerta exibido no painel do responsável. */
 export interface AlertaResponsavel {
   id: string;
+  alunoId: string;
   tipo: 'ausencia_escola' | 'ausencia_aula' | 'suspensao' | 'comunicado';
   titulo: string;
   descricao: string;
@@ -262,11 +251,16 @@ export interface NotificacaoItem {
   rota: string;
 }
 
+/** Janela de atendimento em minutos desde a meia-noite, no fuso da escola. */
+export interface JanelaHorarioProtegido {
+  diaSemana: number; // 0 (Dom) a 6 (Sáb)
+  inicio: number;
+  fim: number;
+}
+
 /** Configuração do horário protegido do canal de diálogo. */
 export interface HorarioProtegido {
-  inicio: string; // formato "HH:MM"
-  fim: string; // formato "HH:MM"
-  diasSemana: number[]; // 0 (Dom) a 6 (Sáb)
+  janelas: JanelaHorarioProtegido[];
   mensagemForaHorario: string;
 }
 

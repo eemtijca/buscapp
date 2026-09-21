@@ -21,6 +21,7 @@ const GestaoUsuarioFormView = () => import('@/paginas/gestao/UsuarioFormView.vue
 const GestaoAlunosView = () => import('@/paginas/gestao/AlunosView.vue');
 const GestaoAlunoFormView = () => import('@/paginas/gestao/AlunoFormView.vue');
 const GestaoCodigosView = () => import('@/paginas/gestao/CodigosView.vue');
+const GestaoAuditoriaView = () => import('@/paginas/gestao/AuditoriaView.vue');
 const GestaoTurmasView = () => import('@/paginas/gestao/TurmasView.vue');
 const AnosLetivosView = () => import('@/paginas/gestao/AnosLetivosView.vue');
 const GestaoDisciplinasView = () => import('@/paginas/gestao/DisciplinasView.vue');
@@ -208,6 +209,12 @@ const router = createRouter({
           name: 'gestao-codigos',
           meta: { requerAutenticacao: true, papeisPermitidos: ['gestao'], titulo: 'Códigos' },
           component: GestaoCodigosView,
+        },
+        {
+          path: 'auditoria',
+          name: 'gestao-auditoria',
+          meta: { requerAutenticacao: true, papeisPermitidos: ['gestao'], titulo: 'Auditoria' },
+          component: GestaoAuditoriaView,
         },
         {
           path: 'turmas',

@@ -32,6 +32,12 @@ As decisões estruturais ficam registradas como ADRs (Architecture Decision Reco
 - [ADR-006: mesma origem e perfis de implantação](adr/006-same-origin-e-perfis.md)
 - [ADR-007: sonda de sessão sem 401 em GET /api/auth/me](adr/007-sonda-de-sessao-sem-401.md)
 - [ADR-008: cache de dados do cliente com IndexedDB e ETag](adr/008-cache-de-dados-cliente.md)
+- [ADR-009: RLS e privilégios de coluna nas tabelas administrativas](adr/009-rls-e-privilegios-administrativos.md)
+- [ADR-010: rate limiting no Postgres e pub/sub com fallback](adr/010-rate-limiting-e-pubsub-com-fallback.md)
+- [ADR-011: fuso horário da escola no servidor](adr/011-fuso-horario-da-escola.md)
+- [ADR-012: cabeçalhos de segurança e verificação de origem](adr/012-cabecalhos-de-seguranca-e-origem.md)
+- [ADR-013: retenção e expurgo agendado](adr/013-retencao-e-expurgo-agendado.md)
+- [ADR-014: exportação e anonimização de dados do titular](adr/014-lgpd-exportacao-e-anonimizacao.md)
 
 Novas decisões seguem o formato descrito em [../CONTRIBUTING.md](../CONTRIBUTING.md).
 

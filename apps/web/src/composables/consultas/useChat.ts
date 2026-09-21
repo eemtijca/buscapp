@@ -1,4 +1,4 @@
-import { computed, type ComputedRef, type Ref } from 'vue';
+import { computed, ref, shallowRef, watch, type ComputedRef, type Ref } from 'vue';
 import { api } from '@/servicos/api';
 import { invalidarChave, invalidarTabela } from '@/servicos/cache';
 import { Consultas } from '@/servicos/consultas';
@@ -7,6 +7,9 @@ import { avatarCor, safeDate } from '@/utils/chatUtils';
 import { iniciaisDoNome } from '@/utils/datas';
 import type { ContatoChat, MensagemChat } from '@/tipos/componentes';
 import type { ConversaApi, MensagemApi } from '@/tipos/api';
+
+/** Mesmo tamanho de página usado pela API para o cursor de mensagens. */
+const LIMITE_MENSAGENS = 50;
 
 function contatoDeConversa(conversa: ConversaApi, nomeContato: string): ContatoChat {
   const ultima = conversa.ultima_mensagem;
@@ -125,6 +128,9 @@ export function useConversaDetalhe(
   contato: ComputedRef<ContatoChat | null>;
   mensagens: ComputedRef<MensagemChat[]>;
   pendente: Ref<boolean>;
+  temAnteriores: Ref<boolean>;
+  carregandoAnteriores: Ref<boolean>;
+  carregarAnteriores: () => Promise<void>;
   recarregar: () => Promise<void>;
 } {
   const consultaConversas = useConsulta(() => Consultas.conversas());
@@ -132,6 +138,41 @@ export function useConversaDetalhe(
     ...Consultas.mensagens(conversaId() ?? ''),
     habilitado: Boolean(conversaId()),
   }));
+
+  // Mensagens anteriores carregadas por cursor ficam fora do cache, acumuladas localmente.
+  const anteriores = shallowRef<MensagemApi[]>([]);
+  const carregandoAnteriores = ref(false);
+  const temAnteriores = ref(true);
+
+  watch(conversaId, () => {
+    anteriores.value = [];
+    temAnteriores.value = true;
+  });
+
+  async function carregarAnteriores(): Promise<void> {
+    const id = conversaId();
+    if (!id || carregandoAnteriores.value) return;
+
+    const carregadas = [...anteriores.value, ...(consultaMensagens.dados.value?.mensagens ?? [])];
+    const maisAntiga = carregadas[0];
+    if (!maisAntiga) {
+      temAnteriores.value = false;
+      return;
+    }
+
+    carregandoAnteriores.value = true;
+    try {
+      const resposta = await api<{ mensagens: MensagemApi[] }>(`/api/conversas/${id}/mensagens`, {
+        parametros: { limite: LIMITE_MENSAGENS, cursor: maisAntiga.id },
+      });
+      anteriores.value = [...resposta.mensagens, ...anteriores.value];
+      if (resposta.mensagens.length < LIMITE_MENSAGENS) temAnteriores.value = false;
+    } catch (erro) {
+      console.error('[useChat] Erro ao carregar mensagens anteriores:', erro);
+    } finally {
+      carregandoAnteriores.value = false;
+    }
+  }
 
   const contato = computed<ContatoChat | null>(() => {
     const id = conversaId();
@@ -144,34 +185,39 @@ export function useConversaDetalhe(
   });
 
   const mensagens = computed<MensagemChat[]>(() =>
-    (consultaMensagens.dados.value?.mensagens ?? []).map((mensagem: MensagemApi) => {
-      const data = safeDate(mensagem.created_at);
-      const autor = mensagem.autor;
-      return {
-        id: mensagem.id,
-        conversaId: mensagem.conversa_id,
-        remetenteId: mensagem.remetente_id,
-        autor: autor?.papel ?? 'gestao',
-        nomeAutor: autor?.nome ?? (mensagem.is_system_message ? 'Sistema' : 'Equipe escolar'),
-        texto: mensagem.conteudo,
-        horario: data.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-        data: data.toLocaleDateString('pt-BR', {
-          day: '2-digit',
-          month: '2-digit',
-          year: 'numeric',
-        }),
-        dataIso: mensagem.created_at,
-        isSistema: mensagem.is_system_message,
-        minha: mensagem.remetente_id === usuarioId(),
-        lida: mensagem.lida_em !== null,
-      };
-    }),
+    [...anteriores.value, ...(consultaMensagens.dados.value?.mensagens ?? [])].map(
+      (mensagem: MensagemApi) => {
+        const data = safeDate(mensagem.created_at);
+        const autor = mensagem.autor;
+        return {
+          id: mensagem.id,
+          conversaId: mensagem.conversa_id,
+          remetenteId: mensagem.remetente_id,
+          autor: autor?.papel ?? 'gestao',
+          nomeAutor: autor?.nome ?? (mensagem.is_system_message ? 'Sistema' : 'Equipe escolar'),
+          texto: mensagem.conteudo,
+          horario: data.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+          data: data.toLocaleDateString('pt-BR', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+          }),
+          dataIso: mensagem.created_at,
+          isSistema: mensagem.is_system_message,
+          minha: mensagem.remetente_id === usuarioId(),
+          lida: mensagem.lida_em !== null,
+        };
+      },
+    ),
   );
 
   return {
     contato,
     mensagens,
     pendente: computed(() => consultaMensagens.pendente.value),
+    temAnteriores,
+    carregandoAnteriores,
+    carregarAnteriores,
     recarregar: () =>
       Promise.all([consultaConversas.recarregar(true), consultaMensagens.recarregar(true)]).then(
         () => undefined,

@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { useAutenticacao } from '@/composables/useAutenticacao';
 import { traduzirErro } from '@/utils/traduzirErro';
 
 const router = useRouter();
+const route = useRoute();
 const { usuario, login } = useAutenticacao();
 
 const email = ref('');
@@ -20,6 +21,12 @@ const homePorPapel: Record<string, string> = {
   responsavel: '/responsavel',
 };
 
+/** Aceita apenas caminhos internos, evitando redirecionamento aberto via `?destino=`. */
+function destinoSeguro(valor: unknown): string | null {
+  if (typeof valor !== 'string' || !valor.startsWith('/') || valor.startsWith('//')) return null;
+  return valor;
+}
+
 async function handleLogin(): Promise<void> {
   if (!email.value.trim() || !senha.value.trim()) {
     erro.value = 'Preencha o email e a senha para continuar.';
@@ -34,8 +41,11 @@ async function handleLogin(): Promise<void> {
 
     // Após o login o perfil já está carregado em usuario.value pelo composable.
     const papel = usuario.value?.papel;
+    const destino = destinoSeguro(route.query.destino);
 
-    if (papel && homePorPapel[papel]) {
+    if (destino) {
+      await router.replace(destino);
+    } else if (papel && homePorPapel[papel]) {
       // Redireciona com base no papel do usuário
       await router.push(homePorPapel[papel]);
     } else {

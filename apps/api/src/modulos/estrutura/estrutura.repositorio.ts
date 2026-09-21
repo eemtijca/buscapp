@@ -33,6 +33,8 @@ export async function listarTurmas(filtro: FiltroTurmas, consulta: ListarTurmas)
       ...(consulta.ano_letivo_id ? { ano_letivo_id: consulta.ano_letivo_id } : {}),
     },
     orderBy: { nome_completo: 'asc' },
+    take: consulta.limite,
+    skip: consulta.offset,
   });
 }
 
@@ -109,6 +111,8 @@ export async function listarDisciplinas(consulta: ListarDisciplinas) {
   return prisma.disciplinas.findMany({
     where: consulta.ativo !== undefined ? { ativo: consulta.ativo } : {},
     orderBy: { nome: 'asc' },
+    take: consulta.limite,
+    skip: consulta.offset,
   });
 }
 
@@ -158,6 +162,8 @@ export async function listarAtribuicoes(consulta: ListarAtribuicoes) {
       disciplinas: { select: { id: true, nome: true } },
     },
     orderBy: { created_at: 'desc' },
+    take: consulta.limite,
+    skip: consulta.offset,
   });
 }
 
@@ -328,6 +334,8 @@ export async function listarEnturmacoes(
       anos_letivos: { select: { id: true, ano: true } },
     },
     orderBy: { created_at: 'desc' },
+    take: consulta.limite,
+    skip: consulta.offset,
   });
 }
 
@@ -348,7 +356,10 @@ export async function buscarAlunoPorId(id: string) {
 }
 
 export async function buscarPerfilPorId(id: string) {
-  return prisma.perfis.findUnique({ where: { id } });
+  return prisma.perfis.findUnique({
+    where: { id },
+    select: { id: true, papel: true, status: true },
+  });
 }
 
 export interface DadosEnturmacao {

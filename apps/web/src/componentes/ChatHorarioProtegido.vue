@@ -14,6 +14,8 @@ const props = withDefaults(
     podeEnviar?: boolean;
     mostrarBotaoVoltar?: boolean;
     mostrarBotaoFechar?: boolean;
+    temMensagensAnteriores?: boolean;
+    carregandoAnteriores?: boolean;
   }>(),
   {
     mensagemForaHorario: '',
@@ -23,6 +25,8 @@ const props = withDefaults(
     podeEnviar: true,
     mostrarBotaoVoltar: false,
     mostrarBotaoFechar: false,
+    temMensagensAnteriores: false,
+    carregandoAnteriores: false,
   },
 );
 
@@ -30,6 +34,7 @@ const emit = defineEmits<{
   'enviar-mensagem': [texto: string];
   voltar: [];
   'fechar-conversa': [];
+  'carregar-anteriores': [];
 }>();
 
 const texto = ref('');
@@ -50,7 +55,11 @@ function submeter() {
   if (!texto.value.trim() || props.enviando || !props.podeEnviar) return;
   emit('enviar-mensagem', texto.value.trim());
   texto.value = '';
-  nextTick(() => autoResize());
+  nextTick(() => {
+    autoResize();
+    // Mantém o foco no campo após o envio, que agora usa `readonly` em vez de `disabled`.
+    textareaRef.value?.focus();
+  });
 }
 
 const grupos = computed(() => agruparPorData(props.mensagens));
@@ -60,15 +69,18 @@ const cabecalhoSubtitulo = computed(() => {
   return props.horarioAtivo ? 'Online agora' : 'Fora do horário escolar';
 });
 
-async function rolarParaBaixo() {
+async function rolarParaBaixo(forcar = false) {
   await nextTick();
-  if (contenedorMensagens.value) {
-    contenedorMensagens.value.scrollTop = contenedorMensagens.value.scrollHeight;
-  }
+  const container = contenedorMensagens.value;
+  if (!container) return;
+
+  // Só rola quando o usuário já está no fim da conversa.
+  const distanciaDoFim = container.scrollHeight - container.scrollTop - container.clientHeight;
+  if (forcar || distanciaDoFim < 120) container.scrollTop = container.scrollHeight;
 }
 
 watch(
-  () => props.mensagens.length,
+  () => [props.mensagens.length, props.mensagens[props.mensagens.length - 1]?.id],
   () => rolarParaBaixo(),
   { immediate: true },
 );
@@ -127,6 +139,24 @@ watch(
       aria-live="polite"
       aria-label="Histórico de mensagens"
     >
+      <div v-if="temMensagensAnteriores" class="text-center mb-2">
+        <button
+          type="button"
+          class="btn btn-sm btn-outline-secondary"
+          :disabled="carregandoAnteriores"
+          @click="emit('carregar-anteriores')"
+        >
+          <span
+            v-if="carregandoAnteriores"
+            class="spinner-border spinner-border-sm me-1"
+            role="status"
+            aria-hidden="true"
+          ></span>
+          <i v-else class="bi bi-arrow-up-circle me-1" aria-hidden="true"></i>
+          Carregar mensagens anteriores
+        </button>
+      </div>
+
       <div v-if="!grupos.length" class="text-body-secondary text-center my-auto py-4">
         <span
           class="d-inline-flex align-items-center justify-content-center rounded-circle bg-body-tertiary mb-3"
@@ -207,10 +237,12 @@ watch(
             :placeholder="
               podeEnviar ? 'Digite sua mensagem...' : 'Envio bloqueado fora do horário escolar'
             "
-            :disabled="!podeEnviar || enviando"
+            :disabled="!podeEnviar"
+            :readonly="enviando"
             :aria-disabled="!podeEnviar"
+            :aria-busy="enviando"
             @input="autoResize"
-            @keydown.enter.prevent="submeter"
+            @keydown.enter.exact.prevent="submeter"
             style="
               resize: none;
               min-height: 31px;

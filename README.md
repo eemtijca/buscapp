@@ -24,7 +24,7 @@ Plataforma web de gestão escolar para acompanhar frequência, ocorrências, jus
 
 ### Módulo gestão
 
-- Painel com ranking de turmas e infrequências, a partir do termômetro de risco.
+- Painel com ranking de priorização de risco dos alunos e infrequências, a partir do termômetro de risco.
 - Central de ocorrências, com confirmação de presença do responsável e registro pela própria gestão.
 - Fila de justificativas, com aceite que auto-justifica as frequências ou recusa com parecer.
 - Gestão de usuários, códigos, alunos, turmas, anos letivos, disciplinas, atribuições e enturmações.

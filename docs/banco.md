@@ -27,14 +27,19 @@ Nunca edite uma migração já aplicada. Crie uma nova com `prisma migrate dev`.
 
 ## Migrações
 
-| Migração                                 | Conteúdo                                                                       |
-| ---------------------------------------- | ------------------------------------------------------------------------------ |
-| `20260913000000_baseline`                | 31 tabelas de domínio, 14 enums, índices, FKs, CHECKs, `pgcrypto` e `pg_trgm`. |
-| `20260913000100_autenticacao`            | `perfis.senha_hash`, tabela `sessoes` e `codigos_redefinicao.codigo_hash`.     |
-| `20260913000200_dados_canonicos`         | Configuração inicial, catálogos, horários, tags, disciplinas e ano letivo.     |
-| `20260913000300_rotinas_dominio`         | Funções e triggers de domínio.                                                 |
-| `20260913000400_rls_backstop`            | Papel `buscapp_api`, funções auxiliares e políticas RLS.                       |
-| `20260913000500_corrige_politica_anexos` | Correção da política de leitura de `anexos`.                                   |
+| Migração                                         | Conteúdo                                                                                               |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
+| `20260913000000_baseline`                        | 31 tabelas de domínio, 14 enums, índices, FKs, CHECKs, `pgcrypto` e `pg_trgm`.                         |
+| `20260913000100_autenticacao`                    | `perfis.senha_hash`, `perfis.senha_alterada_em`, tabela `sessoes` e `codigos_redefinicao.codigo_hash`. |
+| `20260913000200_dados_canonicos`                 | Configuração inicial, catálogos, horários, tags, disciplinas e ano letivo.                             |
+| `20260913000300_rotinas_dominio`                 | Funções e triggers de domínio.                                                                         |
+| `20260913000400_rls_backstop`                    | Papel `buscapp_api`, funções auxiliares e políticas RLS.                                               |
+| `20260913000500_corrige_politica_anexos`         | Correção da política de leitura de `anexos`.                                                           |
+| `20260920215818_rate_limit_contadores`           | Tabela de contadores do rate limiting.                                                                 |
+| `20260920223000_integridade_anos_anexos_codigos` | Unicidade do ano ativo, do `storage_path` e do código ativo; triggers de enturmação.                   |
+| `20260920224500_indices_catalogos`               | Índices B-tree e GIN para contagens de catálogo.                                                       |
+| `20260920230000_rls_tabelas_administrativas`     | RLS e privilégios de coluna em `perfis`, `configuracoes_sistema`, `auditoria` e `codigos_redefinicao`. |
+| `20260920231500_dedupe_notificacoes`             | `notificacoes.dedupe_key` e índice único parcial por pendência.                                        |
 
 O container aplica as migrações na partida pelo entrypoint. Em produção, o workflow `migracoes.yml` aplica e em seguida define a senha do papel. Ver [deploy.md](deploy.md).
 
@@ -43,10 +48,11 @@ O container aplica as migrações na partida pelo entrypoint. Em produção, o w
 - O dono do schema (`postgres` no Supabase, `buscapp` no Compose) é usado por migrações, seed, fixtures e pelas rotinas administrativas da API (tabelas `sessoes`, `codigos_redefinicao` e `codigos_redefinicao_tentativas`, por exemplo). O dono não sofre RLS.
 - O papel `buscapp_api` é criado pela migração de backstop com `login` e sem `bypassrls`. Recebe permissões nas tabelas, sequências e funções auxiliares. A senha nunca fica na migração: é aplicada por `infra/docker/role.mjs` a partir de `APP_DB_PASSWORD`.
 - A API usa `DATABASE_URL` com `buscapp_api`. Cada operação de modelo roda em uma transação curta que executa `select set_config('app.usuario_id', $1, true)`, permitindo que as políticas leiam o usuário da requisição. O helper `comEscopo()` faz o mesmo em transações explícitas.
-- As funções auxiliares (`app_usuario_id`, `app_papel`, `app_modulos`, `app_is_gestao`, `app_professor_da_turma` e `app_aluno_visivel`) são `security definer` e concentram as regras das políticas.
+- Listagens que combinam escopo e dados (alunos, frequências, ocorrências, registros de comportamento, justificativas, enturmações, vínculos e conversas) chamam `comEscopo()` e resolvem tudo em **uma única transação por requisição**: o cliente Prisma reutiliza a transação corrente registrada no `contextoBanco`. `contarTransacoesExecutadas()` expõe o contador usado pelo teste de regressão.
+- As funções auxiliares (`app_usuario_id`, `app_papel`, `app_modulos`, `app_is_gestao`, `app_professor_da_turma` e `app_aluno_visivel`) concentram as regras das políticas. Apenas `app_usuario_id` é `stable` sem `security definer`; as demais cinco são `security definer`.
 - Tabelas com RLS e políticas: `alunos`, `enturmacoes`, `vinculos_responsaveis`, `frequencias`, `registros_comportamento`, `registro_comportamento_tags`, `ocorrencias`, `ocorrencia_anexos`, `justificativas_faltas`, `justificativa_anexos`, `anexos`, `conversas`, `mensagens`, `notificacoes`, `turmas`, `disciplinas`, `anos_letivos`, `atribuicoes_professores`, `opcoes_configuracao`, `horarios_letivos`, `tags_comportamento`, `monitoramento_acoes`, `pontuacao_turmas`, `importacoes_log`, `exportacoes` e `convites`.
-- `sessoes` tem RLS habilitado sem política, de propósito: o acesso é feito pelo cliente administrativo.
-- `perfis`, `auditoria`, `codigos_redefinicao`, `codigos_redefinicao_tentativas` e `configuracoes_sistema` não têm RLS e são acessados pelo papel administrativo.
+- `sessoes` tem RLS habilitado com a política `negado_para_runtime`, de propósito: o acesso é feito pelo cliente administrativo.
+- `perfis`, `auditoria`, `codigos_redefinicao`, `codigos_redefinicao_tentativas` e `configuracoes_sistema` também usam o cliente administrativo nos fluxos de autenticação e auditoria. Desde o ADR-009, `perfis` e `configuracoes_sistema` têm RLS com leitura autenticada e escrita da gestão, enquanto `auditoria` e `codigos_redefinicao` são restritas à gestão. O papel de runtime não lê `senha_hash` por privilégio de coluna.
 
 A autorização efetiva é a camada de serviços da API; a RLS é a segunda barreira. Ver [seguranca.md](seguranca.md) e [ADR-003](adr/003-rls-backstop.md).
 
@@ -60,15 +66,17 @@ Funções de domínio:
 - `fn_set_turma_nome`: preenche `turmas.nome_completo` a partir de série e letra.
 - `fn_set_updated_at`: mantém `updated_at` nas tabelas que o possuem.
 - `fn_chave_catalogo_valida`, `fn_chaves_catalogo_validas` e `fn_tags_validas`: validam chaves de catálogo e tags nas restrições CHECK.
+- `fn_validar_enturmacao_ano`: impede enturmação fora do ano letivo da turma.
+- `fn_proteger_ano_da_turma`: impede mudar o ano letivo de uma turma com enturmações.
 
-São 29 triggers, incluindo os quatro de domínio e o `trg_set_updated_at` presente nas tabelas com `updated_at`.
+São 31 triggers, incluindo os seis de domínio e o `trg_set_updated_at` presente nas tabelas com `updated_at`.
 
 ## Índices
 
 - `idx_alunos_nome_trgm`: GIN com trigrama para busca por nome.
 - `idx_frequencias_unicidade`: unicidade parcial por aluno, data, tipo, período e disciplina quando `deleted_at is null`.
 - `idx_anexos_expurgo`: parcial para anexos ainda não expurgados.
-- Índices parciais de status ativo e de idempotência por `client_request_id` em frequências, mensagens e registros de comportamento.
+- Índices parciais de status ativo; índices únicos totais de idempotência por `client_request_id` em frequências, mensagens e registros de comportamento.
 - `idx_pontuacao_ranking`: ranking mensal por turma.
 
 ## Seeds
@@ -77,11 +85,12 @@ São 29 triggers, incluindo os quatro de domínio e o `trg_set_updated_at` prese
 
 ## Retenção
 
-Hoje a retenção é declarativa:
+A retenção é aplicada por `POST /api/tarefas/expurgo`, autenticado por `CRON_SECRET` e agendado externamente (pelo agendador do provedor, por chamada HTTP externa ou pelo GitHub Actions):
 
-- `anexos.expurgo_em` tem padrão de 30 dias e `anexos.expurgado_em` existe no schema, mas nenhuma rotina grava o expurgo.
-- `configuracoes_sistema.dias_expurgo_anexos` e `dias_retencao_codigos` são parâmetros editáveis, sem tarefa agendada que os aplique.
-- `POST /api/codigos/limpar` remove códigos usados, expirados e revogados manualmente, sem considerar a janela de retenção.
+- Anexos vencidos têm o objeto removido do storage e o registro excluído; `dias_expurgo_anexos` define a data de expurgo na criação.
+- Códigos usados, revogados ou expirados além de `dias_retencao_codigos` são removidos, junto das tentativas antigas.
+- Sessões encerradas ou expiradas há mais de 7 dias são removidas.
+- Contadores de rate limiting expirados são removidos.
 - Frequências usam soft delete (`deleted_at`); mensagens têm `deleted_at` e `edited_at`.
 
 O servidor não possui cron nem `pg_cron`. Qualquer rotina de expurgo futuro deve ser agendado externamente. Ver [operacao.md](operacao.md).

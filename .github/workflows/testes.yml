@@ -1,4 +1,4 @@
-name: Testes
+name: Testes de integração (Compose)
 
 on:
   push:
@@ -14,14 +14,17 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24
           cache: npm
 
       - run: npm ci
+
+      - name: Gera o cliente Prisma
+        run: npm run db:generate
 
       # Sobe app + PostgreSQL, aplica as migrações no entrypoint e valida a saúde da API.
       - run: docker compose up -d --build
@@ -38,6 +41,17 @@ jobs:
           echo "API não respondeu no tempo esperado."
           docker compose logs app
           exit 1
+
+      # Integração da API e unidade do cache contra o PostgreSQL e o Redis do Compose.
+      - name: Roda os testes de unidade e integração
+        env:
+          NODE_ENV: test
+          AUTH_PEPPER: dev-pepper-local-com-mais-de-16-caracteres
+          DATABASE_URL: postgresql://buscapp_api:buscapp_api@127.0.0.1:5433/buscapp
+          MIGRATE_DATABASE_URL: postgresql://buscapp:buscapp@127.0.0.1:5433/buscapp
+          REDIS_URL: redis://127.0.0.1:6379
+          STORAGE_DRIVER: disco
+        run: npm run test:unit
 
       - name: Exibe os logs em caso de falha
         if: failure()

@@ -3,11 +3,15 @@ import type {
   Conversa,
   CriarConversa,
   EnviarMensagem,
+  ListarMensagens,
   Mensagem,
   PapelAutorMensagem,
 } from '@buscapp/contratos';
 import type { PerfilAutenticado } from '../../nucleo/autenticacao/tipos.js';
+import { ambiente } from '../../ambiente.js';
+import { comEscopo, prisma } from '../../nucleo/banco/cliente.js';
 import { publicarEvento } from '../../nucleo/eventos/barramento.js';
+import { partesNaEscola } from '../../nucleo/tempo/fuso.js';
 import {
   ErroHttp,
   erroNaoAutorizado,
@@ -22,6 +26,7 @@ import {
   buscarEnturmacaoAtiva,
   buscarMensagemForaHorario,
   buscarMensagemPorClientRequestId,
+  buscarResponsavelValido,
   buscarVinculoAtivo,
   contarNaoLidas,
   criarConversa,
@@ -94,41 +99,32 @@ function minutosDoHorario(data: Date): number {
 }
 
 /**
- * Verifica se o horário atual (fuso do servidor) está dentro de alguma janela ativa.
+ * Verifica se o horário atual no fuso da escola está dentro de alguma janela ativa.
  * Sem nenhum horário cadastrado assume a janela escolar padrão; com janelas cadastradas
  * mas todas inativas o canal fica sempre bloqueado.
  */
-export function horarioPermitido(horarios: HorarioBruto[], agora: Date = new Date()): boolean {
-  const dia = agora.getDay();
-  const minutos = agora.getHours() * 60 + agora.getMinutes();
+export function horarioPermitido(
+  horarios: HorarioBruto[],
+  agora: Date = new Date(),
+  fuso: string = ambiente.TZ_ESCOLA,
+): boolean {
+  const { diaSemana, minutos } = partesNaEscola(agora, fuso);
 
   if (!horarios.length) {
     return (
-      HORARIO_PADRAO.dias.includes(dia) &&
+      HORARIO_PADRAO.dias.includes(diaSemana) &&
       minutos >= HORARIO_PADRAO.inicio &&
       minutos <= HORARIO_PADRAO.fim
     );
   }
 
-  const ativos = horarios.filter((horario) => horario.ativo);
-  if (!ativos.length) return false;
-
-  const dias = [...new Set(ativos.map((horario) => horario.dia_semana))].sort((a, b) => a - b);
-  const primeiroDia = dias[0]!;
-  const ultimoDia = dias[dias.length - 1]!;
-  const inicio = Math.min(
-    ...ativos
-      .filter((horario) => horario.dia_semana === primeiroDia)
-      .map((horario) => minutosDoHorario(horario.hora_inicio)),
+  return horarios.some(
+    (horario) =>
+      horario.ativo &&
+      horario.dia_semana === diaSemana &&
+      minutos >= minutosDoHorario(horario.hora_inicio) &&
+      minutos <= minutosDoHorario(horario.hora_fim),
   );
-  const fim = Math.max(
-    ...ativos
-      .filter((horario) => horario.dia_semana === ultimoDia)
-      .map((horario) => minutosDoHorario(horario.hora_fim)),
-  );
-
-  if (!dias.includes(dia)) return false;
-  return minutos >= inicio && minutos <= fim;
 }
 
 function paraConversa(
@@ -190,6 +186,28 @@ async function hidratar(conversas: ConversaBruta[], usuarioId: string): Promise<
   );
 }
 
+/** Participantes da conversa (responsável, gestão ativa e professores da turma). */
+async function destinatariosDaConversa(conversa: ConversaBruta): Promise<string[]> {
+  const [gestao, professores] = await Promise.all([
+    prisma.perfis.findMany({
+      where: { papel: 'gestao', status: 'ativo' },
+      select: { id: true },
+    }),
+    prisma.atribuicoes_professores.findMany({
+      where: { turma_id: conversa.turma_id, ativo: true },
+      select: { professor_id: true },
+    }),
+  ]);
+
+  return [
+    ...new Set([
+      conversa.responsavel_id,
+      ...gestao.map((perfil) => perfil.id),
+      ...professores.map((atribuicao) => atribuicao.professor_id),
+    ]),
+  ];
+}
+
 async function participa(usuario: PerfilAutenticado, conversa: ConversaBruta): Promise<boolean> {
   if (usuario.papel === 'gestao') return true;
   if (usuario.papel === 'responsavel') return conversa.responsavel_id === usuario.id;
@@ -217,7 +235,13 @@ async function resolverResponsavel(
   dados: CriarConversa,
 ): Promise<string> {
   if (usuario.papel === 'gestao') {
-    if (dados.responsavel_id) return dados.responsavel_id;
+    if (dados.responsavel_id) {
+      const responsavel = await buscarResponsavelValido(dados.responsavel_id, dados.aluno_id);
+      if (!responsavel) {
+        throw erroValidacao('Responsável inválido ou sem vínculo ativo com o aluno.');
+      }
+      return dados.responsavel_id;
+    }
     const contato = await buscarContatoPrioritario(dados.aluno_id);
     if (!contato) throw erroValidacao('O aluno não possui responsável vinculado.');
     return contato.responsavel_id;
@@ -237,16 +261,21 @@ async function resolverResponsavel(
   return usuario.id;
 }
 
-export async function listar(usuario: PerfilAutenticado): Promise<Conversa[]> {
-  const filtro =
-    usuario.papel === 'gestao'
-      ? {}
-      : usuario.papel === 'responsavel'
-        ? { responsavel_id: usuario.id }
-        : { turma_id: { in: await listarTurmasDoProfessor(usuario.id) } };
+export async function listar(
+  usuario: PerfilAutenticado,
+  consulta: { limite?: number; offset?: number } = {},
+): Promise<Conversa[]> {
+  return comEscopo(async () => {
+    const filtro =
+      usuario.papel === 'gestao'
+        ? {}
+        : usuario.papel === 'responsavel'
+          ? { responsavel_id: usuario.id }
+          : { turma_id: { in: await listarTurmasDoProfessor(usuario.id) } };
 
-  const conversas = await listarConversas(filtro);
-  return hidratar(conversas, usuario.id);
+    const conversas = await listarConversas({ ...filtro, ...consulta });
+    return hidratar(conversas, usuario.id);
+  });
 }
 
 export interface ResultadoCriacaoConversa {
@@ -297,12 +326,16 @@ export async function criar(
 export async function listarMensagens(
   usuario: PerfilAutenticado,
   conversaId: string,
+  consulta: ListarMensagens,
 ): Promise<Mensagem[]> {
   const conversa = await buscarConversaPorId(conversaId);
   if (!conversa) throw erroNaoEncontrado('Conversa não encontrada.');
 
   await garantirParticipacao(usuario, conversa);
-  const mensagens = await buscarMensagens(conversaId);
+  const mensagens = await buscarMensagens(conversaId, {
+    limite: consulta.limite,
+    cursor: consulta.cursor,
+  });
   return mensagens.map(paraMensagem);
 }
 
@@ -344,8 +377,9 @@ export async function enviarMensagem(
 
     await registrarMensagemNaConversa(conversaId, new Date());
 
-    publicarEvento({ tabela: 'mensagens', escopo: { conversa_id: conversaId } });
-    publicarEvento({ tabela: 'conversas' });
+    const destinatarios = await destinatariosDaConversa(conversa);
+    publicarEvento({ tabela: 'mensagens', escopo: { conversa_id: conversaId }, destinatarios });
+    publicarEvento({ tabela: 'conversas', destinatarios });
 
     return { mensagem: paraMensagem(mensagem), criada: true };
   } catch (erro) {
@@ -368,7 +402,11 @@ export async function marcarLidas(usuario: PerfilAutenticado, conversaId: string
 
   const atualizadas = await marcarMensagensLidas(conversaId, usuario.id, new Date());
   if (atualizadas > 0) {
-    publicarEvento({ tabela: 'mensagens', escopo: { conversa_id: conversaId } });
+    publicarEvento({
+      tabela: 'mensagens',
+      escopo: { conversa_id: conversaId },
+      destinatarios: await destinatariosDaConversa(conversa),
+    });
   }
   return atualizadas;
 }
@@ -385,7 +423,7 @@ export async function atualizar(
   await garantirParticipacao(usuario, conversa);
 
   const atualizada = await atualizarConversaAtiva(conversaId, dados.ativa);
-  publicarEvento({ tabela: 'conversas' });
+  publicarEvento({ tabela: 'conversas', destinatarios: await destinatariosDaConversa(conversa) });
 
   const [hidratada] = await hidratar([atualizada], usuario.id);
   return hidratada!;

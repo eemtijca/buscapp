@@ -9,7 +9,8 @@ import {
 } from '@/composables/consultas/useGestaoUsuarios';
 import { useOpcoes, useTurmas } from '@/composables/consultas/useCatalogos';
 import { useFormSnapshot } from '@/composables/useFormSnapshot';
-import { api } from '@/servicos/api';
+import { api, ErroApi } from '@/servicos/api';
+import { hojeIso } from '@/utils/datas';
 import type { UsuarioApi } from '@/tipos/api';
 import {
   mensagemSucesso as criarMensagemSucesso,
@@ -20,6 +21,7 @@ import Combobox from '@/componentes/Combobox.vue';
 import type { OpcaoCombobox } from '@/componentes/Combobox.vue';
 import GrupoCheckbox from '@/componentes/GrupoCheckbox.vue';
 import ModalConfirmacao from '@/componentes/ModalConfirmacao.vue';
+import { formatarData } from '@/utils/datas';
 import type { Enturmacao, VinculoResponsavel } from '@/tipos/database';
 
 interface EnturmacaoApi {
@@ -132,6 +134,9 @@ const mensagemSucesso = ref<string | null>(null);
 const mensagemErro = ref<string | null>(null);
 const confirmarSalvar = ref(false);
 const confirmarCancelar = ref(false);
+const confirmarAnonimizacao = ref(false);
+const exportandoDados = ref(false);
+const anonimizandoDados = ref(false);
 const rotaPendente = ref<((v?: boolean) => void) | null>(null);
 let timerSucesso: ReturnType<typeof setTimeout> | null = null;
 
@@ -268,7 +273,7 @@ watch(
 );
 
 function hoje() {
-  return new Date().toISOString().slice(0, 10);
+  return hojeIso();
 }
 
 function mostrarErro(msg: string) {
@@ -281,6 +286,51 @@ function mostrarSucesso(msg: string) {
   if (timerSucesso) clearTimeout(timerSucesso);
   mensagemSucesso.value = msg;
   timerSucesso = setTimeout(() => (mensagemSucesso.value = null), 6000);
+}
+
+/** Exporta o pacote de dados do titular em JSON (direito de acesso da LGPD). */
+async function exportarDadosTitular() {
+  if (!alunoId.value) return;
+  exportandoDados.value = true;
+  try {
+    const dados = await api<Record<string, unknown>>(`/api/lgpd/alunos/${alunoId.value}/exportar`);
+    const blob = new Blob([JSON.stringify(dados, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `dados-aluno-${alunoId.value}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    mostrarSucesso('Exportação gerada.');
+  } catch (falha) {
+    mostrarErro(
+      falha instanceof ErroApi ? falha.message : 'Não foi possível exportar os dados do aluno.',
+    );
+  } finally {
+    exportandoDados.value = false;
+  }
+}
+
+/** Anonimiza os dados pessoais e remove os anexos; ação irreversível. */
+async function anonimizarDados() {
+  if (!alunoId.value) return;
+  confirmarAnonimizacao.value = false;
+  anonimizandoDados.value = true;
+  try {
+    await api(`/api/lgpd/alunos/${alunoId.value}/anonimizar`, {
+      metodo: 'POST',
+      corpo: { confirmar: true },
+    });
+    await router.push('/gestao/alunos');
+  } catch (falha) {
+    mostrarErro(
+      falha instanceof ErroApi ? falha.message : 'Não foi possível anonimizar os dados do aluno.',
+    );
+  } finally {
+    anonimizandoDados.value = false;
+  }
 }
 
 async function carregarEnturmacao() {
@@ -341,11 +391,27 @@ async function carregarVinculos() {
   }
 }
 
-async function salvarAlterarEnturmacao() {
+const confirmacaoEnturmacao = ref(false);
+const novaTurmaNome = computed(
+  () => turmas.value.find((turma) => turma.id === novaTurmaId.value)?.nome_completo ?? '',
+);
+const mensagemEnturmacao = computed(() => {
+  const destino = novaTurmaNome.value || 'outra turma';
+  return turmaAtualNome.value
+    ? `A matrícula atual em ${turmaAtualNome.value} será encerrada e o aluno passará para ${destino}. Continuar?`
+    : `O aluno será matriculado em ${destino}. Continuar?`;
+});
+
+function salvarAlterarEnturmacao() {
   if (!novaTurmaId.value || !novaDataMatricula.value || !alunoId.value) {
     mostrarErro('Selecione a turma e a data de matrícula.');
     return;
   }
+  confirmacaoEnturmacao.value = true;
+}
+
+async function confirmarAlteracaoEnturmacao() {
+  confirmacaoEnturmacao.value = false;
   salvando.value = true;
   try {
     // O servidor reutiliza a linha do ano letivo (unicidade de aluno e ano) ou
@@ -939,7 +1005,7 @@ async function salvar() {
             <span class="fw-medium">Turma:</span> {{ turmaAtualNome }}
             <br />
             <span class="fw-medium">Matrícula em:</span>
-            {{ new Date(enturmacaoAtual.data_matricula).toLocaleDateString('pt-BR') }}
+            {{ formatarData(enturmacaoAtual.data_matricula) }}
           </p>
           <p v-else class="mb-2 small text-body-secondary">Aluno não enturmado.</p>
 
@@ -1098,9 +1164,10 @@ async function salvar() {
                 <input
                   id="campoNovoRespTelefone"
                   v-model="novoRespTelefone"
-                  type="text"
+                  type="tel"
+                  inputmode="tel"
+                  autocomplete="tel"
                   class="form-control form-control-sm"
-                  autocomplete="off"
                 />
               </CampoFormulario>
               <CampoFormulario id="campoNovoTipoVinculo" label="Tipo de vínculo">
@@ -1142,27 +1209,64 @@ async function salvar() {
         </div>
       </div>
 
-      <div class="d-flex gap-2 justify-content-end">
-        <button
-          type="button"
-          class="btn btn-sm btn-outline-secondary"
-          :disabled="salvando"
-          @click="formDirty ? (confirmarCancelar = true) : router.push('/gestao/alunos')"
-        >
-          Cancelar
-        </button>
-        <button type="submit" class="btn btn-sm btn-success" :disabled="salvando">
-          <span
-            v-if="salvando"
-            class="spinner-border spinner-border-sm me-1"
-            role="status"
-            aria-hidden="true"
-          ></span>
-          <i v-else class="bi bi-check-lg me-1" aria-hidden="true"></i>
-          {{ modoEdicao ? 'Salvar alterações' : 'Criar aluno' }}
-        </button>
+      <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center">
+        <div v-if="modoEdicao && alunoId" class="d-flex flex-wrap gap-2">
+          <button
+            type="button"
+            class="btn btn-sm btn-outline-secondary"
+            :disabled="exportandoDados"
+            @click="exportarDadosTitular"
+          >
+            <span
+              v-if="exportandoDados"
+              class="spinner-border spinner-border-sm me-1"
+              role="status"
+              aria-hidden="true"
+            ></span>
+            <i v-else class="bi bi-download me-1" aria-hidden="true"></i>
+            Exportar dados
+          </button>
+          <button
+            type="button"
+            class="btn btn-sm btn-outline-danger"
+            @click="confirmarAnonimizacao = true"
+          >
+            <i class="bi bi-person-x me-1" aria-hidden="true"></i>
+            Anonimizar dados
+          </button>
+        </div>
+        <div class="d-flex gap-2 ms-auto">
+          <button
+            type="button"
+            class="btn btn-sm btn-outline-secondary"
+            :disabled="salvando"
+            @click="formDirty ? (confirmarCancelar = true) : router.push('/gestao/alunos')"
+          >
+            Cancelar
+          </button>
+          <button type="submit" class="btn btn-sm btn-success" :disabled="salvando">
+            <span
+              v-if="salvando"
+              class="spinner-border spinner-border-sm me-1"
+              role="status"
+              aria-hidden="true"
+            ></span>
+            <i v-else class="bi bi-check-lg me-1" aria-hidden="true"></i>
+            {{ modoEdicao ? 'Salvar alterações' : 'Criar aluno' }}
+          </button>
+        </div>
       </div>
     </form>
+    <ModalConfirmacao
+      :visivel="confirmarAnonimizacao"
+      titulo="Anonimizar dados do aluno"
+      mensagem="Esta ação é irreversível: os dados pessoais serão anonimizados e os anexos removidos, mantendo apenas as frequências para estatística. Deseja continuar?"
+      rotulo-confirmar="Anonimizar"
+      icone="person-x"
+      variante="danger"
+      @confirmar="anonimizarDados"
+      @cancelar="confirmarAnonimizacao = false"
+    />
     <ModalConfirmacao
       :visivel="confirmarSalvar"
       titulo="Salvar aluno"
@@ -1184,4 +1288,15 @@ async function salvar() {
       @cancelar="cancelarDescarte"
     />
   </div>
+
+  <ModalConfirmacao
+    :visivel="confirmacaoEnturmacao"
+    titulo="Alterar enturmação"
+    :mensagem="mensagemEnturmacao"
+    rotulo-confirmar="Alterar"
+    icone="arrow-left-right"
+    variante="warning"
+    @confirmar="confirmarAlteracaoEnturmacao"
+    @cancelar="confirmacaoEnturmacao = false"
+  />
 </template>

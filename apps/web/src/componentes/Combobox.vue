@@ -174,6 +174,11 @@ function aoTeclar(event: KeyboardEvent) {
       if (opcao) selecionar(opcao);
     }
   } else if (event.key === 'Escape') {
+    // Com a lista aberta, o Escape fecha apenas o combobox e não o modal que o contém.
+    if (aberto.value) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
     fechar();
     sincronizarTexto();
   }
@@ -208,7 +213,7 @@ const classeInput = computed(() => [
         :placeholder="placeholder"
         :disabled="desabilitado"
         :required="obrigatorio"
-        :aria-label="ariaLabel || placeholder"
+        :aria-label="ariaLabel"
         role="combobox"
         :aria-expanded="aberto"
         :aria-controls="idLista"
@@ -252,7 +257,7 @@ const classeInput = computed(() => [
         :placeholder="placeholder"
         :disabled="desabilitado"
         :required="obrigatorio"
-        :aria-label="ariaLabel || placeholder"
+        :aria-label="ariaLabel"
         role="combobox"
         :aria-expanded="aberto"
         :aria-controls="idLista"

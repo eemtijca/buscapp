@@ -8,7 +8,6 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   alternar: [alunoId: string];
-  'registrar-ausencia-periodo': [alunoId: string];
 }>();
 
 const classesCartao = computed(() =>
@@ -73,18 +72,6 @@ const inicialAluno = computed(() =>
         <span class="d-none d-sm-inline ms-1">
           {{ aluno.ausente ? 'Ausente' : 'Presente' }}
         </span>
-      </button>
-    </div>
-
-    <div class="card-footer bg-transparent border-top-0 pt-0 pb-3 px-3">
-      <button
-        type="button"
-        class="btn btn-link btn-sm text-decoration-none p-0 text-warning-emphasis"
-        :aria-label="'Registrar ausência em aula específica para ' + aluno.nome"
-        @click="emit('registrar-ausencia-periodo', aluno.id)"
-      >
-        <i class="bi bi-clock me-1" aria-hidden="true"></i>
-        Registrar ausência em aula
       </button>
     </div>
   </div>

@@ -3,6 +3,7 @@ import type {
   AtualizarHorarioLetivo,
   AtualizarOpcaoConfiguracao,
   AtualizarTagComportamento,
+  ConfiguracaoPublica,
   ConfiguracaoSistema,
   CriarHorarioLetivo,
   CriarOpcaoConfiguracao,
@@ -21,6 +22,7 @@ import type {
   tags_comportamento,
 } from '../../../generated/prisma/client.js';
 import { publicarEvento } from '../../nucleo/eventos/barramento.js';
+import { ambiente } from '../../ambiente.js';
 import { ErroHttp, erroNaoEncontrado } from '../../nucleo/http/erros.js';
 import {
   atualizarConfiguracao,
@@ -84,6 +86,7 @@ export function paraConfiguracao(row: configuracoes_sistema): ConfiguracaoSistem
     janela_positivo_dias: row.janela_positivo_dias,
     bonus_presenca_confirmada: numero(row.bonus_presenca_confirmada),
     updated_at: row.updated_at.toISOString(),
+    fuso_horario: ambiente.TZ_ESCOLA,
   };
 }
 
@@ -205,6 +208,19 @@ export async function obterConfiguracao(): Promise<ConfiguracaoSistema> {
   return paraConfiguracao(configuracao);
 }
 
+/** Subconjunto visível a todos os perfis, sem os parâmetros operacionais. */
+export async function obterConfiguracaoPublica(): Promise<ConfiguracaoPublica> {
+  const {
+    dias_expurgo_anexos: _expurgo,
+    minutos_validade_codigo: _validade,
+    max_tentativas_codigo: _tentativas,
+    minutos_bloqueio_codigo: _bloqueio,
+    dias_retencao_codigos: _retencao,
+    ...publica
+  } = await obterConfiguracao();
+  return publica;
+}
+
 export async function atualizarConfiguracaoSistema(
   dados: AtualizarConfiguracaoSistema,
 ): Promise<ConfiguracaoSistema> {
@@ -286,12 +302,24 @@ export async function listarHorariosLetivos(): Promise<HorarioLetivo[]> {
 
 export async function criarHorarioLetivo(dados: CriarHorarioLetivo): Promise<HorarioLetivo> {
   validarIntervalo(dados.hora_inicio, dados.hora_fim);
-  const criado = await criarHorario({
-    dia_semana: dados.dia_semana,
-    hora_inicio: paraDataHora(dados.hora_inicio),
-    hora_fim: paraDataHora(dados.hora_fim),
-    ativo: dados.ativo,
-  });
+  let criado;
+  try {
+    criado = await criarHorario({
+      dia_semana: dados.dia_semana,
+      hora_inicio: paraDataHora(dados.hora_inicio),
+      hora_fim: paraDataHora(dados.hora_fim),
+      ativo: dados.ativo,
+    });
+  } catch (erro) {
+    if ((erro as { code?: string }).code === 'P2002') {
+      throw new ErroHttp(
+        409,
+        'horario_duplicado',
+        'Já existe um horário com este dia e intervalo.',
+      );
+    }
+    throw erro;
+  }
   publicarEvento({ tabela: 'horarios_letivos' });
   return paraHorario(criado);
 }
@@ -307,12 +335,24 @@ export async function atualizarHorarioLetivo(
   const horaFim = dados.hora_fim ?? paraHora(existente.hora_fim);
   validarIntervalo(horaInicio, horaFim);
 
-  const atualizado = await atualizarHorario(id, {
-    ...(dados.dia_semana !== undefined ? { dia_semana: dados.dia_semana } : {}),
-    ...(dados.hora_inicio !== undefined ? { hora_inicio: paraDataHora(dados.hora_inicio) } : {}),
-    ...(dados.hora_fim !== undefined ? { hora_fim: paraDataHora(dados.hora_fim) } : {}),
-    ...(dados.ativo !== undefined ? { ativo: dados.ativo } : {}),
-  });
+  let atualizado;
+  try {
+    atualizado = await atualizarHorario(id, {
+      ...(dados.dia_semana !== undefined ? { dia_semana: dados.dia_semana } : {}),
+      ...(dados.hora_inicio !== undefined ? { hora_inicio: paraDataHora(dados.hora_inicio) } : {}),
+      ...(dados.hora_fim !== undefined ? { hora_fim: paraDataHora(dados.hora_fim) } : {}),
+      ...(dados.ativo !== undefined ? { ativo: dados.ativo } : {}),
+    });
+  } catch (erro) {
+    if ((erro as { code?: string }).code === 'P2002') {
+      throw new ErroHttp(
+        409,
+        'horario_duplicado',
+        'Já existe um horário com este dia e intervalo.',
+      );
+    }
+    throw erro;
+  }
   publicarEvento({ tabela: 'horarios_letivos' });
   return paraHorario(atualizado);
 }

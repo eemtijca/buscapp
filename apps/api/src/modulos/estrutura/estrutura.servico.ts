@@ -21,6 +21,7 @@ import type {
 } from '@buscapp/contratos';
 import type { PerfilAutenticado } from '../../nucleo/autenticacao/tipos.js';
 import { filtroAlunosVisiveis, podeVerAluno } from '../../nucleo/autorizacao/escopo.js';
+import { comEscopo } from '../../nucleo/banco/cliente.js';
 import { publicarEvento } from '../../nucleo/eventos/barramento.js';
 import { ErroHttp, erroNaoEncontrado, erroValidacao } from '../../nucleo/http/erros.js';
 import {
@@ -392,7 +393,16 @@ export async function atualizarAnoLetivo(
 }
 
 export async function ativarAnoLetivo(id: string, usuarioId: string): Promise<AnoLetivo> {
-  const resultado = await executarAtivacaoAnoLetivo(id, usuarioId);
+  let resultado;
+  try {
+    resultado = await executarAtivacaoAnoLetivo(id, usuarioId);
+  } catch (erro) {
+    // O índice único do ano ativo impede duas viradas concorrentes.
+    if ((erro as { code?: string }).code === 'P2002') {
+      throw new ErroHttp(409, 'virada_concorrente', 'Outro ano letivo foi ativado em paralelo.');
+    }
+    throw erro;
+  }
 
   if (resultado.tipo === 'nao_encontrado') throw erroNaoEncontrado('Ano letivo não encontrado.');
   if (resultado.tipo === 'ja_ativo') throw erroValidacao('Este ano letivo já está ativo.');
@@ -424,15 +434,17 @@ export async function listarEnturmacoes(
   usuario: PerfilAutenticado,
   consulta: ListarEnturmacoes,
 ): Promise<Enturmacao[]> {
-  if (consulta.aluno_id && !(await podeVerAluno(usuario, consulta.aluno_id))) {
-    // Fora do escopo responde 404 para não revelar a existência do registro.
-    throw erroNaoEncontrado('Aluno não encontrado.');
-  }
+  return comEscopo(async () => {
+    if (consulta.aluno_id && !(await podeVerAluno(usuario, consulta.aluno_id))) {
+      // Fora do escopo responde 404 para não revelar a existência do registro.
+      throw erroNaoEncontrado('Aluno não encontrado.');
+    }
 
-  const filtro = await filtroAlunosVisiveis(usuario);
-  const alunoIdsVisiveis = filtro.id?.in ?? null;
-  const enturmacoes = await listarEnturmacoesNoBanco(consulta, alunoIdsVisiveis);
-  return enturmacoes.map(paraEnturmacao);
+    const filtro = await filtroAlunosVisiveis(usuario);
+    const alunoIdsVisiveis = filtro.id?.in ?? null;
+    const enturmacoes = await listarEnturmacoesNoBanco(consulta, alunoIdsVisiveis);
+    return enturmacoes.map(paraEnturmacao);
+  });
 }
 
 export async function criarEnturmacao(dados: CriarEnturmacao): Promise<Enturmacao> {
@@ -442,13 +454,25 @@ export async function criarEnturmacao(dados: CriarEnturmacao): Promise<Enturmaca
   const turma = await buscarTurmaPorId(dados.turma_id);
   if (!turma) throw erroNaoEncontrado('Turma não encontrada.');
 
-  const enturmacao = await enturmarAluno({
-    aluno_id: dados.aluno_id,
-    turma_id: dados.turma_id,
-    ano_letivo_id: turma.ano_letivo_id,
-    data_matricula: dados.data_matricula ? dataDeEntrada(dados.data_matricula) : hojeUtc(),
-    observacoes: dados.observacoes ?? null,
-  });
+  let enturmacao;
+  try {
+    enturmacao = await enturmarAluno({
+      aluno_id: dados.aluno_id,
+      turma_id: dados.turma_id,
+      ano_letivo_id: turma.ano_letivo_id,
+      data_matricula: dados.data_matricula ? dataDeEntrada(dados.data_matricula) : hojeUtc(),
+      observacoes: dados.observacoes ?? null,
+    });
+  } catch (erro) {
+    if ((erro as { code?: string }).code === 'P2002') {
+      throw new ErroHttp(
+        409,
+        'enturmacao_duplicada',
+        'O aluno já possui enturmação neste ano letivo.',
+      );
+    }
+    throw erro;
+  }
 
   publicarEvento({ tabela: 'enturmacoes' });
   return paraEnturmacao(enturmacao);

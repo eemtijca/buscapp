@@ -79,7 +79,9 @@ export const rotasUsuarios: FastifyPluginAsyncZod = async (app) => {
         response: { 200: z.object({ usuario: usuarioSchema }) },
       },
     },
-    async (pedido) => ({ usuario: await atualizar(pedido.params.id, pedido.body) }),
+    async (pedido) => ({
+      usuario: await atualizar(pedido.params.id, pedido.body, usuarioAtual(pedido).id),
+    }),
   );
 
   app.patch(

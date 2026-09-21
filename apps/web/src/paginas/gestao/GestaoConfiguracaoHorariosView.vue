@@ -5,6 +5,9 @@ import { useHorariosLetivos } from '@/composables/consultas/useCatalogos';
 import CampoFormulario from '@/componentes/CampoFormulario.vue';
 import Combobox from '@/componentes/Combobox.vue';
 import type { OpcaoCombobox } from '@/componentes/Combobox.vue';
+import ModalBase from '@/componentes/ModalBase.vue';
+import ModalConfirmacao from '@/componentes/ModalConfirmacao.vue';
+import EstadoErro from '@/componentes/EstadoErro.vue';
 import type { HorarioLetivo } from '@/tipos/database';
 
 const diasSemana = [
@@ -17,11 +20,12 @@ const diasSemana = [
   { valor: 6, rotulo: 'Sábado' },
 ];
 
-const { horarios, pendente, recarregar } = useHorariosLetivos();
+const { horarios, pendente, recarregar, erro } = useHorariosLetivos();
 const salvando = ref(false);
 const carregando = computed(() => pendente.value || salvando.value);
 const mensagemSucesso = ref<string | null>(null);
 const mensagemErro = ref<string | null>(null);
+const erroModal = ref<string | null>(null);
 
 const modalAberto = ref(false);
 const modoEdicao = ref(false);
@@ -61,6 +65,7 @@ function resetForm() {
 function abrirNovo() {
   resetForm();
   modalAberto.value = true;
+  erroModal.value = null;
 }
 
 function abrirEditar(item: HorarioLetivo) {
@@ -75,7 +80,7 @@ function abrirEditar(item: HorarioLetivo) {
 
 async function salvar() {
   if (formFim.value <= formInicio.value) {
-    mostrarErro('O horário de fim deve ser posterior ao de início.');
+    erroModal.value = 'O horário de fim deve ser posterior ao de início.';
     return;
   }
   salvando.value = true;
@@ -106,8 +111,7 @@ async function salvar() {
     modalAberto.value = false;
     await recarregar();
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    mostrarErro(msg);
+    erroModal.value = e instanceof Error ? e.message : String(e);
   } finally {
     salvando.value = false;
   }
@@ -125,8 +129,16 @@ async function alternarAtivo(item: HorarioLetivo) {
   }
 }
 
+const horarioParaExcluir = ref<string | null>(null);
+
 async function excluir(id: string) {
-  if (!confirm('Excluir este horário?')) return;
+  horarioParaExcluir.value = id;
+}
+
+async function confirmarExclusao() {
+  const id = horarioParaExcluir.value;
+  horarioParaExcluir.value = null;
+  if (!id) return;
   try {
     await api(`/api/horarios/${id}`, { metodo: 'DELETE' });
     mostrarSucesso('Horário excluído.');
@@ -171,7 +183,13 @@ async function excluir(id: string) {
       <button type="button" class="btn-close" @click="mensagemErro = null"></button>
     </div>
 
-    <div v-if="carregando" class="text-center py-4">
+    <EstadoErro
+      v-if="erro"
+      mensagem="Não foi possível carregar os horários."
+      @tentar-novamente="recarregar()"
+    />
+
+    <div v-else-if="carregando" class="text-center py-4">
       <div class="spinner-border text-success" role="status"></div>
     </div>
 
@@ -203,12 +221,17 @@ async function excluir(id: string) {
                   class="form-check-input"
                   type="checkbox"
                   :checked="item.ativo"
+                  :aria-label="`Ativo: ${item.dia_semana} ${item.hora_inicio}`"
                   @change="alternarAtivo(item)"
                 />
               </div>
             </td>
             <td class="text-end">
-              <button class="btn btn-outline-primary btn-sm me-1" @click="abrirEditar(item)">
+              <button
+                class="btn btn-outline-primary btn-sm me-1"
+                :aria-label="`Editar horário de ${item.hora_inicio} às ${item.hora_fim}`"
+                @click="abrirEditar(item)"
+              >
                 <i class="bi bi-pencil"></i>
               </button>
               <button class="btn btn-outline-danger btn-sm" @click="excluir(item.id)">
@@ -225,57 +248,65 @@ async function excluir(id: string) {
       </table>
     </div>
 
-    <div v-if="modalAberto" class="modal d-block" tabindex="-1" @click.self="modalAberto = false">
-      <div class="modal-dialog">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">{{ modoEdicao ? 'Editar' : 'Novo' }} horário</h5>
-            <button type="button" class="btn-close" @click="modalAberto = false"></button>
-          </div>
-          <div class="modal-body">
-            <CampoFormulario id="hr-dia" label="Dia da semana">
-              <Combobox
-                id="hr-dia"
-                v-model="formDiaStr"
-                :opcoes="diasOpcoes"
-                placeholder="Selecione o dia"
-              />
-            </CampoFormulario>
-            <CampoFormulario id="hr-inicio" label="Início">
-              <input
-                id="hr-inicio"
-                v-model="formInicio"
-                type="time"
-                class="form-control"
-                :disabled="carregando"
-              />
-            </CampoFormulario>
-            <CampoFormulario id="hr-fim" label="Fim">
-              <input
-                id="hr-fim"
-                v-model="formFim"
-                type="time"
-                class="form-control"
-                :disabled="carregando"
-              />
-            </CampoFormulario>
-            <div class="form-check form-switch mt-3">
-              <input class="form-check-input" type="checkbox" id="hr-ativo" v-model="formAtivo" />
-              <label class="form-check-label" for="hr-ativo">Ativo</label>
-            </div>
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-outline-secondary" @click="modalAberto = false">
-              Cancelar
-            </button>
-            <button type="button" class="btn btn-success" @click="salvar" :disabled="carregando">
-              <span v-if="carregando" class="spinner-border spinner-border-sm me-1"></span>
-              Salvar
-            </button>
-          </div>
-        </div>
+    <ModalBase
+      :visivel="modalAberto"
+      :titulo="(modoEdicao ? 'Editar' : 'Novo') + ' horário'"
+      largura="md"
+      @update:visivel="(aberto) => !aberto && (modalAberto = false)"
+    >
+      <div v-if="erroModal" class="alert alert-danger py-2 small mb-3" role="alert">
+        {{ erroModal }}
       </div>
-    </div>
-    <div v-if="modalAberto" class="modal-backdrop fade show"></div>
+      <CampoFormulario id="hr-dia" label="Dia da semana">
+        <Combobox
+          id="hr-dia"
+          v-model="formDiaStr"
+          :opcoes="diasOpcoes"
+          placeholder="Selecione o dia"
+        />
+      </CampoFormulario>
+      <CampoFormulario id="hr-inicio" label="Início">
+        <input
+          id="hr-inicio"
+          v-model="formInicio"
+          type="time"
+          class="form-control"
+          :disabled="carregando"
+        />
+      </CampoFormulario>
+      <CampoFormulario id="hr-fim" label="Fim">
+        <input
+          id="hr-fim"
+          v-model="formFim"
+          type="time"
+          class="form-control"
+          :disabled="carregando"
+        />
+      </CampoFormulario>
+      <div class="form-check form-switch mt-3">
+        <input class="form-check-input" type="checkbox" id="hr-ativo" v-model="formAtivo" />
+        <label class="form-check-label" for="hr-ativo">Ativo</label>
+      </div>
+
+      <template #rodape>
+        <button type="button" class="btn btn-outline-secondary" @click="modalAberto = false">
+          Cancelar
+        </button>
+        <button type="button" class="btn btn-success" @click="salvar" :disabled="carregando">
+          <span v-if="carregando" class="spinner-border spinner-border-sm me-1"></span>
+          Salvar
+        </button>
+      </template>
+    </ModalBase>
   </div>
+
+  <ModalConfirmacao
+    :visivel="!!horarioParaExcluir"
+    titulo="Excluir horário"
+    mensagem="Excluir este horário?"
+    rotulo-confirmar="Excluir"
+    icone="trash"
+    @confirmar="confirmarExclusao"
+    @cancelar="horarioParaExcluir = null"
+  />
 </template>

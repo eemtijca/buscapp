@@ -21,7 +21,7 @@ O retorno é feito pelo próprio canal do GitHub. Vulnerabilidades confirmadas s
 - Códigos de redefinição de 6 dígitos guardados apenas como HMAC, com expiração, uso único e bloqueio por tentativas.
 - Isolamento por papel, módulo e escopo na API, com RLS como segunda barreira no banco.
 - Anexos com autorização por criador ou aluno visível, download autenticado e limite de tamanho.
-- Dependências atualizadas via Dependabot para o ecossistema de devcontainers.
+- Dependências e Actions atualizadas via Dependabot nos ecossistemas npm, GitHub Actions, Docker e devcontainers.
 
 ## Fora de escopo
 
@@ -31,4 +31,4 @@ O retorno é feito pelo próprio canal do GitHub. Vulnerabilidades confirmadas s
 
 ## Detalhes e lacunas conhecidas
 
-O detalhamento dos controles, incluindo ausência de CSRF explícito, de limite de tentativas por IP e de cabeçalhos de segurança, está em [docs/seguranca.md](docs/seguranca.md).
+O detalhamento dos controles, incluindo a ausência de token CSRF explícito, está em [docs/seguranca.md](docs/seguranca.md).

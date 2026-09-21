@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { uuidSchema } from './comuns.js';
+import { paginacaoSchema, uuidSchema } from './comuns.js';
 
 /** Tipos de decaimento aceitos para o cálculo do termômetro. */
 export const decaimentoOcorrenciaTipoSchema = z.enum(['nenhum', 'janela', 'exponencial']);
@@ -38,9 +38,24 @@ export const configuracaoSistemaSchema = z.object({
   janela_positivo_dias: z.number().int(),
   bonus_presenca_confirmada: z.number(),
   updated_at: z.string(),
+  fuso_horario: z.string(),
 });
 
 export type ConfiguracaoSistema = z.infer<typeof configuracaoSistemaSchema>;
+
+/**
+ * Subconjunto exposto a todos os perfis: parâmetros do termômetro, escola, fuso e
+ * mensagem fora de horário. Os parâmetros operacionais ficam restritos à gestão.
+ */
+export const configuracaoPublicaSchema = configuracaoSistemaSchema.omit({
+  dias_expurgo_anexos: true,
+  minutos_validade_codigo: true,
+  max_tentativas_codigo: true,
+  minutos_bloqueio_codigo: true,
+  dias_retencao_codigos: true,
+});
+
+export type ConfiguracaoPublica = z.infer<typeof configuracaoPublicaSchema>;
 
 export const atualizarConfiguracaoSistemaSchema = z.object({
   escola_nome: z.string().trim().min(1, 'Informe o nome da escola.').max(100).optional(),
@@ -107,6 +122,7 @@ export type AtualizarOpcaoConfiguracao = z.infer<typeof atualizarOpcaoConfigurac
 export const listarOpcoesConfiguracaoSchema = z.object({
   tipo: z.string().trim().min(1).optional(),
   ativo: booleanoTexto.optional(),
+  ...paginacaoSchema.shape,
 });
 
 export type ListarOpcoesConfiguracao = z.infer<typeof listarOpcoesConfiguracaoSchema>;
@@ -207,6 +223,7 @@ export type AtualizarStatusTagComportamento = z.infer<typeof atualizarStatusTagC
 
 export const listarTagsComportamentoSchema = z.object({
   ativo: booleanoTexto.optional(),
+  ...paginacaoSchema.shape,
 });
 
 export type ListarTagsComportamento = z.infer<typeof listarTagsComportamentoSchema>;

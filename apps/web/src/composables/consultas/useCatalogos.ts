@@ -1,7 +1,9 @@
 import { computed, onScopeDispose, ref, type ComputedRef, type Ref } from 'vue';
 import { useConsulta } from '@/composables/useConsulta';
+import { useAutenticacao } from '@/composables/useAutenticacao';
 import { Consultas } from '@/servicos/consultas';
 import { CONFIG_TERMOMETRO_PADRAO, type ConfigTermometro } from '@/servicos/termometro';
+import { FUSO_HORARIO_PADRAO, partesNoFuso } from '@/utils/datas';
 import type {
   AnoLetivo,
   ConfiguracaoSistema,
@@ -55,6 +57,7 @@ export function configTermometroDe(
 export function useOpcoes(tipo: () => string): {
   opcoes: ComputedRef<OpcaoCheckbox[]>;
   pendente: Ref<boolean>;
+  erro: Ref<unknown>;
   garantirDados: () => Promise<void>;
   recarregar: () => Promise<void>;
 } {
@@ -74,6 +77,7 @@ export function useOpcoes(tipo: () => string): {
   return {
     opcoes,
     pendente: consulta.pendente,
+    erro: consulta.erro,
     // Aguarda a primeira leitura quando ainda não há dados, sem forçar revalidação.
     garantirDados: () => consulta.recarregar(false),
     recarregar: () => consulta.recarregar(true),
@@ -84,6 +88,7 @@ export function useOpcoes(tipo: () => string): {
 export function useTags(): {
   tags: ComputedRef<TagComportamento[]>;
   pendente: Ref<boolean>;
+  erro: Ref<unknown>;
   recarregar: () => Promise<void>;
 } {
   const consulta = useConsulta(() => Consultas.tags());
@@ -91,6 +96,7 @@ export function useTags(): {
   return {
     tags,
     pendente: consulta.pendente,
+    erro: consulta.erro,
     recarregar: () => consulta.recarregar(true),
   };
 }
@@ -99,6 +105,7 @@ export function useTags(): {
 export function useTurmas(filtros?: () => Record<string, string | undefined>): {
   turmas: ComputedRef<Turma[]>;
   pendente: Ref<boolean>;
+  erro: Ref<unknown>;
   recarregar: () => Promise<void>;
 } {
   const consulta = useConsulta(() => Consultas.turmas(filtros?.()));
@@ -110,6 +117,7 @@ export function useTurmas(filtros?: () => Record<string, string | undefined>): {
   return {
     turmas,
     pendente: consulta.pendente,
+    erro: consulta.erro,
     recarregar: () => consulta.recarregar(true),
   };
 }
@@ -118,6 +126,7 @@ export function useTurmas(filtros?: () => Record<string, string | undefined>): {
 export function useDisciplinas(filtros?: () => Record<string, string | undefined>): {
   disciplinas: ComputedRef<Disciplina[]>;
   pendente: Ref<boolean>;
+  erro: Ref<unknown>;
   recarregar: () => Promise<void>;
 } {
   const consulta = useConsulta(() => Consultas.disciplinas(filtros?.()));
@@ -127,6 +136,7 @@ export function useDisciplinas(filtros?: () => Record<string, string | undefined
   return {
     disciplinas,
     pendente: consulta.pendente,
+    erro: consulta.erro,
     recarregar: () => consulta.recarregar(true),
   };
 }
@@ -150,6 +160,7 @@ export function useAnosLetivos(): {
 export function useHorariosLetivos(): {
   horarios: ComputedRef<HorarioLetivo[]>;
   pendente: Ref<boolean>;
+  erro: Ref<unknown>;
   recarregar: () => Promise<void>;
 } {
   const consulta = useConsulta(() => Consultas.horarios());
@@ -157,6 +168,7 @@ export function useHorariosLetivos(): {
   return {
     horarios,
     pendente: consulta.pendente,
+    erro: consulta.erro,
     recarregar: () => consulta.recarregar(true),
   };
 }
@@ -165,6 +177,7 @@ export function useHorariosLetivos(): {
 export function useOpcoesConfiguracao(tipo: () => string): {
   opcoes: ComputedRef<OpcaoConfiguracao[]>;
   pendente: Ref<boolean>;
+  erro: Ref<unknown>;
   recarregar: () => Promise<void>;
 } {
   const consulta = useConsulta(() => ({
@@ -177,6 +190,7 @@ export function useOpcoesConfiguracao(tipo: () => string): {
   return {
     opcoes,
     pendente: consulta.pendente,
+    erro: consulta.erro,
     recarregar: () => consulta.recarregar(true),
   };
 }
@@ -196,20 +210,29 @@ export function useConfiguracaoSistema(): {
   configuracao: ComputedRef<ConfiguracaoSistema | undefined>;
   configTermometro: ComputedRef<ConfigTermometro>;
   mensagemForaHorario: ComputedRef<string>;
+  fusoHorario: ComputedRef<string>;
   pendente: Ref<boolean>;
   recarregar: () => Promise<void>;
 } {
-  const consulta = useConsulta(() => Consultas.configuracoes());
+  const { usuario } = useAutenticacao();
+  const consulta = useConsulta(() => {
+    // A gestão recebe os parâmetros operacionais; os demais perfis, apenas o subconjunto público.
+    return usuario.value?.papel === 'gestao'
+      ? Consultas.configuracoes()
+      : Consultas.configuracoesPublicas();
+  });
   const configuracao = computed(() => consulta.dados.value?.configuracao);
   const configTermometro = computed(() => configTermometroDe(configuracao.value));
   const mensagemForaHorario = computed(
     () => configuracao.value?.mensagem_fora_horario || MENSAGEM_FORA_HORARIO_PADRAO,
   );
+  const fusoHorario = computed(() => configuracao.value?.fuso_horario || FUSO_HORARIO_PADRAO);
 
   return {
     configuracao,
     configTermometro,
     mensagemForaHorario,
+    fusoHorario,
     pendente: consulta.pendente,
     recarregar: () => consulta.recarregar(true),
   };
@@ -221,41 +244,36 @@ function derivarHorario(
 ): HorarioProtegido {
   if (!horarios.length) {
     return {
-      inicio: '07:00',
-      fim: '17:00',
-      diasSemana: [1, 2, 3, 4, 5],
+      janelas: [1, 2, 3, 4, 5].map((diaSemana) => ({
+        diaSemana,
+        inicio: 7 * 60,
+        fim: 17 * 60,
+      })),
       mensagemForaHorario,
     };
   }
 
-  const janelas = horarios.filter((horario) => horario.ativo);
-  if (!janelas.length) {
-    return { inicio: '23:59', fim: '23:59', diasSemana: [], mensagemForaHorario };
-  }
+  const janelas = horarios
+    .filter((horario) => horario.ativo)
+    .map((horario) => ({
+      diaSemana: horario.dia_semana,
+      inicio: minutosDeHora(horario.hora_inicio),
+      fim: minutosDeHora(horario.hora_fim),
+    }));
 
-  const dias = [...new Set(janelas.map((janela) => janela.dia_semana))].sort();
-  const horasInicio =
-    janelas
-      .filter((janela) => janela.dia_semana === dias[0])
-      .map((janela) => janela.hora_inicio.slice(0, 5))
-      .sort()[0] ?? '07:00';
-  const horasFim =
-    janelas
-      .filter((janela) => janela.dia_semana === dias[dias.length - 1])
-      .map((janela) => janela.hora_fim.slice(0, 5))
-      .sort()
-      .reverse()[0] ?? '17:00';
-
-  return { inicio: horasInicio, fim: horasFim, diasSemana: dias, mensagemForaHorario };
+  return { janelas, mensagemForaHorario };
 }
 
-function janelaAberta(horario: HorarioProtegido, agora: Date): boolean {
-  if (!horario.diasSemana.includes(agora.getDay())) return false;
+function minutosDeHora(hora: string): number {
+  const [horas = '0', minutos = '0'] = hora.slice(0, 5).split(':');
+  return Number(horas) * 60 + Number(minutos);
+}
 
-  const minutosTotais = agora.getHours() * 60 + agora.getMinutes();
-  const [hInicio = 0, mInicio = 0] = horario.inicio.split(':').map(Number);
-  const [hFim = 0, mFim = 0] = horario.fim.split(':').map(Number);
-  return minutosTotais >= hInicio * 60 + mInicio && minutosTotais <= hFim * 60 + mFim;
+function janelaAberta(horario: HorarioProtegido, agora: Date, fuso: string): boolean {
+  const { diaSemana, minutos } = partesNoFuso(agora, fuso);
+  return horario.janelas.some(
+    (janela) => janela.diaSemana === diaSemana && minutos >= janela.inicio && minutos <= janela.fim,
+  );
 }
 
 /** Horário protegido do canal de diálogo, com estado de janela aberta atualizado a cada minuto. */
@@ -265,7 +283,7 @@ export function useHorarioProtegido(): {
   pendente: Ref<boolean>;
 } {
   const consultaHorarios = useConsulta(() => Consultas.horarios());
-  const { mensagemForaHorario } = useConfiguracaoSistema();
+  const { mensagemForaHorario, fusoHorario } = useConfiguracaoSistema();
 
   const horario = computed(() =>
     derivarHorario(consultaHorarios.dados.value?.horarios ?? [], mensagemForaHorario.value),
@@ -275,7 +293,7 @@ export function useHorarioProtegido(): {
   const timer = setInterval(() => (agora.value = new Date()), 60_000);
   onScopeDispose(() => clearInterval(timer));
 
-  const horarioAtivo = computed(() => janelaAberta(horario.value, agora.value));
+  const horarioAtivo = computed(() => janelaAberta(horario.value, agora.value, fusoHorario.value));
 
   return { horario, horarioAtivo, pendente: consultaHorarios.pendente };
 }

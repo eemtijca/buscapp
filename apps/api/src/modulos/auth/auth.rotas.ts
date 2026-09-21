@@ -1,11 +1,16 @@
 import {
+  erroApiSchema,
+  listarSessoesRespostaSchema,
   loginSchema,
   perfilAutenticadoSchema,
   redefinirSenhaSchema,
+  revogarSessoesRespostaSchema,
   senhaForte,
   solicitarCodigoSchema,
 } from '@buscapp/contratos';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
+import type { FastifyRequest } from 'fastify';
+import { normalizeIP } from '@fastify/rate-limit';
 import { z } from 'zod';
 import {
   ErroCodigoInvalido,
@@ -13,23 +18,44 @@ import {
   redefinirSenhaComCodigo,
   solicitarCodigoRedefinicao,
 } from '../../nucleo/autenticacao/codigos.js';
-import { autenticarOpcional } from '../../nucleo/autenticacao/middleware.js';
+import {
+  autenticar,
+  autenticarOpcional,
+  usuarioAtual,
+} from '../../nucleo/autenticacao/middleware.js';
 import {
   definirCookieSessao,
   limparCookieSessao,
+  listarSessoesAtivas,
+  nomeCookieSessao,
+  revogarOutrasSessoes,
   revogarSessao,
 } from '../../nucleo/autenticacao/sessoes.js';
 import { ErroHttp } from '../../nucleo/http/erros.js';
-import { ambiente } from '../../ambiente.js';
+import { auditar } from '../../nucleo/auditoria/registrar.js';
 import {
   autenticar as autenticarServico,
   ErroContaInativa,
+  ErroContaPendente,
   ErroCredenciaisInvalidas,
 } from './auth.servico.js';
 
 const respostaOkSchema = z.object({ ok: z.literal(true) });
 
+/** Chave do limitador: IP normalizado combinado ao email informado no corpo. */
+function chavePorIpEEmail(pedido: FastifyRequest): string {
+  const email = String((pedido.body as { email?: unknown } | null)?.email ?? '').toLowerCase();
+  return `${normalizeIP(pedido.ip)}|${email}`;
+}
+
 export const rotasAuth: FastifyPluginAsyncZod = async (app) => {
+  // O login conta apenas tentativas falhas; por isso o limitador é chamado manualmente.
+  const limitadorLogin = app.createRateLimit({
+    max: 10,
+    timeWindow: 60_000,
+    keyGenerator: chavePorIpEEmail,
+  });
+
   app.post(
     '/api/auth/login',
     {
@@ -37,10 +63,23 @@ export const rotasAuth: FastifyPluginAsyncZod = async (app) => {
         tags: ['auth'],
         summary: 'Autentica com email e senha e cria a sessão',
         body: loginSchema,
-        response: { 200: z.object({ perfil: perfilAutenticadoSchema }) },
+        response: {
+          200: z.object({ perfil: perfilAutenticadoSchema }),
+          429: erroApiSchema,
+        },
       },
     },
     async (pedido, resposta) => {
+      const limite = await limitadorLogin(pedido, { increment: false });
+      if (!limite.isAllowed && (limite.isExceeded || limite.remaining <= 0)) {
+        return resposta.status(429).send({
+          erro: {
+            codigo: 'muitas_requisicoes',
+            mensagem: 'Muitas tentativas de login. Aguarde alguns minutos e tente novamente.',
+          },
+        });
+      }
+
       try {
         const resultado = await autenticarServico({
           email: pedido.body.email,
@@ -54,10 +93,14 @@ export const rotasAuth: FastifyPluginAsyncZod = async (app) => {
         return { perfil: resultado.perfil };
       } catch (erro) {
         if (erro instanceof ErroCredenciaisInvalidas) {
+          await limitadorLogin(pedido);
           throw new ErroHttp(401, 'credenciais_invalidas', 'Email ou senha incorretos.');
         }
         if (erro instanceof ErroContaInativa) {
           throw new ErroHttp(403, 'conta_inativa', erro.message);
+        }
+        if (erro instanceof ErroContaPendente) {
+          throw new ErroHttp(403, 'conta_pendente', erro.message);
         }
         throw erro;
       }
@@ -74,10 +117,60 @@ export const rotasAuth: FastifyPluginAsyncZod = async (app) => {
       },
     },
     async (pedido, resposta) => {
-      const token = pedido.cookies[ambiente.SESSAO_COOKIE];
+      const perfil = await autenticarOpcional(pedido);
+      const token = pedido.cookies[nomeCookieSessao()];
       if (token) await revogarSessao(token);
       limparCookieSessao(resposta);
+      if (perfil) {
+        await auditar({
+          usuarioId: perfil.id,
+          acao: 'LOGOUT',
+          entidade: 'perfis',
+          entidadeId: perfil.id,
+          ip: pedido.ip,
+        });
+      }
       return { ok: true as const };
+    },
+  );
+
+  app.get(
+    '/api/auth/sessoes',
+    {
+      preHandler: [autenticar],
+      schema: {
+        tags: ['auth'],
+        summary: 'Lista as sessões ativas do usuário autenticado',
+        response: { 200: listarSessoesRespostaSchema },
+      },
+    },
+    async (pedido) => {
+      const token = pedido.cookies[nomeCookieSessao()] ?? '';
+      return { sessoes: await listarSessoesAtivas(usuarioAtual(pedido).id, token) };
+    },
+  );
+
+  app.delete(
+    '/api/auth/sessoes',
+    {
+      preHandler: [autenticar],
+      schema: {
+        tags: ['auth'],
+        summary: 'Revoga as outras sessões ativas, preservando a atual',
+        response: { 200: revogarSessoesRespostaSchema },
+      },
+    },
+    async (pedido) => {
+      const token = pedido.cookies[nomeCookieSessao()] ?? '';
+      const revogadas = await revogarOutrasSessoes(usuarioAtual(pedido).id, token);
+      await auditar({
+        usuarioId: usuarioAtual(pedido).id,
+        acao: 'REVOGAR_SESSOES',
+        entidade: 'sessoes',
+        dadosNovos: { revogadas },
+        ip: pedido.ip,
+      });
+      return { ok: true as const, revogadas };
     },
   );
 
@@ -98,6 +191,9 @@ export const rotasAuth: FastifyPluginAsyncZod = async (app) => {
   app.post(
     '/api/auth/solicitar-codigo',
     {
+      config: {
+        rateLimit: { max: 3, timeWindow: '5 minutes', keyGenerator: chavePorIpEEmail },
+      },
       schema: {
         tags: ['auth'],
         summary: 'Registra a solicitação de código e notifica a gestão',
@@ -114,6 +210,9 @@ export const rotasAuth: FastifyPluginAsyncZod = async (app) => {
   app.post(
     '/api/auth/redefinir-senha',
     {
+      config: {
+        rateLimit: { max: 5, timeWindow: '15 minutes', keyGenerator: chavePorIpEEmail },
+      },
       schema: {
         tags: ['auth'],
         summary: 'Redefine a senha com código de 6 dígitos',

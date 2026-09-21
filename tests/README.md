@@ -18,6 +18,7 @@ export NODE_ENV=test
 export AUTH_PEPPER=dev-pepper-local-com-mais-de-16-caracteres
 export DATABASE_URL=postgresql://buscapp_api:buscapp_api@127.0.0.1:5433/buscapp
 export MIGRATE_DATABASE_URL=postgresql://buscapp:buscapp@127.0.0.1:5433/buscapp
+export REDIS_URL=redis://127.0.0.1:6379
 export STORAGE_DRIVER=disco
 ```
 
@@ -27,7 +28,7 @@ export STORAGE_DRIVER=disco
 npm run test          # type-check, lint, build da SPA e testes de unidade
 npm run test:unit     # integração da API e unidade do cache do web (Vitest)
 npm run test:unit:web # apenas a unidade do cache do frontend
-npm run test:e2e      # Playwright (20 especificações, sobe API e SPA)
+npm run test:e2e      # Playwright (21 especificações, sobe API e SPA)
 npm run test:pwa      # build de produção e testes de PWA
 npm run test:db       # smoke test do schema no PostgreSQL do Compose
 ```

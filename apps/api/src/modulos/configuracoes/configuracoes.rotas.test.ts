@@ -126,11 +126,11 @@ afterAll(async () => {
 });
 
 describe('GET/PUT /api/configuracoes', () => {
-  it('usuário autenticado lê a configuração do sistema', async () => {
+  it('gestão lê a configuração completa do sistema', async () => {
     const resposta = await app.inject({
       method: 'GET',
       url: '/api/configuracoes',
-      cookies: { buscapp_sessao: cookieProfessor },
+      cookies: { buscapp_sessao: cookieGestao },
     });
     expect(resposta.statusCode).toBe(200);
     const configuracao = resposta.json().configuracao;
@@ -140,6 +140,25 @@ describe('GET/PUT /api/configuracoes', () => {
       decaimento_ocorrencia_tipo: configuracaoInicial.decaimento_ocorrencia_tipo,
     });
     expect(typeof configuracao.updated_at).toBe('string');
+    expect(typeof configuracao.dias_retencao_codigos).toBe('number');
+  });
+
+  it('professor lê apenas o subconjunto público', async () => {
+    const resposta = await app.inject({
+      method: 'GET',
+      url: '/api/configuracoes/publicas',
+      cookies: { buscapp_sessao: cookieProfessor },
+    });
+    expect(resposta.statusCode).toBe(200);
+    expect(resposta.json().configuracao).toMatchObject({ id: 1 });
+    expect(resposta.json().configuracao).not.toHaveProperty('dias_retencao_codigos');
+
+    const completa = await app.inject({
+      method: 'GET',
+      url: '/api/configuracoes',
+      cookies: { buscapp_sessao: cookieProfessor },
+    });
+    expect(completa.statusCode).toBe(403);
   });
 
   it('anônimo recebe 401', async () => {

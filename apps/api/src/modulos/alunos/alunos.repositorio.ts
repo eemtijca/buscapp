@@ -20,6 +20,8 @@ export async function listarAlunos(filtro: FiltroAlunos, consulta: ListarAlunos)
         : {}),
     },
     orderBy: { nome: 'asc' },
+    take: consulta.limite,
+    skip: consulta.offset,
   });
 }
 

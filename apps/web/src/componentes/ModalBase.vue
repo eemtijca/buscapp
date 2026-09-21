@@ -15,6 +15,8 @@ withDefaults(
     titulo: string;
     descricao?: string;
     largura?: 'sm' | 'md' | 'lg';
+    /** Em telas estreitas, ocupa a tela cheia como no Bootstrap. */
+    telaCheia?: boolean;
     /** Ícone Bootstrap decorativo exibido antes do título. */
     icone?: string;
     corIcone?: string;
@@ -24,6 +26,7 @@ withDefaults(
   {
     descricao: undefined,
     largura: 'md',
+    telaCheia: false,
     icone: undefined,
     corIcone: undefined,
     rotuloFechar: 'Fechar',
@@ -50,8 +53,11 @@ const CLASSE_LARGURA: Record<'sm' | 'md' | 'lg', string> = {
   <DialogRoot :open="visivel" @update:open="aoMudarAberto">
     <DialogPortal>
       <DialogOverlay class="modal-backdrop fade show" style="z-index: 1055" />
-      <DialogContent class="modal d-block" style="z-index: 1056">
-        <div class="modal-dialog modal-dialog-centered" :class="CLASSE_LARGURA[largura]">
+      <DialogContent class="modal d-block show" style="z-index: 1056">
+        <div
+          class="modal-dialog modal-dialog-centered"
+          :class="[CLASSE_LARGURA[largura], { 'modal-fullscreen-sm-down': telaCheia }]"
+        >
           <div class="modal-content">
             <div class="modal-header py-2">
               <DialogTitle class="modal-title small fw-bold">

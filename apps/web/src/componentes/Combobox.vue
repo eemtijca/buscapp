@@ -174,6 +174,11 @@ function aoTeclar(event: KeyboardEvent) {
       if (opcao) selecionar(opcao);
     }
   } else if (event.key === 'Escape') {
+    // Com a lista aberta, o Escape fecha apenas o combobox e não o modal que o contém.
+    if (aberto.value) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
     fechar();
     sincronizarTexto();
   }

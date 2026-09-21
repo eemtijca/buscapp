@@ -19,7 +19,7 @@ test.describe('Gestão - Home', () => {
   test('CT07 - Notificação de código aparece no header', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     const bell = page.locator(
-      'button[aria-label="Notificações"] i.bi-bell, a[aria-label="Notificações"] i.bi-bell',
+      'button[aria-label^="Notificações"] i.bi-bell, a[aria-label^="Notificações"] i.bi-bell',
     );
     await expect(bell.first()).toBeVisible();
   });

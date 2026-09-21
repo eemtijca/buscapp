@@ -58,7 +58,7 @@ test.describe('Tempo real — Atualizações sem reload', () => {
     await page.goto('/gestao');
     await expect(page.getByText('Ranking de risco')).toBeVisible();
     await page.waitForTimeout(2500);
-    await page.locator('button[aria-label="Notificações"]').click();
+    await page.locator('button[aria-label^="Notificações"]').click();
     const notifMenu = page.locator('.notif-menu');
     await expect(notifMenu).toBeVisible();
     try {

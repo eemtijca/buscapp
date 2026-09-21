@@ -28,9 +28,9 @@ const emit = defineEmits<{
   'update:modelo': [valor: string[]];
 }>();
 
-// Identificador único por instância: evita colisão de ids entre grupos na mesma tela.
+// Identificador único por instância: evita colisão de ids entre grupos sem nome na mesma tela.
 const idBase = `cb-${useId()}`;
-const prefixo = computed(() => (props.nome ? `${idBase}-${props.nome}` : idBase));
+const prefixo = computed(() => props.nome || idBase);
 
 const classeColuna = computed(() => {
   const tamanho = Math.max(1, Math.floor(12 / props.colunas));

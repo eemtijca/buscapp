@@ -269,7 +269,7 @@ test.describe('Notificações — Popover', () => {
   test('CT87 - Popover abre ao clicar no sino', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao');
-    const btnNotif = page.locator('button[aria-label="Notificações"]');
+    const btnNotif = page.locator('button[aria-label^="Notificações"]');
     await btnNotif.click();
     await page.waitForTimeout(500);
     await expect(page.locator('.notif-menu').first()).toBeVisible({ timeout: 5000 });
@@ -279,7 +279,7 @@ test.describe('Notificações — Popover', () => {
   test('CT88 - Notificação de mensagem aparece no popover', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao');
-    await page.locator('button[aria-label="Notificações"]').click();
+    await page.locator('button[aria-label^="Notificações"]').click();
     await page.waitForTimeout(500);
     const notifMenu = page.locator('.notif-menu');
     await expect(notifMenu).toBeVisible();
@@ -427,7 +427,7 @@ test.describe('Notificações — Casos Extremos', () => {
   test('CT103 - Popover fecha e reabre sem erros', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao');
-    const btnNotif = page.locator('button[aria-label="Notificações"]');
+    const btnNotif = page.locator('button[aria-label^="Notificações"]');
     await btnNotif.click();
     await page.waitForTimeout(300);
     await expect(page.locator('.notif-menu').first()).toBeVisible({ timeout: 5000 });
@@ -440,7 +440,7 @@ test.describe('Notificações — Casos Extremos', () => {
   test('CT104 - Marcar todas como lidas', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao');
-    await page.locator('button[aria-label="Notificações"]').click();
+    await page.locator('button[aria-label^="Notificações"]').click();
     await page.waitForTimeout(500);
     const notifMenu = page.locator('.notif-menu');
     const btnMarcar = notifMenu.locator('button:has-text("Marcar todas como lidas")');
@@ -453,7 +453,7 @@ test.describe('Notificações — Casos Extremos', () => {
   test('CT105 - Notificação com rota de chat', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao');
-    await page.locator('button[aria-label="Notificações"]').click();
+    await page.locator('button[aria-label^="Notificações"]').click();
     await page.waitForTimeout(500);
     const items = page.locator('.notif-menu button');
     if ((await items.count()) > 0) {
@@ -464,7 +464,7 @@ test.describe('Notificações — Casos Extremos', () => {
   test('CT106 - Popover sem notificações mostra estado vazio', async ({ page }) => {
     await login(page, 'resp1@email.com', SENHA_RESP);
     await page.goto('/responsavel');
-    await page.locator('button[aria-label="Notificações"]').click();
+    await page.locator('button[aria-label^="Notificações"]').click();
     await page.waitForTimeout(500);
     const notifMenu = page.locator('.notif-menu');
     if (await notifMenu.isVisible()) {

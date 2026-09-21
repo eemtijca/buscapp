@@ -341,6 +341,7 @@ async function alternarAtivo(turma: Turma) {
       icone="book"
       cor-icone="text-primary"
       largura="md"
+      tela-cheia
       @update:visivel="(aberto) => !aberto && (modalAberto = false)"
     >
       <form @submit.prevent="salvar">

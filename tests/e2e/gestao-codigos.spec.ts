@@ -15,15 +15,15 @@ test.describe('Gestão - Códigos', () => {
   test('CT13 - Página de códigos carrega com abas', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/codigos');
-    await expect(page.getByRole('button', { name: 'Solicitações' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Códigos' })).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'Solicitações' })).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'Códigos' })).toBeVisible();
   });
 
   test('CT14 - Códigos do seed são exibidos', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/codigos');
-    await expect(page.getByRole('button', { name: 'Solicitações' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Códigos' })).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'Solicitações' })).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'Códigos' })).toBeVisible();
   });
 });
 
@@ -31,8 +31,8 @@ test.describe('Gestão - Códigos - Aba Pendentes', () => {
   test('CT34 - Página de códigos carrega com abas e indicador', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/codigos');
-    await expect(page.getByRole('button', { name: 'Solicitações' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Códigos' })).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'Solicitações' })).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'Códigos' })).toBeVisible();
     await expect(page.locator('.nav-link.active')).toContainText('Solicitações');
   });
 
@@ -40,7 +40,7 @@ test.describe('Gestão - Códigos - Aba Pendentes', () => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/codigos');
     await page.waitForTimeout(1500);
-    await expect(page.getByRole('button', { name: 'Solicitações' })).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'Solicitações' })).toBeVisible();
     const emptyState = page.getByText('Nenhuma solicitação pendente');
     const cards = page.locator('.card');
     const hasCards = (await cards.count()) > 0;
@@ -69,7 +69,7 @@ test.describe('Gestão - Códigos - Aba Pendentes', () => {
     await page.goto('/gestao/codigos');
     await page.locator('button:has-text("Códigos")').click();
     await page.waitForTimeout(1000);
-    await expect(page.getByRole('button', { name: 'Códigos' })).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'Códigos' })).toBeVisible();
     const emptyState = page.getByText('Nenhum código gerado ainda');
     const table = page.locator('table');
     const hasTable = await table.isVisible();
@@ -153,8 +153,8 @@ test.describe('Gestão - Códigos - Mobile', () => {
     await page.setViewportSize({ width: 375, height: 667 });
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/codigos');
-    await expect(page.getByRole('button', { name: 'Solicitações' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Códigos' })).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'Solicitações' })).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'Códigos' })).toBeVisible();
   });
 
   test('CT54 - Mobile: botão Atualizar funciona', async ({ page }) => {

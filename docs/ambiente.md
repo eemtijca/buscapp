@@ -35,7 +35,7 @@ Todas as variáveis da API passam por `apps/api/src/ambiente.ts`, validadas com 
 | `VITE_API_URL`                                                                      | Frontend          | URL base da API. Vazio (padrão) usa a mesma origem; defina ao hospedar a SPA separada da API.  |
 
 > [!NOTE]
-> Não existe variável `DIRECT_URL`. As migrações em bancos gerenciados usam `MIGRATE_DATABASE_URL`, que também é a conexão do cliente administrativo da API. No GitHub Actions o secret `DIRECT_URL_PROD` é injetado nessa variável.
+> Não existe variável `DIRECT_URL`. As migrações em bancos gerenciados usam `MIGRATE_DATABASE_URL`, que também é a conexão do cliente administrativo da API. No GitHub Actions o secret `DIRECT_URL_PROD` é injetado em `DATABASE_URL` no passo de migração e em `MIGRATE_DATABASE_URL` no passo que define a senha do papel.
 
 ## Banco de dados
 

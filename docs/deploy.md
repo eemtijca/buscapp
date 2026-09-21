@@ -74,7 +74,7 @@ Limites do perfil serverless:
 
 - As Functions limitam corpo de requisição e resposta a 4,5 MB. Por isso o anexo usa URL pré-assinada para envio e streaming no download.
 - A duração padrão de 300 segundos encerra o stream SSE periodicamente. O `EventSource` reconecta sozinho e dispara recarga.
-- O barramento SSE é em memória; eventos podem não cruzar instâncias diferentes. As telas continuam se atualizando ao reconectar, ao voltar para a aba e pelo polling de notificações.
+- O barramento SSE distribui os eventos por Redis pub/sub, com fallback de `LISTEN/NOTIFY`, e as telas também se atualizam ao reconectar, ao voltar para a aba e pelo polling de notificações.
 - O `sharp` adiciona binários nativos ao bundle da função (dezenas de MB). As imagens são regravadas na confirmação do upload direto, com download e novo envio ao bucket; se o processamento falhar, o original é mantido e um aviso é registrado. `PROCESSAR_IMAGENS=false` desliga o processamento e reduz o cold start.
 
 Para desenvolver com a mesma topologia:
@@ -127,7 +127,7 @@ node apps/api/dist/src/server.js
 ## Redis e cron
 
 - `REDIS_URL` é obrigatória em todos os ambientes; o Redis atende apenas ao pub/sub do SSE, com fallback por `LISTEN/NOTIFY` na conexão de sessão.
-- O expurgo é agendado por Vercel Cron (`crons` no topo do `vercel.json`) ou GitHub Actions, com `CRON_SECRET`.
+- O expurgo é agendado externamente com `CRON_SECRET`; o `vercel.json` atual não declara `crons`, então use o agendador do provedor, uma chamada HTTP externa ou o GitHub Actions.
 - Os cabeçalhos da SPA ficam no topo do `vercel.json`, aplicados às rotas fora de `/api`.
 
 ## Verificação pós-deploy

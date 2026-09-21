@@ -12,22 +12,45 @@ erDiagram
   perfis ||--o{ vinculos_responsaveis : responde
   perfis ||--o{ frequencias : registra
   perfis ||--o{ ocorrencias : registra
+  perfis ||--o{ registros_comportamento : registra
+  perfis ||--o{ justificativas_faltas : envia
+  perfis ||--o{ justificativas_faltas : avalia
+  perfis ||--o{ conversas : responde
+  perfis ||--o{ mensagens : envia
+  perfis ||--o{ anexos : cria
   perfis ||--o{ notificacoes : recebe
+  perfis ||--o{ monitoramento_acoes : acompanha
   alunos ||--o{ enturmacoes : cursa
   alunos ||--o{ frequencias : possui
   alunos ||--o{ justificativas_faltas : possui
   alunos ||--o{ ocorrencias : possui
   alunos ||--o{ vinculos_responsaveis : possui
+  alunos ||--o{ registros_comportamento : possui
+  alunos ||--o{ conversas : origina
+  alunos ||--o{ monitoramento_acoes : alvo
   turmas ||--o{ enturmacoes : agrupa
   turmas ||--o{ atribuicoes_professores : recebe
+  turmas ||--o{ conversas : abriga
+  turmas ||--o{ registros_comportamento : agrupa
+  turmas ||--o{ pontuacao_turmas : pontua
   anos_letivos ||--o{ turmas : organiza
   anos_letivos ||--o{ frequencias : organiza
+  anos_letivos ||--o{ registros_comportamento : organiza
+  anos_letivos ||--o{ pontuacao_turmas : referencia
   disciplinas ||--o{ atribuicoes_professores : compoe
+  disciplinas ||--o{ registros_comportamento : opcional
+  frequencias ||--o{ justificativas_faltas : justifica
   conversas ||--o{ mensagens : contem
-  alunos ||--o{ conversas : origina
+  ocorrencias ||--o{ ocorrencia_anexos : usa
+  justificativas_faltas ||--o{ justificativa_anexos : usa
   anexos ||--o{ ocorrencia_anexos : compoe
   anexos ||--o{ justificativa_anexos : compoe
+  registros_comportamento ||--o{ registro_comportamento_tags : marca
+  tags_comportamento ||--o{ registro_comportamento_tags : aplica
 ```
+
+> [!NOTE]
+> O diagrama cobre as entidades de domínio e as de apoio mais relevantes. Tabelas puramente operacionais (`rate_limit_contadores`, `codigos_redefinicao_tentativas`, `convites`, `importacoes_log` e `exportacoes`) aparecem nas seções abaixo, mas foram omitidas do diagrama por não terem relações de domínio.
 
 ### Perfis
 
@@ -68,14 +91,14 @@ Alunos identificados por nome e matrícula, sem CPF ou endereço.
 
 ### Estrutura escolar
 
-| Entidade                  | Campos principais                                                                             | Observação                                                          |
-| ------------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| `anos_letivos`            | `ano` único, `status` (`planejado`, `ativo`, `arquivado`), `data_inicio`, `data_fim`, `ativo` | Apenas um ano ativo por vez, garantido pela virada de ano.          |
-| `turmas`                  | `ano_letivo_id`, `serie`, `letra`, `nome_completo`, `capacidade`, `ativo`                     | `nome_completo` é preenchido por trigger a partir de série e letra. |
-| `disciplinas`             | `nome`, `codigo_sige` único, `carga_horaria`, `ativo`                                         | `codigo_sige` apoia integração com a SEDUC.                         |
-| `enturmacoes`             | `aluno_id`, `turma_id`, `ano_letivo_id`, `status`, `data_matricula`, `data_encerramento`      | Única por aluno e ano.                                              |
-| `atribuicoes_professores` | `professor_id`, `turma_id`, `disciplina_id`, `papel` (`titular` ou `substituto`), vigência    | Define o escopo do professor.                                       |
-| `vinculos_responsaveis`   | `responsavel_id`, `aluno_id`, `tipo_relacao`, `contato_prioritario`, `ativo`                  | Único por par responsável e aluno.                                  |
+| Entidade                  | Campos principais                                                                             | Observação                                                                             |
+| ------------------------- | --------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `anos_letivos`            | `ano` único, `status` (`planejado`, `ativo`, `arquivado`), `data_inicio`, `data_fim`, `ativo` | Apenas um ano ativo por vez, garantido pela virada de ano e pelo índice único parcial. |
+| `turmas`                  | `ano_letivo_id`, `serie`, `letra`, `nome_completo`, `capacidade`, `ativo`                     | `nome_completo` é preenchido por trigger a partir de série e letra.                    |
+| `disciplinas`             | `nome`, `codigo_sige` único, `carga_horaria`, `ativo`                                         | `codigo_sige` apoia integração com a SEDUC.                                            |
+| `enturmacoes`             | `aluno_id`, `turma_id`, `ano_letivo_id`, `status`, `data_matricula`, `data_encerramento`      | Única por aluno e ano.                                                                 |
+| `atribuicoes_professores` | `professor_id`, `turma_id`, `disciplina_id`, `papel` (`titular` ou `substituto`), vigência    | Define o escopo do professor.                                                          |
+| `vinculos_responsaveis`   | `responsavel_id`, `aluno_id`, `tipo_relacao`, `contato_prioritario`, `ativo`                  | Único por par responsável e aluno.                                                     |
 
 ### Frequência
 
@@ -99,13 +122,13 @@ O índice `idx_frequencias_unicidade` garante um registro por aluno, data, tipo,
 
 ### Ocorrências e comportamento
 
-| Entidade                      | Campos principais                                                                                                                                                                            | Observação                                 |
-| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
-| `ocorrencias`                 | `aluno_id`, `professor_id`, `coordenador_id`, `turma_id`, `titulo`, `descricao`, `tipo[]`, `status`, `exige_presenca_responsavel`, `presenca_responsavel_confirmada`, `tags_comportamento[]` | Workflow de status e flags de notificação. |
-| `ocorrencia_anexos`           | `ocorrencia_id`, `anexo_id`                                                                                                                                                                  | Associação N:N.                            |
-| `registros_comportamento`     | `aluno_id`, `professor_id`, `turma_id`, `disciplina_id`, `data_hora`, `observacao`, `client_request_id`                                                                                      | Registros positivos e negativos.           |
-| `registro_comportamento_tags` | `registro_id`, `tag_id`                                                                                                                                                                      | Associação N:N.                            |
-| `tags_comportamento`          | `nome` único, `categoria` (`positivo`, `atencao`, `critico`), `peso_pontuacao`, `ativo`                                                                                                      | Alimenta a pontuação e o termômetro.       |
+| Entidade                      | Campos principais                                                                                                                                                                                                                                                                            | Observação                                 |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| `ocorrencias`                 | `aluno_id`, `professor_id`, `coordenador_id`, `turma_id`, `ano_letivo_id`, `titulo`, `descricao`, `tipo[]`, `status`, `exige_presenca_responsavel`, `presenca_responsavel_confirmada`, `data_confirmacao_presenca`, `tags_comportamento[]`, `notificar_coordenacao`, `notificar_responsavel` | Workflow de status e flags de notificação. |
+| `ocorrencia_anexos`           | `ocorrencia_id`, `anexo_id`                                                                                                                                                                                                                                                                  | Associação N:N.                            |
+| `registros_comportamento`     | `aluno_id`, `professor_id`, `turma_id`, `disciplina_id`, `data_hora`, `observacao`, `client_request_id`                                                                                                                                                                                      | Registros positivos e negativos.           |
+| `registro_comportamento_tags` | `registro_id`, `tag_id`                                                                                                                                                                                                                                                                      | Associação N:N.                            |
+| `tags_comportamento`          | `nome` único, `categoria` (`positivo`, `atencao`, `critico`), `peso_pontuacao`, `ativo`                                                                                                                                                                                                      | Alimenta a pontuação e o termômetro.       |
 
 ### Justificativas
 
@@ -138,26 +161,26 @@ O índice `idx_frequencias_unicidade` garante um registro por aluno, data, tipo,
 | `mime_type`     | text        | JPEG, PNG, WEBP ou PDF                                         |
 | `tamanho_bytes` | int         | Até 10 MB (CHECK)                                              |
 | `criado_por`    | uuid        | Perfil criador                                                 |
-| `expurgo_em`    | timestamptz | Padrão de 30 dias, declarativo                                 |
+| `expurgo_em`    | timestamptz | Padrão de 30 dias, aplicado pelo expurgo agendado              |
 | `expurgado_em`  | timestamptz | Reservado, sem rotina que o preencha                           |
-| `processado_em` | timestamptz | Reservado                                                      |
+| `processado_em` | timestamptz | Marcado quando a imagem é reprocessada no servidor             |
 
 ### Notificações, monitoramento e pontuação
 
 | Entidade              | Campos principais                                                                                        | Observação                                                                              |
 | --------------------- | -------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| `notificacoes`        | `destinatario_id`, `tipo`, `titulo`, `corpo`, `metadados`, `lida`, `lida_em`                             | Tipos: ausências, monitoramento, ocorrência, justificativa, mensagem, sistema e código. |
+| `notificacoes`        | `destinatario_id`, `tipo`, `titulo`, `corpo`, `metadados`, `lida`, `lida_em`, `dedupe_key`               | Tipos: ausências, monitoramento, ocorrência, justificativa, mensagem, sistema e código. |
 | `monitoramento_acoes` | `aluno_id`, `responsavel_id`, `tipo_contato`, `status`, `observacao`, `agendado_para`, `realizado_em`    | Registro das tentativas de contato.                                                     |
 | `pontuacao_turmas`    | `turma_id`, `ano_letivo_id`, `mes_referencia`, `pontos_presenca`, `pontos_comportamento`, `pontos_total` | `pontos_total` é coluna gerada.                                                         |
 
 ### Autenticação
 
-| Entidade                         | Campos principais                                                                                | Observação                                         |
-| -------------------------------- | ------------------------------------------------------------------------------------------------ | -------------------------------------------------- |
-| `sessoes`                        | `perfil_id`, `token_hash` único, `expira_em`, `revogada_em`, `ultimo_uso_em`, `user_agent`, `ip` | O banco guarda apenas o SHA-256 do token.          |
-| `codigos_redefinicao`            | `email`, `perfil_id`, `codigo_hash`, `criado_por`, `expira_em`, `usado_em`, `revogado_em`        | HMAC-SHA256; a coluna legada `codigo` não é usada. |
-| `codigos_redefinicao_tentativas` | `email` (chave), `tentativas`, `bloqueado_ate`                                                   | Bloqueio temporário por email.                     |
-| `auditoria`                      | `usuario_id`, `acao`, `entidade`, `entidade_id`, `dados_anteriores`, `dados_novos`, `ip_origem`  | Escrita parcial: códigos e virada de ano letivo.   |
+| Entidade                         | Campos principais                                                                                | Observação                                                               |
+| -------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------ |
+| `sessoes`                        | `perfil_id`, `token_hash` único, `expira_em`, `revogada_em`, `ultimo_uso_em`, `user_agent`, `ip` | O banco guarda apenas o SHA-256 do token.                                |
+| `codigos_redefinicao`            | `email`, `perfil_id`, `codigo_hash`, `criado_por`, `expira_em`, `usado_em`, `revogado_em`        | HMAC-SHA256; a coluna legada `codigo` não é usada.                       |
+| `codigos_redefinicao_tentativas` | `email` (chave), `tentativas`, `bloqueado_ate`                                                   | Bloqueio temporário por email.                                           |
+| `auditoria`                      | `usuario_id`, `acao`, `entidade`, `entidade_id`, `dados_anteriores`, `dados_novos`, `ip_origem`  | Login, códigos, anexos, alunos, usuários, virada de ano, expurgo e LGPD. |
 
 ### Apoio administrativo
 
@@ -169,6 +192,7 @@ O índice `idx_frequencias_unicidade` garante um registro por aluno, data, tipo,
 | `convites`              | `email`, `papel`, `nome_convidado`, `enviado_por`, `status`, `expira_em`                                  | Registro de convites.                                               |
 | `importacoes_log`       | `coordenador_id`, `ano_letivo_id`, `arquivo_nome`, `formato`, `mapeamento`, contadores, `status`          | Auditoria de importações SIGE.                                      |
 | `exportacoes`           | `coordenador_id`, `tipo`, `turma_id`, `ano_letivo_id`, `periodo`, `formato`, `status`, `arquivo_path`     | Registro de exportações.                                            |
+| `rate_limit_contadores` | `chave` (chave), `contagem`, `expira_em`                                                                  | Contadores do rate limiting; sem RLS.                               |
 
 ## Enums
 
@@ -185,7 +209,7 @@ O índice `idx_frequencias_unicidade` garante um registro por aluno, data, tipo,
 | `status_monitoramento`     | `pendente`, `em_andamento`, `realizado`, `sem_contato`, `cancelado`                                                             |
 | `status_importacao`        | `processando`, `concluido`, `parcial`, `falhou`                                                                                 |
 | `status_exportacao`        | `agendada`, `processando`, `concluida`, `falhou`                                                                                |
-| `tipo_contato_busca`       | `telefone`, `whatsapp`, `presencial`                                                                                            |
+| `tipo_contato_busca`       | `telefone`, `whatsapp`, `presencial`, `carta`, `outro`                                                                          |
 | `tipo_notificacao`         | `ausencia_portao`, `ausencia_aula`, `monitoramento`, `ocorrencia`, `justificativa`, `mensagem`, `sistema`, `codigo_redefinicao` |
 | `categoria_tag`            | `positivo`, `atencao`, `critico`                                                                                                |
 
@@ -208,7 +232,7 @@ O índice `idx_frequencias_unicidade` garante um registro por aluno, data, tipo,
 | Módulo de acesso          | Recurso liberado por perfil em `acesso_modulos`, com semântica fail-closed.                          |
 | Ocorrência                | Registro disciplinar com tipo, status e flags de notificação e presença do responsável.              |
 | Perfil                    | Conta de usuário do sistema, com papel e status.                                                     |
-| Ranking                   | Classificação mensal das turmas por pontuação, calculada no frontend.                                |
+| Ranking                   | Classificação dos alunos por risco, calculada no frontend.                                           |
 | Registro de comportamento | Anotação positiva ou negativa associada a tags, que alimenta a pontuação.                            |
 | RLS                       | Row-Level Security do PostgreSQL, usada como barreira adicional de isolamento.                       |
 | Sessão opaca              | Sessão cujo token aleatório existe apenas no cookie; o banco guarda o hash.                          |

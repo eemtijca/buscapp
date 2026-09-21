@@ -47,7 +47,7 @@ Cria usuários e fixtures de desenvolvimento, de forma idempotente. O entrypoint
 2. A gestão gera um código de 6 dígitos em `POST /api/codigos/perfil/:perfilId`. O valor em claro é exibido uma única vez; o banco guarda apenas o HMAC.
 3. O usuário define a nova senha em `POST /api/auth/redefinir-senha`. O código pode ser revogado a qualquer momento e expira por `configuracoes_sistema.minutos_validade_codigo` (padrão 60).
 4. Após `max_tentativas_codigo` erros (padrão 5), o email fica bloqueado por `minutos_bloqueio_codigo` (padrão 15).
-5. `POST /api/codigos/limpar` remove códigos usados, expirados e revogados; a janela de retenção configurada não é aplicada automaticamente.
+5. `POST /api/codigos/limpar` remove códigos usados, expirados e revogados de imediato; a janela de `dias_retencao_codigos` é aplicada pelo expurgo agendado.
 
 ## Anexos
 
@@ -56,7 +56,7 @@ Cria usuários e fixtures de desenvolvimento, de forma idempotente. O entrypoint
 - O envio clássico é `multipart/form-data` em `POST /api/anexos`, com limite de 10 MB e tipos JPEG, PNG, WEBP e PDF.
 - O envio direto usa `POST /api/anexos/upload` para obter a URL pré-assinada, envia o arquivo ao provedor e confirma em `POST /api/anexos/confirmar`, que valida chave, tamanho e tipo antes de registrar. O limite é `UPLOAD_DIRETO_MAX_BYTES` (padrão 20 MB).
 - O download é autenticado e transmitido em streaming.
-- A expiração e o expurgo de anexos são declarativos: `expurgo_em` e `dias_expurgo_anexos` existem, mas não há rotina agendada que os aplique. A remoção ocorre pela ação do usuário ou da gestão.
+- `dias_expurgo_anexos` define `expurgo_em` na criação do anexo; a rotina agendada `POST /api/tarefas/expurgo` remove os anexos vencidos do storage. A remoção manual pela ação do usuário ou da gestão continua disponível.
 
 ## Notificações
 
@@ -64,18 +64,18 @@ As notificações são criadas por triggers de banco (mensagem e ocorrência) e 
 
 ## Auditoria
 
-A tabela `auditoria` recebe os eventos de geração, revogação, uso e limpeza de códigos, além da virada de ano letivo. Não existem registros de auditoria para login, alunos, usuários, uploads e demais operações, e não há endpoint de leitura da auditoria pela interface. A consulta é feita diretamente no banco.
+A tabela `auditoria` registra login, falhas de login, logout, revogação de sessões, geração, revogação, uso e limpeza de códigos, CRUD de usuários e alunos, criação, remoção e download de anexos, expurgo, anonimização e viradas de ano, sempre com `ip_origem`. `GET /api/auditoria` (gestão) permite ler a trilha com filtros e paginação, e a tela **Auditoria** em `/gestao/auditoria` consome a rota.
 
 ## Saúde e logs
 
 - `GET /api/saude` responde `{ status: 'ok', hora }` e serve como liveness; não consulta o banco.
-- Os logs usam o logger do Fastify, com nível `info` em produção e `debug` em desenvolvimento. Não há configuração de `redact`.
+- Os logs usam o logger do Fastify, com nível `info` em produção e `debug` em desenvolvimento. O `redact` cobre cookie, `authorization` e `set-cookie`.
 - O entrypoint não imprime a `DATABASE_URL`.
 - O indicador de conexão do frontend consulta `/api/saude` a cada 30 segundos.
 
 ## Backup
 
-Não existe backup automático nem endpoint de exportação. A durabilidade depende do provedor do PostgreSQL e dos volumes do Compose. Em bancos gerenciados, configure a política de backup do provedor. Antes de operações destrutivas, faça um dump manual com `pg_dump`.
+Não existe backup automático. A exportação existente é a de dados do titular (LGPD), não de backup. A durabilidade depende do provedor do PostgreSQL e dos volumes do Compose. Em bancos gerenciados, configure a política de backup do provedor. Antes de operações destrutivas, faça um dump manual com `pg_dump`.
 
 ## Resolução de problemas
 

@@ -28,7 +28,7 @@ export STORAGE_DRIVER=disco
 npm run test          # type-check, lint, build da SPA e testes de unidade
 npm run test:unit     # integração da API e unidade do cache do web (Vitest)
 npm run test:unit:web # apenas a unidade do cache do frontend
-npm run test:e2e      # Playwright (20 especificações, sobe API e SPA)
+npm run test:e2e      # Playwright (21 especificações, sobe API e SPA)
 npm run test:pwa      # build de produção e testes de PWA
 npm run test:db       # smoke test do schema no PostgreSQL do Compose
 ```

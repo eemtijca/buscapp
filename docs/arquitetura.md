@@ -11,6 +11,8 @@ flowchart LR
   W -->|EventSource /api/eventos| A
   A -->|Prisma + adapter-pg| D[(PostgreSQL)]
   A -->|driver disco ou S3| F[Armazenamento de anexos]
+  A <-->|pub/sub do SSE| R[(Redis)]
+  A -.->|LISTEN/NOTIFY| D
   C[packages/contratos] -.-> W
   C -.-> A
 ```
@@ -22,7 +24,7 @@ flowchart LR
 - `apps/api/src/aplicacao.ts`: fábrica Fastify, testável com `inject`. Registra cookie, CORS, multipart, rotas e, quando existe `WEB_DIST`, o `@fastify/static` com fallback da SPA.
 - `apps/api/src/server.ts`: entrada do processo. Instancia a aplicação com `construirApp()` e chama `listen()`.
 - `apps/api/src/ambiente.ts`: validação Zod das variáveis, com falha antecipada.
-- `apps/api/src/nucleo/`: infraestrutura transversal (`banco`, `autenticacao`, `autorizacao`, `armazenamento`, `eventos`, `http`).
+- `apps/api/src/nucleo/`: infraestrutura transversal (`banco`, `autenticacao`, `autorizacao`, `armazenamento`, `auditoria`, `eventos`, `http`, `rate-limit` e `tempo`).
 - `apps/api/src/modulos/<dominio>/`: padrão `.rotas.ts`, `.servico.ts` e `.repositorio.ts`.
 - `packages/contratos/src/`: schemas Zod de entrada e saída por domínio, compartilhados entre API e frontend.
 - `tests/`: Playwright e helpers de apoio. Os testes de integração da API ficam no próprio módulo, em `apps/api/src/**/*.test.ts`.
@@ -34,14 +36,17 @@ sequenceDiagram
   participant C as Cliente
   participant R as Rota Fastify
   participant M as Middleware de sessão
+  participant Z as Autorização
   participant S as Serviço
   participant B as Prisma e banco
   C->>R: Requisição com cookie HttpOnly
   R->>M: autenticar resolve a sessão
   M->>B: perfilDaSessao consulta o hash do token
   M-->>R: usuário e papel
+  R->>Z: exigirPapel e exigirModulo
+  Z-->>R: acesso liberado
   R->>S: regra de negócio e escopo de visibilidade
-  S->>B: consulta em transação com app.usuario_id
+  S->>B: comEscopo define app.usuario_id na transação
   B-->>S: linhas dentro do escopo e do RLS
   S-->>C: JSON no envelope próprio
 ```
@@ -59,7 +64,7 @@ Leituras fora do escopo respondem 404, para não revelar a existência do regist
 
 ## Tempo real
 
-O stream `GET /api/eventos` usa Server-Sent Events e publica eventos de invalidação `{ tabela, escopo }`, sem dados sensíveis. O barramento é em memória, com heartbeat de 25 segundos, e o cache do cliente invalida as consultas inscritas na tabela, revalidando ao reconectar, ao voltar para a aba e ao voltar a rede. A conexão é aberta apenas com sessão ativa e encerrada no logout. Ver [ADR-005](adr/005-tempo-real-sse.md) e [modulos.md](modulos.md).
+O stream `GET /api/eventos` usa Server-Sent Events e publica eventos de invalidação `{ tabela, escopo }`, sem dados sensíveis. O barramento distribui os eventos por Redis pub/sub, com fallback de `LISTEN/NOTIFY` do PostgreSQL, e heartbeat de 25 segundos; o cache do cliente invalida as consultas inscritas na tabela, revalidando ao reconectar, ao voltar para a aba e ao voltar a rede. A conexão é aberta apenas com sessão ativa e encerrada no logout. Ver [ADR-005](adr/005-tempo-real-sse.md), [ADR-010](adr/010-rate-limiting-e-pubsub-com-fallback.md) e [modulos.md](modulos.md).
 
 ## Cache de dados do cliente
 
@@ -95,13 +100,13 @@ apps/
   api/
     prisma/
       schema.prisma      contrato do banco
-      migrations/        seis migrações SQL
+      migrations/        onze migrações SQL
       seeds/dev.ts       fixtures de desenvolvimento
     src/
       ambiente.ts        validação das variáveis
       aplicacao.ts       fábrica Fastify
       server.ts          entrada do processo
-      nucleo/            banco, autenticação, autorização, armazenamento, eventos e http
+      nucleo/            banco, autenticação, autorização, armazenamento, auditoria, eventos, http, rate-limit e tempo
       modulos/<dominio>/ rotas, serviço e repositório por domínio
 packages/contratos       schemas Zod compartilhados
 tests/e2e                Playwright
@@ -118,3 +123,11 @@ docs/                    esta documentação
 - [ADR-004: anexos atrás de interface, com upload direto](adr/004-anexos-armazenamento.md)
 - [ADR-005: tempo real por Server-Sent Events](adr/005-tempo-real-sse.md)
 - [ADR-006: mesma origem e perfis de implantação](adr/006-same-origin-e-perfis.md)
+- [ADR-007: sonda de sessão sem 401 em GET /api/auth/me](adr/007-sonda-de-sessao-sem-401.md)
+- [ADR-008: cache de dados do cliente com IndexedDB e ETag](adr/008-cache-de-dados-cliente.md)
+- [ADR-009: RLS e privilégios de coluna nas tabelas administrativas](adr/009-rls-e-privilegios-administrativos.md)
+- [ADR-010: rate limiting no Postgres e pub/sub com fallback](adr/010-rate-limiting-e-pubsub-com-fallback.md)
+- [ADR-011: fuso horário da escola no servidor](adr/011-fuso-horario-da-escola.md)
+- [ADR-012: cabeçalhos de segurança e verificação de origem](adr/012-cabecalhos-de-seguranca-e-origem.md)
+- [ADR-013: retenção e expurgo agendado](adr/013-retencao-e-expurgo-agendado.md)
+- [ADR-014: exportação e anonimização de dados do titular](adr/014-lgpd-exportacao-e-anonimizacao.md)

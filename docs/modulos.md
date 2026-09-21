@@ -49,7 +49,7 @@ O registro é por exceção: o professor envia apenas os ausentes da turma em um
 - Cada par responsável e aluno tem uma única conversa, obtida ou criada em `POST /api/conversas`. A gestão inicia conversas com quaisquer responsáveis; o responsável inicia com os próprios dependentes.
 - O responsável só envia mensagens dentro das janelas de `horarios_letivos`; fora delas a API responde `403` com `fora_horario`. A verificação é feita no servidor.
 - Mensagens aceitam `client_request_id` para reenvio idempotente, o que apoia a recuperação após quedas de rede.
-- Ocultar uma conversa (`ativa: false`) não remove o histórico; uma nova mensagem do outro lado a reabre e o trigger `fn_notificar_nova_mensagem` cria a notificação de mensagem.
+- Ocultar uma conversa (`ativa: false`) não remove o histórico; uma nova mensagem a reabre e o trigger `fn_notificar_nova_mensagem` cria a notificação de mensagem.
 - Mensagens de sistema registram eventos da conversa e não são editáveis.
 - A leitura marca as mensagens recebidas em `PATCH /api/conversas/:id/lidas`.
 
@@ -62,7 +62,7 @@ O registro é por exceção: o professor envia apenas os ausentes da turma em um
 ## Monitoramento, termômetro e ranking
 
 - A tabela `monitoramento_acoes` e a rota de importação de planilhas não têm rotas HTTP hoje: o registro de tentativas de contato existe no schema e no seed, sem uso pela interface.
-- O termômetro de risco e o ranking de turmas são calculados no frontend (`apps/web/src/composables/useMonitoramento.ts` e `apps/web/src/servicos/termometro.ts`) a partir de frequências, ocorrências, registros de comportamento e dos pesos de `configuracoes_sistema` (faltas, ocorrências, recência, limites de score e bônus).
+- O termômetro de risco e o ranking de priorização de risco dos alunos são calculados no frontend (`apps/web/src/composables/consultas/useMonitoramento.ts` e `apps/web/src/servicos/termometro.ts`) a partir de frequências, ocorrências, registros de comportamento e dos pesos de `configuracoes_sistema` (faltas, ocorrências, recência, limites de score e bônus).
 - A gestão acompanha infrequências, termômetro e ranking; o responsável vê o termômetro dos dependentes.
 
 ## Estrutura escolar
@@ -77,7 +77,7 @@ O registro é por exceção: o professor envia apenas os ausentes da turma em um
 - Os catálogos de `opcoes_configuracao` cobrem módulos, documentos, períodos, motivos de ausência, tipos de ocorrência, vínculos, papéis de atribuição, séries e letras. As chaves são validadas por CHECK nas tabelas que as referenciam.
 - Opções e tags referenciadas não podem ser excluídas; a orientação é desativar.
 - `tags_comportamento` define categoria e peso, usados na pontuação.
-- `configuracoes_sistema` concentra limites de faltas, pesos do termômetro, dias de expurgo (declarativos) e parâmetros dos códigos. A gestão lê o registro completo em `GET /api/configuracoes`; os demais perfis recebem apenas o subconjunto público (`GET /api/configuracoes/publicas`) com escola, fuso, mensagem fora de horário e parâmetros do termômetro.
+- `configuracoes_sistema` concentra limites de faltas, pesos do termômetro, dias de expurgo e parâmetros dos códigos. A gestão lê o registro completo em `GET /api/configuracoes`; os demais perfis recebem apenas o subconjunto público (`GET /api/configuracoes/publicas`) com escola, fuso, mensagem fora de horário e parâmetros do termômetro. As janelas de expurgo são aplicadas pela rotina agendada `POST /api/tarefas/expurgo`.
 - `horarios_letivos` define as janelas de atendimento do chat.
 
 ## Auditoria

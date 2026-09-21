@@ -6,7 +6,7 @@ Organização da SPA Vue 3, design system e padrões de interação. Os tokens f
 
 | Diretório                         | Papel                                                                             |
 | --------------------------------- | --------------------------------------------------------------------------------- |
-| `src/componentes/`                | 21 componentes reutilizáveis (cartões, chat, combobox, modais e afins).           |
+| `src/componentes/`                | 24 componentes reutilizáveis (cartões, chat, combobox, modais e afins).           |
 | `src/composables/`                | 8 composables de estado e orquestração, incluindo autenticação e notificações.    |
 | `src/composables/consultas/`      | View models reativos derivados do cache, por domínio.                             |
 | `src/layouts/LayoutPrincipal.vue` | Shell com cabeçalho, notificações, menu de perfil, rodapé e indicador de conexão. |
@@ -34,20 +34,20 @@ As rotas usam `createWebHistory` com fallback para `index.html`, servido pela AP
 4. Rota protegida sem sessão redireciona para o login.
 5. Papel sem permissão vai para `/403`; módulo ausente volta à home com aviso na página.
 
-Páginas públicas: `/login`, `/solicitar-codigo`, `/redefinir-senha`. A raiz anônima é a tela de login.
+Páginas públicas: `/` (login), `/solicitar-codigo` e `/redefinir-senha-codigo`.
 
 ## Páginas por papel
 
-| Papel       | Páginas                                                                                                                                                                                                 |
-| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Professor   | Home, Frequência, Ausência e Ocorrências.                                                                                                                                                               |
-| Gestão      | Home e painel, Ranking, Ocorrências, Infrequências, Justificativas, Usuários, Alunos, Códigos, Turmas, Anos letivos, Disciplinas, Atribuições, Chat e Configurações (sistema, opções, tags e horários). |
-| Responsável | Home, Alertas, Termômetro, Justificativa e Chat.                                                                                                                                                        |
-| Erros       | Genérico, 403, 404, 500 e conta desativada.                                                                                                                                                             |
+| Papel       | Páginas                                                                                                                                                                                                            |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Professor   | Home, Frequência, Ausência e Ocorrência.                                                                                                                                                                           |
+| Gestão      | Home e painel, Ranking, Ocorrências, Infrequências, Justificativas, Usuários, Alunos, Códigos, Turmas, Anos letivos, Disciplinas, Atribuições, Chat, Auditoria e Configurações (sistema, opções, tags e horários). |
+| Responsável | Home, Alertas, Termômetro, Justificativa e Chat.                                                                                                                                                                   |
+| Erros       | Genérico, 403, 404, 500 e conta desativada.                                                                                                                                                                        |
 
 ## Componentes e composables
 
-Os 21 componentes cobrem os cartões de aluno, alertas e navegação, o chat em painel duplo com contatos e horário protegido, a fila e o formulário de justificativas, o combobox acessível, o visualizador de anexo, o seletor de ícone, a lista de ocorrências, o popover de notificações, o indicador de conexão, o modal de confirmação, o termômetro de risco e estados de carregamento por região.
+Os 24 componentes cobrem a navegação e os cartões (cabeçalho, cartões de aluno, alerta, risco, seleção e navegação), o chat em painel duplo com contatos e horário protegido, a fila e o formulário de justificativas, o combobox, o seletor de ícone, o campo de formulário e o grupo de checkbox, a lista de ocorrências, o popover de notificações, o indicador de conexão, o modal base e o de confirmação, o modal de sessões, o termômetro de risco, o visualizador de anexo e os estados de erro e de carregamento por região.
 
 Os composables concentram autenticação, sessão, navegação, notificações, formulários e status da conexão. As consultas ficam em `servicos/cache.ts` (estado, deduplicação e revalidação) e em `servicos/consultas.ts` (chaves, frescor e tabelas de invalidação); `composables/consultas/` deriva view models reativos por domínio, e `useConsulta` adapta uma consulta ao componente.
 

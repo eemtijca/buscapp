@@ -16,7 +16,7 @@ Verificações antes de abrir um pull request:
 ```bash
 npm run type-check
 npm run lint
-npm run test          # type-check, lint, build da SPA e testes de integração
+npm run test          # type-check, lint, build da SPA e testes de unidade e integração
 npm run test:e2e      # com o Compose no ar e o banco com seed
 ```
 

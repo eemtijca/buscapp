@@ -13,13 +13,13 @@ Suítes de integração da API (Vitest), unidade do cache do frontend (Vitest), 
 
 ## Suítes
 
-| Suíte             | Arquivos                                              | Dependências                              | Cobertura                                                                                                    |
-| ----------------- | ----------------------------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| Integração da API | `apps/api/src/**/*.test.ts` (13 arquivos)             | Banco do Compose migrado                  | Autenticação e sessões, senhas, autorização e escopo, CRUD dos domínios, códigos, anexos, regras e ETag/304. |
-| Unidade do cache  | `apps/web/src/**/*.test.ts` (1 arquivo)               | Nenhuma                                   | Deduplicação, frescor, 304, invalidação por tabela e escopo, GC e namespace.                                 |
-| E2E               | `tests/e2e/*.spec.ts` (20 especificações, exceto PWA) | API e SPA no ar, banco com seed           | Fluxos dos três papéis, tempo real, notificações, anexos, termômetro, ranking, cache, sessão e resiliência.  |
-| PWA               | `tests/e2e/pwa*.spec.ts` (2 especificações)           | Build via `vite preview` e API em `:3001` | Manifest, service worker, ícones, shell offline, dados persistidos e revalidação por 304.                    |
-| Smoke do banco    | `scripts/test-db.sh`                                  | Compose no ar                             | Migrações aplicadas, 33 tabelas, CHECKs, triggers e índice parcial de frequência.                            |
+| Suíte             | Arquivos                                              | Dependências                              | Cobertura                                                                                                                                                                                            |
+| ----------------- | ----------------------------------------------------- | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Integração da API | `apps/api/src/**/*.test.ts` (24 arquivos)             | Banco do Compose migrado                  | Autenticação e sessões, senhas, matriz de autorização, escopo por requisição, CRUD dos domínios, códigos, anexos, paginação, auditoria, barramento SSE, processamento de imagens, regras e ETag/304. |
+| Unidade do web    | `apps/web/src/**/*.test.ts` (2 arquivos)              | Nenhuma                                   | Cache (deduplicação, frescor, 304, invalidação, GC, namespace) e cliente HTTP (timeout, retry, 401 e cancelamento).                                                                                  |
+| E2E               | `tests/e2e/*.spec.ts` (20 especificações, exceto PWA) | API e SPA no ar, banco com seed           | Fluxos dos três papéis, tempo real, notificações, anexos, termômetro, ranking, cache, sessão e resiliência.                                                                                          |
+| PWA               | `tests/e2e/pwa*.spec.ts` (2 especificações)           | Build via `vite preview` e API em `:3001` | Manifest, service worker, ícones, shell offline, dados persistidos e revalidação por 304.                                                                                                            |
+| Smoke do banco    | `scripts/test-db.sh`                                  | Compose no ar                             | Migrações aplicadas, 34 tabelas, CHECKs, triggers, RLS e índice parcial de frequência.                                                                                                               |
 
 ## Como executar
 
@@ -44,7 +44,18 @@ STORAGE_DRIVER=disco \
 npm run test:unit
 ```
 
-Os testes E2E usam `DATABASE_URL_ADMIN` para fixtures e limpeza direta no banco, e esperam o seed de desenvolvimento aplicado. As senhas vêm de `SEED_SENHA_*`.
+Os testes E2E esperam o seed de desenvolvimento aplicado e usam `DATABASE_URL_ADMIN` (dono do schema) para fixtures e limpeza direta no banco; a API continua com `DATABASE_URL` no papel restrito. As senhas vêm de `SEED_SENHA_*`:
+
+```bash
+NODE_ENV=test \
+AUTH_PEPPER='dev-pepper-local-com-mais-de-16-caracteres' \
+DATABASE_URL='postgresql://buscapp_api:buscapp_api@127.0.0.1:5433/buscapp' \
+DATABASE_URL_ADMIN='postgresql://buscapp:buscapp@127.0.0.1:5433/buscapp' \
+MIGRATE_DATABASE_URL='postgresql://buscapp:buscapp@127.0.0.1:5433/buscapp' \
+STORAGE_DRIVER=disco \
+SEED_SENHA_ADMIN='Admin123!' SEED_SENHA_PROF='Prof123!' SEED_SENHA_RESP='Resp123!' \
+npm run test:e2e
+```
 
 ## Integração contínua
 

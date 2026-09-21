@@ -77,5 +77,11 @@ O registro é por exceção: o professor envia apenas os ausentes da turma em um
 - Os catálogos de `opcoes_configuracao` cobrem módulos, documentos, períodos, motivos de ausência, tipos de ocorrência, vínculos, papéis de atribuição, séries e letras. As chaves são validadas por CHECK nas tabelas que as referenciam.
 - Opções e tags referenciadas não podem ser excluídas; a orientação é desativar.
 - `tags_comportamento` define categoria e peso, usados na pontuação.
-- `configuracoes_sistema` concentra limites de faltas, pesos do termômetro, dias de expurgo (declarativos) e parâmetros dos códigos.
+- `configuracoes_sistema` concentra limites de faltas, pesos do termômetro, dias de expurgo (declarativos) e parâmetros dos códigos. A gestão lê o registro completo em `GET /api/configuracoes`; os demais perfis recebem apenas o subconjunto público (`GET /api/configuracoes/publicas`) com escola, fuso, mensagem fora de horário e parâmetros do termômetro.
 - `horarios_letivos` define as janelas de atendimento do chat.
+
+## Auditoria
+
+- A trilha registra login, falhas de login, logout, revogação de sessões, CRUD de usuários e alunos, criação/remoção/download de anexos, expurgo, anonimização e viradas de ano, sempre com `ip_origem`.
+- `GET /api/auditoria` (gestão) lista os eventos com filtros por ação, entidade, usuário e intervalo, com paginação. A tela **Auditoria** em `/gestao/auditoria` consome a rota.
+- Downloads de anexo gravam `BAIXAR_ANEXO` antes de iniciar o streaming.

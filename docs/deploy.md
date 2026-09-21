@@ -18,6 +18,9 @@ A aplicação pode ser publicada de três formas: imagem Docker (GHCR), Docker C
 - `migracoes.yml`: aplica `prisma migrate deploy` com `DATABASE_URL` vindo do secret `DIRECT_URL_PROD` e, em seguida, define a senha do papel `buscapp_api` com `APP_DB_PASSWORD_PROD`.
 - `publicacao.yml`: build e push da imagem para o GHCR.
 - `codeql.yml`: análise estática de javascript-typescript.
+- Todas as Actions são fixadas por SHA (comentário com a versão) e o Dependabot mantém as atualizações.
+
+A imagem Docker roda como usuário `node` (não-root), com o diretório de uploads próprio, e declara `HEALTHCHECK` contra `/api/saude` (intervalo de 30 s, 30 s de carência). A base `node:24-slim` é fixada por digest para builds reproduzíveis.
 
 Ver [testes.md](testes.md) para as lacunas de cobertura do CI.
 

@@ -1,6 +1,7 @@
 import type { Aluno, AtualizarAluno, CriarAluno, ListarAlunos } from '@buscapp/contratos';
 import type { PerfilAutenticado } from '../../nucleo/autenticacao/tipos.js';
 import { filtroAlunosVisiveis, podeVerAluno } from '../../nucleo/autorizacao/escopo.js';
+import { comEscopo } from '../../nucleo/banco/cliente.js';
 import { publicarEvento } from '../../nucleo/eventos/barramento.js';
 import { auditar } from '../../nucleo/auditoria/registrar.js';
 import { ErroHttp, erroNaoEncontrado } from '../../nucleo/http/erros.js';
@@ -52,9 +53,12 @@ export function paraAluno(aluno: AlunoBruto): Aluno {
 }
 
 export async function listar(usuario: PerfilAutenticado, consulta: ListarAlunos): Promise<Aluno[]> {
-  const filtro = await filtroAlunosVisiveis(usuario);
-  const alunos = await listarAlunos(filtro, consulta);
-  return alunos.map(paraAluno);
+  // Escopo + listagem em uma transação: uma única ida ao banco por requisição.
+  return comEscopo(async () => {
+    const filtro = await filtroAlunosVisiveis(usuario);
+    const alunos = await listarAlunos(filtro, consulta);
+    return alunos.map(paraAluno);
+  });
 }
 
 export async function obter(usuario: PerfilAutenticado, id: string): Promise<Aluno> {

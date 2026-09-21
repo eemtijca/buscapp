@@ -15,6 +15,7 @@ import {
   idsDeAlunosVisiveis,
   podeVerAluno,
 } from '../../nucleo/autorizacao/escopo.js';
+import { comEscopo } from '../../nucleo/banco/cliente.js';
 import { publicarEvento } from '../../nucleo/eventos/barramento.js';
 import { erroNaoAutorizado, erroNaoEncontrado, erroValidacao } from '../../nucleo/http/erros.js';
 import {
@@ -269,27 +270,29 @@ export async function listar(
   usuario: PerfilAutenticado,
   consulta: ListarFrequencias,
 ): Promise<Frequencia[]> {
-  const solicitados = [
-    ...(consulta.aluno_id ? [consulta.aluno_id] : []),
-    ...(consulta.aluno_ids ?? []),
-  ];
-  const alunoIds = await alunosNoEscopo(usuario, solicitados);
+  return comEscopo(async () => {
+    const solicitados = [
+      ...(consulta.aluno_id ? [consulta.aluno_id] : []),
+      ...(consulta.aluno_ids ?? []),
+    ];
+    const alunoIds = await alunosNoEscopo(usuario, solicitados);
 
-  const frequencias = await listarFrequencias({
-    alunoIds: alunoIds ?? undefined,
-    turmaId: consulta.turma_id,
-    dataAula: consulta.data_aula ? paraData(consulta.data_aula) : undefined,
-    dataInicio: consulta.data_inicio ? paraData(consulta.data_inicio) : undefined,
-    dataFim: consulta.data_fim ? paraData(consulta.data_fim) : undefined,
-    periodo: consulta.periodo,
-    status: consulta.status,
-    tipoRegistro: consulta.tipo_registro,
-    incluirDeletadas: consulta.incluir_deletadas,
-    limite: consulta.limite,
-    offset: consulta.offset,
+    const frequencias = await listarFrequencias({
+      alunoIds: alunoIds ?? undefined,
+      turmaId: consulta.turma_id,
+      dataAula: consulta.data_aula ? paraData(consulta.data_aula) : undefined,
+      dataInicio: consulta.data_inicio ? paraData(consulta.data_inicio) : undefined,
+      dataFim: consulta.data_fim ? paraData(consulta.data_fim) : undefined,
+      periodo: consulta.periodo,
+      status: consulta.status,
+      tipoRegistro: consulta.tipo_registro,
+      incluirDeletadas: consulta.incluir_deletadas,
+      limite: consulta.limite,
+      offset: consulta.offset,
+    });
+
+    return frequencias.map(paraFrequencia);
   });
-
-  return frequencias.map(paraFrequencia);
 }
 
 /** Agrega ausências e justificativas por aluno para o painel de monitoramento. */

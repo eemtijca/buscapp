@@ -21,6 +21,7 @@ import type {
 } from '@buscapp/contratos';
 import type { PerfilAutenticado } from '../../nucleo/autenticacao/tipos.js';
 import { filtroAlunosVisiveis, podeVerAluno } from '../../nucleo/autorizacao/escopo.js';
+import { comEscopo } from '../../nucleo/banco/cliente.js';
 import { publicarEvento } from '../../nucleo/eventos/barramento.js';
 import { ErroHttp, erroNaoEncontrado, erroValidacao } from '../../nucleo/http/erros.js';
 import {
@@ -433,15 +434,17 @@ export async function listarEnturmacoes(
   usuario: PerfilAutenticado,
   consulta: ListarEnturmacoes,
 ): Promise<Enturmacao[]> {
-  if (consulta.aluno_id && !(await podeVerAluno(usuario, consulta.aluno_id))) {
-    // Fora do escopo responde 404 para não revelar a existência do registro.
-    throw erroNaoEncontrado('Aluno não encontrado.');
-  }
+  return comEscopo(async () => {
+    if (consulta.aluno_id && !(await podeVerAluno(usuario, consulta.aluno_id))) {
+      // Fora do escopo responde 404 para não revelar a existência do registro.
+      throw erroNaoEncontrado('Aluno não encontrado.');
+    }
 
-  const filtro = await filtroAlunosVisiveis(usuario);
-  const alunoIdsVisiveis = filtro.id?.in ?? null;
-  const enturmacoes = await listarEnturmacoesNoBanco(consulta, alunoIdsVisiveis);
-  return enturmacoes.map(paraEnturmacao);
+    const filtro = await filtroAlunosVisiveis(usuario);
+    const alunoIdsVisiveis = filtro.id?.in ?? null;
+    const enturmacoes = await listarEnturmacoesNoBanco(consulta, alunoIdsVisiveis);
+    return enturmacoes.map(paraEnturmacao);
+  });
 }
 
 export async function criarEnturmacao(dados: CriarEnturmacao): Promise<Enturmacao> {

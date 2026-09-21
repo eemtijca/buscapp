@@ -6,6 +6,7 @@ import type {
 } from '@buscapp/contratos';
 import type { PerfilAutenticado } from '../../nucleo/autenticacao/tipos.js';
 import { idsDeAlunosVisiveis } from '../../nucleo/autorizacao/escopo.js';
+import { comEscopo } from '../../nucleo/banco/cliente.js';
 import { ErroHttp, erroNaoEncontrado } from '../../nucleo/http/erros.js';
 import {
   atualizarVinculo,
@@ -42,28 +43,30 @@ export async function listar(
   usuario: PerfilAutenticado,
   filtros: ListarVinculos,
 ): Promise<VinculoResponsavel[]> {
-  if (usuario.papel === 'responsavel') {
-    if (filtros.responsavel_id && filtros.responsavel_id !== usuario.id) {
-      throw erroNaoEncontrado('Vínculo não encontrado.');
+  return comEscopo(async () => {
+    if (usuario.papel === 'responsavel') {
+      if (filtros.responsavel_id && filtros.responsavel_id !== usuario.id) {
+        throw erroNaoEncontrado('Vínculo não encontrado.');
+      }
+      const vinculos = await listarVinculos({ ...filtros, responsavel_id: usuario.id });
+      return vinculos.map(paraVinculo);
     }
-    const vinculos = await listarVinculos({ ...filtros, responsavel_id: usuario.id });
+
+    if (usuario.papel === 'professor') {
+      const alunos = await idsDeAlunosVisiveis(usuario);
+      if (filtros.aluno_id && !(alunos ?? []).includes(filtros.aluno_id)) {
+        throw erroNaoEncontrado('Vínculo não encontrado.');
+      }
+      const vinculos = await listarVinculos(
+        filtros.aluno_id ? filtros : { ...filtros, aluno_id: undefined },
+      );
+      const visiveis = vinculos.filter((vinculo) => (alunos ?? []).includes(vinculo.aluno_id));
+      return visiveis.map(paraVinculo);
+    }
+
+    const vinculos = await listarVinculos(filtros);
     return vinculos.map(paraVinculo);
-  }
-
-  if (usuario.papel === 'professor') {
-    const alunos = await idsDeAlunosVisiveis(usuario);
-    if (filtros.aluno_id && !(alunos ?? []).includes(filtros.aluno_id)) {
-      throw erroNaoEncontrado('Vínculo não encontrado.');
-    }
-    const vinculos = await listarVinculos(
-      filtros.aluno_id ? filtros : { ...filtros, aluno_id: undefined },
-    );
-    const visiveis = vinculos.filter((vinculo) => (alunos ?? []).includes(vinculo.aluno_id));
-    return visiveis.map(paraVinculo);
-  }
-
-  const vinculos = await listarVinculos(filtros);
-  return vinculos.map(paraVinculo);
+  });
 }
 
 export async function criar(dados: CriarVinculo): Promise<VinculoResponsavel> {

@@ -5,6 +5,10 @@ import { construirApp } from './aplicacao.js';
 import { criarSessao } from './nucleo/autenticacao/sessoes.js';
 import { gerarHashSenha } from './nucleo/autenticacao/senhas.js';
 import { prismaAdmin as prisma } from './nucleo/banco/cliente.js';
+import {
+  contarTransacoesExecutadas,
+  reiniciarContadorDeTransacoes,
+} from './nucleo/banco/cliente.js';
 
 /**
  * Matriz de autorização: cobre papel, módulo, escopo e status da conta.
@@ -285,6 +289,18 @@ describe('matriz de autorização', () => {
 
     expect(resposta.statusCode).toBe(200);
     expect(resposta.json().perfil).toBeNull();
+  });
+
+  it('listagem do professor resolve escopo e alunos em uma única transação', async () => {
+    reiniciarContadorDeTransacoes();
+    const resposta = await app.inject({
+      method: 'GET',
+      url: '/api/alunos',
+      cookies: cookies.profCom,
+    });
+
+    expect(resposta.statusCode).toBe(200);
+    expect(contarTransacoesExecutadas()).toBe(1);
   });
 
   it('configurações completas são restritas à gestão', async () => {

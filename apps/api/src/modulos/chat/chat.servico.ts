@@ -9,7 +9,7 @@ import type {
 } from '@buscapp/contratos';
 import type { PerfilAutenticado } from '../../nucleo/autenticacao/tipos.js';
 import { ambiente } from '../../ambiente.js';
-import { prisma } from '../../nucleo/banco/cliente.js';
+import { comEscopo, prisma } from '../../nucleo/banco/cliente.js';
 import { publicarEvento } from '../../nucleo/eventos/barramento.js';
 import { partesNaEscola } from '../../nucleo/tempo/fuso.js';
 import {
@@ -265,15 +265,17 @@ export async function listar(
   usuario: PerfilAutenticado,
   consulta: { limite?: number; offset?: number } = {},
 ): Promise<Conversa[]> {
-  const filtro =
-    usuario.papel === 'gestao'
-      ? {}
-      : usuario.papel === 'responsavel'
-        ? { responsavel_id: usuario.id }
-        : { turma_id: { in: await listarTurmasDoProfessor(usuario.id) } };
+  return comEscopo(async () => {
+    const filtro =
+      usuario.papel === 'gestao'
+        ? {}
+        : usuario.papel === 'responsavel'
+          ? { responsavel_id: usuario.id }
+          : { turma_id: { in: await listarTurmasDoProfessor(usuario.id) } };
 
-  const conversas = await listarConversas({ ...filtro, ...consulta });
-  return hidratar(conversas, usuario.id);
+    const conversas = await listarConversas({ ...filtro, ...consulta });
+    return hidratar(conversas, usuario.id);
+  });
 }
 
 export interface ResultadoCriacaoConversa {

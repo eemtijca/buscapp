@@ -15,6 +15,7 @@ import {
   idsDeAlunosVisiveis,
   podeVerAluno,
 } from '../../nucleo/autorizacao/escopo.js';
+import { comEscopo } from '../../nucleo/banco/cliente.js';
 import { publicarEvento } from '../../nucleo/eventos/barramento.js';
 import { ErroHttp, erroNaoEncontrado, erroValidacao } from '../../nucleo/http/erros.js';
 import {
@@ -130,13 +131,15 @@ export async function listar(
   usuario: PerfilAutenticado,
   consulta: ListarOcorrencias,
 ): Promise<Ocorrencia[]> {
-  const alunoIds = await idsDeAlunosVisiveis(usuario);
-  const registros = await listarOcorrencias(alunoIds, consulta);
-  const tags = await buscarTagsPorNomes(
-    registros.flatMap((registro) => registro.tags_comportamento),
-  );
-  const mapa = mapaDeTags(tags);
-  return registros.map((registro) => paraOcorrencia(registro, mapa));
+  return comEscopo(async () => {
+    const alunoIds = await idsDeAlunosVisiveis(usuario);
+    const registros = await listarOcorrencias(alunoIds, consulta);
+    const tags = await buscarTagsPorNomes(
+      registros.flatMap((registro) => registro.tags_comportamento),
+    );
+    const mapa = mapaDeTags(tags);
+    return registros.map((registro) => paraOcorrencia(registro, mapa));
+  });
 }
 
 export async function obter(usuario: PerfilAutenticado, id: string): Promise<Ocorrencia> {
@@ -205,9 +208,11 @@ export async function listarRegistrosComportamento(
   usuario: PerfilAutenticado,
   consulta: ListarRegistrosComportamento,
 ): Promise<RegistroComportamento[]> {
-  const alunoIds = await idsDeAlunosVisiveis(usuario);
-  const registros = await listarRegistros(alunoIds, consulta);
-  return registros.map(paraRegistro);
+  return comEscopo(async () => {
+    const alunoIds = await idsDeAlunosVisiveis(usuario);
+    const registros = await listarRegistros(alunoIds, consulta);
+    return registros.map(paraRegistro);
+  });
 }
 
 export async function criarRegistroComportamento(

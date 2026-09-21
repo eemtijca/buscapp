@@ -36,6 +36,17 @@ async function definirContexto(
   await tx.$executeRawUnsafe("select set_config('app.usuario_id', $1, true)", usuarioId ?? '');
 }
 
+let transacoesExecutadas = 0;
+
+/** Quantidade de transações abertas desde o último reinício (uso em testes e métricas). */
+export function contarTransacoesExecutadas(): number {
+  return transacoesExecutadas;
+}
+
+export function reiniciarContadorDeTransacoes(): void {
+  transacoesExecutadas = 0;
+}
+
 /**
  * Executa um bloco em transação única definindo `app.usuario_id` para as políticas RLS.
  * Use em transações explícitas; operações simples são embrulhadas automaticamente.
@@ -47,16 +58,25 @@ export async function comEscopo<T>(
   const contexto = contextoBanco.getStore();
   const id = usuarioId ?? contexto?.usuarioId ?? null;
 
+  transacoesExecutadas += 1;
   return base.$transaction(async (tx) => {
     await definirContexto(tx, id);
-    if (contexto) contexto.emTransacao = true;
+    if (contexto) {
+      contexto.emTransacao = true;
+      contexto.tx = tx;
+    }
     try {
       return await fn(tx);
     } finally {
-      if (contexto) contexto.emTransacao = false;
+      if (contexto) {
+        contexto.emTransacao = false;
+        contexto.tx = undefined;
+      }
     }
   });
 }
+
+type Delegados = Record<string, Record<string, (a: unknown) => Promise<unknown>>>;
 
 /**
  * Cliente Prisma da API. Toda operação de modelo fora de uma transação explícita roda
@@ -67,20 +87,30 @@ export const prisma = base.$extends({
     $allModels: {
       async $allOperations({ model, operation, args, query }) {
         const contexto = contextoBanco.getStore();
-        if (!contexto || contexto.emTransacao) return query(args as never);
+        if (!contexto) return query(args as never);
 
+        // Já existe uma transação explícita no request: executa nela para manter o RLS e o agrupamento.
+        if (contexto.tx) {
+          const metodo = (contexto.tx as unknown as Delegados)[model]?.[operation];
+          if (metodo) return await metodo.call((contexto.tx as unknown as Delegados)[model], args);
+          return query(args as never);
+        }
+
+        if (contexto.emTransacao) return query(args as never);
+
+        transacoesExecutadas += 1;
         return base.$transaction(async (tx) => {
           await definirContexto(tx, contexto.usuarioId);
           contexto.emTransacao = true;
+          contexto.tx = tx;
           try {
-            const delegado = (
-              tx as unknown as Record<string, Record<string, (a: unknown) => Promise<unknown>>>
-            )[model];
+            const delegado = (tx as unknown as Delegados)[model];
             const metodo = delegado?.[operation];
             if (!metodo) return query(args as never);
             return await metodo.call(delegado, args);
           } finally {
             contexto.emTransacao = false;
+            contexto.tx = undefined;
           }
         });
       },

@@ -1147,9 +1147,10 @@ async function salvar() {
                 <input
                   id="campoNovoRespTelefone"
                   v-model="novoRespTelefone"
-                  type="text"
+                  type="tel"
+                  inputmode="tel"
+                  autocomplete="tel"
                   class="form-control form-control-sm"
-                  autocomplete="off"
                 />
               </CampoFormulario>
               <CampoFormulario id="campoNovoTipoVinculo" label="Tipo de vínculo">

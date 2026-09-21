@@ -598,9 +598,10 @@ async function salvar() {
             <input
               id="campoTelefone"
               v-model="telefone"
-              type="text"
+              type="tel"
+              inputmode="tel"
+              autocomplete="tel"
               class="form-control form-control-sm"
-              autocomplete="off"
             />
           </CampoFormulario>
 

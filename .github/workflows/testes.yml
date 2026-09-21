@@ -1,9 +1,8 @@
 name: Testes de integração (Compose)
 
 on:
-  push:
-    branches: [main]
   pull_request:
+  workflow_dispatch:
 
 concurrency:
   group: testes-${{ github.ref }}

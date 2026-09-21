@@ -8,7 +8,7 @@
   --bs-link-color-rgb: 0, 130, 65;
   --bs-link-hover-color: #006632;
   --bs-link-hover-color-rgb: 0, 102, 50;
-  --bs-font-sans-serif: 'Geist', system-ui, -apple-system, sans-serif;
+  --bs-font-sans-serif: 'Geist Sans', system-ui, -apple-system, sans-serif;
   --bs-font-monospace: 'Geist Mono', SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
@@ -43,11 +43,6 @@ footer {
   .form-control.form-control-sm,
   .form-select.form-select-sm {
     font-size: 16px;
-  }
-
-  /* Alvos de toque confortáveis nas ações primárias. */
-  main .btn-sm {
-    min-height: 44px;
   }
 }
 

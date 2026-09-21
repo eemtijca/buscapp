@@ -190,7 +190,10 @@ async function abrirDetalhes(alunoId: string) {
       <p class="mt-2 text-body-secondary small mb-0">Calculando prioridades...</p>
     </div>
 
-    <div v-else-if="erro && !ranking.length" class="alert alert-danger d-flex align-items-center justify-content-between gap-3">
+    <div
+      v-else-if="erro && !ranking.length"
+      class="alert alert-danger d-flex align-items-center justify-content-between gap-3"
+    >
       <span>
         <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>
         Não foi possível carregar o ranking. Verifique a conexão e tente novamente.

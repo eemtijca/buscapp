@@ -15,11 +15,7 @@ export type TipoOcorrencia = 'grave' | 'suspensao';
 export type StatusOcorrencia = 'aberta' | 'em_andamento' | 'resolvida' | 'arquivada';
 export type TipoContatoBusca = 'telefone' | 'whatsapp' | 'presencial' | 'carta' | 'outro';
 export type StatusMonitoramento =
-  | 'pendente'
-  | 'em_andamento'
-  | 'realizado'
-  | 'sem_contato'
-  | 'cancelado';
+  'pendente' | 'em_andamento' | 'realizado' | 'sem_contato' | 'cancelado';
 export type StatusJustificativa = 'pendente' | 'aceita' | 'recusada';
 export type TipoNotificacao =
   | 'ausencia_portao'

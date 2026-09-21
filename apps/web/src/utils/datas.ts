@@ -72,7 +72,8 @@ export function formatarDataHorario(iso: string): { data: string; horario: strin
   if (!iso) return { data: '', horario: '' };
 
   const partes = iso.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  const dataCivil = partes?.[1] && partes[2] && partes[3] ? `${partes[3]}/${partes[2]}/${partes[1]}` : '';
+  const dataCivil =
+    partes?.[1] && partes[2] && partes[3] ? `${partes[3]}/${partes[2]}/${partes[1]}` : '';
 
   if (!iso.includes('T')) return { data: dataCivil || iso, horario: '' };
 

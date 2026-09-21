@@ -43,7 +43,9 @@ export const rotasSaude: FastifyPluginAsyncZod = async (app) => {
         await prisma.$queryRaw`select 1`;
         return { status: 'ok' as const, banco: 'ok' as const };
       } catch {
-        return resposta.status(503).send({ status: 'indisponivel' as const, banco: 'erro' as const });
+        return resposta
+          .status(503)
+          .send({ status: 'indisponivel' as const, banco: 'erro' as const });
       }
     },
   );

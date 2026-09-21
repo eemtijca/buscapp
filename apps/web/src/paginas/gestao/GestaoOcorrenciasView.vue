@@ -320,11 +320,7 @@ async function registrarOcorrencia() {
             <span class="visually-hidden">Carregando ocorrências</span>
           </div>
         </div>
-        <ListaOcorrencias
-          v-else
-          :ocorrencias="ocorrencias"
-          @bloquear-retorno="alternarBloqueio"
-        />
+        <ListaOcorrencias v-else :ocorrencias="ocorrencias" @bloquear-retorno="alternarBloqueio" />
       </div>
     </div>
     <ModalConfirmacao

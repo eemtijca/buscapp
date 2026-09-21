@@ -27,19 +27,19 @@ Nunca edite uma migração já aplicada. Crie uma nova com `prisma migrate dev`.
 
 ## Migrações
 
-| Migração                                 | Conteúdo                                                                       |
-| ---------------------------------------- | ------------------------------------------------------------------------------ |
-| `20260913000000_baseline`                | 31 tabelas de domínio, 14 enums, índices, FKs, CHECKs, `pgcrypto` e `pg_trgm`. |
-| `20260913000100_autenticacao`            | `perfis.senha_hash`, tabela `sessoes` e `codigos_redefinicao.codigo_hash`.     |
-| `20260913000200_dados_canonicos`         | Configuração inicial, catálogos, horários, tags, disciplinas e ano letivo.     |
-| `20260913000300_rotinas_dominio`         | Funções e triggers de domínio.                                                 |
-| `20260913000400_rls_backstop`            | Papel `buscapp_api`, funções auxiliares e políticas RLS.                       |
-| `20260913000500_corrige_politica_anexos` | Correção da política de leitura de `anexos`.                                   |
-| `20260920215818_rate_limit_contadores`   | Tabela de contadores do rate limiting.                                         |
-| `20260920223000_integridade_anos_anexos_codigos` | Unicidade do ano ativo, do `storage_path` e do código ativo; triggers de enturmação. |
-| `20260920224500_indices_catalogos`       | Índices B-tree e GIN para contagens de catálogo.                               |
-| `20260920230000_rls_tabelas_administrativas` | RLS e privilégios de coluna em `perfis`, `configuracoes_sistema`, `auditoria` e `codigos_redefinicao`. |
-| `20260920231500_dedupe_notificacoes`     | `notificacoes.dedupe_key` e índice único parcial por pendência.                |
+| Migração                                         | Conteúdo                                                                                               |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
+| `20260913000000_baseline`                        | 31 tabelas de domínio, 14 enums, índices, FKs, CHECKs, `pgcrypto` e `pg_trgm`.                         |
+| `20260913000100_autenticacao`                    | `perfis.senha_hash`, tabela `sessoes` e `codigos_redefinicao.codigo_hash`.                             |
+| `20260913000200_dados_canonicos`                 | Configuração inicial, catálogos, horários, tags, disciplinas e ano letivo.                             |
+| `20260913000300_rotinas_dominio`                 | Funções e triggers de domínio.                                                                         |
+| `20260913000400_rls_backstop`                    | Papel `buscapp_api`, funções auxiliares e políticas RLS.                                               |
+| `20260913000500_corrige_politica_anexos`         | Correção da política de leitura de `anexos`.                                                           |
+| `20260920215818_rate_limit_contadores`           | Tabela de contadores do rate limiting.                                                                 |
+| `20260920223000_integridade_anos_anexos_codigos` | Unicidade do ano ativo, do `storage_path` e do código ativo; triggers de enturmação.                   |
+| `20260920224500_indices_catalogos`               | Índices B-tree e GIN para contagens de catálogo.                                                       |
+| `20260920230000_rls_tabelas_administrativas`     | RLS e privilégios de coluna em `perfis`, `configuracoes_sistema`, `auditoria` e `codigos_redefinicao`. |
+| `20260920231500_dedupe_notificacoes`             | `notificacoes.dedupe_key` e índice único parcial por pendência.                                        |
 
 O container aplica as migrações na partida pelo entrypoint. Em produção, o workflow `migracoes.yml` aplica e em seguida define a senha do papel. Ver [deploy.md](deploy.md).
 

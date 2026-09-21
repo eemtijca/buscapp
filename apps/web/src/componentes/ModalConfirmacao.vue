@@ -43,10 +43,7 @@ function classeBotao(variante: 'danger' | 'success' | 'warning'): string {
     @update:visivel="(aberto) => !aberto && emit('cancelar')"
   >
     <p class="mb-0 d-flex align-items-start gap-2">
-      <i
-        :class="'bi bi-' + icone + ' ' + classeIcone(variante)"
-        aria-hidden="true"
-      ></i>
+      <i :class="'bi bi-' + icone + ' ' + classeIcone(variante)" aria-hidden="true"></i>
       <span>{{ mensagem }}</span>
     </p>
 

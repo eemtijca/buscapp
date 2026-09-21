@@ -24,7 +24,8 @@ const container = ref<HTMLElement | null>(null);
 /** Fecha o menu ao clicar fora ou pressionar Escape. */
 function aoClicarFora(evento: MouseEvent) {
   if (!menuAbertoId.value) return;
-  if (container.value && !container.value.contains(evento.target as Node)) menuAbertoId.value = null;
+  if (container.value && !container.value.contains(evento.target as Node))
+    menuAbertoId.value = null;
 }
 
 function aoTeclar(evento: KeyboardEvent) {

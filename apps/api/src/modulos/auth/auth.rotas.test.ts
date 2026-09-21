@@ -395,7 +395,9 @@ describe('sessões ativas', () => {
     });
     expect(lista.statusCode).toBe(200);
     expect(lista.json().sessoes).toHaveLength(2);
-    expect(lista.json().sessoes.filter((sessao: { atual: boolean }) => sessao.atual)).toHaveLength(1);
+    expect(lista.json().sessoes.filter((sessao: { atual: boolean }) => sessao.atual)).toHaveLength(
+      1,
+    );
 
     const revogacao = await app.inject({
       method: 'DELETE',

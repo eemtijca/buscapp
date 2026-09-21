@@ -54,7 +54,8 @@ function mensagemDoFastify(status: number): string {
 }
 
 /** Monta a aplicação Fastify; exposta separadamente para testes com `inject`. */
-export async function construirApp(): Promise<FastifyInstance> {  const app = Fastify({
+export async function construirApp(): Promise<FastifyInstance> {
+  const app = Fastify({
     trustProxy: ambiente.TRUST_PROXY,
     // O corpo JSON fica limitado a 1 MB; o multipart de anexos tem limite próprio de 10 MB.
     bodyLimit: 1024 * 1024,
@@ -181,10 +182,7 @@ export async function construirApp(): Promise<FastifyInstance> {  const app = Fa
     skipOnError: true,
     onExceeded: (pedido) => {
       // Alerta para monitoração: picos de 429 por rota e IP.
-      app.log.warn(
-        { rota: pedido.url, ip: pedido.ip },
-        'Limite de requisições excedido',
-      );
+      app.log.warn({ rota: pedido.url, ip: pedido.ip }, 'Limite de requisições excedido');
     },
     errorResponseBuilder: (_pedido, contexto) => ({
       erro: {

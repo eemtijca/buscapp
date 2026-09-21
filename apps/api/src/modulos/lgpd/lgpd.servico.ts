@@ -20,9 +20,18 @@ export async function exportarTitular(alunoId: string): Promise<ExportacaoTitula
       include: { perfis: { select: { id: true, nome: true, email: true, telefone: true } } },
     }),
     prisma.frequencias.findMany({ where: { aluno_id: alunoId }, orderBy: { data_aula: 'asc' } }),
-    prisma.ocorrencias.findMany({ where: { aluno_id: alunoId }, orderBy: { data_ocorrencia: 'asc' } }),
-    prisma.justificativas_faltas.findMany({ where: { aluno_id: alunoId }, orderBy: { data_falta: 'asc' } }),
-    prisma.registros_comportamento.findMany({ where: { aluno_id: alunoId }, orderBy: { data_hora: 'asc' } }),
+    prisma.ocorrencias.findMany({
+      where: { aluno_id: alunoId },
+      orderBy: { data_ocorrencia: 'asc' },
+    }),
+    prisma.justificativas_faltas.findMany({
+      where: { aluno_id: alunoId },
+      orderBy: { data_falta: 'asc' },
+    }),
+    prisma.registros_comportamento.findMany({
+      where: { aluno_id: alunoId },
+      orderBy: { data_hora: 'asc' },
+    }),
   ]);
 
   const justificativaIds = justificativas.map((justificativa) => justificativa.id);

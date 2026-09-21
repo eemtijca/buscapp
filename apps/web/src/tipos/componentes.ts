@@ -85,22 +85,10 @@ export interface Postagem {
 }
 
 export type CorBadge =
-  | 'primary'
-  | 'secondary'
-  | 'success'
-  | 'danger'
-  | 'warning'
-  | 'info'
-  | 'light'
-  | 'dark';
+  'primary' | 'secondary' | 'success' | 'danger' | 'warning' | 'info' | 'light' | 'dark';
 
 export type VarianteBadge =
-  | 'solida'
-  | 'sutil'
-  | 'borda'
-  | 'avatar'
-  | 'removivel'
-  | 'avatar-removivel';
+  'solida' | 'sutil' | 'borda' | 'avatar' | 'removivel' | 'avatar-removivel';
 
 /** Nível de risco calculado a partir do acúmulo de ausências e ocorrências graves. Usado pelo Termômetro de Atenção. */
 export type NivelRisco = 'baixo' | 'medio' | 'alto';

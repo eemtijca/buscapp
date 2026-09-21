@@ -31,9 +31,13 @@ test.describe('Cache - purga de sessão', () => {
     await page.goto('/gestao/anos-letivos');
     await expect(page.locator('table')).toBeVisible();
     await expect
-      .poll(async () => (await lerConsultas(page)).some((registro) => registro.chave.includes('anos-letivos')), {
-        timeout: 15_000,
-      })
+      .poll(
+        async () =>
+          (await lerConsultas(page)).some((registro) => registro.chave.includes('anos-letivos')),
+        {
+          timeout: 15_000,
+        },
+      )
       .toBe(true);
 
     await logout(page);

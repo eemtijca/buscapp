@@ -258,18 +258,20 @@ export const rotasAnexos: FastifyPluginAsyncZod = async (app) => {
       const fluxo = await armazenamento().lerFluxo(anexo.storage_path);
       const exibivel = anexo.mime_type.startsWith('image/');
 
-      return resposta
-        .header('Content-Type', anexo.mime_type)
-        .header('Content-Length', String(anexo.tamanho_bytes))
-        .header(
-          'Content-Disposition',
-          `${exibivel ? 'inline' : 'attachment'}; filename="${encodeURIComponent(anexo.nome_arquivo)}"`,
-        )
-        // Conteúdo enviado por usuário: nunca deve ser interpretado como documento no domínio da API.
-        .header('Content-Security-Policy', 'sandbox')
-        .header('X-Content-Type-Options', 'nosniff')
-        .header('Cache-Control', 'private, no-store')
-        .send(fluxo);
+      return (
+        resposta
+          .header('Content-Type', anexo.mime_type)
+          .header('Content-Length', String(anexo.tamanho_bytes))
+          .header(
+            'Content-Disposition',
+            `${exibivel ? 'inline' : 'attachment'}; filename="${encodeURIComponent(anexo.nome_arquivo)}"`,
+          )
+          // Conteúdo enviado por usuário: nunca deve ser interpretado como documento no domínio da API.
+          .header('Content-Security-Policy', 'sandbox')
+          .header('X-Content-Type-Options', 'nosniff')
+          .header('Cache-Control', 'private, no-store')
+          .send(fluxo)
+      );
     },
   );
 

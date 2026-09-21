@@ -13,13 +13,13 @@ Suítes de integração da API (Vitest), unidade do cache do frontend (Vitest), 
 
 ## Suítes
 
-| Suíte             | Arquivos                                  | Dependências                         | Cobertura                                                                                          |
-| ----------------- | ----------------------------------------- | ------------------------------------ | -------------------------------------------------------------------------------------------------- |
-| Integração da API | `apps/api/src/**/*.test.ts` (13 arquivos) | Banco do Compose migrado             | Autenticação e sessões, senhas, autorização e escopo, CRUD dos domínios, códigos, anexos, regras e ETag/304. |
-| Unidade do cache  | `apps/web/src/**/*.test.ts` (1 arquivo)   | Nenhuma                              | Deduplicação, frescor, 304, invalidação por tabela e escopo, GC e namespace.                        |
-| E2E               | `tests/e2e/*.spec.ts` (20 especificações, exceto PWA) | API e SPA no ar, banco com seed      | Fluxos dos três papéis, tempo real, notificações, anexos, termômetro, ranking, cache, sessão e resiliência. |
-| PWA               | `tests/e2e/pwa*.spec.ts` (2 especificações) | Build via `vite preview` e API em `:3001` | Manifest, service worker, ícones, shell offline, dados persistidos e revalidação por 304.  |
-| Smoke do banco    | `scripts/test-db.sh`                      | Compose no ar                        | Migrações aplicadas, 33 tabelas, CHECKs, triggers e índice parcial de frequência.                  |
+| Suíte             | Arquivos                                              | Dependências                              | Cobertura                                                                                                    |
+| ----------------- | ----------------------------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Integração da API | `apps/api/src/**/*.test.ts` (13 arquivos)             | Banco do Compose migrado                  | Autenticação e sessões, senhas, autorização e escopo, CRUD dos domínios, códigos, anexos, regras e ETag/304. |
+| Unidade do cache  | `apps/web/src/**/*.test.ts` (1 arquivo)               | Nenhuma                                   | Deduplicação, frescor, 304, invalidação por tabela e escopo, GC e namespace.                                 |
+| E2E               | `tests/e2e/*.spec.ts` (20 especificações, exceto PWA) | API e SPA no ar, banco com seed           | Fluxos dos três papéis, tempo real, notificações, anexos, termômetro, ranking, cache, sessão e resiliência.  |
+| PWA               | `tests/e2e/pwa*.spec.ts` (2 especificações)           | Build via `vite preview` e API em `:3001` | Manifest, service worker, ícones, shell offline, dados persistidos e revalidação por 304.                    |
+| Smoke do banco    | `scripts/test-db.sh`                                  | Compose no ar                             | Migrações aplicadas, 33 tabelas, CHECKs, triggers e índice parcial de frequência.                            |
 
 ## Como executar
 
@@ -48,13 +48,13 @@ Os testes E2E usam `DATABASE_URL_ADMIN` para fixtures e limpeza direta no banco,
 
 ## Integração contínua
 
-| Workflow         | Etapas                                                                                            |
-| ---------------- | ------------------------------------------------------------------------------------------------- |
-| `qualidade.yml`  | `npm ci`, `type-check`, `lint` e `build-only` em push para `main` e pull requests.                |
+| Workflow         | Etapas                                                                                                 |
+| ---------------- | ------------------------------------------------------------------------------------------------------ |
+| `qualidade.yml`  | `npm ci`, `type-check`, `lint` e `build-only` em push para `main` e pull requests.                     |
 | `testes.yml`     | `docker compose up -d --build`, espera `/api/saude` e roda `npm run test:unit` com PostgreSQL e Redis. |
-| `migracoes.yml`  | `prisma migrate deploy` e aplicação da senha do papel em push para `main` com mudanças no schema. |
-| `publicacao.yml` | Build da imagem e push para o GHCR em push para `main` e tags `v*`.                               |
-| `codeql.yml`     | Análise CodeQL para javascript-typescript em push, pull request e agenda semanal.                 |
+| `migracoes.yml`  | `prisma migrate deploy` e aplicação da senha do papel em push para `main` com mudanças no schema.      |
+| `publicacao.yml` | Build da imagem e push para o GHCR em push para `main` e tags `v*`.                                    |
+| `codeql.yml`     | Análise CodeQL para javascript-typescript em push, pull request e agenda semanal.                      |
 
 > [!WARNING]
 > Vitest roda no CI desde a integração com o Compose. Playwright e o teste de PWA continuam de execução local: rode as suítes antes de abrir um pull request.

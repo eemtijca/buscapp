@@ -274,9 +274,7 @@ export function useHorarioProtegido(): {
   const timer = setInterval(() => (agora.value = new Date()), 60_000);
   onScopeDispose(() => clearInterval(timer));
 
-  const horarioAtivo = computed(() =>
-    janelaAberta(horario.value, agora.value, fusoHorario.value),
-  );
+  const horarioAtivo = computed(() => janelaAberta(horario.value, agora.value, fusoHorario.value));
 
   return { horario, horarioAtivo, pendente: consultaHorarios.pendente };
 }

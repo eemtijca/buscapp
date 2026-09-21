@@ -53,7 +53,10 @@ export type Sessao = z.infer<typeof sessaoSchema>;
 
 export const listarSessoesRespostaSchema = z.object({ sessoes: z.array(sessaoSchema) });
 
-export const revogarSessoesRespostaSchema = z.object({ ok: z.literal(true), revogadas: z.number().int() });
+export const revogarSessoesRespostaSchema = z.object({
+  ok: z.literal(true),
+  revogadas: z.number().int(),
+});
 
 /** Política de senha forte: mínimo 8 com maiúscula, minúscula, dígito e símbolo. */
 export function senhaForte(senha: string): boolean {

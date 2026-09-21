@@ -230,8 +230,8 @@ const tendenciaInfo = computed(() => {
             {{ termometro.totalAusencias - limites.preventivo + 1 }}).
           </li>
           <li v-else>
-            Faltam {{ limites.preventivo - termometro.totalAusencias }} falta(s) para
-            atingir o nível de atenção — mantenha a frequência.
+            Faltam {{ limites.preventivo - termometro.totalAusencias }} falta(s) para atingir o
+            nível de atenção — mantenha a frequência.
           </li>
           <li v-if="termometro.totalOcorrencias > 0">
             Ocorrências pendentes mantêm o score elevado — resolva ou confirme presença do

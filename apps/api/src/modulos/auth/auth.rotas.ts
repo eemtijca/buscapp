@@ -18,7 +18,11 @@ import {
   redefinirSenhaComCodigo,
   solicitarCodigoRedefinicao,
 } from '../../nucleo/autenticacao/codigos.js';
-import { autenticar, autenticarOpcional, usuarioAtual } from '../../nucleo/autenticacao/middleware.js';
+import {
+  autenticar,
+  autenticarOpcional,
+  usuarioAtual,
+} from '../../nucleo/autenticacao/middleware.js';
 import {
   definirCookieSessao,
   limparCookieSessao,

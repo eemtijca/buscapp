@@ -104,7 +104,9 @@ test.describe('Gestão - Usuários - Salvamento limpa estado de edição', () =>
 });
 
 test.describe('Navegação - cache de dados', () => {
-  test('CT-Cache-1: reabrir rota visitada não espera a rede nem exibe overlay', async ({ page }) => {
+  test('CT-Cache-1: reabrir rota visitada não espera a rede nem exibe overlay', async ({
+    page,
+  }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/usuarios');
     await page.waitForSelector('table');

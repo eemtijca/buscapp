@@ -298,7 +298,11 @@ export async function criarHorarioLetivo(dados: CriarHorarioLetivo): Promise<Hor
     });
   } catch (erro) {
     if ((erro as { code?: string }).code === 'P2002') {
-      throw new ErroHttp(409, 'horario_duplicado', 'Já existe um horário com este dia e intervalo.');
+      throw new ErroHttp(
+        409,
+        'horario_duplicado',
+        'Já existe um horário com este dia e intervalo.',
+      );
     }
     throw erro;
   }
@@ -327,7 +331,11 @@ export async function atualizarHorarioLetivo(
     });
   } catch (erro) {
     if ((erro as { code?: string }).code === 'P2002') {
-      throw new ErroHttp(409, 'horario_duplicado', 'Já existe um horário com este dia e intervalo.');
+      throw new ErroHttp(
+        409,
+        'horario_duplicado',
+        'Já existe um horário com este dia e intervalo.',
+      );
     }
     throw erro;
   }

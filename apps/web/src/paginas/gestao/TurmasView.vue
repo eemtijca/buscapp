@@ -375,12 +375,7 @@ async function alternarAtivo(turma: Turma) {
         </CampoFormulario>
         <div class="mb-0">
           <div class="form-check">
-            <input
-              id="campoAtivo"
-              v-model="formAtivo"
-              type="checkbox"
-              class="form-check-input"
-            />
+            <input id="campoAtivo" v-model="formAtivo" type="checkbox" class="form-check-input" />
             <label class="form-check-label small fw-medium" for="campoAtivo">Ativo</label>
           </div>
         </div>

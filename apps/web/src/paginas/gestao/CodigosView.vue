@@ -401,7 +401,12 @@ onUnmounted(() => {
       </li>
     </ul>
 
-    <div v-if="guiaAtiva === 'pendentes'" id="painel-solicitacoes" role="tabpanel" aria-labelledby="aba-solicitacoes">
+    <div
+      v-if="guiaAtiva === 'pendentes'"
+      id="painel-solicitacoes"
+      role="tabpanel"
+      aria-labelledby="aba-solicitacoes"
+    >
       <div v-if="pendente && !solicitacoes.length" class="text-center py-5">
         <div class="spinner-border text-primary" role="status">
           <span class="visually-hidden">Carregando...</span>

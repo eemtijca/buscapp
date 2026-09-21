@@ -66,7 +66,9 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await prisma.enturmacoes.deleteMany({ where: { aluno_id: alunoId } });
-  await prisma.anexos.deleteMany({ where: { storage_path: { contains: `integridade-${marcador}` } } });
+  await prisma.anexos.deleteMany({
+    where: { storage_path: { contains: `integridade-${marcador}` } },
+  });
   await prisma.codigos_redefinicao.deleteMany({ where: { email } });
   await prisma.alunos.deleteMany({ where: { id: alunoId } });
   await prisma.turmas.deleteMany({ where: { id: turmaId } });

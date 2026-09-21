@@ -34,12 +34,19 @@ export async function executarExpurgo(): Promise<ExpurgoResposta> {
   const codigos = await prisma.codigos_redefinicao.deleteMany({
     where: {
       created_at: { lt: limiteCodigos },
-      OR: [{ usado_em: { not: null } }, { revogado_em: { not: null } }, { expira_em: { lte: agora } }],
+      OR: [
+        { usado_em: { not: null } },
+        { revogado_em: { not: null } },
+        { expira_em: { lte: agora } },
+      ],
     },
   });
   await prisma.codigos_redefinicao_tentativas.deleteMany({
     where: {
-      OR: [{ bloqueado_ate: null, updated_at: { lt: limiteCodigos } }, { bloqueado_ate: { lte: agora } }],
+      OR: [
+        { bloqueado_ate: null, updated_at: { lt: limiteCodigos } },
+        { bloqueado_ate: { lte: agora } },
+      ],
     },
   });
 

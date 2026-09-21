@@ -32,13 +32,19 @@ beforeAll(async () => {
     },
   });
   await prisma.rate_limit_contadores.create({
-    data: { chave: `expurgo-teste-${marcador}`, contagem: 3, expira_em: new Date(Date.now() - 1000) },
+    data: {
+      chave: `expurgo-teste-${marcador}`,
+      contagem: 3,
+      expira_em: new Date(Date.now() - 1000),
+    },
   });
 });
 
 afterAll(async () => {
   await prisma.auditoria.deleteMany({ where: { acao: 'EXPURGO' } });
-  await prisma.rate_limit_contadores.deleteMany({ where: { chave: { contains: 'expurgo-teste' } } });
+  await prisma.rate_limit_contadores.deleteMany({
+    where: { chave: { contains: 'expurgo-teste' } },
+  });
   await app.close();
   await prisma.$disconnect();
 });

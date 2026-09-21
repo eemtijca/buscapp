@@ -21,6 +21,7 @@ import Combobox from '@/componentes/Combobox.vue';
 import type { OpcaoCombobox } from '@/componentes/Combobox.vue';
 import GrupoCheckbox from '@/componentes/GrupoCheckbox.vue';
 import ModalConfirmacao from '@/componentes/ModalConfirmacao.vue';
+import { formatarData } from '@/utils/datas';
 import type { Enturmacao, VinculoResponsavel } from '@/tipos/database';
 
 interface EnturmacaoApi {
@@ -1004,7 +1005,7 @@ async function salvar() {
             <span class="fw-medium">Turma:</span> {{ turmaAtualNome }}
             <br />
             <span class="fw-medium">Matrícula em:</span>
-            {{ new Date(enturmacaoAtual.data_matricula).toLocaleDateString('pt-BR') }}
+            {{ formatarData(enturmacaoAtual.data_matricula) }}
           </p>
           <p v-else class="mb-2 small text-body-secondary">Aluno não enturmado.</p>
 

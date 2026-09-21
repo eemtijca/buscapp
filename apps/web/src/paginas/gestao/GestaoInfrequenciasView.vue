@@ -15,6 +15,7 @@ import Combobox from '@/componentes/Combobox.vue';
 import type { OpcaoCombobox } from '@/componentes/Combobox.vue';
 import GrupoCheckbox from '@/componentes/GrupoCheckbox.vue';
 import ModalConfirmacao from '@/componentes/ModalConfirmacao.vue';
+import { formatarData } from '@/utils/datas';
 import type { AlunoFrequencia } from '@/tipos/componentes';
 
 const route = useRoute();
@@ -552,7 +553,7 @@ watch(dataAula, () => {
         'Registrar ' +
         totalAusentesMarcados +
         ' ausência(s) na turma selecionada em ' +
-        new Date(dataAula + 'T12:00:00').toLocaleDateString('pt-BR') +
+        formatarData(dataAula) +
         '?'
       "
       rotulo-confirmar="Registrar faltas"
@@ -564,7 +565,7 @@ watch(dataAula, () => {
     <ModalConfirmacao
       :visivel="confirmarIndividual"
       titulo="Registrar ausência"
-      :mensagem="`Registrar ${periodosIndividuais.length} ausência(s) para o aluno selecionado em ${new Date(dataAula + 'T12:00:00').toLocaleDateString('pt-BR')}?`"
+      :mensagem="`Registrar ${periodosIndividuais.length} ausência(s) para o aluno selecionado em ${formatarData(dataAula)}?`"
       rotulo-confirmar="Registrar"
       icone="person-dash"
       variante="warning"

@@ -12,6 +12,7 @@ import {
 import { useStatusConexao } from '@/composables/useStatusConexao';
 import ModalBase from '@/componentes/ModalBase.vue';
 import EstadoErro from '@/componentes/EstadoErro.vue';
+import { formatarDataHoraCurta } from '@/utils/datas';
 import type { SolicitacaoCodigo, CodigoGerado } from '@/tipos/componentes';
 
 const router = useRouter();
@@ -115,12 +116,7 @@ const codigoStatusBadge = (status: string) => {
 };
 
 function formatarDataCurta(data: string) {
-  return new Date(data).toLocaleDateString('pt-BR', {
-    day: '2-digit',
-    month: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  return formatarDataHoraCurta(data);
 }
 
 function toggleVisibilidade(codigoId: string) {

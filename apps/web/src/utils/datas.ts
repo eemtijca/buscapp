@@ -86,6 +86,18 @@ export function formatarDataHorario(iso: string): { data: string; horario: strin
   };
 }
 
+/** Data curta com horário (`dd/mm hh:mm`), usada em listas densas. */
+export function formatarDataHoraCurta(iso: string): string {
+  const data = new Date(iso);
+  if (Number.isNaN(data.getTime())) return iso;
+  return data.toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 /** Dias civis entre duas datas ISO (`yyyy-mm-dd`). */
 export function diasEntre(inicio: string, fim: string): number {
   const a = new Date(`${inicio}T00:00:00`);

@@ -72,8 +72,11 @@ let redirecionandoParaLogin = false;
  */
 function tratarSessaoExpirada(caminho: string): void {
   if (caminho.startsWith('/api/auth/') || redirecionandoParaLogin) return;
-  redirecionandoParaLogin = true;
+  // Já está no login (ou o destino é a raiz): nada a preservar, evita `?destino=/`.
+  if (window.location.pathname === '/') return;
   const destino = `${window.location.pathname}${window.location.search}`;
+  if (destino === '/') return;
+  redirecionandoParaLogin = true;
   window.location.assign(`/?destino=${encodeURIComponent(destino)}`);
 }
 

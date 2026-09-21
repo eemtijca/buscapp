@@ -192,8 +192,8 @@ test.describe('Gestão - Integridade de catálogo', () => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/configuracao/serie_turma');
     const linha = page.locator('.config-table tbody tr').filter({ hasText: '1ª' });
-    page.on('dialog', (d) => d.accept());
     await linha.locator('button.btn-outline-danger').click();
+    await page.locator('.modal.show').getByRole('button', { name: 'Excluir' }).click();
     await expect(page.getByText(/Não é possível excluir/)).toBeVisible();
     await expect(linha).toBeVisible();
   });
@@ -209,8 +209,8 @@ test.describe('Gestão - Integridade de catálogo', () => {
     await page.waitForTimeout(1000);
     await expect(page.locator('table')).toContainText(nome, { timeout: 5000 });
     const linha = page.locator('.config-table tbody tr').filter({ hasText: nome });
-    page.on('dialog', (d) => d.accept());
     await linha.locator('button.btn-outline-danger').click();
+    await page.locator('.modal.show').getByRole('button', { name: 'Excluir' }).click();
     await page.waitForTimeout(1000);
     await expect(page.locator('table')).not.toContainText(nome, { timeout: 5000 });
   });
@@ -219,8 +219,8 @@ test.describe('Gestão - Integridade de catálogo', () => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/configuracao/tags');
     const linha = page.locator('tbody tr').filter({ hasText: 'Desatenção' });
-    page.on('dialog', (d) => d.accept());
     await linha.locator('button.btn-outline-danger').click();
+    await page.locator('.modal.show').getByRole('button', { name: 'Excluir' }).click();
     await expect(page.getByText(/Não é possível excluir/)).toBeVisible();
     await expect(linha).toBeVisible();
   });
@@ -252,6 +252,7 @@ test.describe('Gestão - Integridade de catálogo', () => {
     await card.locator('#campoNovaTurma-lista [role="option"]', { hasText: '3ª C' }).click();
     await card.locator('#campoNovaDataMat').fill('2026-08-01');
     await card.getByRole('button', { name: 'Salvar' }).click();
+    await page.locator('.modal.show').getByRole('button', { name: 'Alterar' }).click();
     await expect(card.getByRole('button', { name: 'Alterar enturmação' })).toBeVisible({
       timeout: 15000,
     });

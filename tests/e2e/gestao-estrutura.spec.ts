@@ -134,9 +134,9 @@ test.describe('Gestão - Anos Letivos', () => {
     await page.goto('/gestao/anos-letivos');
     await page.waitForSelector('tbody tr');
 
-    page.on('dialog', (d) => d.accept());
     const linhaNova = page.locator('tr').filter({ hasText: String(ANO_TESTE) });
     await linhaNova.locator('button[title="Ativar (virada de ano)"]').click();
+    await page.locator('.modal.show').getByRole('button', { name: 'Ativar' }).click();
 
     await expect(linhaNova.locator('.badge')).toHaveText(/Ativo/i, { timeout: 5000 });
     const linhaAnterior = page.locator('tr').filter({ hasText: String(new Date().getFullYear()) });
@@ -149,9 +149,9 @@ test.describe('Gestão - Anos Letivos', () => {
     await page.goto('/gestao/anos-letivos');
     await page.waitForSelector('tbody tr');
 
-    page.on('dialog', (d) => d.accept());
     const linhaCorrente = page.locator('tr').filter({ hasText: String(new Date().getFullYear()) });
     await linhaCorrente.locator('button[title="Ativar (virada de ano)"]').click();
+    await page.locator('.modal.show').getByRole('button', { name: 'Ativar' }).click();
 
     await expect(linhaCorrente.locator('.badge')).toHaveText(/Ativo/i, { timeout: 5000 });
     await expect(

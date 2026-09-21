@@ -12,8 +12,9 @@ test.describe('Gestão - Home', () => {
     await expect(page.locator('h3.card-nav-title').nth(4)).toHaveText('Usuários');
     await expect(page.locator('h3.card-nav-title').nth(5)).toHaveText('Alunos');
     await expect(page.locator('h3.card-nav-title').nth(6)).toHaveText('Códigos');
-    await expect(page.locator('h3.card-nav-title').nth(8)).toHaveText('Anos letivos');
-    await expect(page.locator('h3.card-nav-title').nth(12)).toHaveText('Configurações');
+    await expect(page.locator('h3.card-nav-title').nth(7)).toHaveText('Auditoria');
+    await expect(page.locator('h3.card-nav-title').nth(9)).toHaveText('Anos letivos');
+    await expect(page.locator('h3.card-nav-title').nth(13)).toHaveText('Configurações');
   });
 
   test('CT07 - Notificação de código aparece no header', async ({ page }) => {

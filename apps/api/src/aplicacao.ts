@@ -12,7 +12,7 @@ import {
   validatorCompiler,
   type ZodTypeProvider,
 } from 'fastify-type-provider-zod';
-import { ambiente, origensPermitidas } from './ambiente.js';
+import { ambiente, deveAvisarTrustProxy, origensPermitidas } from './ambiente.js';
 import { contextoBanco } from './nucleo/banco/contexto.js';
 import { registrarCacheHttp } from './nucleo/http/etag.js';
 import { ErroHttp } from './nucleo/http/erros.js';
@@ -80,6 +80,12 @@ export async function construirApp(): Promise<FastifyInstance> {
 
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);
+
+  if (deveAvisarTrustProxy(ambiente)) {
+    app.log.warn(
+      'TRUST_PROXY desativado em produção: o IP real, o rate limiting e a auditoria podem registrar o proxy.',
+    );
+  }
 
   registrarCacheHttp(app);
 

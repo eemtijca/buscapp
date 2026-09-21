@@ -26,6 +26,7 @@ import {
   buscarEnturmacaoAtiva,
   buscarMensagemForaHorario,
   buscarMensagemPorClientRequestId,
+  buscarResponsavelValido,
   buscarVinculoAtivo,
   contarNaoLidas,
   criarConversa,
@@ -234,7 +235,13 @@ async function resolverResponsavel(
   dados: CriarConversa,
 ): Promise<string> {
   if (usuario.papel === 'gestao') {
-    if (dados.responsavel_id) return dados.responsavel_id;
+    if (dados.responsavel_id) {
+      const responsavel = await buscarResponsavelValido(dados.responsavel_id, dados.aluno_id);
+      if (!responsavel) {
+        throw erroValidacao('Responsável inválido ou sem vínculo ativo com o aluno.');
+      }
+      return dados.responsavel_id;
+    }
     const contato = await buscarContatoPrioritario(dados.aluno_id);
     if (!contato) throw erroValidacao('O aluno não possui responsável vinculado.');
     return contato.responsavel_id;

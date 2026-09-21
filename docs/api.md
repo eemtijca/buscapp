@@ -85,7 +85,8 @@ Rotas HTTP da API Fastify. Todas ficam sob `/api` e respondem JSON, exceto o dow
 | POST                   | `/api/anexos`                                            | Todos                             | Envia anexo por multipart                                                  |
 | GET                    | `/api/anexos/:id/arquivo`                                | Todos                             | Baixa o anexo em streaming, com autorização                                |
 | DELETE                 | `/api/anexos/:id`                                        | Todos                             | Remove anexo do criador ou da gestão                                       |
-| GET                    | `/api/configuracoes`                                     | Sessão                            | Parâmetros do sistema                                                      |
+| GET                    | `/api/configuracoes`                                     | Gestão                            | Parâmetros completos do sistema                                            |
+| GET                    | `/api/configuracoes/publicas`                            | Sessão                            | Subconjunto público (termômetro, escola, fuso e mensagem fora de horário)  |
 | PUT                    | `/api/configuracoes`                                     | Gestão                            | Atualiza parâmetros do sistema                                             |
 | GET, POST, PUT, DELETE | `/api/opcoes`, `/api/opcoes/:id`                         | Consulta: sessão; escrita: gestão | Catálogos genéricos                                                        |
 | PATCH                  | `/api/opcoes/reordenar`                                  | Gestão                            | Reordena opções em transação                                               |
@@ -216,7 +217,7 @@ Baixa o conteúdo em streaming, com `Content-Type`, `Content-Length`, `Content-D
 
 ## Configurações e catálogos
 
-- `GET /api/configuracoes` devolve os parâmetros globais; `PUT` fica restrito à gestão.
+- `GET /api/configuracoes` devolve os parâmetros completos e `PUT` fica restrito à gestão. `GET /api/configuracoes/publicas` devolve o subconjunto visível a todos os perfis (parâmetros do termômetro, escola, fuso e mensagem fora de horário), sem os parâmetros operacionais (expurgo de anexos e política de códigos).
 - `/api/opcoes` cobre os catálogos genéricos, com reordenação em transação e bloqueio de exclusão de opções referenciadas.
 - `/api/horarios` define as janelas de atendimento do chat.
 - `/api/tags-comportamento` define o catálogo de tags usado em ocorrências e registros.

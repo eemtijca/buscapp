@@ -65,6 +65,15 @@ const esquema = z
         message: 'AUTH_PEPPER deve ter ao menos 32 caracteres em produção',
       });
     }
+
+    const cookieSeguro = valores.COOKIE_SECURE ?? valores.NODE_ENV === 'production';
+    if (valores.COOKIE_SAMESITE === 'none' && !cookieSeguro) {
+      contexto.addIssue({
+        code: 'custom',
+        path: ['COOKIE_SECURE'],
+        message: 'COOKIE_SAMESITE=none exige COOKIE_SECURE=true',
+      });
+    }
   });
 
 export type Ambiente = z.infer<typeof esquema>;
@@ -72,6 +81,13 @@ export type Ambiente = z.infer<typeof esquema>;
 export const ambiente: Ambiente = esquema.parse(process.env);
 
 export const cookieSeguro = ambiente.COOKIE_SECURE ?? ambiente.NODE_ENV === 'production';
+
+/** Avisa quando produção roda atrás de proxy sem confiar no encaminhamento de IP. */
+export function deveAvisarTrustProxy(
+  valores: Pick<Ambiente, 'NODE_ENV' | 'TRUST_PROXY'>,
+): boolean {
+  return valores.NODE_ENV === 'production' && !valores.TRUST_PROXY;
+}
 
 /** Origens autorizadas a consumir a API com credenciais (CORS). */
 export const origensPermitidas = [

@@ -163,6 +163,19 @@ export async function buscarContatoPrioritario(alunoId: string) {
   });
 }
 
+/** Confere que o perfil é responsável ativo e tem vínculo ativo com o aluno. */
+export async function buscarResponsavelValido(responsavelId: string, alunoId: string) {
+  return prisma.perfis.findFirst({
+    where: {
+      id: responsavelId,
+      papel: 'responsavel',
+      status: 'ativo',
+      vinculos_responsaveis: { some: { aluno_id: alunoId, ativo: true } },
+    },
+    select: { id: true },
+  });
+}
+
 export async function buscarEnturmacaoAtiva(alunoId: string) {
   return prisma.enturmacoes.findFirst({
     where: { aluno_id: alunoId, status: 'matriculado' },

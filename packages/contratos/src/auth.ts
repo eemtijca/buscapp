@@ -19,7 +19,7 @@ export type PerfilAutenticado = z.infer<typeof perfilAutenticadoSchema>;
 
 export const loginSchema = z.object({
   email: z.string().email('Informe um email válido.'),
-  senha: z.string().min(1, 'Informe a senha.'),
+  senha: z.string().min(1, 'Informe a senha.').max(128, 'A senha é muito longa.'),
   lembrar: z.boolean().optional().default(false),
 });
 
@@ -34,7 +34,10 @@ export type SolicitarCodigo = z.infer<typeof solicitarCodigoSchema>;
 export const redefinirSenhaSchema = z.object({
   email: z.string().email('Informe um email válido.'),
   codigo: z.string().regex(/^\d{6}$/, 'O código deve ter 6 dígitos.'),
-  novaSenha: z.string().min(8, 'A senha deve ter ao menos 8 caracteres.'),
+  novaSenha: z
+    .string()
+    .min(8, 'A senha deve ter ao menos 8 caracteres.')
+    .max(128, 'A senha é muito longa.'),
 });
 
 export type RedefinirSenha = z.infer<typeof redefinirSenhaSchema>;

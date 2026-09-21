@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { construirApp } from './aplicacao.js';
+import { deveAvisarTrustProxy } from './ambiente.js';
 
 let app: FastifyInstance;
 
@@ -37,6 +38,18 @@ describe('envelope de erro do Fastify', () => {
     expect(resposta.json().erro.codigo).toBe('payload_grande');
   });
 
+  it('recusa senha acima do tamanho máximo do contrato', async () => {
+    const resposta = await app.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      headers: { 'content-type': 'application/json' },
+      payload: { email: 'a@b.com', senha: 'x'.repeat(129) },
+    });
+
+    expect(resposta.statusCode).toBe(400);
+    expect(resposta.json().erro.codigo).toBe('validacao');
+  });
+
   it('responde 415 para tipo de conteúdo não suportado', async () => {
     const resposta = await app.inject({
       method: 'POST',
@@ -47,6 +60,14 @@ describe('envelope de erro do Fastify', () => {
 
     expect(resposta.statusCode).toBe(415);
     expect(resposta.json().erro.codigo).toBe('tipo_nao_suportado');
+  });
+});
+
+describe('aviso de TRUST_PROXY', () => {
+  it('avisa apenas em produção sem confiança no proxy', () => {
+    expect(deveAvisarTrustProxy({ NODE_ENV: 'production', TRUST_PROXY: false })).toBe(true);
+    expect(deveAvisarTrustProxy({ NODE_ENV: 'production', TRUST_PROXY: true })).toBe(false);
+    expect(deveAvisarTrustProxy({ NODE_ENV: 'development', TRUST_PROXY: false })).toBe(false);
   });
 });
 

@@ -159,23 +159,26 @@ beforeAll(async () => {
   cookies.profCom = await entrar(emails.profCom);
   cookies.profSem = await entrar(emails.profSem);
   cookies.responsavel = await entrar(emails.responsavel);
-  cookies.pendente = { buscapp_sessao: (await criarSessao(ids.pendente, { lembrar: false })).token };
+  cookies.pendente = {
+    buscapp_sessao: (await criarSessao(ids.pendente, { lembrar: false })).token,
+  };
   cookies.inativo = { buscapp_sessao: (await criarSessao(ids.inativo, { lembrar: false })).token };
 });
 
 afterAll(async () => {
-  await prisma.vinculos_responsaveis.deleteMany({ where: { aluno_id: { in: [ids.alunoTurma, ids.alunoFora] } } });
+  await prisma.vinculos_responsaveis.deleteMany({
+    where: { aluno_id: { in: [ids.alunoTurma, ids.alunoFora] } },
+  });
   await prisma.atribuicoes_professores.deleteMany({ where: { turma_id: ids.turma } });
-  await prisma.enturmacoes.deleteMany({ where: { aluno_id: { in: [ids.alunoTurma, ids.alunoFora] } } });
+  await prisma.enturmacoes.deleteMany({
+    where: { aluno_id: { in: [ids.alunoTurma, ids.alunoFora] } },
+  });
   await prisma.alunos.deleteMany({ where: { id: { in: [ids.alunoTurma, ids.alunoFora] } } });
   await prisma.turmas.deleteMany({ where: { id: ids.turma } });
   await prisma.anos_letivos.deleteMany({ where: { id: ids.ano } });
   await prisma.auditoria.deleteMany({
     where: {
-      OR: [
-        { usuario_id: { in: Object.values(ids) } },
-        { entidade_id: { in: Object.values(ids) } },
-      ],
+      OR: [{ usuario_id: { in: Object.values(ids) } }, { entidade_id: { in: Object.values(ids) } }],
     },
   });
   await prisma.sessoes.deleteMany({ where: { perfil_id: { in: Object.values(ids) } } });
@@ -203,11 +206,26 @@ const casos: CasoMatriz[] = [
   { nome: 'eventos exige sessão', url: '/api/eventos', esperado: 401 },
   // Papel
   { nome: 'gestão lista usuários', url: '/api/usuarios', como: 'gestao', esperado: 200 },
-  { nome: 'responsável não lista usuários', url: '/api/usuarios', como: 'responsavel', esperado: 403 },
+  {
+    nome: 'responsável não lista usuários',
+    url: '/api/usuarios',
+    como: 'responsavel',
+    esperado: 403,
+  },
   { nome: 'professor não lista usuários', url: '/api/usuarios', como: 'profCom', esperado: 403 },
   // Módulo (fail-closed)
-  { nome: 'professor com módulo lê ocorrências', url: '/api/ocorrencias', como: 'profCom', esperado: 200 },
-  { nome: 'professor sem módulo não lê ocorrências', url: '/api/ocorrencias', como: 'profSem', esperado: 403 },
+  {
+    nome: 'professor com módulo lê ocorrências',
+    url: '/api/ocorrencias',
+    como: 'profCom',
+    esperado: 200,
+  },
+  {
+    nome: 'professor sem módulo não lê ocorrências',
+    url: '/api/ocorrencias',
+    como: 'profSem',
+    esperado: 403,
+  },
   // Escopo
   {
     nome: 'professor lê aluno da própria turma',
@@ -237,7 +255,12 @@ const casos: CasoMatriz[] = [
   { nome: 'conta pendente é recusada', url: '/api/alunos', como: 'pendente', esperado: 403 },
   { nome: 'conta inativa é recusada', url: '/api/alunos', como: 'inativo', esperado: 403 },
   // Módulo do responsável
-  { nome: 'responsável com alertas lê ocorrências', url: '/api/ocorrencias', como: 'responsavel', esperado: 200 },
+  {
+    nome: 'responsável com alertas lê ocorrências',
+    url: '/api/ocorrencias',
+    como: 'responsavel',
+    esperado: 200,
+  },
 ];
 
 describe('matriz de autorização', () => {
@@ -279,6 +302,32 @@ describe('matriz de autorização', () => {
       cookies: cookies.responsavel,
     });
     expect(responsavel.statusCode).toBe(403);
+  });
+
+  it('gestão só cria conversa com responsável vinculado ao aluno', async () => {
+    const semVinculo = await app.inject({
+      method: 'POST',
+      url: '/api/conversas',
+      cookies: cookies.gestao,
+      payload: { aluno_id: ids.alunoFora, responsavel_id: ids.responsavel },
+    });
+    expect(semVinculo.statusCode).toBe(400);
+
+    const papelErrado = await app.inject({
+      method: 'POST',
+      url: '/api/conversas',
+      cookies: cookies.gestao,
+      payload: { aluno_id: ids.alunoTurma, responsavel_id: ids.profCom },
+    });
+    expect(papelErrado.statusCode).toBe(400);
+
+    const valido = await app.inject({
+      method: 'POST',
+      url: '/api/conversas',
+      cookies: cookies.gestao,
+      payload: { aluno_id: ids.alunoTurma, responsavel_id: ids.responsavel },
+    });
+    expect(valido.statusCode).toBeLessThan(300);
   });
 
   it('configurações públicas omitem os parâmetros operacionais', async () => {

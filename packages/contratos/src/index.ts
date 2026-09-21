@@ -1,5 +1,6 @@
 export * from './alunos.js';
 export * from './anexos.js';
+export * from './auditoria.js';
 export * from './auth.js';
 export * from './chat.js';
 export * from './codigos.js';

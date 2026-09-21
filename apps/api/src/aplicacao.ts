@@ -23,6 +23,7 @@ import { rotasEventos } from './nucleo/http/rotas-eventos.js';
 import { rotasSaude } from './nucleo/http/rotas-saude.js';
 import { rotasAlunos } from './modulos/alunos/alunos.rotas.js';
 import { rotasAnexos } from './modulos/anexos/anexos.rotas.js';
+import { rotasAuditoria } from './modulos/auditoria/auditoria.rotas.js';
 import { rotasAuth } from './modulos/auth/auth.rotas.js';
 import { rotasChat } from './modulos/chat/chat.rotas.js';
 import { rotasCodigos } from './modulos/codigos/codigos.rotas.js';
@@ -203,6 +204,7 @@ export async function construirApp(): Promise<FastifyInstance> {
   await app.register(rotasAlunos);
   await app.register(rotasUsuarios);
   await app.register(rotasAnexos);
+  await app.register(rotasAuditoria);
   await app.register(rotasCodigos);
   await app.register(rotasVinculos);
   await app.register(rotasEstrutura);

@@ -13,6 +13,7 @@ import type {
 } from '@/tipos/database';
 import type {
   AtribuicaoApi,
+  AuditoriaApi,
   ConversaApi,
   CodigoApi,
   EnturmacaoApi,
@@ -275,5 +276,14 @@ export const Consultas = {
     staleTime: TEMPOS.operacional,
     tabelas: ['codigos_redefinicao'],
     executar: (etag) => buscar('/api/codigos', undefined, etag),
+  }),
+
+  auditoria: (
+    parametros?: Record<string, string | undefined>,
+  ): OpcoesConsulta<{ auditoria: AuditoriaApi[] }> => ({
+    chave: chaveConsulta('auditoria', parametros),
+    staleTime: TEMPOS.operacional,
+    tabelas: ['auditoria'],
+    executar: (etag) => buscar('/api/auditoria', parametros, etag),
   }),
 };

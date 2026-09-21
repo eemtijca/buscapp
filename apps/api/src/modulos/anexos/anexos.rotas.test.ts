@@ -65,6 +65,8 @@ afterAll(async () => {
   await prisma.anexos.deleteMany({ where: { criado_por: gestaoId } });
   await prisma.sessoes.deleteMany({ where: { perfil_id: gestaoId } });
   await prisma.auditoria.deleteMany({ where: { usuario_id: gestaoId } });
+  // Zera o rate limiting para que execuções repetidas da suíte não estourem o limite de 20/h.
+  await prisma.$executeRawUnsafe('delete from public.rate_limit_contadores');
   await prisma.perfis.deleteMany({ where: { id: gestaoId } });
   await app.close();
   await prisma.$disconnect();
@@ -149,6 +151,12 @@ describe('anexo multipart', () => {
     expect(leitura.headers['content-security-policy']).toBe('sandbox');
     expect(String(leitura.headers['content-disposition'])).toContain('attachment');
     expect(leitura.rawPayload.equals(conteudo)).toBe(true);
+
+    const downloadAuditado = await prisma.auditoria.findFirst({
+      where: { usuario_id: gestaoId, acao: 'BAIXAR_ANEXO', entidade_id: anexo.id },
+    });
+    expect(downloadAuditado).not.toBeNull();
+    expect(downloadAuditado?.ip_origem).toBeTruthy();
 
     const remocao = await app.inject({
       method: 'DELETE',

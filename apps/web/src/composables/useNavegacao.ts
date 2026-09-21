@@ -21,6 +21,7 @@ const mapaTitulos: Record<string, string> = {
   'gestao-alunos-novo': 'Novo aluno',
   'gestao-alunos-editar': 'Editar aluno',
   'gestao-codigos': 'Códigos',
+  'gestao-auditoria': 'Auditoria',
   'gestao-turmas': 'Turmas',
   'gestao-anos-letivos': 'Anos letivos',
   'gestao-disciplinas': 'Disciplinas',

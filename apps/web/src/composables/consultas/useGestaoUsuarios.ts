@@ -5,7 +5,7 @@ import { Consultas } from '@/servicos/consultas';
 import { useConsulta } from '@/composables/useConsulta';
 import { hojeIso } from '@/utils/datas';
 import type { Disciplina, Turma } from '@/tipos/database';
-import type { CodigoApi, UsuarioApi } from '@/tipos/api';
+import type { CodigoApi, AuditoriaApi, UsuarioApi } from '@/tipos/api';
 import type {
   AlunoItem,
   CodigoGerado,
@@ -19,6 +19,44 @@ function mensagemDeErro(erroCapturado: unknown, padrao: string): string {
   if (erroCapturado instanceof ErroApi) return erroCapturado.message;
   if (erroCapturado instanceof Error && erroCapturado.message) return erroCapturado.message;
   return padrao;
+}
+
+/** Eventos de auditoria consultados pela gestão, com filtros e paginação. */
+export function useAuditoria(
+  filtros?: () => {
+    acao?: string;
+    entidade?: string;
+    usuario_id?: string;
+    data_inicio?: string;
+    data_fim?: string;
+    limite?: number;
+  },
+): {
+  eventos: ComputedRef<AuditoriaApi[]>;
+  pendente: Ref<boolean>;
+  atualizando: Ref<boolean>;
+  erro: Ref<unknown>;
+  recarregar: () => Promise<void>;
+} {
+  const consulta = useConsulta(() => {
+    const valores = filtros?.() ?? {};
+    return Consultas.auditoria({
+      acao: valores.acao || undefined,
+      entidade: valores.entidade || undefined,
+      usuario_id: valores.usuario_id || undefined,
+      data_inicio: valores.data_inicio || undefined,
+      data_fim: valores.data_fim || undefined,
+      limite: valores.limite ? String(valores.limite) : undefined,
+    });
+  });
+
+  return {
+    eventos: computed(() => consulta.dados.value?.auditoria ?? []),
+    pendente: consulta.pendente,
+    atualizando: consulta.atualizando,
+    erro: consulta.erro,
+    recarregar: () => consulta.recarregar(true),
+  };
 }
 
 /** Usuários da gestão filtrados por papel, status e busca. */

@@ -286,9 +286,19 @@ export const rotasAnexos: FastifyPluginAsyncZod = async (app) => {
       },
     },
     async (pedido, resposta) => {
-      const anexo = await garantirAcessoAnexo(usuarioAtual(pedido), pedido.params.id);
+      const usuario = usuarioAtual(pedido);
+      const anexo = await garantirAcessoAnexo(usuario, pedido.params.id);
       const fluxo = await armazenamento().lerFluxo(anexo.storage_path);
       const exibivel = anexo.mime_type.startsWith('image/');
+
+      await auditar({
+        usuarioId: usuario.id,
+        acao: 'BAIXAR_ANEXO',
+        entidade: 'anexos',
+        entidadeId: anexo.id,
+        dadosNovos: { nome_arquivo: anexo.nome_arquivo, mime_type: anexo.mime_type },
+        ip: pedido.ip,
+      });
 
       return (
         resposta

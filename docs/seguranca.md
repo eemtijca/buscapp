@@ -74,7 +74,7 @@ As ameaças consideradas incluem enumeração de contas, força bruta de senhas 
 - **Rate limiting:** `@fastify/rate-limit` com store no Postgres, nas rotas de login (10/min, contando só falhas), solicitação de código (3/5 min), redefinição de senha (5/15 min) e upload de anexos (20/h).
 - **Cabeçalhos:** CSP, `nosniff`, `Referrer-Policy`, `X-Frame-Options` e HSTS, além da verificação de `Origin` em métodos mutáveis.
 - **Uploads:** validação de bytes mágicos, `ContentLength` na URL pré-assinada e download com `attachment`, sandbox e `nosniff`.
-- **Auditoria:** login, falhas de login, logout, revogação de sessões, CRUD de usuários e alunos, anexos, expurgo e anonimização, com `ip_origem`.
+- **Auditoria:** login, falhas de login, logout, revogação de sessões, CRUD de usuários e alunos, anexos (criação, remoção e download), expurgo e anonimização, com `ip_origem`.
 - **LGPD:** exportação e anonimização de dados do titular, restritas à gestão e auditadas.
 - **Retenção:** expurgo agendado de anexos, códigos, sessões encerradas e contadores de rate limiting.
 - **Metadados de imagem:** no envio, imagens são regravadas no servidor com `sharp` (orientação aplicada, lado máximo de 1600 px) e sem EXIF, removendo geolocalização e dados de câmera. Em falha, o original é mantido e o caso é registrado no log.

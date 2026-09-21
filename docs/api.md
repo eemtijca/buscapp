@@ -98,6 +98,7 @@ Rotas HTTP da API Fastify. Todas ficam sob `/api` e respondem JSON, exceto o dow
 | GET                    | `/api/codigos`                                           | Gestão                            | Lista códigos com status derivado e bloqueio                               |
 | POST                   | `/api/codigos/perfil/:perfilId`                          | Gestão                            | Gera código de 6 dígitos                                                   |
 | PATCH                  | `/api/codigos/:id/revogar`                               | Gestão                            | Revoga código                                                              |
+| GET                    | `/api/auditoria`                                         | Gestão                            | Lista eventos de auditoria com filtros e paginação                         |
 | POST                   | `/api/codigos/limpar`                                    | Gestão                            | Remove códigos usados, expirados e revogados                               |
 
 > [!NOTE]
@@ -196,6 +197,11 @@ Corpo: `conteudo` (até 2000 caracteres) e `client_request_id` opcional. Respond
 ## Notificações
 
 `GET /api/notificacoes` aceita `limite` (1 a 100, padrão 20) e `lida`. Responde `{ notificacoes, nao_lidas }`. As rotas `PATCH` marcam como lidas e `DELETE` remove todas as notificações do usuário, sempre restritas ao destinatário.
+
+## Auditoria
+
+- `GET /api/auditoria` devolve os eventos para a gestão, do mais recente para o mais antigo, com `limite`/`offset` e filtros por `acao`, `entidade`, `usuario_id`, `data_inicio` e `data_fim`.
+- Downloads de anexo são registrados como `BAIXAR_ANEXO`, com `ip_origem`.
 
 ## Anexos
 

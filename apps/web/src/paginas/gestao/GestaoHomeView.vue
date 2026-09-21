@@ -87,6 +87,15 @@ const nomeGestor = usuario.value?.nome || 'Gestor';
       </div>
       <div class="col-12 col-md-6 col-lg-4">
         <CartaoNavegacao
+          icone="clipboard-data"
+          titulo="Auditoria"
+          descricao="Consulte o histórico de ações sensíveis do sistema."
+          rota="/gestao/auditoria"
+          cor="success"
+        />
+      </div>
+      <div class="col-12 col-md-6 col-lg-4">
+        <CartaoNavegacao
           icone="book"
           titulo="Turmas"
           descricao="Cadastre e gerencie as turmas da escola."

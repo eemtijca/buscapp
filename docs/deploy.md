@@ -22,6 +22,8 @@ A aplicação pode ser publicada de três formas: imagem Docker (GHCR), Docker C
 
 A imagem Docker roda como usuário `node` (não-root), com o diretório de uploads próprio, e declara `HEALTHCHECK` contra `/api/saude` (intervalo de 30 s, 30 s de carência). A base `node:24-slim` é fixada por digest para builds reproduzíveis.
 
+O schema engine do Prisma (usado por `prisma migrate deploy` no entrypoint) é baixado durante o build da imagem e tem a escrita liberada para o usuário `node`; o container não precisa de rede para migrar. A aplicação sobe como `node` e o ensaio local do container cobre migrações, login, RLS, upload com remoção de EXIF e leitura da auditoria.
+
 Ver [testes.md](testes.md) para as lacunas de cobertura do CI.
 
 ## Vercel full-stack (Services)

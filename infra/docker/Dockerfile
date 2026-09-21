@@ -27,7 +27,11 @@ COPY package.json package-lock.json ./
 COPY apps/web/package.json apps/web/package.json
 COPY apps/api/package.json apps/api/package.json
 COPY packages/contratos/package.json packages/contratos/package.json
-RUN npm ci --omit=dev --ignore-scripts
+# `--ignore-scripts` bloqueia scripts de instalação; o schema engine do Prisma é
+# baixado explicitamente abaixo (o entrypoint o usa em `prisma migrate deploy`).
+RUN npm ci --omit=dev --ignore-scripts \
+  && node node_modules/@prisma/engines/scripts/postinstall.js \
+  && chown -R node:node node_modules/@prisma node_modules/prisma
 
 COPY --from=build /app/apps/api/dist apps/api/dist
 COPY --from=build /app/apps/web/dist apps/web/dist

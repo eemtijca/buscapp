@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, watch } from 'vue';
+import { onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAutenticacao } from '@/composables/useAutenticacao';
 import { useStatusConta } from '@/composables/useStatusConta';
@@ -8,6 +8,7 @@ import { useNotificacoes } from '@/composables/useNotificacoes';
 import { prefetchEssenciais } from '@/servicos/prefetch';
 import IndicadorConexao from '@/componentes/IndicadorConexao.vue';
 import CabecalhoNavegacao from '@/componentes/CabecalhoNavegacao.vue';
+import ModalSessoes from '@/componentes/ModalSessoes.vue';
 import NotificacoesPopover from '@/componentes/NotificacoesPopover.vue';
 
 const router = useRouter();
@@ -51,6 +52,8 @@ const rotaInicio = () => {
   if (usuario.value.papel === 'responsavel') return '/responsavel';
   return '/';
 };
+
+const sessoesAbertas = ref(false);
 
 const papelChat = () => {
   if (usuario.value?.papel === 'gestao' || usuario.value?.papel === 'responsavel')
@@ -114,6 +117,16 @@ const papelChat = () => {
               <button
                 type="button"
                 class="dropdown-item d-flex align-items-center gap-2"
+                @click="sessoesAbertas = true"
+              >
+                <i class="bi bi-shield-check" aria-hidden="true"></i>
+                Sessões ativas
+              </button>
+            </li>
+            <li>
+              <button
+                type="button"
+                class="dropdown-item d-flex align-items-center gap-2"
                 @click="handleLogout"
               >
                 <i class="bi bi-box-arrow-right" aria-hidden="true"></i>
@@ -137,5 +150,7 @@ const papelChat = () => {
         <span>v0.1.0</span>
       </div>
     </footer>
+
+    <ModalSessoes v-model:visivel="sessoesAbertas" />
   </div>
 </template>

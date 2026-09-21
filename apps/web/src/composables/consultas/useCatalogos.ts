@@ -1,5 +1,6 @@
 import { computed, onScopeDispose, ref, type ComputedRef, type Ref } from 'vue';
 import { useConsulta } from '@/composables/useConsulta';
+import { useAutenticacao } from '@/composables/useAutenticacao';
 import { Consultas } from '@/servicos/consultas';
 import { CONFIG_TERMOMETRO_PADRAO, type ConfigTermometro } from '@/servicos/termometro';
 import { FUSO_HORARIO_PADRAO, partesNoFuso } from '@/utils/datas';
@@ -201,7 +202,13 @@ export function useConfiguracaoSistema(): {
   pendente: Ref<boolean>;
   recarregar: () => Promise<void>;
 } {
-  const consulta = useConsulta(() => Consultas.configuracoes());
+  const { usuario } = useAutenticacao();
+  const consulta = useConsulta(() => {
+    // A gestão recebe os parâmetros operacionais; os demais perfis, apenas o subconjunto público.
+    return usuario.value?.papel === 'gestao'
+      ? Consultas.configuracoes()
+      : Consultas.configuracoesPublicas();
+  });
   const configuracao = computed(() => consulta.dados.value?.configuracao);
   const configTermometro = computed(() => configTermometroDe(configuracao.value));
   const mensagemForaHorario = computed(

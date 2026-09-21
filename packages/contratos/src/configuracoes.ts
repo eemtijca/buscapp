@@ -43,6 +43,20 @@ export const configuracaoSistemaSchema = z.object({
 
 export type ConfiguracaoSistema = z.infer<typeof configuracaoSistemaSchema>;
 
+/**
+ * Subconjunto exposto a todos os perfis: parâmetros do termômetro, escola, fuso e
+ * mensagem fora de horário. Os parâmetros operacionais ficam restritos à gestão.
+ */
+export const configuracaoPublicaSchema = configuracaoSistemaSchema.omit({
+  dias_expurgo_anexos: true,
+  minutos_validade_codigo: true,
+  max_tentativas_codigo: true,
+  minutos_bloqueio_codigo: true,
+  dias_retencao_codigos: true,
+});
+
+export type ConfiguracaoPublica = z.infer<typeof configuracaoPublicaSchema>;
+
 export const atualizarConfiguracaoSistemaSchema = z.object({
   escola_nome: z.string().trim().min(1, 'Informe o nome da escola.').max(100).optional(),
   limite_critico_faltas: z.number().int().min(1).max(1000).optional(),

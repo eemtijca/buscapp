@@ -5,6 +5,7 @@ import {
   atualizarStatusHorarioLetivoSchema,
   atualizarStatusTagComportamentoSchema,
   atualizarTagComportamentoSchema,
+  configuracaoPublicaSchema,
   configuracaoSistemaSchema,
   criarHorarioLetivoSchema,
   criarOpcaoConfiguracaoSchema,
@@ -37,6 +38,7 @@ import {
   listarOpcoesConfiguracao,
   listarTagsComportamento,
   obterConfiguracao,
+  obterConfiguracaoPublica,
   reordenarOpcoesConfiguracao,
 } from './configuracoes.servico.js';
 
@@ -49,14 +51,27 @@ export const rotasConfiguracoes: FastifyPluginAsyncZod = async (app) => {
   app.get(
     '/api/configuracoes',
     {
-      preHandler: [autenticar],
+      preHandler: [autenticar, somenteGestao],
       schema: {
         tags: ['configuracoes'],
-        summary: 'Retorna as configurações gerais do sistema',
+        summary: 'Retorna as configurações gerais do sistema (gestão)',
         response: { 200: z.object({ configuracao: configuracaoSistemaSchema }) },
       },
     },
     async () => ({ configuracao: await obterConfiguracao() }),
+  );
+
+  app.get(
+    '/api/configuracoes/publicas',
+    {
+      preHandler: [autenticar],
+      schema: {
+        tags: ['configuracoes'],
+        summary: 'Retorna o subconjunto de configurações visível a todos os perfis',
+        response: { 200: z.object({ configuracao: configuracaoPublicaSchema }) },
+      },
+    },
+    async () => ({ configuracao: await obterConfiguracaoPublica() }),
   );
 
   app.put(

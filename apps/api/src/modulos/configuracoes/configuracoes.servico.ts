@@ -3,6 +3,7 @@ import type {
   AtualizarHorarioLetivo,
   AtualizarOpcaoConfiguracao,
   AtualizarTagComportamento,
+  ConfiguracaoPublica,
   ConfiguracaoSistema,
   CriarHorarioLetivo,
   CriarOpcaoConfiguracao,
@@ -205,6 +206,19 @@ function traduzirErroTag(erro: unknown): never {
 export async function obterConfiguracao(): Promise<ConfiguracaoSistema> {
   const configuracao = await garantirConfiguracao();
   return paraConfiguracao(configuracao);
+}
+
+/** Subconjunto visível a todos os perfis, sem os parâmetros operacionais. */
+export async function obterConfiguracaoPublica(): Promise<ConfiguracaoPublica> {
+  const {
+    dias_expurgo_anexos: _expurgo,
+    minutos_validade_codigo: _validade,
+    max_tentativas_codigo: _tentativas,
+    minutos_bloqueio_codigo: _bloqueio,
+    dias_retencao_codigos: _retencao,
+    ...publica
+  } = await obterConfiguracao();
+  return publica;
 }
 
 export async function atualizarConfiguracaoSistema(

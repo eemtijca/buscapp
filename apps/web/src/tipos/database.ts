@@ -47,13 +47,14 @@ export interface ConfiguracaoSistema {
   id: number;
   limite_critico_faltas: number;
   limite_preventivo_faltas: number;
-  dias_expurgo_anexos: number;
+  /** Parâmetros operacionais: presentes apenas para a gestão. */
+  dias_expurgo_anexos?: number;
   escola_nome: string;
   mensagem_fora_horario: string;
-  minutos_validade_codigo: number;
-  max_tentativas_codigo: number;
-  minutos_bloqueio_codigo: number;
-  dias_retencao_codigos: number;
+  minutos_validade_codigo?: number;
+  max_tentativas_codigo?: number;
+  minutos_bloqueio_codigo?: number;
+  dias_retencao_codigos?: number;
   peso_falta: number;
   peso_ocorrencia: number;
   peso_recencia: number;

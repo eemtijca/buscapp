@@ -263,4 +263,39 @@ describe('matriz de autorização', () => {
     expect(resposta.statusCode).toBe(200);
     expect(resposta.json().perfil).toBeNull();
   });
+
+  it('configurações completas são restritas à gestão', async () => {
+    const gestao = await app.inject({
+      method: 'GET',
+      url: '/api/configuracoes',
+      cookies: cookies.gestao,
+    });
+    expect(gestao.statusCode).toBe(200);
+    expect(gestao.json().configuracao.dias_retencao_codigos).toBeDefined();
+
+    const responsavel = await app.inject({
+      method: 'GET',
+      url: '/api/configuracoes',
+      cookies: cookies.responsavel,
+    });
+    expect(responsavel.statusCode).toBe(403);
+  });
+
+  it('configurações públicas omitem os parâmetros operacionais', async () => {
+    const resposta = await app.inject({
+      method: 'GET',
+      url: '/api/configuracoes/publicas',
+      cookies: cookies.responsavel,
+    });
+
+    expect(resposta.statusCode).toBe(200);
+    const configuracao = resposta.json().configuracao as Record<string, unknown>;
+    expect(configuracao.escola_nome).toBeDefined();
+    expect(configuracao.fuso_horario).toBeDefined();
+    expect(configuracao).not.toHaveProperty('dias_expurgo_anexos');
+    expect(configuracao).not.toHaveProperty('minutos_validade_codigo');
+    expect(configuracao).not.toHaveProperty('max_tentativas_codigo');
+    expect(configuracao).not.toHaveProperty('minutos_bloqueio_codigo');
+    expect(configuracao).not.toHaveProperty('dias_retencao_codigos');
+  });
 });

@@ -137,7 +137,7 @@ function aplicarConfiguracao(valores: ConfiguracaoSistema): void {
   escolaNome.value = valores.escola_nome;
   limiteCritico.value = valores.limite_critico_faltas;
   limitePreventivo.value = valores.limite_preventivo_faltas;
-  diasExpurgo.value = valores.dias_expurgo_anexos;
+  diasExpurgo.value = valores.dias_expurgo_anexos ?? 30;
   mensagemForaHorario.value = valores.mensagem_fora_horario ?? '';
   minutosValidadeCodigo.value = valores.minutos_validade_codigo ?? 60;
   maxTentativasCodigo.value = valores.max_tentativas_codigo ?? 5;

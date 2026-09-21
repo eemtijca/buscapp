@@ -92,6 +92,15 @@ export const Consultas = {
     executar: (etag) => buscar('/api/configuracoes', undefined, etag),
   }),
 
+  configuracoesPublicas: (): OpcoesConsulta<{ configuracao: ConfiguracaoSistema }> => ({
+    chave: 'configuracoes-publicas',
+    staleTime: TEMPOS.referencia,
+    persistir: true,
+    ttl: TTL_REFERENCIA,
+    tabelas: ['configuracoes_sistema'],
+    executar: (etag) => buscar('/api/configuracoes/publicas', undefined, etag),
+  }),
+
   horarios: (): OpcoesConsulta<{ horarios: HorarioLetivo[] }> => ({
     chave: 'horarios',
     staleTime: TEMPOS.referencia,

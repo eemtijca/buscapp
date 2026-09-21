@@ -17,11 +17,14 @@ const LIMITE_REGISTROS = 80;
 
 let bancoPromessa: Promise<IDBDatabase | null> | null = null;
 let indisponivel = false;
+let avisouQuota = false;
 
 function abrirBanco(): Promise<IDBDatabase | null> {
   if (bancoPromessa) return bancoPromessa;
 
-  bancoPromessa = new Promise((resolver) => {
+  let bloqueado = false;
+
+  const promessa = new Promise<IDBDatabase | null>((resolver) => {
     if (indisponivel || typeof indexedDB === 'undefined') {
       resolver(null);
       return;
@@ -42,14 +45,42 @@ function abrirBanco(): Promise<IDBDatabase | null> {
         indisponivel = true;
         resolver(null);
       };
-      requisicao.onblocked = () => resolver(null);
+      // Outra aba pode estar migrando o banco; libera a promessa para tentar de novo depois.
+      requisicao.onblocked = () => {
+        bloqueado = true;
+        resolver(null);
+      };
     } catch {
       indisponivel = true;
       resolver(null);
     }
   });
 
-  return bancoPromessa;
+  bancoPromessa = promessa;
+  void promessa.then((banco) => {
+    if (!banco) {
+      if (bloqueado) bancoPromessa = null;
+      return;
+    }
+    // Conexão encerrada ou substituída por outra aba: permite reabrir na próxima operação.
+    banco.onclose = () => {
+      bancoPromessa = null;
+    };
+    banco.onversionchange = () => {
+      banco.close();
+      bancoPromessa = null;
+    };
+  });
+
+  return promessa;
+}
+
+/** Trata falhas de transação; em cota excedida, limpa a persistência e segue sem ela. */
+function tratarFalhaDeTransacao(transacao: IDBTransaction): void {
+  if (transacao.error?.name !== 'QuotaExceededError' || avisouQuota) return;
+  avisouQuota = true;
+  console.warn('[cache] Cota do IndexedDB excedida; limpando a persistência local.');
+  void limparPersistencia();
 }
 
 /** Executa uma operação na loja de consultas; devolve `null` quando o IndexedDB não está disponível. */
@@ -65,8 +96,14 @@ async function comLoja<T>(
       const transacao = banco.transaction(LOJA, modo);
       const requisicao = operacao(transacao.objectStore(LOJA));
       requisicao.onsuccess = () => resolver(requisicao.result);
-      requisicao.onerror = () => resolver(null);
-      transacao.onabort = () => resolver(null);
+      requisicao.onerror = () => {
+        tratarFalhaDeTransacao(transacao);
+        resolver(null);
+      };
+      transacao.onabort = () => {
+        tratarFalhaDeTransacao(transacao);
+        resolver(null);
+      };
     } catch {
       resolver(null);
     }

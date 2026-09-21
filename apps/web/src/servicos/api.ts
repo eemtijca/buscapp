@@ -14,12 +14,22 @@ export class ErroApi extends Error {
 
 type Metodo = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
+/** Tempo máximo de uma requisição comum, em milissegundos. */
+const TIMEOUT_MS = 15_000;
+/** Tempo máximo de transferências de arquivo (download e upload). */
+const TIMEOUT_ARQUIVO_MS = 120_000;
+/** Tentativas totais para métodos idempotentes (GET). */
+const TENTATIVAS_GET = 3;
+const ESPERA_BASE_MS = 300;
+
 export interface OpcoesRequisicao {
   metodo?: Metodo;
   corpo?: unknown;
   parametros?: Record<string, string | number | boolean | string[] | undefined | null>;
   formData?: FormData;
   ifNoneMatch?: string | null;
+  /** Sinal externo para cancelar a requisição (somado ao timeout). */
+  signal?: AbortSignal;
 }
 
 /** Resposta crua da API, incluindo o validador de cache para revalidação condicional. */
@@ -30,8 +40,47 @@ export interface RespostaRequisicao<T> {
   naoModificado: boolean;
 }
 
+function esperar(tentativa: number): Promise<void> {
+  return new Promise((resolver) => setTimeout(resolver, ESPERA_BASE_MS * 2 ** (tentativa - 1)));
+}
+
+/** Combina o timeout com um sinal externo; sem `AbortSignal.any`, usa o que existir. */
+function sinalDaRequisicao(timeout: number, externo?: AbortSignal): AbortSignal {
+  const limite = AbortSignal.timeout(timeout);
+  if (!externo) return limite;
+  if (typeof AbortSignal.any === 'function') return AbortSignal.any([limite, externo]);
+  return externo;
+}
+
+function erroDeRede(erro: unknown): ErroApi {
+  if (erro instanceof ErroApi) return erro;
+  const nome = (erro as { name?: string } | null)?.name;
+  if (nome === 'TimeoutError') {
+    return new ErroApi(0, 'tempo_esgotado', 'A requisição demorou demais. Tente novamente.');
+  }
+  if (nome === 'AbortError') {
+    return new ErroApi(0, 'requisicao_cancelada', 'Requisição cancelada.');
+  }
+  return new ErroApi(0, 'falha_rede', 'Falha de conexão. Verifique sua internet.');
+}
+
+let redirecionandoParaLogin = false;
+
+/**
+ * Sessão expirada em rota autenticada: recarrega a SPA no login guardando a rota
+ * de origem em `?destino=`. O recarregamento limpa o estado em memória.
+ */
+function tratarSessaoExpirada(caminho: string): void {
+  if (caminho.startsWith('/api/auth/') || redirecionandoParaLogin) return;
+  redirecionandoParaLogin = true;
+  const destino = `${window.location.pathname}${window.location.search}`;
+  window.location.assign(`/?destino=${encodeURIComponent(destino)}`);
+}
+
 function montarUrl(caminho: string, parametros?: OpcoesRequisicao['parametros']): string {
-  const url = new URL(`${BASE}${caminho}`, window.location.origin);
+  // Fora do navegador (testes) a base absoluta evita depender de `window`.
+  const base = typeof window === 'undefined' ? 'http://localhost' : window.location.origin;
+  const url = new URL(`${BASE}${caminho}`, base);
   for (const [chave, valor] of Object.entries(parametros ?? {})) {
     if (valor === undefined || valor === null || valor === '') continue;
     if (Array.isArray(valor)) {
@@ -81,40 +130,71 @@ export async function requisitar<T>(
   caminho: string,
   opcoes: OpcoesRequisicao = {},
 ): Promise<RespostaRequisicao<T>> {
+  const metodo = opcoes.metodo ?? 'GET';
   const temCorpo = opcoes.corpo !== undefined;
   const cabecalhos: Record<string, string> = {};
   if (!opcoes.formData && temCorpo) cabecalhos['Content-Type'] = 'application/json';
   if (opcoes.ifNoneMatch) cabecalhos['If-None-Match'] = opcoes.ifNoneMatch;
 
-  const resposta = await fetch(montarUrl(caminho, opcoes.parametros), {
-    method: opcoes.metodo ?? 'GET',
-    credentials: 'include',
-    headers: cabecalhos,
-    body: opcoes.formData ?? (temCorpo ? JSON.stringify(opcoes.corpo) : undefined),
-    cache: 'no-store',
-  });
+  const url = montarUrl(caminho, opcoes.parametros);
+  const timeout = opcoes.formData ? TIMEOUT_ARQUIVO_MS : TIMEOUT_MS;
+  // Só métodos idempotentes são repetidos: POST/PUT/PATCH podem duplicar efeitos.
+  const maxTentativas = metodo === 'GET' ? TENTATIVAS_GET : 1;
 
-  if (resposta.status === 304) {
-    return {
-      status: resposta.status,
-      dados: undefined as T,
-      etag: resposta.headers.get('etag'),
-      naoModificado: true,
-    };
+  for (let tentativa = 1; ; tentativa += 1) {
+    try {
+      const resposta = await fetch(url, {
+        method: metodo,
+        credentials: 'include',
+        headers: cabecalhos,
+        body: opcoes.formData ?? (temCorpo ? JSON.stringify(opcoes.corpo) : undefined),
+        cache: 'no-store',
+        signal: sinalDaRequisicao(timeout, opcoes.signal),
+      });
+
+      if (resposta.status === 401) tratarSessaoExpirada(caminho);
+      if (resposta.status >= 500 && tentativa < maxTentativas) {
+        await esperar(tentativa);
+        continue;
+      }
+
+      if (resposta.status === 304) {
+        return {
+          status: resposta.status,
+          dados: undefined as T,
+          etag: resposta.headers.get('etag'),
+          naoModificado: true,
+        };
+      }
+
+      const dados = await interpretarResposta<T>(resposta);
+      return {
+        status: resposta.status,
+        dados,
+        etag: resposta.headers.get('etag'),
+        naoModificado: false,
+      };
+    } catch (erro) {
+      // Cancelamento explícito não deve ser repetido; falha de rede/5xx pode.
+      const cancelado =
+        opcoes.signal?.aborted === true ||
+        (erro as { name?: string } | null)?.name === 'AbortError';
+      if (erro instanceof ErroApi || cancelado || tentativa >= maxTentativas)
+        throw erroDeRede(erro);
+      await esperar(tentativa);
+    }
   }
-
-  const dados = await interpretarResposta<T>(resposta);
-  return {
-    status: resposta.status,
-    dados,
-    etag: resposta.headers.get('etag'),
-    naoModificado: false,
-  };
 }
 
 /** Baixa o conteúdo de um anexo autenticado e devolve um blob para visualização. */
 export async function baixarArquivo(caminho: string): Promise<Blob> {
-  const resposta = await fetch(montarUrl(caminho), { credentials: 'include' });
+  const resposta = await fetch(montarUrl(caminho), {
+    credentials: 'include',
+    signal: AbortSignal.timeout(TIMEOUT_ARQUIVO_MS),
+  }).catch((erro: unknown) => {
+    throw erroDeRede(erro);
+  });
+  if (resposta.status === 401) tratarSessaoExpirada(caminho);
   if (!resposta.ok) {
     const erro = await interpretarResposta<unknown>(resposta).catch((e: unknown) => e);
     if (erro instanceof ErroApi) throw erro;
@@ -156,6 +236,7 @@ export async function enviarAnexo<T = { anexo: { id: string } }>(
       method: 'PUT',
       headers: { 'Content-Type': mimeType },
       body: arquivo,
+      signal: AbortSignal.timeout(TIMEOUT_ARQUIVO_MS),
     });
     if (!envio.ok) {
       throw new ErroApi(

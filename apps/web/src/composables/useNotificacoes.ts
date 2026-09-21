@@ -1,7 +1,13 @@
 import { ref, type Ref } from 'vue';
 import { api } from '@/servicos/api';
 import { Consultas } from '@/servicos/consultas';
-import { invalidarChave, observar, recarregar, type SnapshotConsulta } from '@/servicos/cache';
+import {
+  invalidarChave,
+  observar,
+  recarregar,
+  tempoRealAtivo,
+  type SnapshotConsulta,
+} from '@/servicos/cache';
 import { timestampRelativo } from '@/utils/chatUtils';
 import type { Notificacao } from '@/tipos/database';
 import type { NotificacaoItem } from '@/tipos/componentes';
@@ -105,11 +111,20 @@ async function iniciar(userId: string): Promise<void> {
 
   cancelarObservacao = observar(OPCOES, aplicar);
   // O cache já recebe o SSE de `notificacoes`; o polling cobre instâncias sem barramento.
+  // Com o stream ativo ou a aba oculta, o polling é dispensável.
   timerPolling = setInterval(() => {
-    if (usuarioId) void recarregar(OPCOES.chave, true);
+    if (!usuarioId || document.hidden || tempoRealAtivo()) return;
+    void recarregar(OPCOES.chave, true);
   }, INTERVALO_POLLING_MS);
+  document.addEventListener('visibilitychange', aoVoltarParaAba);
 
   await recarregar(OPCOES.chave);
+}
+
+/** Ao voltar para a aba, revalida uma vez para não exibir dados parados. */
+function aoVoltarParaAba(): void {
+  if (document.hidden || !usuarioId) return;
+  void recarregar(OPCOES.chave, true);
 }
 
 function parar(): void {
@@ -117,6 +132,7 @@ function parar(): void {
     clearInterval(timerPolling);
     timerPolling = null;
   }
+  document.removeEventListener('visibilitychange', aoVoltarParaAba);
   if (cancelarObservacao) {
     cancelarObservacao();
     cancelarObservacao = null;

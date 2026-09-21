@@ -78,6 +78,8 @@ export function useConsulta<T>(obter: () => OpcoesConsulta<T>): ResultadoConsult
 
   function recarregar(forcar = true): Promise<void> {
     const opcoes = obter();
+    // Consulta desabilitada não deve disparar requisição nem reabrir assinatura.
+    if (opcoes.habilitado === false) return Promise.resolve();
     return recarregarConsulta(opcoes.chave, forcar, opcoes.namespace);
   }
 

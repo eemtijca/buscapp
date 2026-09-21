@@ -357,6 +357,11 @@ function ativarTempoReal(): void {
   });
 }
 
+/** Indica se o stream SSE está aberto nesta aba (o polling vira redundante). */
+export function tempoRealAtivo(): boolean {
+  return cancelarEventos !== null;
+}
+
 /** Encerra o stream SSE; a última inscrição fecha a conexão. */
 function desativarTempoReal(): void {
   cancelarEventos?.();
@@ -384,6 +389,7 @@ export async function limparTudo(propagar = true): Promise<void> {
 
   entradas.clear();
   hidratados.clear();
+  hidratacoes.clear();
   await limparPersistencia();
   if (propagar) publicarInvalidacao({ tipo: 'limpar' });
 }

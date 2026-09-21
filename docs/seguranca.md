@@ -77,6 +77,7 @@ As ameaças consideradas incluem enumeração de contas, força bruta de senhas 
 - **Auditoria:** login, falhas de login, logout, revogação de sessões, CRUD de usuários e alunos, anexos (criação, remoção e download), expurgo e anonimização, com `ip_origem`.
 - **LGPD:** exportação e anonimização de dados do titular, restritas à gestão e auditadas.
 - **Retenção:** expurgo agendado de anexos, códigos, sessões encerradas e contadores de rate limiting.
+- **Sessão expirada no cliente:** requisições autenticadas que recebem 401 recarregam a SPA no login com `?destino=` (aceito apenas se for caminho interno), voltando à rota de origem após autenticar. O cliente HTTP usa timeout de 15 s, repetição com backoff apenas em GET (até 3 tentativas) e não repete métodos com efeito.
 - **Metadados de imagem:** no envio, imagens são regravadas no servidor com `sharp` (orientação aplicada, lado máximo de 1600 px) e sem EXIF, removendo geolocalização e dados de câmera. Em falha, o original é mantido e o caso é registrado no log.
 
 ## Resposta a incidentes

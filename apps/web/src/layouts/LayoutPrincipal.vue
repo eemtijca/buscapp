@@ -3,7 +3,7 @@ import { onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAutenticacao } from '@/composables/useAutenticacao';
 import { useStatusConta } from '@/composables/useStatusConta';
-import { useStatusConexao } from '@/composables/useStatusConexao';
+import { pararVerificacao, useStatusConexao } from '@/composables/useStatusConexao';
 import { useNotificacoes } from '@/composables/useNotificacoes';
 import { prefetchEssenciais } from '@/servicos/prefetch';
 import IndicadorConexao from '@/componentes/IndicadorConexao.vue';
@@ -38,6 +38,7 @@ watch(
 onUnmounted(() => {
   parar();
   pararStatusConta();
+  pararVerificacao();
 });
 
 async function handleLogout(): Promise<void> {

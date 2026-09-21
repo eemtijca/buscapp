@@ -19,6 +19,8 @@ import type { OpcaoCheckbox } from '@/tipos/componentes';
 
 const router = useRouter();
 const { usuario } = useAutenticacao();
+// Declarado antes do composable: a consulta é montada de imediato e lê o valor.
+const limite = ref(50);
 const { ocorrencias, pendente, atualizando, recarregar } = useOcorrenciasGraves(() => limite.value);
 const { alunos } = useAlunosFrequencia(() => '');
 const { opcoes: opcoesTipo } = useOpcoes(() => 'tipo_ocorrencia');
@@ -26,7 +28,6 @@ const { tags: catalogoTags } = useTags();
 
 const mensagemSucesso = ref<string | null>(null);
 const mensagemErro = ref<string | null>(null);
-const limite = ref(50);
 
 // Registro de ocorrência pela gestão (mesmo fluxo do professor).
 const mostrarFormulario = ref(false);

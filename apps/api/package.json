@@ -35,6 +35,7 @@
     "ioredis": "^6.0.0",
     "pg": "^8.23.0",
     "prisma": "7.10.0",
+    "sharp": "^0.35.4",
     "zod": "^4.6.4"
   },
   "devDependencies": {

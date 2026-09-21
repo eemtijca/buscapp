@@ -9,6 +9,7 @@ import { z } from 'zod';
 import { ambiente } from '../../ambiente.js';
 import { auditar } from '../../nucleo/auditoria/registrar.js';
 import { assinaturaConfere } from '../../nucleo/armazenamento/magic-bytes.js';
+import { ehImagem, processarImagem } from '../../nucleo/armazenamento/imagens.js';
 import { armazenamento, nomeSeguro, normalizarChave } from '../../nucleo/armazenamento/index.js';
 import { autenticar, exigirPapel, usuarioAtual } from '../../nucleo/autenticacao/middleware.js';
 import { prisma } from '../../nucleo/banco/cliente.js';
@@ -136,15 +137,34 @@ export const rotasAnexos: FastifyPluginAsyncZod = async (app) => {
         );
       }
 
+      // Imagens são baixadas, regravadas sem metadados e gravadas de volta.
+      let tamanhoFinal = info.tamanho;
+      let processadoEm: Date | null = null;
+      if (ehImagem(dados.mime_type)) {
+        const original = await armazenamentoAtual.ler(chave);
+        const processada = await processarImagem(original, dados.mime_type);
+        if (processada) {
+          await armazenamentoAtual.salvar(chave, processada, dados.mime_type);
+          tamanhoFinal = processada.length;
+          processadoEm = new Date();
+        } else {
+          pedido.log.warn(
+            { mime_type: dados.mime_type },
+            'Imagem mantida sem processamento (fallback para o original).',
+          );
+        }
+      }
+
       const anexo = await prisma.anexos
         .create({
           data: {
             storage_path: chave,
             nome_arquivo: dados.nome_arquivo,
             mime_type: dados.mime_type,
-            tamanho_bytes: info.tamanho,
+            tamanho_bytes: tamanhoFinal,
             criado_por: usuarioAtual(pedido).id,
             expurgo_em: await expurgoEm(),
+            processado_em: processadoEm,
           },
         })
         .catch(async (erro: unknown) => {
@@ -212,6 +232,17 @@ export const rotasAnexos: FastifyPluginAsyncZod = async (app) => {
 
       const usuario = usuarioAtual(pedido);
       const chave = normalizarChave(gerarChaveAnexo(usuario.id, nomeSeguro(arquivo.filename)));
+
+      // Re-encode de imagens no servidor: remove EXIF (inclusive geolocalização).
+      const processada = await processarImagem(conteudo, arquivo.mimetype);
+      if (processada) conteudo = processada;
+      else if (ehImagem(arquivo.mimetype)) {
+        pedido.log.warn(
+          { mime_type: arquivo.mimetype },
+          'Imagem mantida sem processamento (fallback para o original).',
+        );
+      }
+
       await armazenamento().salvar(chave, conteudo, arquivo.mimetype);
 
       const anexo = await prisma.anexos.create({
@@ -222,6 +253,7 @@ export const rotasAnexos: FastifyPluginAsyncZod = async (app) => {
           tamanho_bytes: conteudo.length,
           criado_por: usuario.id,
           expurgo_em: await expurgoEm(),
+          processado_em: processada ? new Date() : null,
         },
       });
 

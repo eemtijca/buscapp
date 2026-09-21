@@ -24,6 +24,7 @@ Todas as variáveis da API passam por `apps/api/src/ambiente.ts`, validadas com 
 | `S3_BUCKET`, `S3_REGION`, `S3_ENDPOINT`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | API (S3)          | Credenciais e endpoint do bucket (MinIO, R2, AWS ou Supabase Storage).                         |
 | `S3_UPLOAD_URL_EXPIRA_S`                                                            | API (S3)          | Validade da URL pré-assinada do upload direto, em segundos (padrão `300`).                     |
 | `UPLOAD_DIRETO_MAX_BYTES`                                                           | API               | Limite do upload direto, em bytes (padrão `20971520`, 20 MB).                                  |
+| `PROCESSAR_IMAGENS`                                                                 | API               | Regrava imagens no servidor removendo EXIF e limitando o lado a 1600 px (padrão `true`).       |
 | `DB_POOL_MAX`                                                                       | API               | Conexões por instância do pool `pg` (padrão `10`; use `1` ou `2` em serverless).               |
 | `TZ_ESCOLA`                                                                         | API               | Fuso IANA da escola para o horário protegido e datas civis (padrão `America/Sao_Paulo`).       |
 | `REDIS_URL`                                                                         | API               | Redis do pub/sub do SSE; obrigatória em todos os ambientes.                                    |

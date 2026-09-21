@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
+import sharp from 'sharp';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { construirApp } from '../../aplicacao.js';
 import { prismaAdmin as prisma } from '../../nucleo/banco/cliente.js';
@@ -162,6 +163,45 @@ describe('anexo multipart', () => {
       cookies: { buscapp_sessao: cookieGestao },
     });
     expect(apagado.statusCode).toBe(404);
+  });
+
+  it('remove o EXIF da imagem enviada no multipart', async () => {
+    const original = await sharp({
+      create: { width: 2400, height: 1200, channels: 3, background: '#0a7' },
+    })
+      .jpeg()
+      .withMetadata({ exif: { IFD0: { Make: 'BuscApp', Software: 'Teste EXIF' } } })
+      .toBuffer();
+    expect((await sharp(original).metadata()).exif).toBeDefined();
+
+    const { boundary, payload } = corpoMultipart('foto.jpg', 'image/jpeg', original);
+    const envio = await app.inject({
+      method: 'POST',
+      url: '/api/anexos',
+      cookies: { buscapp_sessao: cookieGestao },
+      headers: { 'content-type': `multipart/form-data; boundary=${boundary}` },
+      payload,
+    });
+
+    expect(envio.statusCode).toBe(201);
+    const anexo = envio.json().anexo as {
+      id: string;
+      tamanho_bytes: number;
+      processado_em: string | null;
+    };
+    expect(anexo.processado_em).not.toBeNull();
+
+    const leitura = await app.inject({
+      method: 'GET',
+      url: `/api/anexos/${anexo.id}/arquivo`,
+      cookies: { buscapp_sessao: cookieGestao },
+    });
+    expect(leitura.statusCode).toBe(200);
+    expect(leitura.rawPayload.length).toBe(anexo.tamanho_bytes);
+
+    const metadados = await sharp(leitura.rawPayload).metadata();
+    expect(metadados.exif).toBeUndefined();
+    expect(metadados.width).toBe(1600);
   });
 
   it('recusa conteúdo que não corresponde ao tipo declarado', async () => {

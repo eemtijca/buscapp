@@ -70,6 +70,7 @@ Limites do perfil serverless:
 - As Functions limitam corpo de requisição e resposta a 4,5 MB. Por isso o anexo usa URL pré-assinada para envio e streaming no download.
 - A duração padrão de 300 segundos encerra o stream SSE periodicamente. O `EventSource` reconecta sozinho e dispara recarga.
 - O barramento SSE é em memória; eventos podem não cruzar instâncias diferentes. As telas continuam se atualizando ao reconectar, ao voltar para a aba e pelo polling de notificações.
+- O `sharp` adiciona binários nativos ao bundle da função (dezenas de MB). As imagens são regravadas na confirmação do upload direto, com download e novo envio ao bucket; se o processamento falhar, o original é mantido e um aviso é registrado. `PROCESSAR_IMAGENS=false` desliga o processamento e reduz o cold start.
 
 Para desenvolver com a mesma topologia:
 

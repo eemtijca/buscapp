@@ -42,6 +42,11 @@ const esquema = z
       .int()
       .positive()
       .default(20 * 1024 * 1024),
+    // Re-encode de imagens no servidor (remove EXIF e limita o lado a 1600 px).
+    PROCESSAR_IMAGENS: z
+      .enum(['true', 'false'])
+      .default('true')
+      .transform((valor) => valor === 'true'),
     DB_POOL_MAX: z.coerce.number().int().positive().default(10),
     COOKIE_SECURE: z
       .enum(['true', 'false'])
@@ -83,9 +88,7 @@ export const ambiente: Ambiente = esquema.parse(process.env);
 export const cookieSeguro = ambiente.COOKIE_SECURE ?? ambiente.NODE_ENV === 'production';
 
 /** Avisa quando produção roda atrás de proxy sem confiar no encaminhamento de IP. */
-export function deveAvisarTrustProxy(
-  valores: Pick<Ambiente, 'NODE_ENV' | 'TRUST_PROXY'>,
-): boolean {
+export function deveAvisarTrustProxy(valores: Pick<Ambiente, 'NODE_ENV' | 'TRUST_PROXY'>): boolean {
   return valores.NODE_ENV === 'production' && !valores.TRUST_PROXY;
 }
 

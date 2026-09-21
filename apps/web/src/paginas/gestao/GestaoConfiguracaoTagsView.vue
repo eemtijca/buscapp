@@ -17,6 +17,7 @@ const salvando = ref(false);
 const carregando = computed(() => pendente.value || salvando.value);
 const mensagemSucesso = ref<string | null>(null);
 const mensagemErro = ref<string | null>(null);
+const erroModal = ref<string | null>(null);
 
 const modalAberto = ref(false);
 const modoEdicao = ref(false);
@@ -58,6 +59,7 @@ function resetForm() {
 function abrirNovo() {
   resetForm();
   modalAberto.value = true;
+  erroModal.value = null;
 }
 
 function abrirEditar(item: TagComportamento) {
@@ -74,11 +76,11 @@ function abrirEditar(item: TagComportamento) {
 
 function validarPeso(): boolean {
   if (formPeso.value < -50) {
-    mostrarErro('O peso mínimo é -50.');
+    erroModal.value = 'O peso mínimo é -50.';
     return false;
   }
   if (formPeso.value > 50) {
-    mostrarErro('O peso máximo é +50.');
+    erroModal.value = 'O peso máximo é +50.';
     return false;
   }
   return true;
@@ -86,7 +88,7 @@ function validarPeso(): boolean {
 
 async function salvar() {
   if (!formNome.value.trim()) {
-    mostrarErro('Preencha o nome da tag.');
+    erroModal.value = 'Preencha o nome da tag.';
     return;
   }
   if (!validarPeso()) return;
@@ -121,7 +123,7 @@ async function salvar() {
     await recarregar();
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    mostrarErro(msg);
+    erroModal.value = msg;
   } finally {
     salvando.value = false;
   }
@@ -194,7 +196,11 @@ async function confirmarExclusao() {
       <button type="button" class="btn-close" @click="mensagemErro = null"></button>
     </div>
 
-    <EstadoErro v-if="erro" mensagem="Não foi possível carregar as tags." @tentar-novamente="recarregar()" />
+    <EstadoErro
+      v-if="erro"
+      mensagem="Não foi possível carregar as tags."
+      @tentar-novamente="recarregar()"
+    />
 
     <div v-else-if="carregando" class="text-center py-4">
       <div class="spinner-border text-success" role="status"></div>
@@ -278,6 +284,9 @@ async function confirmarExclusao() {
       largura="md"
       @update:visivel="(aberto) => !aberto && (modalAberto = false)"
     >
+      <div v-if="erroModal" class="alert alert-danger py-2 small mb-3" role="alert">
+        {{ erroModal }}
+      </div>
       <CampoFormulario id="tag-nome" label="Nome">
         <input
           id="tag-nome"
@@ -334,13 +343,13 @@ async function confirmarExclusao() {
     </ModalBase>
   </div>
 
-    <ModalConfirmacao
-      :visivel="!!tagParaExcluir"
-      titulo="Excluir tag"
-      :mensagem="mensagemExclusaoTag"
-      rotulo-confirmar="Excluir"
-      icone="trash"
-      @confirmar="confirmarExclusao"
-      @cancelar="tagParaExcluir = null"
-    />
+  <ModalConfirmacao
+    :visivel="!!tagParaExcluir"
+    titulo="Excluir tag"
+    :mensagem="mensagemExclusaoTag"
+    rotulo-confirmar="Excluir"
+    icone="trash"
+    @confirmar="confirmarExclusao"
+    @cancelar="tagParaExcluir = null"
+  />
 </template>

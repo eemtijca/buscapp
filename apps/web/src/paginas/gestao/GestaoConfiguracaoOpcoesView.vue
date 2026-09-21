@@ -15,7 +15,12 @@ import Sortable from 'sortablejs';
 
 const route = useRoute();
 const tipo = computed(() => route.params.tipo as string);
-const { opcoes: opcoesRemotas, pendente, recarregar, erro } = useOpcoesConfiguracao(() => tipo.value);
+const {
+  opcoes: opcoesRemotas,
+  pendente,
+  recarregar,
+  erro,
+} = useOpcoesConfiguracao(() => tipo.value);
 
 const regra = computed(() => obterRegra(tipo.value));
 const tituloPagina = computed(() => regra.value.titulo);
@@ -28,6 +33,7 @@ const salvando = ref(false);
 const carregando = computed(() => pendente.value || salvando.value);
 const mensagemSucesso = ref<string | null>(null);
 const mensagemErro = ref<string | null>(null);
+const erroModal = ref<string | null>(null);
 
 const modalAberto = ref(false);
 const modoEdicao = ref(false);
@@ -240,6 +246,7 @@ function cancelarReordenar() {
 function abrirNovo() {
   resetForm();
   modalAberto.value = true;
+  erroModal.value = null;
 }
 
 function abrirEditar(item: OpcaoConfiguracao) {
@@ -286,7 +293,7 @@ async function salvar() {
     modalAberto.value = false;
     await recarregar();
   } catch (e) {
-    mostrarErro(e instanceof Error ? e.message : String(e));
+    erroModal.value = e instanceof Error ? e.message : String(e);
   } finally {
     salvando.value = false;
   }
@@ -387,7 +394,11 @@ onUnmounted(() => {
       }}<button type="button" class="btn-close" @click="mensagemErro = null"></button>
     </div>
 
-    <EstadoErro v-if="erro" mensagem="Não foi possível carregar as opções." @tentar-novamente="recarregar()" />
+    <EstadoErro
+      v-if="erro"
+      mensagem="Não foi possível carregar as opções."
+      @tentar-novamente="recarregar()"
+    />
 
     <div v-else-if="carregando && !opcoes.length" class="text-center py-4">
       <div class="spinner-border text-success"></div>
@@ -468,6 +479,9 @@ onUnmounted(() => {
       largura="md"
       @update:visivel="(aberto) => !aberto && (modalAberto = false)"
     >
+      <div v-if="erroModal" class="alert alert-danger py-2 small mb-3" role="alert">
+        {{ erroModal }}
+      </div>
       <CampoFormulario :id="'campo-picker'" :label="labelNome" :obrigatorio="true">
         <div class="border rounded p-2 mb-2 overflow-auto" style="max-height: 200px">
           <div
@@ -557,13 +571,13 @@ onUnmounted(() => {
     </ModalBase>
   </div>
 
-    <ModalConfirmacao
-      :visivel="!!opcaoParaExcluir"
-      titulo="Excluir opção"
-      :mensagem="mensagemExclusaoOpcao"
-      rotulo-confirmar="Excluir"
-      icone="trash"
-      @confirmar="confirmarExclusao"
-      @cancelar="opcaoParaExcluir = null"
-    />
+  <ModalConfirmacao
+    :visivel="!!opcaoParaExcluir"
+    titulo="Excluir opção"
+    :mensagem="mensagemExclusaoOpcao"
+    rotulo-confirmar="Excluir"
+    icone="trash"
+    @confirmar="confirmarExclusao"
+    @cancelar="opcaoParaExcluir = null"
+  />
 </template>

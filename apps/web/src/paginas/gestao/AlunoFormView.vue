@@ -390,11 +390,27 @@ async function carregarVinculos() {
   }
 }
 
-async function salvarAlterarEnturmacao() {
+const confirmacaoEnturmacao = ref(false);
+const novaTurmaNome = computed(
+  () => turmas.value.find((turma) => turma.id === novaTurmaId.value)?.nome_completo ?? '',
+);
+const mensagemEnturmacao = computed(() => {
+  const destino = novaTurmaNome.value || 'outra turma';
+  return turmaAtualNome.value
+    ? `A matrícula atual em ${turmaAtualNome.value} será encerrada e o aluno passará para ${destino}. Continuar?`
+    : `O aluno será matriculado em ${destino}. Continuar?`;
+});
+
+function salvarAlterarEnturmacao() {
   if (!novaTurmaId.value || !novaDataMatricula.value || !alunoId.value) {
     mostrarErro('Selecione a turma e a data de matrícula.');
     return;
   }
+  confirmacaoEnturmacao.value = true;
+}
+
+async function confirmarAlteracaoEnturmacao() {
+  confirmacaoEnturmacao.value = false;
   salvando.value = true;
   try {
     // O servidor reutiliza a linha do ano letivo (unicidade de aluno e ano) ou
@@ -1271,4 +1287,15 @@ async function salvar() {
       @cancelar="cancelarDescarte"
     />
   </div>
+
+  <ModalConfirmacao
+    :visivel="confirmacaoEnturmacao"
+    titulo="Alterar enturmação"
+    :mensagem="mensagemEnturmacao"
+    rotulo-confirmar="Alterar"
+    icone="arrow-left-right"
+    variante="warning"
+    @confirmar="confirmarAlteracaoEnturmacao"
+    @cancelar="confirmacaoEnturmacao = false"
+  />
 </template>

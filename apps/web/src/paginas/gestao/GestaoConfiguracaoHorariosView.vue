@@ -25,6 +25,7 @@ const salvando = ref(false);
 const carregando = computed(() => pendente.value || salvando.value);
 const mensagemSucesso = ref<string | null>(null);
 const mensagemErro = ref<string | null>(null);
+const erroModal = ref<string | null>(null);
 
 const modalAberto = ref(false);
 const modoEdicao = ref(false);
@@ -64,6 +65,7 @@ function resetForm() {
 function abrirNovo() {
   resetForm();
   modalAberto.value = true;
+  erroModal.value = null;
 }
 
 function abrirEditar(item: HorarioLetivo) {
@@ -78,7 +80,7 @@ function abrirEditar(item: HorarioLetivo) {
 
 async function salvar() {
   if (formFim.value <= formInicio.value) {
-    mostrarErro('O horário de fim deve ser posterior ao de início.');
+    erroModal.value = 'O horário de fim deve ser posterior ao de início.';
     return;
   }
   salvando.value = true;
@@ -109,8 +111,7 @@ async function salvar() {
     modalAberto.value = false;
     await recarregar();
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    mostrarErro(msg);
+    erroModal.value = e instanceof Error ? e.message : String(e);
   } finally {
     salvando.value = false;
   }
@@ -182,7 +183,11 @@ async function confirmarExclusao() {
       <button type="button" class="btn-close" @click="mensagemErro = null"></button>
     </div>
 
-    <EstadoErro v-if="erro" mensagem="Não foi possível carregar os horários." @tentar-novamente="recarregar()" />
+    <EstadoErro
+      v-if="erro"
+      mensagem="Não foi possível carregar os horários."
+      @tentar-novamente="recarregar()"
+    />
 
     <div v-else-if="carregando" class="text-center py-4">
       <div class="spinner-border text-success" role="status"></div>
@@ -249,6 +254,9 @@ async function confirmarExclusao() {
       largura="md"
       @update:visivel="(aberto) => !aberto && (modalAberto = false)"
     >
+      <div v-if="erroModal" class="alert alert-danger py-2 small mb-3" role="alert">
+        {{ erroModal }}
+      </div>
       <CampoFormulario id="hr-dia" label="Dia da semana">
         <Combobox
           id="hr-dia"
@@ -292,13 +300,13 @@ async function confirmarExclusao() {
     </ModalBase>
   </div>
 
-    <ModalConfirmacao
-      :visivel="!!horarioParaExcluir"
-      titulo="Excluir horário"
-      mensagem="Excluir este horário?"
-      rotulo-confirmar="Excluir"
-      icone="trash"
-      @confirmar="confirmarExclusao"
-      @cancelar="horarioParaExcluir = null"
-    />
+  <ModalConfirmacao
+    :visivel="!!horarioParaExcluir"
+    titulo="Excluir horário"
+    mensagem="Excluir este horário?"
+    rotulo-confirmar="Excluir"
+    icone="trash"
+    @confirmar="confirmarExclusao"
+    @cancelar="horarioParaExcluir = null"
+  />
 </template>

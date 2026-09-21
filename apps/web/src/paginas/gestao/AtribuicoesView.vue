@@ -523,14 +523,14 @@ const papelBadge = (papel: string) => {
     </ModalBase>
   </div>
 
-    <ModalConfirmacao
-      :visivel="confirmacaoSaida"
-      titulo="Alterações não salvas"
-      mensagem="Há alterações não salvas. Deseja realmente sair?"
-      rotulo-confirmar="Sair sem salvar"
-      icone="exclamation-triangle"
-      variante="warning"
-      @confirmar="responderSaida(true)"
-      @cancelar="responderSaida(false)"
-    />
+  <ModalConfirmacao
+    :visivel="confirmacaoSaida"
+    titulo="Alterações não salvas"
+    mensagem="Há alterações não salvas. Deseja realmente sair?"
+    rotulo-confirmar="Sair sem salvar"
+    icone="exclamation-triangle"
+    variante="warning"
+    @confirmar="responderSaida(true)"
+    @cancelar="responderSaida(false)"
+  />
 </template>

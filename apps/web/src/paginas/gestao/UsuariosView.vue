@@ -13,7 +13,9 @@ import type { UsuarioItem } from '@/tipos/componentes';
 const router = useRouter();
 const route = useRoute();
 const limite = ref(50);
-const { usuarios, pendente, atualizando, erro, recarregar } = useUsuarios(() => ({ limite: limite.value }));
+const { usuarios, pendente, atualizando, erro, recarregar } = useUsuarios(() => ({
+  limite: limite.value,
+}));
 
 const busca = ref((route.query.busca as string) ?? '');
 const filtroPapel = ref<'todos' | 'professor' | 'responsavel'>(

@@ -414,14 +414,14 @@ async function confirmarAtivacao() {
     </ModalBase>
   </div>
 
-    <ModalConfirmacao
-      :visivel="!!anoParaAtivar"
-      titulo="Ativar ano letivo"
-      :mensagem="avisoAtivacao"
-      rotulo-confirmar="Ativar"
-      icone="calendar-check"
-      variante="warning"
-      @confirmar="confirmarAtivacao"
-      @cancelar="anoParaAtivar = null"
-    />
+  <ModalConfirmacao
+    :visivel="!!anoParaAtivar"
+    titulo="Ativar ano letivo"
+    :mensagem="avisoAtivacao"
+    rotulo-confirmar="Ativar"
+    icone="calendar-check"
+    variante="warning"
+    @confirmar="confirmarAtivacao"
+    @cancelar="anoParaAtivar = null"
+  />
 </template>

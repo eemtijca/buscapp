@@ -7,7 +7,9 @@ import EstadoErro from '@/componentes/EstadoErro.vue';
 const router = useRouter();
 const route = useRoute();
 const limite = ref(50);
-const { alunos, pendente, atualizando, erro, recarregar } = useAlunos(() => ({ limite: limite.value }));
+const { alunos, pendente, atualizando, erro, recarregar } = useAlunos(() => ({
+  limite: limite.value,
+}));
 
 const busca = ref((route.query.busca as string) ?? '');
 const filtroStatus = ref<'todos' | 'ativo' | 'egresso' | 'transferido' | 'inativo'>(

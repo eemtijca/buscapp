@@ -69,7 +69,7 @@ Os composables concentram autenticação, sessão, navegação, notificações, 
 
 - Foco visível, rótulos e atributos ARIA em ícones, filtros, diálogos e regiões; o `Combobox` é navegável por teclado e tolera acentos.
 - Estrutura semântica com `header`, `nav`, `main` e `footer`; o conteúdo principal recebe `role="main"` e `tabindex="-1"`.
-- Interface mobile-first com Bootstrap: barra superior e navegação inferior no celular, ações com alvos grandes.
+- Interface mobile-first com Bootstrap: barra superior e navegação inferior no celular, com botões no tamanho padrão.
 - Mensagens curtas e estados explícitos nas telas do responsável.
 
 ## PWA

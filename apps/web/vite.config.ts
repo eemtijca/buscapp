@@ -51,6 +51,11 @@ export default defineConfig({
       },
     }),
   ],
+  build: {
+    // Mantém as fontes como arquivos próprios (mesma origem) para atender `font-src 'self'`.
+    assetsInlineLimit: (filePath) =>
+      /\.(woff2?|ttf|otf|eot)$/i.test(filePath) ? false : undefined,
+  },
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),

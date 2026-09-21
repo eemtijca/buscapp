@@ -61,7 +61,7 @@ npm run test:e2e
 
 | Workflow         | Etapas                                                                                                 |
 | ---------------- | ------------------------------------------------------------------------------------------------------ |
-| `qualidade.yml`  | `npm ci`, `type-check`, `lint` e `build-only` em push para `main` e pull requests.                     |
+| `qualidade.yml`  | `npm ci`, `type-check`, `lint` e `build-only` em pull requests e por dispatch manual.                  |
 | `testes.yml`     | `docker compose up -d --build`, espera `/api/saude` e roda `npm run test:unit` com PostgreSQL e Redis. |
 | `migracoes.yml`  | `prisma migrate deploy` e aplicação da senha do papel em push para `main` com mudanças no schema.      |
 | `publicacao.yml` | Build da imagem e push para o GHCR ao publicar um release estável, além de dispatch manual.            |

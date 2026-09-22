@@ -94,6 +94,7 @@ Credenciais de desenvolvimento:
 | [docs/deploy.md](docs/deploy.md)                   | Compose, Vercel e migrações de produção              |
 | [docs/adr/](docs/adr/)                             | Decisões de arquitetura registradas                  |
 | [CONTRIBUTING.md](CONTRIBUTING.md)                 | Rotina de desenvolvimento e padrões                  |
+| [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)           | Normas de convivência da comunidade                  |
 | [SECURITY.md](SECURITY.md)                         | Política de reporte de vulnerabilidades              |
 
 ## Licença

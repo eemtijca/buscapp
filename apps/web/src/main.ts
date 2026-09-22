@@ -1,9 +1,8 @@
-import '@fontsource/geist-sans/400.css';
-import '@fontsource/geist-sans/500.css';
-import '@fontsource/geist-sans/600.css';
-import '@fontsource/geist-sans/700.css';
-import '@fontsource/geist-mono/400.css';
-import '@fontsource/geist-mono/500.css';
+import '@fontsource-variable/noto-sans';
+import '@fontsource-variable/noto-sans/wght-italic.css';
+import '@fontsource-variable/noto-sans-display';
+import '@fontsource-variable/noto-sans-display/wght-italic.css';
+import '@fontsource-variable/noto-sans-mono';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap';
 import 'bootstrap-icons/font/bootstrap-icons.css';

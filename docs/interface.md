@@ -18,7 +18,7 @@ Organização da SPA Vue 3, design system e padrões de interação. Os tokens f
 ## Design system
 
 - Cor primária institucional `#008241`, com variações de hover e ativo, definida em `cores.css` sobre as variáveis do Bootstrap.
-- Fontes Geist Sans e Geist Mono via `@fontsource`, aplicadas nos tokens do Bootstrap.
+- Fontes Noto Sans, Noto Sans Display (títulos e números de destaque) e Noto Sans Mono (código) via `@fontsource-variable`, aplicadas nos tokens do Bootstrap.
 - Bootstrap Icons para iconografia, com `aria-hidden` em ícones decorativos.
 - `reka-ui` fornece primitivos acessíveis para componentes interativos, e `sortablejs` apoia a reordenação por arrastar e soltar.
 - Cores de status usam classes contextuais do Bootstrap, sempre com ícone ou texto, sem depender apenas da cor.

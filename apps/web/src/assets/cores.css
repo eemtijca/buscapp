@@ -8,12 +8,36 @@
   --bs-link-color-rgb: 0, 130, 65;
   --bs-link-hover-color: #006632;
   --bs-link-hover-color-rgb: 0, 102, 50;
-  --bs-font-sans-serif: 'Geist Sans', system-ui, -apple-system, sans-serif;
-  --bs-font-monospace: 'Geist Mono', SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --bs-font-sans-serif: 'Noto Sans Variable', system-ui, -apple-system, sans-serif;
+  --bs-font-display: 'Noto Sans Display Variable', 'Noto Sans Variable', system-ui, sans-serif;
+  --bs-font-monospace: 'Noto Sans Mono Variable', SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
 body {
   font-family: var(--bs-font-sans-serif);
+}
+
+/* Títulos e números de destaque usam a variação Display, mais adequada a tamanhos grandes. */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+.h1,
+.h2,
+.h3,
+.h4,
+.h5,
+.h6,
+.display-1,
+.display-2,
+.display-3,
+.display-4,
+.display-5,
+.display-6,
+.fonte-display {
+  font-family: var(--bs-font-display);
 }
 
 /* Usuários sensíveis a movimento não recebem animações nem transições. */

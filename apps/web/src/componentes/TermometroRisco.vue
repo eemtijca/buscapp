@@ -102,7 +102,7 @@ const tendenciaInfo = computed(() => {
         <div class="d-flex justify-content-between align-items-center mb-2">
           <span class="small fw-semibold" :class="config.corTexto">Nível de atenção</span>
           <span class="small text-body-secondary">
-            <strong class="text-body">{{ score }}/100</strong>
+            <strong class="text-body fonte-display">{{ score }}/100</strong>
           </span>
         </div>
         <div

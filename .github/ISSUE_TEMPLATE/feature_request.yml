@@ -1,0 +1,39 @@
+name: Melhoria
+description: Proponha uma funcionalidade ou melhoria.
+title: "[Melhoria]: "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problema
+    attributes:
+      label: Problema
+      description: Qual necessidade ou dificuldade motiva a proposta?
+    validations:
+      required: true
+  - type: textarea
+    id: proposta
+    attributes:
+      label: Proposta
+      description: Descreva o comportamento desejado e as alternativas consideradas.
+    validations:
+      required: true
+  - type: dropdown
+    id: papel
+    attributes:
+      label: Papel beneficiado
+      options:
+        - Professor
+        - Gestão
+        - Responsável
+        - Todos
+        - Não se aplica
+    validations:
+      required: false
+  - type: textarea
+    id: contexto
+    attributes:
+      label: Contexto adicional
+      description: Referências, esboços ou restrições, sem dados sensíveis.
+    validations:
+      required: false

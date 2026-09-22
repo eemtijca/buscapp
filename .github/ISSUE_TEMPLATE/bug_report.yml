@@ -1,0 +1,52 @@
+name: Bug
+description: Reporte um comportamento incorreto.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Obrigado por reportar. Não inclua dados reais de alunos, responsáveis ou professores.
+  - type: textarea
+    id: descricao
+    attributes:
+      label: Descrição
+      description: O que aconteceu e qual era o comportamento esperado?
+    validations:
+      required: true
+  - type: textarea
+    id: reproducao
+    attributes:
+      label: Passos para reproduzir
+      placeholder: |
+        1. Acesse ...
+        2. Clique em ...
+        3. Observe ...
+    validations:
+      required: true
+  - type: input
+    id: versao
+    attributes:
+      label: Versão ou commit
+      placeholder: v0.1.0 ou hash do commit
+    validations:
+      required: false
+  - type: dropdown
+    id: papel
+    attributes:
+      label: Papel afetado
+      options:
+        - Professor
+        - Gestão
+        - Responsável
+        - Não se aplica
+    validations:
+      required: false
+  - type: textarea
+    id: contexto
+    attributes:
+      label: Contexto adicional
+      description: Navegador, dispositivo, capturas ou logs, sem dados sensíveis.
+    validations:
+      required: false

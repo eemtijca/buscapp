@@ -19,7 +19,7 @@
     "type-check": "tsc -b"
   },
   "dependencies": {
-    "zod": "^4.6.4"
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "typescript": "~6.0.0"

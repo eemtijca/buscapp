@@ -23,6 +23,7 @@
     "test:e2e": "npx playwright test",
     "test:pwa:run": "playwright test --config=playwright.pwa.config.ts",
     "test:db": "bash scripts/test-db.sh",
+    "test:runtime:vercel": "node scripts/verificar-runtime-vercel.mjs",
     "test:typecheck": "run-s type-check",
     "test:lint": "run-s lint:*",
     "test:build": "run-s build-only",

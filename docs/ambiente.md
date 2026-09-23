@@ -13,6 +13,7 @@ Todas as variáveis da API passam por `apps/api/src/ambiente.ts`, validadas com 
 | `PORT` / `HOST`                                                                     | API               | Porta e interface de escuta (padrão `3001` e `0.0.0.0`).                                       |
 | `APP_URL`                                                                           | API               | Origem do frontend liberada no CORS com credenciais (padrão `http://localhost:5173`).          |
 | `APP_ORIGINS`                                                                       | API               | Origens adicionais para CORS, separadas por vírgula.                                           |
+| `APP_ORIGIN_SUFFIXES`                                                               | API               | Sufixos HTTPS de previews confiáveis, separados por vírgula e sem wildcard.                    |
 | `WEB_DIST`                                                                          | API               | Caminho do build da SPA servido na mesma origem (padrão `../web/dist`).                        |
 | `AUTH_PEPPER`                                                                       | API               | Pepper do HMAC dos códigos de redefinição; mínimo de 32 caracteres em produção.                |
 | `SESSAO_COOKIE`                                                                     | API               | Nome do cookie de sessão (padrão `buscapp_sessao`).                                            |
@@ -75,7 +76,17 @@ node apps/api/dist/src/server.js
 
 ### Vercel
 
-O perfil full-stack usa `DATABASE_URL` no pooler de transação, `MIGRATE_DATABASE_URL` como dono do schema, `TRUST_PROXY=true`, `DB_POOL_MAX=1`, `STORAGE_DRIVER=s3` e `WEB_DIST` apontando para um caminho inexistente, o que desativa a SPA na API. Detalhes em [deploy.md](deploy.md).
+O perfil full-stack usa `DATABASE_URL` no pooler de transação, `MIGRATE_DATABASE_URL` como dono do schema, `TRUST_PROXY=true`, `DB_POOL_MAX=1`, `STORAGE_DRIVER=s3` e `WEB_DIST` apontando para um caminho inexistente, o que desativa a SPA na API. Nesse perfil, `@fastify/static` só é carregado quando existe um `index.html` no caminho configurado.
+
+No ambiente Preview, configure o sufixo confiável do projeto:
+
+```text
+APP_ORIGIN_SUFFIXES=emanuel-lazaro-custodio-silvas-projects.vercel.app
+```
+
+A variável aceita somente hostnames HTTPS separados por vírgula. Não use `*.vercel.app`, domínios de outros projetos ou curingas genéricos. Produção deve manter a variável vazia, salvo revisão de segurança explícita. Preview deve usar banco, Redis e armazenamento isolados da produção.
+
+Detalhes em [deploy.md](deploy.md).
 
 ## Seed de desenvolvimento
 

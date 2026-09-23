@@ -5,14 +5,13 @@ import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import multipart from '@fastify/multipart';
 import rateLimit from '@fastify/rate-limit';
-import fastifyStatic from '@fastify/static';
 import Fastify, { type FastifyError, type FastifyInstance } from 'fastify';
 import {
   serializerCompiler,
   validatorCompiler,
   type ZodTypeProvider,
 } from 'fastify-type-provider-zod';
-import { ambiente, deveAvisarTrustProxy, origensPermitidas } from './ambiente.js';
+import { ambiente, deveAvisarTrustProxy, origemAutorizada } from './ambiente.js';
 import { contextoBanco } from './nucleo/banco/contexto.js';
 import { registrarCacheHttp } from './nucleo/http/etag.js';
 import { ErroHttp } from './nucleo/http/erros.js';
@@ -101,7 +100,7 @@ export async function construirApp(): Promise<FastifyInstance> {
     if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(pedido.method)) return;
 
     const origem = pedido.headers.origin;
-    if (!origem || origensPermitidas.includes(origem)) return;
+    if (!origem || origemAutorizada(origem)) return;
 
     return resposta.status(403).send({
       erro: { codigo: 'origem_invalida', mensagem: 'Origem não autorizada.' },
@@ -173,7 +172,9 @@ export async function construirApp(): Promise<FastifyInstance> {
     },
   });
   await app.register(cors, {
-    origin: origensPermitidas,
+    origin: (origem, concluir) => {
+      concluir(null, origem && origemAutorizada(origem) ? origem : false);
+    },
     credentials: true,
     methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     exposedHeaders: ['ETag'],
@@ -219,6 +220,8 @@ export async function construirApp(): Promise<FastifyInstance> {
 
   const distWeb = path.resolve(process.cwd(), ambiente.WEB_DIST);
   if (existsSync(path.join(distWeb, 'index.html'))) {
+    // O perfil Vercel não serve a SPA; evita carregar o plugin CommonJS incompatível.
+    const { default: fastifyStatic } = await import('@fastify/static');
     await app.register(fastifyStatic, { root: distWeb, wildcard: false });
     app.setNotFoundHandler((pedido, resposta) => {
       if (pedido.url.startsWith('/api/')) {

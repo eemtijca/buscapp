@@ -41,6 +41,9 @@ jobs:
           docker compose logs app
           exit 1
 
+      - name: Valida o runtime Vercel sem SPA
+        run: npm run test:runtime:vercel
+
       # Integração da API e unidade do cache contra o PostgreSQL e o Redis do Compose.
       - name: Roda os testes de unidade e integração
         env:

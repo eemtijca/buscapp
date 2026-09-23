@@ -61,11 +61,13 @@ Configuração do projeto:
 2. `DATABASE_URL` no pooler de transação do Supabase (`:6543`, usuário `buscapp_api.<ref>`), com `TRUST_PROXY=true`, `DB_POOL_MAX=1` e `WEB_DIST=/tmp/sem-spa`.
 3. `MIGRATE_DATABASE_URL` com a conexão de sessão ou direta do dono do schema. A API usa essa conexão no cliente administrativo, e o workflow de migrações continua sendo o responsável por migrar.
 4. `AUTH_PEPPER` com pelo menos 32 caracteres, `COOKIE_SECURE=true`, `APP_URL` com o domínio do projeto e as origens extras em `APP_ORIGINS`.
-5. Anexos com `STORAGE_DRIVER=s3`, endpoint S3 do Supabase Storage e bucket com underscore no nome, como `buscapp_anexos`. Isso força URLs pré-assinadas path-style e evita erro de CORS no envio direto do navegador.
+5. No ambiente Preview, `APP_ORIGIN_SUFFIXES=emanuel-lazaro-custodio-silvas-projects.vercel.app`. A variável aceita somente hostnames HTTPS, nunca curingas genéricas como `*.vercel.app`. Produção deve mantê-la vazia, e Preview deve usar banco, Redis e armazenamento isolados.
+6. Anexos com `STORAGE_DRIVER=s3`, endpoint S3 do Supabase Storage e bucket com underscore no nome, como `buscapp_anexos`. Isso força URLs pré-assinadas path-style e evita erro de CORS no envio direto do navegador.
 
 Build no monorepo:
 
 - A Vercel instala dependências por serviço. Por isso o `prepare` do root é ignorado no ambiente da Vercel e cada workspace declara as ferramentas que os próprios scripts usam (`typescript`, `@types/node`, `vue-tsc` e `@tsconfig/node24` onde se aplica). No desenvolvimento local, o `prepare` continua compilando os contratos.
+- A API carrega `@fastify/static` somente quando `WEB_DIST` contém `index.html`. O perfil Vercel usa `/tmp/sem-spa` e não avalia o plugin CommonJS no startup da Function.
 - O `buildCommand` do serviço `api` roda `npm run build`, que compila `@buscapp/contratos`, gera o Prisma Client e transpila a API. O serviço `web` roda `npm run build-only`, que não depende dos contratos.
 - Não defina `NODE_ENV` manualmente no projeto da Vercel, para não omitir as devDependencies no install.
 - O preset `fastify` da Vercel ignora o `entrypoint` do `vercel.json` e detecta o servidor pelo nome do arquivo: `app`, `index` ou `server`, na raiz do serviço ou em `src/`, desde que o arquivo importe `fastify` e chame `listen()`. Por isso a API separa `src/aplicacao.ts` (fábrica Fastify, usada pelos testes) de `src/server.ts` (entrada do processo). Renomear esses arquivos ou mover a chamada de `listen()` para fora de `server.ts` faz a função subir sem handler e as requisições expirarem.
@@ -81,6 +83,12 @@ Para desenvolver com a mesma topologia:
 
 ```bash
 npx vercel dev -L
+```
+
+Com o Compose em execução, o smoke test reproduz o startup da Function sem SPA e valida CORS, login e o bloqueio de origens não confiáveis:
+
+```bash
+npm run test:runtime:vercel
 ```
 
 ## Vercel SPA separada

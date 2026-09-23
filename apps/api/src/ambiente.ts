@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { config } from 'dotenv';
 import { z } from 'zod';
+import { criarVerificadorOrigens, normalizarDominiosOrigem } from './nucleo/http/origens.js';
 
 // A API sempre roda com cwd em apps/api (dev e container); o .env fica na raiz do repositório.
 config({ path: path.resolve(process.cwd(), '../../.env') });
@@ -25,6 +26,20 @@ const esquema = z
     MIGRATE_DATABASE_URL: z.string().optional(),
     APP_URL: z.string().url().default('http://localhost:5173'),
     APP_ORIGINS: z.string().default(''),
+    APP_ORIGIN_SUFFIXES: z
+      .string()
+      .default('')
+      .transform((valor, contexto) => {
+        try {
+          return normalizarDominiosOrigem(valor);
+        } catch (erro) {
+          contexto.addIssue({
+            code: 'custom',
+            message: erro instanceof Error ? erro.message : 'APP_ORIGIN_SUFFIXES inválido.',
+          });
+          return z.NEVER;
+        }
+      }),
     WEB_DIST: z.string().default('../web/dist'),
     AUTH_PEPPER: z.string().min(16, 'AUTH_PEPPER deve ter ao menos 16 caracteres'),
     SESSAO_COOKIE: z.string().default('buscapp_sessao'),
@@ -92,10 +107,16 @@ export function deveAvisarTrustProxy(valores: Pick<Ambiente, 'NODE_ENV' | 'TRUST
   return valores.NODE_ENV === 'production' && !valores.TRUST_PROXY;
 }
 
-/** Origens autorizadas a consumir a API com credenciais (CORS). */
+/** Origens exatas autorizadas a consumir a API com credenciais. */
 export const origensPermitidas = [
   ambiente.APP_URL,
   ...ambiente.APP_ORIGINS.split(',')
     .map((origem) => origem.trim())
     .filter(Boolean),
 ];
+
+/** Verifica origens exatas e sufixos HTTPS configurados para previews confiáveis. */
+export const origemAutorizada = criarVerificadorOrigens(
+  origensPermitidas,
+  ambiente.APP_ORIGIN_SUFFIXES,
+);

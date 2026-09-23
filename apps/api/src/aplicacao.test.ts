@@ -3,6 +3,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { construirApp } from './aplicacao.js';
 import { deveAvisarTrustProxy } from './ambiente.js';
 
+const ORIGEM_PREVIEW_CONFIADA = 'https://buscapp-fix.preview.example.com';
+
 let app: FastifyInstance;
 
 beforeAll(async () => {
@@ -93,6 +95,60 @@ describe('verificação de origem', () => {
     });
 
     expect(resposta.statusCode).toBe(401);
+  });
+
+  it('aceita preview no sufixo confiável', async () => {
+    const resposta = await app.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      headers: { origin: ORIGEM_PREVIEW_CONFIADA },
+      payload: { email: 'ninguem@escola.edu.br', senha: 'Errada1!' },
+    });
+
+    expect(resposta.statusCode).toBe(401);
+  });
+
+  it('rejeita domínio que contorna o sufixo confiável', async () => {
+    const resposta = await app.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      headers: { origin: 'https://preview.example.com.evil.test' },
+      payload: { email: 'a@b.com', senha: 'x' },
+    });
+
+    expect(resposta.statusCode).toBe(403);
+    expect(resposta.json().erro.codigo).toBe('origem_invalida');
+  });
+});
+
+describe('CORS', () => {
+  it('reflete a origem confiável no preflight', async () => {
+    const resposta = await app.inject({
+      method: 'OPTIONS',
+      url: '/api/auth/login',
+      headers: {
+        origin: ORIGEM_PREVIEW_CONFIADA,
+        'access-control-request-method': 'POST',
+        'access-control-request-headers': 'content-type',
+      },
+    });
+
+    expect(resposta.statusCode).toBe(204);
+    expect(resposta.headers['access-control-allow-origin']).toBe(ORIGEM_PREVIEW_CONFIADA);
+    expect(resposta.headers['access-control-allow-credentials']).toBe('true');
+  });
+
+  it('não reflete origem não autorizada', async () => {
+    const resposta = await app.inject({
+      method: 'OPTIONS',
+      url: '/api/auth/login',
+      headers: {
+        origin: 'https://outro.vercel.app',
+        'access-control-request-method': 'POST',
+      },
+    });
+
+    expect(resposta.headers['access-control-allow-origin']).toBeUndefined();
   });
 });
 

@@ -39,8 +39,10 @@ onUnmounted(() => {
   document.removeEventListener('keydown', aoTeclar);
 });
 
-async function navegar(n: { id: string; rota: string; lida: boolean }) {
-  if (!n.lida) void marcarLida(n.id);
+async function navegar(n: { id: string; tipo: string; rota: string; lida: boolean }) {
+  // Solicitações de código só são concluídas após a geração; marcá-las ao abrir
+  // as remove da fila, que consulta apenas notificações não lidas.
+  if (!n.lida && n.tipo !== 'codigo_redefinicao') void marcarLida(n.id);
   aberto.value = false;
   try {
     await router.push(n.rota);

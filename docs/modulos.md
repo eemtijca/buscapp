@@ -57,6 +57,7 @@ O registro é por exceção: o professor envia apenas os ausentes da turma em um
 
 - Os tipos são `ausencia_portao`, `ausencia_aula`, `monitoramento`, `ocorrencia`, `justificativa`, `mensagem`, `sistema` e `codigo_redefinicao`.
 - Quem recebe é sempre o destinatário; as rotas de leitura e alteração são restritas a ele.
+- Uma solicitação de código permanece pendente ao abrir a notificação e só é marcada como lida depois que a gestão confirma a geração.
 - O frontend combina o stream SSE com polling de segurança a cada 30 segundos.
 
 ## Monitoramento, termômetro e ranking

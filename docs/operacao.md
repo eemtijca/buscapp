@@ -44,10 +44,11 @@ Cria usuários e fixtures de desenvolvimento, de forma idempotente. O entrypoint
 ## Códigos de redefinição
 
 1. O usuário solicita na tela de login; a gestão recebe uma notificação, sem saber se o email existe.
-2. A gestão gera um código de 6 dígitos em `POST /api/codigos/perfil/:perfilId`. O valor em claro é exibido uma única vez; o banco guarda apenas o HMAC.
-3. O usuário define a nova senha em `POST /api/auth/redefinir-senha`. O código pode ser revogado a qualquer momento e expira por `configuracoes_sistema.minutos_validade_codigo` (padrão 60).
-4. Após `max_tentativas_codigo` erros (padrão 5), o email fica bloqueado por `minutos_bloqueio_codigo` (padrão 15).
-5. `POST /api/codigos/limpar` remove códigos usados, expirados e revogados de imediato; a janela de `dias_retencao_codigos` é aplicada pelo expurgo agendado.
+2. A solicitação de código continua pendente ao abrir a notificação e só é marcada como lida depois que a gestão confirma a geração.
+3. A gestão gera um código de 6 dígitos em `POST /api/codigos/perfil/:perfilId`. O valor em claro é exibido uma única vez; o banco guarda apenas o HMAC.
+4. O usuário define a nova senha em `POST /api/auth/redefinir-senha`. O código pode ser revogado a qualquer momento e expira por `configuracoes_sistema.minutos_validade_codigo` (padrão 60).
+5. Após `max_tentativas_codigo` erros (padrão 5), o email fica bloqueado por `minutos_bloqueio_codigo` (padrão 15).
+6. `POST /api/codigos/limpar` remove códigos usados, expirados e revogados de imediato; a janela de `dias_retencao_codigos` é aplicada pelo expurgo agendado.
 
 ## Anexos
 

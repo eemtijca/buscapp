@@ -178,6 +178,75 @@ test.describe('Gestão - Códigos - Mobile', () => {
   });
 });
 
+test.describe('Códigos — Notificação e solicitação', () => {
+  test('CT128 - Notificação de código mantém a solicitação ao abrir e após atualizar', async ({
+    page,
+  }) => {
+    const nome = 'Notificação Código';
+    const email = emailUnico('pwnotif');
+    let userId = '';
+    const requisicoesDeLeitura: string[] = [];
+
+    page.on('request', (requisicao) => {
+      if (
+        requisicao.method() === 'PATCH' &&
+        requisicao.url().includes('/api/notificacoes/') &&
+        requisicao.url().endsWith('/lida')
+      ) {
+        requisicoesDeLeitura.push(requisicao.url());
+      }
+    });
+
+    try {
+      const criado = await criarUsuarioApi({ nome, email, papel: 'professor' });
+      userId = criado.id;
+
+      await page.goto('/solicitar-codigo');
+      await page.fill('input[type="email"]', email);
+      await page.click('button[type="submit"]');
+      await expect(page.getByText('Solicitação enviada com sucesso!')).toBeVisible({
+        timeout: 15000,
+      });
+
+      await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
+      await page.locator('button[aria-label^="Notificações"]').click();
+      const item = page.locator('.notif-menu button').filter({ hasText: nome });
+      await expect(item).toBeVisible({ timeout: 15000 });
+      await item.click();
+
+      await expect(page).toHaveURL(/\/gestao\/codigos/, { timeout: 10000 });
+      const card = page.locator('.card').filter({ hasText: email });
+      await expect(card).toBeVisible({ timeout: 10000 });
+      expect(requisicoesDeLeitura).toHaveLength(0);
+
+      await page.reload();
+      await expect(card).toBeVisible({ timeout: 10000 });
+      expect(requisicoesDeLeitura).toHaveLength(0);
+
+      await card.getByRole('button', { name: 'Gerar' }).click();
+      await page.locator('.modal button:has-text("Sim, gerar")').click();
+      const codeEl = page.locator('.modal code.font-monospace');
+      await expect(codeEl).toBeVisible({ timeout: 10000 });
+      const codigo = (await codeEl.textContent())?.trim() ?? '';
+      expect(codigo).toMatch(/^\d{6}$/);
+      await page.locator('.modal button:has-text("Concluído")').click();
+
+      await expect(card).toHaveCount(0, { timeout: 10000 });
+      await expect.poll(() => requisicoesDeLeitura.length).toBe(1);
+
+      await page.locator('button:has-text("Códigos")').click();
+      await expect(page.locator('tr').filter({ hasText: email }).first()).toBeVisible({
+        timeout: 10000,
+      });
+    } finally {
+      if (userId) {
+        await excluirLinhas('notificacoes', "metadados->>'perfil_id' = $1", [userId]);
+        await deletarUsuario(userId);
+      }
+    }
+  });
+});
+
 test.describe('Códigos — Workflow completo (regressão pendente)', () => {
   test('CT121 - Pendente: código expirado → solicitação aparece → gera → redefinir senha', async ({
     page,

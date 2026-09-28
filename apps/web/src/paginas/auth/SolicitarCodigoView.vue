@@ -48,8 +48,8 @@ async function handleSolicitarCodigo(): Promise<void> {
           <div>
             <p class="mb-1">Solicitação enviada com sucesso!</p>
             <p class="mb-0 small">
-              A administração será notificada e lhe enviará um código. Você pode fechar esta tela e
-              voltar depois.
+              A administração será notificada e enviará um código. Esta tela pode ser fechada e
+              acessada novamente depois.
             </p>
           </div>
         </div>

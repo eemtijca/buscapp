@@ -1,6 +1,6 @@
 # Arquitetura
 
-Monorepo npm workspaces com três pacotes: a SPA Vue 3 (`apps/web`), a API Fastify 5 (`apps/api`) e os contratos Zod compartilhados (`packages/contratos`). O PostgreSQL é acessado via Prisma 7.10 com `@prisma/adapter-pg`. A topologia padrão é de mesma origem: a API serve o build da SPA, o que mantém o cookie de sessão first-party.
+Monorepo npm workspaces com três pacotes: a SPA Vue 3 (`apps/web`), a API Fastify 5 (`apps/api`) e os contratos Zod (`packages/contratos`), consumidos pela API. O PostgreSQL é acessado via Prisma 7.10 com `@prisma/adapter-pg`. A topologia padrão é de mesma origem: a API serve o build da SPA, o que mantém o cookie de sessão first-party.
 
 ## Visão geral
 
@@ -13,8 +13,7 @@ flowchart LR
   A -->|driver disco ou S3| F[Armazenamento de anexos]
   A <-->|pub/sub do SSE| R[(Redis)]
   A -.->|LISTEN/NOTIFY| D
-  C[packages/contratos] -.-> W
-  C -.-> A
+  C[packages/contratos] -.-> A
 ```
 
 ## Camadas
@@ -26,7 +25,7 @@ flowchart LR
 - `apps/api/src/ambiente.ts`: validação Zod das variáveis, com falha antecipada.
 - `apps/api/src/nucleo/`: infraestrutura transversal (`banco`, `autenticacao`, `autorizacao`, `armazenamento`, `auditoria`, `eventos`, `http`, `rate-limit` e `tempo`).
 - `apps/api/src/modulos/<dominio>/`: padrão `.rotas.ts`, `.servico.ts` e `.repositorio.ts`.
-- `packages/contratos/src/`: schemas Zod de entrada e saída por domínio, compartilhados entre API e frontend.
+- `packages/contratos/src/`: schemas Zod de entrada e saída por domínio, consumidos pela API. O web mantém tipos próprios em `apps/web/src/tipos`.
 - `tests/`: Playwright e helpers de apoio. Os testes de integração da API ficam no próprio módulo, em `apps/api/src/**/*.test.ts`.
 
 ## Fluxo de uma requisição autenticada
@@ -108,7 +107,7 @@ apps/
       server.ts          entrada do processo
       nucleo/            banco, autenticação, autorização, armazenamento, auditoria, eventos, http, rate-limit e tempo
       modulos/<dominio>/ rotas, serviço e repositório por domínio
-packages/contratos       schemas Zod compartilhados
+packages/contratos       schemas Zod consumidos pela API
 tests/e2e                Playwright
 tests/suporte            helpers de API, banco, fixtures e sessão
 infra/docker             Dockerfile, entrypoint e preparação do papel

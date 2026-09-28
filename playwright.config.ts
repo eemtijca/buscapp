@@ -23,7 +23,7 @@ export default defineConfig({
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('')`. */
-    baseURL: 'http://localhost:5173',
+    baseURL: process.env.TEST_BASE_URL || 'http://localhost:5173',
 
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',
@@ -64,18 +64,22 @@ export default defineConfig({
     },
   ],
 
-  /* Sobe API e web antes dos testes; Playwright aceita uma lista de webServers. */
-  webServer: [
-    {
-      command: 'npm run dev:api',
-      url: 'http://localhost:3001/api/saude',
-      reuseExistingServer: !process.env.CI,
-      timeout: 120_000,
-    },
-    {
-      command: 'VITE_API_URL=http://localhost:3001 npm run dev:web',
-      url: 'http://localhost:5173',
-      reuseExistingServer: !process.env.CI,
-    },
-  ],
+  /* Sobe API e web antes dos testes; Playwright aceita uma lista de webServers.
+     Com PLAYWRIGHT_SKIP_WEBSERVER=1, a suíte usa apenas o aplicativo já no ar. */
+  webServer:
+    process.env.PLAYWRIGHT_SKIP_WEBSERVER === '1'
+      ? undefined
+      : [
+          {
+            command: 'npm run dev:api',
+            url: 'http://localhost:3001/api/saude',
+            reuseExistingServer: !process.env.CI,
+            timeout: 120_000,
+          },
+          {
+            command: 'VITE_API_URL=http://localhost:3001 npm run dev:web',
+            url: 'http://localhost:5173',
+            reuseExistingServer: !process.env.CI,
+          },
+        ],
 });

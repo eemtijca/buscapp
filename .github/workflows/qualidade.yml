@@ -1,4 +1,4 @@
-name: Qualidade (tipos, lint e build)
+name: Qualidade
 
 on:
   pull_request:

@@ -1,4 +1,4 @@
-name: Publicação da imagem (GHCR)
+name: Publicação da imagem
 
 on:
   release:

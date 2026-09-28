@@ -288,7 +288,7 @@ onMounted(async () => {
             ativo: a.ativo,
             created_at: a.created_at,
             updated_at: a.updated_at,
-            turma_nome: a.turma?.nome_completo ?? '—',
+            turma_nome: a.turma?.nome_completo ?? '-',
           }))
           .sort((a, b) => b.created_at.localeCompare(a.created_at));
       } catch (e) {
@@ -312,7 +312,7 @@ onMounted(async () => {
             ativo: v.ativo,
             created_at: v.created_at,
             updated_at: v.created_at,
-            aluno_nome: nomePorAluno.get(v.aluno_id) ?? '—',
+            aluno_nome: nomePorAluno.get(v.aluno_id) ?? '-',
           }))
           .sort((a, b) => b.created_at.localeCompare(a.created_at));
       } catch (e) {

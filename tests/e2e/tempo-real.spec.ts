@@ -4,7 +4,7 @@ import { SENHA_ADMIN, SENHA_RESP, SENHA_PROF } from '../suporte/dados.js';
 import { apiFetch, loginApi } from '../suporte/api.js';
 import { excluirLinhas, executar, inserirLinhas } from '../suporte/banco.js';
 
-test.describe('Tempo real — Atualizações sem reload', () => {
+test.describe('Tempo real: Atualizações sem reload', () => {
   const GESTAO_ID = 'a0000000-0000-0000-0000-000000000001';
   const ALUNO_ID = 'e0000000-0000-0000-0000-000000000001';
 

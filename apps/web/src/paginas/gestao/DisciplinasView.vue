@@ -287,8 +287,8 @@ async function alternarAtivo(disciplina: Disciplina) {
           <tbody>
             <tr v-for="disciplina in disciplinas" :key="disciplina.id">
               <td class="fw-medium">{{ disciplina.nome }}</td>
-              <td class="text-body-secondary">{{ disciplina.codigo_sige ?? '—' }}</td>
-              <td>{{ disciplina.carga_horaria ?? '—' }}</td>
+              <td class="text-body-secondary">{{ disciplina.codigo_sige ?? '-' }}</td>
+              <td>{{ disciplina.carga_horaria ?? '-' }}</td>
               <td>
                 <span
                   class="badge"

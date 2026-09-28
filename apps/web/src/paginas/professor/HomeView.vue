@@ -18,8 +18,8 @@ const moduloNegado = computed(() => {
   const valor = route.query.moduloNegado;
   if (typeof valor !== 'string') return '';
   return valor === 'ocorrencias'
-    ? 'Você não possui acesso ao módulo de ocorrências.'
-    : 'Você não possui acesso ao módulo de frequência.';
+    ? 'Sem acesso ao módulo de ocorrências.'
+    : 'Sem acesso ao módulo de frequência.';
 });
 </script>
 

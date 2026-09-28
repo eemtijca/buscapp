@@ -200,7 +200,7 @@ const statusBadge = (status: string) => {
             <tr v-for="aluno in alunosFiltrados" :key="aluno.id">
               <td class="fw-medium">{{ aluno.nome }}</td>
               <td class="text-body-secondary">{{ aluno.matricula }}</td>
-              <td>{{ aluno.turma ?? '—' }}</td>
+              <td>{{ aluno.turma ?? '-' }}</td>
               <td>
                 <div class="d-flex gap-1 flex-wrap">
                   <i
@@ -231,7 +231,7 @@ const statusBadge = (status: string) => {
                 >
                   {{ aluno.documentos_recebidos.length }}
                 </span>
-                <span v-else class="text-body-tertiary small">—</span>
+                <span v-else class="text-body-tertiary small">-</span>
               </td>
               <td>
                 <span class="badge" :class="'text-bg-' + statusBadge(aluno.status)">

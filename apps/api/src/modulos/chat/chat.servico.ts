@@ -252,7 +252,7 @@ async function resolverResponsavel(
   }
 
   if (dados.responsavel_id && dados.responsavel_id !== usuario.id) {
-    throw erroNaoAutorizado('Você só pode iniciar conversas em seu próprio nome.');
+    throw erroNaoAutorizado('Conversas só podem ser iniciadas em nome próprio.');
   }
 
   const vinculo = await buscarVinculoAtivo(usuario.id, dados.aluno_id);

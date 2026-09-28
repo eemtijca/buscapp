@@ -314,7 +314,7 @@ async function alternarAtivo(turma: Turma) {
               <td class="fw-medium">{{ turma.nome_completo }}</td>
               <td>{{ turma.serie }}</td>
               <td>{{ turma.letra }}</td>
-              <td>{{ turma.capacidade ?? '—' }}</td>
+              <td>{{ turma.capacidade ?? '-' }}</td>
               <td>
                 <span class="badge" :class="turma.ativo ? 'text-bg-success' : 'text-bg-secondary'">
                   {{ turma.ativo ? 'Ativo' : 'Inativo' }}

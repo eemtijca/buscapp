@@ -40,7 +40,7 @@ test.describe('Combobox - todos os dropdowns viraram combobox', () => {
       .locator('#campoRespEmail-lista [role="option"]', { hasText: 'Maria' })
       .first()
       .click();
-    // O input deve exibir "Nome — email"
+    // O input deve exibir "Nome: email"
     await expect(comboboxResp).toHaveValue(/Maria.*@.*\..*/);
     // Alternar para "Criar novo" mostra campos adicionais e esconde combobox de busca
     await page.locator('label[for="vinculoNovo"]').click();

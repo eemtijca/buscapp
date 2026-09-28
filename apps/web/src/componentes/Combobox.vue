@@ -51,7 +51,7 @@ function rotuloDoValor(valor: string): string {
   const encontrada = props.opcoes.find((o) => o.valor === valor);
   if (encontrada)
     return encontrada.descricao
-      ? `${encontrada.rotulo} — ${encontrada.descricao}`
+      ? `${encontrada.rotulo}: ${encontrada.descricao}`
       : encontrada.rotulo;
   return valor;
 }
@@ -129,7 +129,7 @@ function fechar() {
 
 function selecionar(opcao: OpcaoCombobox) {
   emit('update:modelValue', opcao.valor);
-  textoBusca.value = opcao.descricao ? `${opcao.rotulo} — ${opcao.descricao}` : opcao.rotulo;
+  textoBusca.value = opcao.descricao ? `${opcao.rotulo}: ${opcao.descricao}` : opcao.rotulo;
   fechar();
   nextTick(() => inputRef.value?.focus());
 }

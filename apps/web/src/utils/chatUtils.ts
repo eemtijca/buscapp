@@ -65,7 +65,7 @@ export function truncarPreview(texto: string, max = 40): string {
   if (!texto) return '';
   const limpo = texto.replace(/\n/g, ' ');
   if (limpo.length <= max) return limpo;
-  return limpo.slice(0, max).trimEnd() + '…';
+  return limpo.slice(0, max).trimEnd() + '...';
 }
 
 export function formatarHorario(iso: string): string {

@@ -7,6 +7,7 @@ import {
 } from '@/composables/consultas/useMonitoramento';
 import FilaJustificativas from '@/componentes/FilaJustificativas.vue';
 import VisualizadorAnexo from '@/componentes/VisualizadorAnexo.vue';
+import { plural } from '@/utils/plural';
 
 const router = useRouter();
 const { justificativas, pendente, atualizando, recarregar } = useJustificativasPendentes();
@@ -80,7 +81,10 @@ async function recusarJustificativa(justId: string) {
         Validação de justificativas
       </h1>
       <div class="d-flex align-items-center gap-2">
-        <span class="badge text-bg-warning">{{ justificativasPendentes.length }} pendente(s)</span>
+        <span class="badge text-bg-warning"
+          >{{ justificativasPendentes.length }}
+          {{ plural(justificativasPendentes.length, 'pendente', 'pendentes') }}</span
+        >
         <button
           type="button"
           class="btn btn-sm btn-outline-secondary"

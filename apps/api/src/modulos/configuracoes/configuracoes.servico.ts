@@ -24,6 +24,7 @@ import type {
 import { publicarEvento } from '../../nucleo/eventos/barramento.js';
 import { ambiente } from '../../ambiente.js';
 import { ErroHttp, erroNaoEncontrado } from '../../nucleo/http/erros.js';
+import { plural } from '../../nucleo/plural.js';
 import {
   atualizarConfiguracao,
   atualizarHorario,
@@ -284,7 +285,7 @@ export async function excluirOpcaoConfiguracao(id: string): Promise<void> {
     throw new ErroHttp(
       409,
       'opcao_em_uso',
-      `Não é possível excluir "${existente.rotulo}": está referenciada por ${usos} registro(s). Desative-a para deixá-la indisponível.`,
+      `Não é possível excluir "${existente.rotulo}": está referenciada por ${usos} ${plural(usos, 'registro', 'registros')}. Desative-a para deixá-la indisponível.`,
     );
   }
 
@@ -407,7 +408,7 @@ export async function atualizarTagComportamento(
       throw new ErroHttp(
         409,
         'tag_em_uso',
-        `Não é possível renomear: a tag é usada em ${usos} referência(s). Desative-a em vez de renomear.`,
+        `Não é possível renomear: a tag é usada em ${usos} ${plural(usos, 'referência', 'referências')}. Desative-a em vez de renomear.`,
       );
     }
   }
@@ -442,7 +443,7 @@ export async function excluirTagComportamento(id: string): Promise<void> {
     throw new ErroHttp(
       409,
       'tag_em_uso',
-      `Não é possível excluir: a tag é usada em ${usos} referência(s). Desative-a para deixá-la indisponível.`,
+      `Não é possível excluir: a tag é usada em ${usos} ${plural(usos, 'referência', 'referências')}. Desative-a para deixá-la indisponível.`,
     );
   }
 

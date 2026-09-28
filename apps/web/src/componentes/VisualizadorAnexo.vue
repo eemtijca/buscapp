@@ -77,7 +77,7 @@ onUnmounted(() => {
         class="d-flex flex-column align-items-center gap-2 py-5 text-body-secondary"
       >
         <span class="spinner-border" role="status" aria-hidden="true"></span>
-        <small>Carregando anexo…</small>
+        <small>Carregando anexo...</small>
       </div>
 
       <div

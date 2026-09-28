@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { TermometroAtencao, NivelRisco } from '@/tipos/componentes';
+import { plural } from '@/utils/plural';
 
 const props = defineProps<{
   termometro: TermometroAtencao;
@@ -111,7 +112,7 @@ const tendenciaInfo = computed(() => {
           :aria-valuenow="score"
           aria-valuemin="0"
           aria-valuemax="100"
-          :aria-valuetext="config.rotulo + ' — ' + score + ' de 100'"
+          :aria-valuetext="config.rotulo + ': ' + score + ' de 100'"
           style="height: 14px"
         >
           <div
@@ -142,7 +143,8 @@ const tendenciaInfo = computed(() => {
       <div class="d-flex flex-wrap align-items-center gap-2 small">
         <span class="d-inline-flex align-items-center gap-1">
           <i class="bi bi-calendar-x text-body-secondary" aria-hidden="true"></i>
-          {{ termometro.totalAusencias }} falta(s) injust.
+          {{ termometro.totalAusencias }}
+          {{ plural(termometro.totalAusencias, 'falta injustificada', 'faltas injustificadas') }}
         </span>
         <span
           v-if="termometro.totalAusenciasJustificadas > 0"
@@ -150,12 +152,20 @@ const tendenciaInfo = computed(() => {
         >
           <span class="text-body-secondary" aria-hidden="true">·</span>
           <i class="bi bi-calendar-check text-body-secondary" aria-hidden="true"></i>
-          {{ termometro.totalAusenciasJustificadas }} justificada(s)
+          {{ termometro.totalAusenciasJustificadas }}
+          {{
+            plural(
+              termometro.totalAusenciasJustificadas,
+              'falta justificada',
+              'faltas justificadas',
+            )
+          }}
         </span>
         <span class="text-body-secondary" aria-hidden="true">·</span>
         <span class="d-inline-flex align-items-center gap-1">
           <i class="bi bi-exclamation-triangle text-body-secondary" aria-hidden="true"></i>
-          {{ termometro.totalOcorrencias }} ocorrência(s)
+          {{ termometro.totalOcorrencias }}
+          {{ plural(termometro.totalOcorrencias, 'ocorrência', 'ocorrências') }}
         </span>
       </div>
 
@@ -230,18 +240,19 @@ const tendenciaInfo = computed(() => {
             {{ termometro.totalAusencias - limites.preventivo + 1 }}).
           </li>
           <li v-else>
-            Faltam {{ limites.preventivo - termometro.totalAusencias }} falta(s) para atingir o
-            nível de atenção — mantenha a frequência.
+            Faltam {{ limites.preventivo - termometro.totalAusencias }}
+            {{ plural(limites.preventivo - termometro.totalAusencias, 'falta', 'faltas') }} para
+            atingir o nível de atenção. Mantenha a frequência.
           </li>
           <li v-if="termometro.totalOcorrencias > 0">
-            Ocorrências pendentes mantêm o score elevado — resolva ou confirme presença do
+            Ocorrências pendentes mantêm o score elevado. Resolva ou confirme a presença do
             responsável quando aplicável.
           </li>
           <li v-if="termometro.tendencia === 'queda'">
-            Tendência em queda — continue assim para acelerar a redução da recência.
+            Tendência em queda. Continue assim para acelerar a redução da recência.
           </li>
           <li v-else-if="termometro.tendencia === 'alta'">
-            Tendência em alta — evite novas faltas nos próximos dias.
+            Tendência em alta. Evite novas faltas nos próximos dias.
           </li>
           <li>Comportamentos positivos recentes reduzem o score; registre-os com a coordenação.</li>
         </ul>

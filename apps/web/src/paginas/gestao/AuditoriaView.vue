@@ -49,13 +49,13 @@ function limparFiltros() {
 
 function detalhe(evento: AuditoriaApi): string {
   const dados = evento.dados_novos ?? evento.dados_anteriores;
-  if (!dados || typeof dados !== 'object') return '—';
+  if (!dados || typeof dados !== 'object') return '-';
   const registro = dados as Record<string, unknown>;
   const partes = Object.entries(registro)
     .filter(([, valor]) => valor !== null && valor !== undefined)
     .slice(0, 3)
     .map(([chave, valor]) => `${chave}: ${String(valor)}`);
-  return partes.length ? partes.join(' · ') : '—';
+  return partes.length ? partes.join(' · ') : '-';
 }
 </script>
 
@@ -223,7 +223,7 @@ function detalhe(evento: AuditoriaApi): string {
                   {{ detalhe(evento) }}
                 </td>
                 <td class="d-none d-lg-table-cell text-body-secondary">
-                  {{ evento.ip_origem ?? '—' }}
+                  {{ evento.ip_origem ?? '-' }}
                 </td>
               </tr>
             </tbody>

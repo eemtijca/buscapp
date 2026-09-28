@@ -347,7 +347,7 @@ async function salvar() {
           >
         </CampoFormulario>
 
-        <h2 class="h6 fw-bold mt-4 mb-2">Termômetro de atenção — pesos e limites</h2>
+        <h2 class="h6 fw-bold mt-4 mb-2">Termômetro de atenção: pesos e limites</h2>
         <p class="small text-body-secondary">
           Ajuste fino do cálculo inteligente. A barra preenche até o score e muda de cor
           (verde/amarelo/vermelho) conforme os limiares.
@@ -425,10 +425,9 @@ async function salvar() {
               ><span>100</span>
             </div>
             <div class="small text-body-secondary mt-1">
-              Verde 0–{{ limiteScoreMedio - 1 }} · Amarelo {{ limiteScoreMedio }}–{{
-                limiteScoreAlto - 1
-              }}
-              · Vermelho ≥{{ limiteScoreAlto }} — a barra assume a cor do nível.
+              Verde 0 a {{ limiteScoreMedio - 1 }} · Amarelo {{ limiteScoreMedio }} a
+              {{ limiteScoreAlto - 1 }} · Vermelho ≥{{ limiteScoreAlto }}: a barra assume a cor do
+              nível.
             </div>
           </div>
         </div>

@@ -1,4 +1,4 @@
-name: Testes de integração (Compose)
+name: Testes
 
 on:
   pull_request:
@@ -32,7 +32,7 @@ jobs:
         run: |
           for tentativa in $(seq 1 60); do
             if curl -fsS http://localhost:3000/api/saude > /dev/null; then
-              echo "API disponível após ${tentativa} tentativa(s)."
+              echo "API disponível. Tentativas: ${tentativa}."
               exit 0
             fi
             sleep 5

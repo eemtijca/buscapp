@@ -11,7 +11,7 @@ const destino = (route.query.destino as string) || '/';
     :codigo="403"
     icone="bi-shield-exclamation"
     titulo="Acesso negado"
-    mensagem="Você não tem permissão para acessar esta página."
+    mensagem="Sem permissão para acessar esta página."
     :destino="destino"
     rotuloAcao="Redirecionar agora"
   />

@@ -11,7 +11,7 @@ import { apiFetch, loginApi } from '../suporte/api.js';
 import { excluirLinhas, inserirLinhas } from '../suporte/banco.js';
 
 const PROF_ID = 'a0000000-0000-0000-0000-000000000002';
-const ALUNO_TERM_ID = ALUNO_JOAO_ID; // João Miguel — filho de resp1
+const ALUNO_TERM_ID = ALUNO_JOAO_ID; // João Miguel, filho de resp1
 
 async function limparTermometro() {
   await excluirLinhas('justificativas_faltas', 'aluno_id = $1', [ALUNO_TERM_ID]);
@@ -51,13 +51,13 @@ test.describe('Termômetro de atenção - textos e cabeçalho', () => {
     await expect(page.locator('h2')).toHaveCount(0);
     const card = page.locator('.card').first();
     await expect(card).toBeVisible();
-    await expect(card.getByText(/falta\(s\)/).first()).toBeVisible();
-    await expect(card.getByText(/ocorrência\(s\)/).first()).toBeVisible();
+    await expect(card.getByText(/faltas?/).first()).toBeVisible();
+    await expect(card.getByText(/ocorrências?/).first()).toBeVisible();
     await logout(page);
   });
 });
 
-test.describe('Termômetro — Barra segmentada inteligente', () => {
+test.describe('Termômetro: Barra segmentada inteligente', () => {
   test.beforeEach(async () => {
     await limparTermometro();
   });
@@ -206,7 +206,7 @@ test.describe('Termômetro — Barra segmentada inteligente', () => {
       page
         .locator('.card')
         .first()
-        .getByText(/10 falta\(s\) injust/)
+        .getByText(/10 faltas? injust/)
         .first(),
     ).toBeVisible();
     await logout(page);
@@ -228,14 +228,14 @@ test.describe('Termômetro — Barra segmentada inteligente', () => {
       page
         .locator('.card')
         .first()
-        .getByText(/9 falta\(s\) injust/)
+        .getByText(/9 faltas? injust/)
         .first(),
     ).toBeVisible();
     await expect(
       page
         .locator('.card')
         .first()
-        .getByText(/1 justificada/)
+        .getByText(/1 falta justificada/)
         .first(),
     ).toBeVisible();
   });

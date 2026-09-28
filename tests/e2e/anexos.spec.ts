@@ -3,7 +3,7 @@ import { login } from '../suporte/sessao.js';
 import { SENHA_ADMIN, SENHA_RESP } from '../suporte/dados.js';
 import { apiFetch, loginApi, inserirLinhas, excluirLinhas } from '../suporte/api.js';
 
-test.describe('Gestão/Responsável — Visualizador de anexo (blob)', () => {
+test.describe('Gestão/Responsável: Visualizador de anexo (blob)', () => {
   const FREQ_ID = '30000000-0000-0000-0000-000000000001';
   const ALUNO_ID = 'e0000000-0000-0000-0000-000000000001';
   const TURMA_ID = 'd0000000-0000-0000-0000-000000000001';

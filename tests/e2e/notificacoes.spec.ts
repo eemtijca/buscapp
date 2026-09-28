@@ -3,7 +3,7 @@ import { login } from '../suporte/sessao.js';
 import { SENHA_RESP, SENHA_ADMIN, SENHA_PROF } from '../suporte/dados.js';
 import { excluirLinhas, inserirLinhas } from '../suporte/api.js';
 
-test.describe('Notificações — 403 regression', () => {
+test.describe('Notificações: 403 regression', () => {
   const RESP_ID = 'a0000000-0000-0000-0000-000000000005';
   const ALUNO_ID = 'e0000000-0000-0000-0000-000000000001';
 

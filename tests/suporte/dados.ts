@@ -1,4 +1,4 @@
-// Dados de ambiente e IDs de seed — fonte única para todos os specs.
+// Dados de ambiente e IDs de seed: fonte única para todos os specs.
 
 export const API_URL = process.env.API_URL ?? 'http://localhost:3001';
 
@@ -17,7 +17,7 @@ export const SENHA_ADMIN = process.env.SEED_SENHA_ADMIN!;
 export const SENHA_PROF = process.env.SEED_SENHA_PROF!;
 export const SENHA_RESP = process.env.SEED_SENHA_RESP!;
 
-// IDs de seed — usados em RLS e gating de módulos.
+// IDs de seed usados em RLS e gating de módulos.
 export const GESTAO_ID = 'a0000000-0000-0000-0000-000000000001';
 export const PROF1_ID = 'a0000000-0000-0000-0000-000000000002';
 export const PROF2_ID = 'a0000000-0000-0000-0000-000000000003';

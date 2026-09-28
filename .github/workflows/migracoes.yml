@@ -1,4 +1,4 @@
-name: Migrações do banco (produção)
+name: Migrações do banco
 
 on:
   push:

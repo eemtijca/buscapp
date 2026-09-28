@@ -1,6 +1,6 @@
 # Testes
 
-Suítes de integração da API, unidade do cache do frontend, Playwright (E2E e PWA) e smoke test do schema. A convenção geral está em [docs/testes.md](../docs/testes.md).
+Suítes de guarda editorial, integração da API, unidade do cache do frontend, Playwright (E2E e PWA) e smoke test do schema. A convenção geral está em [docs/testes.md](../docs/testes.md).
 
 ## Pré-requisitos
 
@@ -25,17 +25,18 @@ export STORAGE_DRIVER=disco
 ## Suítes
 
 ```bash
-npm run test          # type-check, lint, build da SPA e testes de unidade
-npm run test:unit     # integração da API e unidade do cache do web (Vitest)
-npm run test:unit:web # apenas a unidade do cache do frontend
-npm run test:e2e      # Playwright (21 especificações, sobe API e SPA)
-npm run test:pwa      # build de produção e testes de PWA
-npm run test:db       # smoke test do schema no PostgreSQL do Compose
+npm run test              # type-check, lint, build da SPA e testes de unidade
+npm run test:unit         # guarda editorial, integração da API e unidade do web (Vitest)
+npm run test:texto        # apenas a guarda editorial
+npm run test:unit:web     # apenas a unidade do cache do frontend
+npm run test:e2e:docker   # Playwright na imagem oficial, com o aplicativo no ar
+npm run test:pwa:docker   # PWA na imagem oficial, com o preview no ar
+npm run test:db           # smoke test do schema no PostgreSQL do Compose
 ```
 
-- `test:unit` roda `apps/api/src/**/*.test.ts` com `construirApp()` e `app.inject`, em série, contra o PostgreSQL do Compose, e `apps/web/src/**/*.test.ts` para o cache do frontend. Cada arquivo cria e limpa a própria massa.
-- `test:e2e` sobe `npm run dev:api` em `:3001` e `VITE_API_URL=http://localhost:3001 npm run dev:web` em `:5173`, com projetos para Chromium, Firefox, WebKit, Mobile Chrome e Mobile Safari.
-- `test:pwa` usa `vite preview` em `:4173` com a API em `:3001` e valida manifest, service worker, ícones, shell offline e leitura de dados persistidos no IndexedDB.
+- `test:unit` roda `tests/unit/texto-editorial.test.ts`, `apps/api/src/**/*.test.ts` com `construirApp()` e `app.inject`, em série, contra o PostgreSQL do Compose, e `apps/web/src/**/*.test.ts` para o cache do frontend. Cada arquivo cria e limpa a própria massa.
+- `test:e2e:docker` roda o Playwright na imagem oficial da Microsoft com o aplicativo no ar; `test:e2e` é a alternativa local e sobe `npm run dev:api` em `:3001` com `npm run dev:web` em `:5173`, nos projetos Chromium, Firefox, WebKit, Mobile Chrome e Mobile Safari.
+- `test:pwa:docker` valida o PWA contra o `vite preview` em `:4173` com a API em `:3001`; `test:pwa` é a alternativa local.
 - `test:db` aplica migrações pendentes e confere tabelas, CHECKs, triggers e o índice parcial de frequência.
 
 ## Suporte

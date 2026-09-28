@@ -15,8 +15,9 @@ Suítes de integração da API (Vitest), unidade do cache do frontend (Vitest), 
 
 | Suíte             | Arquivos                                              | Dependências                              | Cobertura                                                                                                                                                                                            |
 | ----------------- | ----------------------------------------------------- | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Integração da API | `apps/api/src/**/*.test.ts` (24 arquivos)             | Banco do Compose migrado                  | Autenticação e sessões, senhas, matriz de autorização, escopo por requisição, CRUD dos domínios, códigos, anexos, paginação, auditoria, barramento SSE, processamento de imagens, regras e ETag/304. |
+| Integração da API | `apps/api/src/**/*.test.ts` (25 arquivos)             | Banco do Compose migrado                  | Autenticação e sessões, senhas, matriz de autorização, escopo por requisição, CRUD dos domínios, códigos, anexos, paginação, auditoria, barramento SSE, processamento de imagens, regras e ETag/304. |
 | Unidade do web    | `apps/web/src/**/*.test.ts` (2 arquivos)              | Nenhuma                                   | Cache (deduplicação, frescor, 304, invalidação, GC, namespace) e cliente HTTP (timeout, retry, 401 e cancelamento).                                                                                  |
+| Guarda editorial  | `tests/unit/texto-editorial.test.ts`                  | Nenhuma                                   | Travessão, aspas curvas, setas, segunda pessoa e plural com parênteses em código, documentação e configuração.                                                                                       |
 | E2E               | `tests/e2e/*.spec.ts` (21 especificações, exceto PWA) | API e SPA no ar, banco com seed           | Fluxos dos três papéis, tempo real, notificações, anexos, termômetro, ranking, cache, sessão e resiliência.                                                                                          |
 | PWA               | `tests/e2e/pwa*.spec.ts` (2 especificações)           | Build via `vite preview` e API em `:3001` | Manifest, service worker, ícones, shell offline, dados persistidos e revalidação por 304.                                                                                                            |
 | Smoke do banco    | `scripts/test-db.sh`                                  | Compose no ar                             | Migrações aplicadas, 34 tabelas, CHECKs, triggers e índice parcial de frequência.                                                                                                                    |
@@ -26,11 +27,14 @@ Suítes de integração da API (Vitest), unidade do cache do frontend (Vitest), 
 Na raiz, com o Compose no ar:
 
 ```bash
-npm run test          # type-check, lint, build da SPA e testes de unidade
-npm run test:unit     # integração da API e unidade do cache do web (Vitest)
-npm run test:e2e      # Playwright sobe API e SPA automaticamente
-npm run test:pwa      # build de produção e testes de PWA
-npm run test:db       # smoke test do schema
+npm run test              # type-check, lint, build da SPA e testes de unidade
+npm run test:unit         # guarda editorial, integração da API e unidade do web (Vitest)
+npm run test:texto        # apenas a guarda editorial
+npm run test:e2e:docker   # Playwright na imagem oficial, com o aplicativo no ar
+npm run test:pwa:docker   # PWA na imagem oficial, com o preview no ar
+npm run test:e2e          # alternativa local, sobe API e SPA automaticamente
+npm run test:pwa          # alternativa local do PWA
+npm run test:db           # smoke test do schema
 ```
 
 Os testes de API precisam de `DATABASE_URL` (papel restrito), `MIGRATE_DATABASE_URL` (dono, usado pelo cliente administrativo), `AUTH_PEPPER` e `STORAGE_DRIVER=disco`. Uma execução típica contra o PostgreSQL do Compose:
@@ -54,7 +58,7 @@ DATABASE_URL_ADMIN='postgresql://buscapp:buscapp@127.0.0.1:5433/buscapp' \
 MIGRATE_DATABASE_URL='postgresql://buscapp:buscapp@127.0.0.1:5433/buscapp' \
 STORAGE_DRIVER=disco \
 SEED_SENHA_ADMIN='Admin123!' SEED_SENHA_PROF='Prof123!' SEED_SENHA_RESP='Resp123!' \
-npm run test:e2e
+npm run test:e2e:docker
 ```
 
 ## Integração contínua
@@ -68,7 +72,7 @@ npm run test:e2e
 | `codeql.yml`     | Análise CodeQL para javascript-typescript em push, pull request e agenda semanal.                      |
 
 > [!WARNING]
-> Vitest roda no CI desde a integração com o Compose. Playwright e o teste de PWA continuam de execução local: rode as suítes antes de abrir um pull request.
+> Vitest roda no CI desde a integração com o Compose. Playwright e PWA não rodam no CI: use os comandos em contêiner antes de abrir um pull request, com o aplicativo no ar.
 
 > [!NOTE]
 > Os testes de API e de integração exigem `REDIS_URL` (Redis do Compose) além das variáveis do banco.

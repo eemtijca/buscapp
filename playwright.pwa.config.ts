@@ -17,7 +17,7 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   reporter: 'list',
   use: {
-    baseURL: 'http://localhost:4173',
+    baseURL: process.env.TEST_BASE_URL || 'http://localhost:4173',
     headless: true,
     trace: 'on-first-retry',
   },
@@ -31,18 +31,21 @@ export default defineConfig({
       use: { ...devices['Pixel 5'] },
     },
   ],
-  webServer: [
-    {
-      command: 'APP_ORIGINS=http://localhost:4173 npm run dev:api',
-      url: 'http://localhost:3001/api/saude',
-      reuseExistingServer: !process.env.CI,
-      timeout: 120_000,
-    },
-    {
-      command: 'npm run preview -w @buscapp/web -- --port 4173 --strictPort',
-      url: 'http://localhost:4173',
-      reuseExistingServer: !process.env.CI,
-      timeout: 30_000,
-    },
-  ],
+  webServer:
+    process.env.PLAYWRIGHT_SKIP_WEBSERVER === '1'
+      ? undefined
+      : [
+          {
+            command: 'APP_ORIGINS=http://localhost:4173 npm run dev:api',
+            url: 'http://localhost:3001/api/saude',
+            reuseExistingServer: !process.env.CI,
+            timeout: 120_000,
+          },
+          {
+            command: 'npm run preview -w @buscapp/web -- --port 4173 --strictPort',
+            url: 'http://localhost:4173',
+            reuseExistingServer: !process.env.CI,
+            timeout: 30_000,
+          },
+        ],
 });

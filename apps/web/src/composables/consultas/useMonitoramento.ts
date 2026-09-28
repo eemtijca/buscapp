@@ -385,7 +385,7 @@ export function useOcorrenciasGraves(limite?: () => number): {
       return {
         id: ocorrencia.id,
         alunoNome: ocorrencia.aluno?.nome ?? aluno?.nome ?? 'Aluno não encontrado',
-        alunoMatricula: aluno?.matricula ?? '—',
+        alunoMatricula: aluno?.matricula ?? '-',
         turma: null,
         descricao: ocorrencia.descricao,
         tipo: [...ocorrencia.tipo],

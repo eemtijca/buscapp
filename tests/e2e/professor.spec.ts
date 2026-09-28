@@ -134,7 +134,7 @@ test.describe('Módulos de acesso - gating do professor', () => {
     await page.goto('/professor/ocorrencia');
     await expect(page).toHaveURL(/\/professor\?moduloNegado=ocorrencias/);
     await expect(page.locator('.alert-warning')).toContainText(
-      'Você não possui acesso ao módulo de ocorrências.',
+      'Sem acesso ao módulo de ocorrências.',
     );
     await page.goto('/professor/frequencia');
     await expect(page.locator('h1')).toContainText('Registrar frequência');

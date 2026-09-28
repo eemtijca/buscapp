@@ -178,7 +178,7 @@ test.describe('Gestão - Códigos - Mobile', () => {
   });
 });
 
-test.describe('Códigos — Notificação e solicitação', () => {
+test.describe('Códigos: Notificação e solicitação', () => {
   test('CT128 - Notificação de código mantém a solicitação ao abrir e após atualizar', async ({
     page,
   }) => {
@@ -247,8 +247,8 @@ test.describe('Códigos — Notificação e solicitação', () => {
   });
 });
 
-test.describe('Códigos — Workflow completo (regressão pendente)', () => {
-  test('CT121 - Pendente: código expirado → solicitação aparece → gera → redefinir senha', async ({
+test.describe('Códigos: Workflow completo (regressão pendente)', () => {
+  test('CT121 - Pendente: código expirado, solicitação nova e redefinição de senha', async ({
     page,
   }) => {
     const nome = 'Fluxo Pendente';
@@ -312,7 +312,7 @@ test.describe('Códigos — Workflow completo (regressão pendente)', () => {
   });
 });
 
-test.describe('Códigos — Deduplicação', () => {
+test.describe('Códigos: Deduplicação', () => {
   test('CT122 - Solicitações repetidas para o mesmo e-mail não duplicam', async ({ page }) => {
     const nome = 'Dedupe Pendente';
     const email = emailUnico('pwdedupe');
@@ -352,7 +352,7 @@ test.describe('Códigos — Deduplicação', () => {
   });
 });
 
-test.describe('Códigos — Bloqueio por tentativas', () => {
+test.describe('Códigos: Bloqueio por tentativas', () => {
   test('CT123 - Código bloqueia após tentativas erradas e mostra badge', async ({ page }) => {
     const nome = 'Bloqueio Teste';
     const email = emailUnico('pwblock');
@@ -404,7 +404,7 @@ test.describe('Códigos — Bloqueio por tentativas', () => {
   });
 });
 
-test.describe('Gestão — Configuração de códigos', () => {
+test.describe('Gestão: Configuração de códigos', () => {
   test('CT124 - Configurações do sistema expõem parâmetros de código e salvam', async ({
     page,
   }) => {
@@ -440,7 +440,7 @@ test.describe('Gestão — Configuração de códigos', () => {
   });
 });
 
-test.describe('Códigos — Revogação e nova solicitação (regressão)', () => {
+test.describe('Códigos: Revogação e nova solicitação (regressão)', () => {
   test('CT125 - Gerar sempre novo; re-solicitar após gerar/revogar aparece', async ({ page }) => {
     const nome = 'Revogacao Fluxo';
     const email = emailUnico('pwrev');
@@ -557,7 +557,7 @@ async function inserirCodigo(
   await inserirLinhas('codigos_redefinicao', [corpo]);
 }
 
-test.describe('Códigos — Limpar não ativos', () => {
+test.describe('Códigos: Limpar não ativos', () => {
   test('CT126 - Limpar remove não ativos e preserva ativos (com confirmação)', async ({ page }) => {
     const nome = 'Limpar Teste';
     const email = emailUnico('pwlimpar');
@@ -601,7 +601,7 @@ test.describe('Códigos — Limpar não ativos', () => {
   });
 });
 
-test.describe('Códigos — Copiar ao clicar', () => {
+test.describe('Códigos: Copiar ao clicar', () => {
   test.skip(({ browserName }) => browserName !== 'chromium', 'Clipboard API apenas no Chromium');
 
   test('CT127 - Clique no código do modal copia e dá feedback', async ({ page, context }) => {

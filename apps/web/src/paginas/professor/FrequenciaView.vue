@@ -12,6 +12,7 @@ import CartaoAlunoFrequencia from '@/componentes/CartaoAlunoFrequencia.vue';
 import GrupoCheckbox from '@/componentes/GrupoCheckbox.vue';
 import ModalConfirmacao from '@/componentes/ModalConfirmacao.vue';
 import type { AlunoFrequencia } from '@/tipos/componentes';
+import { plural } from '@/utils/plural';
 
 const router = useRouter();
 const { usuario } = useAutenticacao();
@@ -125,7 +126,9 @@ async function salvarFrequencia() {
   if (errMsg) {
     mostrarErro(errMsg);
   } else if (registradas > 0) {
-    mostrarSucesso(`${registradas} ausência(s) registrada(s) com sucesso.`);
+    mostrarSucesso(
+      `${registradas} ${plural(registradas, 'ausência', 'ausências')} ${plural(registradas, 'registrada', 'registradas')} com sucesso.`,
+    );
   } else {
     mostrarSucesso('Todos os alunos estão presentes. Nenhuma ausência registrada.');
   }
@@ -244,7 +247,8 @@ watch(dataAula, () => {
               >{{ totalAlunos - totalAusentesMarcados }} presentes</span
             >
             <span v-if="totalAusentesMarcados > 0" class="badge text-bg-danger"
-              >{{ totalAusentesMarcados }} ausente(s)</span
+              >{{ totalAusentesMarcados }}
+              {{ plural(totalAusentesMarcados, 'ausente', 'ausentes') }}</span
             >
           </div>
         </div>
@@ -309,7 +313,7 @@ watch(dataAula, () => {
     <ModalConfirmacao
       :visivel="confirmarSalvar"
       titulo="Salvar frequência"
-      :mensagem="`Registrar ${totalAusentesMarcados} ausência(s) em ${new Date(dataAula + 'T12:00:00').toLocaleDateString('pt-BR')}?`"
+      :mensagem="`Registrar ${totalAusentesMarcados} ${plural(totalAusentesMarcados, 'ausência', 'ausências')} em ${new Date(dataAula + 'T12:00:00').toLocaleDateString('pt-BR')}?`"
       rotulo-confirmar="Registrar faltas"
       icone="calendar-x"
       variante="warning"

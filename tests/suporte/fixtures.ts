@@ -1,4 +1,4 @@
-// Fixtures compartilhadas — login por papel e página autenticada.
+// Fixtures compartilhadas: login por papel e página autenticada.
 
 import { test as base, expect } from '@playwright/test';
 import { login } from './sessao.js';

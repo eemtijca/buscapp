@@ -50,8 +50,8 @@ const erro = computed(
 const atribuicoes = computed<AtribuicaoItem[]>(() =>
   (consultaAtribuicoes.dados.value?.atribuicoes ?? []).map((atribuicao) => ({
     ...atribuicao,
-    professor_nome: atribuicao.professor?.nome ?? '—',
-    turma_nome: atribuicao.turma?.nome_completo ?? '—',
+    professor_nome: atribuicao.professor?.nome ?? '-',
+    turma_nome: atribuicao.turma?.nome_completo ?? '-',
     disciplina_nome: atribuicao.disciplina?.nome ?? null,
   })),
 );
@@ -186,7 +186,7 @@ function resetForm() {
 }
 
 function formatarData(data: string | null) {
-  if (!data) return '—';
+  if (!data) return '-';
   return new Date(data).toLocaleDateString('pt-BR');
 }
 
@@ -388,7 +388,7 @@ const papelBadge = (papel: string) => {
             <tr v-for="a in atribuicoes" :key="a.id">
               <td class="fw-medium">{{ a.professor_nome }}</td>
               <td>{{ a.turma_nome }}</td>
-              <td>{{ a.disciplina_nome ?? '—' }}</td>
+              <td>{{ a.disciplina_nome ?? '-' }}</td>
               <td>
                 <span class="badge" :class="papelBadge(a.papel)">
                   {{ opcoesPapel.find((p) => p.valor === a.papel)?.rotulo ?? a.papel }}

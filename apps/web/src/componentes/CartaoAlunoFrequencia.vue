@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { AlunoFrequencia } from '@/tipos/componentes';
+import { plural } from '@/utils/plural';
 
 const props = defineProps<{
   aluno: AlunoFrequencia;
@@ -39,7 +40,8 @@ const inicialAluno = computed(() =>
         <div v-if="aluno.periodosAusentes && aluno.periodosAusentes.length" class="small mt-1">
           <span class="badge text-bg-warning">
             <i class="bi bi-clock-history me-1" aria-hidden="true"></i>
-            Ausente em {{ aluno.periodosAusentes.length }} aula(s)
+            Ausente em {{ aluno.periodosAusentes.length }}
+            {{ plural(aluno.periodosAusentes.length, 'aula', 'aulas') }}
           </span>
         </div>
         <div

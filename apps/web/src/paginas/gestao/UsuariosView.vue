@@ -329,7 +329,7 @@ async function executarToggleAtivacao() {
           <tbody>
             <tr v-for="usuario in usuariosFiltrados" :key="usuario.id">
               <td class="fw-medium">{{ usuario.nome }}</td>
-              <td class="text-body-secondary">{{ usuario.email ?? '—' }}</td>
+              <td class="text-body-secondary">{{ usuario.email ?? '-' }}</td>
               <td>
                 <span class="badge" :class="'text-bg-' + papelBadge(usuario.papel)">
                   {{ papelLabel(usuario.papel) }}

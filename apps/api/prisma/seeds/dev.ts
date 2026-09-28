@@ -393,7 +393,7 @@ const NOTIFICACOES: NotificacaoSeed[] = [
     destinatario_id: PROF1_ID,
     tipo: 'sistema',
     titulo: 'Bem-vinda ao sistema',
-    corpo: 'Seu perfil de professora foi ativado. Você está vinculada à turma 1ª A como titular.',
+    corpo: 'Perfil de professora ativado. O vínculo com a turma 1ª A é como titular.',
   },
   {
     id: 'f4000000-0000-0000-0000-000000000005',
@@ -401,7 +401,7 @@ const NOTIFICACOES: NotificacaoSeed[] = [
     tipo: 'sistema',
     titulo: 'Bem-vindo ao sistema',
     corpo:
-      'Seu perfil de responsável foi ativado. Você receberá notificações sobre a frequência dos seus dependentes.',
+      'Perfil de responsável ativado. As notificações sobre a frequência dos dependentes serão enviadas.',
   },
 ];
 

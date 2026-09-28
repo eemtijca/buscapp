@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { AlunoRisco, NivelRisco } from '@/tipos/componentes';
+import { plural } from '@/utils/plural';
 
 const props = defineProps<{
   aluno: AlunoRisco;
@@ -71,11 +72,12 @@ const inicialAluno = computed(() =>
             </span>
             <span v-if="aluno.totalAusencias > 0" class="badge text-bg-light border">
               <i class="bi bi-calendar-x me-1" aria-hidden="true"></i>
-              {{ aluno.totalAusencias }} falta(s)
+              {{ aluno.totalAusencias }} {{ plural(aluno.totalAusencias, 'falta', 'faltas') }}
             </span>
             <span v-if="aluno.totalOcorrencias > 0" class="badge text-bg-light border">
               <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>
-              {{ aluno.totalOcorrencias }} ocorrência(s)
+              {{ aluno.totalOcorrencias }}
+              {{ plural(aluno.totalOcorrencias, 'ocorrência', 'ocorrências') }}
             </span>
             <span v-if="aluno.exigePresencaResponsavel" class="badge text-bg-dark">
               <i class="bi bi-lock me-1" aria-hidden="true"></i>

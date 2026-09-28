@@ -46,7 +46,7 @@ const rotuloStatus: Record<JustificativaPendente['status'], string> = {
           <small class="text-body-secondary">
             {{ just.dataAusencia
             }}<span v-if="just.dataFim && just.dataFim !== just.dataAusencia">
-              — {{ just.dataFim }}</span
+              a {{ just.dataFim }}</span
             >
           </small>
         </div>

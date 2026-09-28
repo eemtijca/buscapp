@@ -16,7 +16,7 @@ export function ehImagem(mimeType: string): boolean {
 
 /**
  * Redimensiona (até 1600 px), aplica a orientação do EXIF e regrava a imagem
- * sem metadados — inclusive geolocalização. Devolve `null` quando o
+ * sem metadados, inclusive geolocalização. Devolve `null` quando o
  * processamento está desligado, o tipo não é imagem ou o conteúdo não pôde ser
  * interpretado; nesse caso o chamador mantém o original.
  */

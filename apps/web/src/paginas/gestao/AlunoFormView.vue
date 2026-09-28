@@ -382,8 +382,8 @@ async function carregarVinculos() {
         ativo: v.ativo,
         created_at: v.created_at,
         updated_at: v.created_at,
-        responsavel_nome: v.responsavel_nome ?? responsavel?.nome ?? '—',
-        responsavel_email: responsavel?.email ?? '—',
+        responsavel_nome: v.responsavel_nome ?? responsavel?.nome ?? '-',
+        responsavel_email: responsavel?.email ?? '-',
       };
     });
   } catch (e) {
@@ -415,7 +415,7 @@ async function confirmarAlteracaoEnturmacao() {
   salvando.value = true;
   try {
     // O servidor reutiliza a linha do ano letivo (unicidade de aluno e ano) ou
-    // encerra a matrícula anterior e cria a nova — tudo em transação.
+    // encerra a matrícula anterior e cria a nova, tudo em transação.
     await api('/api/enturmacoes', {
       metodo: 'POST',
       corpo: {

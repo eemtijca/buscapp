@@ -11,7 +11,7 @@ import { apiFetch, loginApi } from '../suporte/api.js';
 import { excluirLinhas, inserirLinhas } from '../suporte/banco.js';
 
 const PROF_ID = 'a0000000-0000-0000-0000-000000000002';
-const ALUNO_TERM_ID = ALUNO_JOAO_ID; // João Miguel — filho de resp1
+const ALUNO_TERM_ID = ALUNO_JOAO_ID; // João Miguel, filho de resp1
 
 async function limparTermometro() {
   await excluirLinhas('justificativas_faltas', 'aluno_id = $1', [ALUNO_TERM_ID]);
@@ -57,7 +57,7 @@ test.describe('Termômetro de atenção - textos e cabeçalho', () => {
   });
 });
 
-test.describe('Termômetro — Barra segmentada inteligente', () => {
+test.describe('Termômetro: Barra segmentada inteligente', () => {
   test.beforeEach(async () => {
     await limparTermometro();
   });

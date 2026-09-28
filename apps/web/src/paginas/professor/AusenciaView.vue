@@ -12,6 +12,7 @@ import CampoFormulario from '@/componentes/CampoFormulario.vue';
 import Combobox from '@/componentes/Combobox.vue';
 import GrupoCheckbox from '@/componentes/GrupoCheckbox.vue';
 import ModalConfirmacao from '@/componentes/ModalConfirmacao.vue';
+import { plural } from '@/utils/plural';
 
 const router = useRouter();
 const { usuario } = useAutenticacao();
@@ -90,7 +91,7 @@ async function confirmar() {
       }
     }
     const total = periodos.value.length;
-    mensagemSucesso.value = `${total} ausência(s) registrada(s) com sucesso.`;
+    mensagemSucesso.value = `${total} ${plural(total, 'ausência', 'ausências')} ${plural(total, 'registrada', 'registradas')} com sucesso.`;
     alunoId.value = '';
     periodos.value = [];
     motivos.value = [];
@@ -239,7 +240,7 @@ async function confirmar() {
     <ModalConfirmacao
       :visivel="confirmarEnvio"
       titulo="Confirmar ausência"
-      :mensagem="`Registrar ${periodos.length} ausência(s) para o aluno selecionado em ${new Date(dataAula + 'T12:00:00').toLocaleDateString('pt-BR')}?`"
+      :mensagem="`Registrar ${periodos.length} ${plural(periodos.length, 'ausência', 'ausências')} para o aluno selecionado em ${new Date(dataAula + 'T12:00:00').toLocaleDateString('pt-BR')}?`"
       rotulo-confirmar="Registrar"
       icone="clock-history"
       variante="warning"

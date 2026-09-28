@@ -16,6 +16,7 @@ import type { OpcaoCombobox } from '@/componentes/Combobox.vue';
 import GrupoCheckbox from '@/componentes/GrupoCheckbox.vue';
 import ModalConfirmacao from '@/componentes/ModalConfirmacao.vue';
 import type { OpcaoCheckbox } from '@/tipos/componentes';
+import { plural } from '@/utils/plural';
 
 const router = useRouter();
 const { usuario } = useAutenticacao();
@@ -164,7 +165,9 @@ async function registrarOcorrencia() {
         Ocorrências graves e suspensões
       </h1>
       <div class="d-flex align-items-center gap-2">
-        <span class="badge text-bg-secondary">{{ ocorrencias.length }} registro(s)</span>
+        <span class="badge text-bg-secondary"
+          >{{ ocorrencias.length }} {{ plural(ocorrencias.length, 'registro', 'registros') }}</span
+        >
         <button
           type="button"
           class="btn btn-sm"

@@ -1,4 +1,5 @@
 import type { NivelRisco } from '@/tipos/componentes';
+import { plural } from '@/utils/plural';
 
 /** Configuração do termômetro lida de configuracoes_sistema. */
 export interface ConfigTermometro {
@@ -91,7 +92,7 @@ export function calcularNivel(
   return 'baixo';
 }
 
-/** Calcula o score 0–100 e os fatores explicativos. */
+/** Calcula o score de 0 a 100 e os fatores explicativos. */
 export function calcularTermometro(
   entrada: EntradaTermometro,
   cfg: ConfigTermometro = CONFIG_TERMOMETRO_PADRAO,
@@ -102,7 +103,9 @@ export function calcularTermometro(
   const baseFaltas = Math.min(70, (entrada.faltasInjustificadas / Math.max(1, cfg.critico)) * 70);
   const scoreFaltas = Math.min(70, baseFaltas * cfg.pesoFalta);
   if (entrada.faltasInjustificadas > 0) {
-    fatores.push(`${entrada.faltasInjustificadas} falta(s) injustificada(s)`);
+    fatores.push(
+      `${entrada.faltasInjustificadas} ${plural(entrada.faltasInjustificadas, 'falta injustificada', 'faltas injustificadas')}`,
+    );
   }
 
   // Componente de ocorrências com soma dos pesos das tags, limitado a 30 pontos.
@@ -139,7 +142,9 @@ export function calcularTermometro(
   const scoreOcorrencias = Math.min(30, baseOcorrencias * cfg.pesoOcorrencia);
   if (entrada.ocorrencias.length > 0) {
     // Contagem simples para o responsável, mantendo vocabulário consistente com o restante do projeto.
-    fatores.push(`${entrada.ocorrencias.length} ocorrência(s)`);
+    fatores.push(
+      `${entrada.ocorrencias.length} ${plural(entrada.ocorrencias.length, 'ocorrência', 'ocorrências')}`,
+    );
   }
   const temExigePresenca = entrada.ocorrencias.some((o) => o.exigePresenca);
   if (temExigePresenca) {
@@ -152,7 +157,9 @@ export function calcularTermometro(
     // Até 15 pontos por concentração recente.
     const baseRecencia = Math.min(15, entrada.faltasRecentes * 5);
     scoreRecencia = Math.min(15, baseRecencia * cfg.pesoRecencia);
-    fatores.push(`${entrada.faltasRecentes} falta(s) nos últimos ${cfg.janelaRecenciaDias} dias`);
+    fatores.push(
+      `${entrada.faltasRecentes} ${plural(entrada.faltasRecentes, 'falta', 'faltas')} nos últimos ${cfg.janelaRecenciaDias} dias`,
+    );
   }
   // Bônus de decaimento: quanto mais recente a última falta, maior o peso.
   if (entrada.diasDesdeUltimaFalta !== null && entrada.diasDesdeUltimaFalta <= 7) {
@@ -166,7 +173,7 @@ export function calcularTermometro(
     descontoPositivo = Math.min(cfg.pesoComportamentoPositivo, entrada.comportamentosPositivos * 2);
     if (descontoPositivo > 0) {
       fatores.push(
-        `${entrada.comportamentosPositivos} comportamento(s) positivo(s) nos últimos ${cfg.janelaPositivoDias} dias`,
+        `${entrada.comportamentosPositivos} ${plural(entrada.comportamentosPositivos, 'comportamento positivo', 'comportamentos positivos')} nos últimos ${cfg.janelaPositivoDias} dias`,
       );
     }
   }

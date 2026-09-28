@@ -631,7 +631,7 @@ onUnmounted(() => {
                     </template>
                   </td>
                   <td class="text-body-secondary small d-none d-lg-table-cell text-nowrap">
-                    {{ c.usado_em ? formatarDataCurta(c.usado_em) : '—' }}
+                    {{ c.usado_em ? formatarDataCurta(c.usado_em) : '-' }}
                   </td>
                   <td>
                     <div class="d-flex gap-1">
@@ -677,7 +677,7 @@ onUnmounted(() => {
           <span class="text-body-secondary">
             Página {{ paginaAtual }} de {{ totalPaginas }}
             <span class="d-none d-sm-inline">
-              — {{ codigosFiltrados.length }} registro{{ codigosFiltrados.length !== 1 ? 's' : '' }}
+              {{ codigosFiltrados.length }} registro{{ codigosFiltrados.length !== 1 ? 's' : '' }}
             </span>
           </span>
           <button
@@ -801,13 +801,13 @@ onUnmounted(() => {
         <p class="mb-1">
           <span class="text-body-secondary">Expira em:</span>
           <span class="ms-1">{{
-            codigoParaRevogar ? tempoRestanteFormatado(codigoParaRevogar.expira_em).texto : '—'
+            codigoParaRevogar ? tempoRestanteFormatado(codigoParaRevogar.expira_em).texto : '-'
           }}</span>
         </p>
         <p class="mb-0">
           <span class="text-body-secondary">Código:</span>
           <code class="ms-1 text-primary">{{
-            codigoParaRevogar ? codigoExibivel(codigoParaRevogar) || '—' : '—'
+            codigoParaRevogar ? codigoExibivel(codigoParaRevogar) || '-' : '-'
           }}</code>
         </p>
       </div>

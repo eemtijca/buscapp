@@ -1,4 +1,4 @@
-// Helpers da API própria — login de setup, fetch autenticado e limpeza de dados.
+// Helpers da API própria: login de setup, fetch autenticado e limpeza de dados.
 
 import { consultar, executar } from './banco.js';
 import { API_URL, SENHA_ADMIN } from './dados.js';

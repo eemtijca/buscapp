@@ -4,7 +4,7 @@ import { SENHA_ADMIN, SENHA_RESP, SENHA_PROF } from '../suporte/dados.js';
 import { apiFetch, loginApi, excluirLinhas, inserirLinhas } from '../suporte/api.js';
 import { consultar, executar } from '../suporte/banco.js';
 
-// Setup global de chat — recria conversas e mensagens idempotentes antes de todos os testes deste arquivo.
+// Setup global de chat: recria conversas e mensagens idempotentes antes de todos os testes deste arquivo.
 const RESPONSAVEL_ID = 'a0000000-0000-0000-0000-000000000005';
 const GESTAO_ID = 'a0000000-0000-0000-0000-000000000001';
 const ALUNO1_ID = 'e0000000-0000-0000-0000-000000000001';
@@ -92,7 +92,7 @@ test.beforeAll(async () => {
   ]);
 });
 
-test.describe('Responsável — Chat', () => {
+test.describe('Responsável: Chat', () => {
   test('CT67 - Pagina de chat carrega com lista de contatos', async ({ page }) => {
     await login(page, 'resp1@email.com', SENHA_RESP);
     await page.goto('/responsavel/chat');
@@ -166,7 +166,7 @@ test.describe('Responsável — Chat', () => {
   });
 });
 
-test.describe('Gestão — Chat', () => {
+test.describe('Gestão: Chat', () => {
   test('CT73 - Página de chat carrega com sidebar e placeholder', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 720 });
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
@@ -250,7 +250,7 @@ test.describe('Gestão — Chat', () => {
   });
 });
 
-test.describe('Notificações — Popover', () => {
+test.describe('Notificações: Popover', () => {
   test('CT84 - Sino visível para gestão', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao');
@@ -292,7 +292,7 @@ test.describe('Notificações — Popover', () => {
   });
 });
 
-test.describe('Chat — Mobile', () => {
+test.describe('Chat: Mobile', () => {
   test('CT89 - Mobile: lista ocupa tela cheia inicialmente', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 });
     await login(page, 'resp1@email.com', SENHA_RESP);
@@ -323,7 +323,7 @@ test.describe('Chat — Mobile', () => {
   });
 });
 
-test.describe('Chat — Casos Extremos', () => {
+test.describe('Chat: Casos Extremos', () => {
   test('CT92 - Rota /gestao/chat exige autenticação', async ({ page }) => {
     await page.goto('/gestao/chat');
     await expect(page).toHaveURL('/');
@@ -334,7 +334,7 @@ test.describe('Chat — Casos Extremos', () => {
   });
 });
 
-test.describe('Chat — Resiliência', () => {
+test.describe('Chat: Resiliência', () => {
   test('CT95 - Sidebar contatos visível na gestão', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao/chat');
@@ -367,7 +367,7 @@ test.describe('Chat — Resiliência', () => {
   });
 });
 
-test.describe('Chat — Input', () => {
+test.describe('Chat: Input', () => {
   test('CT99 - Botão enviar desabilitado com input vazio', async ({ page }) => {
     await login(page, 'resp1@email.com', SENHA_RESP);
     await page.goto('/responsavel/chat');
@@ -423,7 +423,7 @@ test.describe('Chat — Input', () => {
   });
 });
 
-test.describe('Notificações — Casos Extremos', () => {
+test.describe('Notificações: Casos Extremos', () => {
   test('CT103 - Popover fecha e reabre sem erros', async ({ page }) => {
     await login(page, 'gestao@escola.edu.br', SENHA_ADMIN);
     await page.goto('/gestao');

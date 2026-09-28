@@ -74,13 +74,13 @@ test.describe('Gestão - Registro de infrequências', () => {
       await expect(
         page.getByRole('button', { name: /Marcar .+ como presente/ }).first(),
       ).toContainText('Ausente');
-      await expect(page.getByText(/ausente\(s\)/)).toBeVisible();
+      await expect(page.getByText(/ausentes?/)).toBeVisible();
       await page.getByRole('button', { name: 'Salvar chamada' }).click();
       const modal = page.getByRole('dialog');
       await expect(modal).toBeVisible();
       await expect(modal).toContainText('Salvar chamada');
       await modal.getByRole('button', { name: 'Registrar faltas' }).click();
-      await expect(page.locator('.alert-success')).toContainText('ausência(s) registrada(s)', {
+      await expect(page.locator('.alert-success')).toContainText(/ausências? registradas?/, {
         timeout: 15000,
       });
     } finally {
@@ -100,7 +100,7 @@ test.describe('Gestão - Registro de infrequências', () => {
     await expect(page).toHaveURL(/\/gestao\/infrequencias\?aluno=/);
     const abaIndividual = page.getByRole('button', { name: 'Registro individual' });
     await expect(abaIndividual).toHaveClass(/btn-success/);
-    // O combobox exibe o rótulo (nome — turma) em vez do UUID; basta garantir que há seleção.
+    // O combobox exibe o rótulo (nome: turma) em vez do UUID; basta garantir que há seleção.
     await expect(page.locator('#alunoIndividual')).not.toHaveValue('');
     const valor = await page.locator('#alunoIndividual').inputValue();
     expect(valor.trim().length).toBeGreaterThan(3);

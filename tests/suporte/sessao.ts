@@ -1,4 +1,4 @@
-// Helpers de sessão UI — login/logout e restauração de senha via banco.
+// Helpers de sessão UI: login/logout e restauração de senha via banco.
 
 import { expect, type Page } from '@playwright/test';
 import { executar } from './banco.js';

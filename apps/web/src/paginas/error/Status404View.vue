@@ -7,6 +7,6 @@ import ErrorView from './ErrorView.vue';
     :codigo="404"
     icone="bi-emoji-frown"
     titulo="Página não encontrada"
-    mensagem="A página que você procura não existe ou foi removida."
+    mensagem="A página procurada não existe ou foi removida."
   />
 </template>

@@ -17,6 +17,7 @@ import GrupoCheckbox from '@/componentes/GrupoCheckbox.vue';
 import ModalConfirmacao from '@/componentes/ModalConfirmacao.vue';
 import { formatarData } from '@/utils/datas';
 import type { AlunoFrequencia } from '@/tipos/componentes';
+import { plural } from '@/utils/plural';
 
 const route = useRoute();
 const { usuario } = useAutenticacao();
@@ -179,7 +180,9 @@ async function confirmarSalvarChamada() {
     if (errMsg) {
       mostrarErro(errMsg);
     } else {
-      mostrarSucesso(`${registradas} ausência(s) registrada(s) para ${turmaNome}.`);
+      mostrarSucesso(
+        `${registradas} ${plural(registradas, 'ausência', 'ausências')} ${plural(registradas, 'registrada', 'registradas')} para ${turmaNome}.`,
+      );
       await recarregar();
     }
   } finally {
@@ -227,8 +230,9 @@ async function registrarIndividual() {
     }
   }
   const aluno = alunos.value.find((a) => a.id === alunoIdIndividual.value);
+  const quantidadeIndividual = periodosIndividuais.value.length;
   mostrarSucesso(
-    `${periodosIndividuais.value.length} ausência(s) registrada(s) para ${aluno?.nome ?? 'aluno'}.`,
+    `${quantidadeIndividual} ${plural(quantidadeIndividual, 'ausência', 'ausências')} ${plural(quantidadeIndividual, 'registrada', 'registradas')} para ${aluno?.nome ?? 'aluno'}.`,
   );
   alunoIdIndividual.value = '';
   periodosIndividuais.value = [];
@@ -400,7 +404,8 @@ watch(dataAula, () => {
                 >{{ totalAlunosTurma - totalAusentesMarcados }} presentes</span
               >
               <span v-if="totalAusentesMarcados > 0" class="badge text-bg-danger"
-                >{{ totalAusentesMarcados }} ausente(s)</span
+                >{{ totalAusentesMarcados }}
+                {{ plural(totalAusentesMarcados, 'ausente', 'ausentes') }}</span
               >
             </div>
           </div>
@@ -552,7 +557,9 @@ watch(dataAula, () => {
       :mensagem="
         'Registrar ' +
         totalAusentesMarcados +
-        ' ausência(s) na turma selecionada em ' +
+        ' ' +
+        plural(totalAusentesMarcados, 'ausência', 'ausências') +
+        ' na turma selecionada em ' +
         formatarData(dataAula) +
         '?'
       "
@@ -565,7 +572,7 @@ watch(dataAula, () => {
     <ModalConfirmacao
       :visivel="confirmarIndividual"
       titulo="Registrar ausência"
-      :mensagem="`Registrar ${periodosIndividuais.length} ausência(s) para o aluno selecionado em ${formatarData(dataAula)}?`"
+      :mensagem="`Registrar ${periodosIndividuais.length} ${plural(periodosIndividuais.length, 'ausência', 'ausências')} para o aluno selecionado em ${formatarData(dataAula)}?`"
       rotulo-confirmar="Registrar"
       icone="person-dash"
       variante="warning"

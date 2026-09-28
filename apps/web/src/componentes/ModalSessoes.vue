@@ -2,6 +2,7 @@
 import { ref, watch } from 'vue';
 import { api, ErroApi } from '@/servicos/api';
 import ModalBase from '@/componentes/ModalBase.vue';
+import { plural } from '@/utils/plural';
 
 interface SessaoApi {
   id: string;
@@ -23,9 +24,9 @@ const mensagem = ref<string | null>(null);
 const erro = ref<string | null>(null);
 
 function formatarDataHora(iso: string | null): string {
-  if (!iso) return '—';
+  if (!iso) return '-';
   const data = new Date(iso);
-  if (Number.isNaN(data.getTime())) return '—';
+  if (Number.isNaN(data.getTime())) return '-';
   return (
     data.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }) +
     ' ' +
@@ -64,7 +65,7 @@ async function encerrarOutras() {
     });
     mensagem.value =
       resposta.revogadas > 0
-        ? `${resposta.revogadas} sessão(ões) encerrada(s).`
+        ? `${resposta.revogadas} ${plural(resposta.revogadas, 'sessão encerrada', 'sessões encerradas')}.`
         : 'Nenhuma outra sessão ativa.';
     await carregar();
   } catch (falha) {

@@ -1,0 +1,64 @@
+name: Tarefa
+description: Registre uma refatoração, teste, mudança de CI, documentação ou manutenção.
+title: "[Tarefa]: "
+labels:
+  - manutencao
+  - triagem
+body:
+  - type: checkboxes
+    id: busca
+    attributes:
+      label: Antes de abrir
+      options:
+        - label: Procurei issues abertas e fechadas e não encontrei uma equivalente.
+          required: true
+  - type: textarea
+    id: contexto
+    attributes:
+      label: Contexto
+      description: Qual problema de manutenção motiva a tarefa?
+    validations:
+      required: true
+  - type: textarea
+    id: objetivo
+    attributes:
+      label: Objetivo
+      description: O que deve mudar?
+    validations:
+      required: true
+  - type: textarea
+    id: criterios
+    attributes:
+      label: Critérios de aceite
+      description: Liste o que precisa estar pronto para considerar a tarefa concluída.
+      placeholder: |
+        - [ ] ...
+        - [ ] ...
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Área
+      options:
+        - Web
+        - API
+        - Banco de dados
+        - Infraestrutura
+        - Não se aplica
+    validations:
+      required: true
+  - type: textarea
+    id: riscos
+    attributes:
+      label: Riscos e dependências
+      description: O que pode dar errado e o que precisa acontecer antes?
+    validations:
+      required: false
+  - type: checkboxes
+    id: privacidade
+    attributes:
+      label: Privacidade
+      options:
+        - label: Confirmei que não incluí segredos, credenciais nem dados reais de alunos, responsáveis ou professores.
+          required: true

@@ -3,16 +3,31 @@ description: Reporte um comportamento incorreto.
 title: "[Bug]: "
 labels:
   - bug
+  - triagem
 body:
   - type: markdown
     attributes:
       value: |
         Obrigado por reportar. Não inclua dados reais de alunos, responsáveis ou professores.
+  - type: checkboxes
+    id: busca
+    attributes:
+      label: Antes de abrir
+      options:
+        - label: Procurei issues abertas e fechadas e não encontrei uma equivalente.
+          required: true
   - type: textarea
     id: descricao
     attributes:
       label: Descrição
-      description: O que aconteceu e qual era o comportamento esperado?
+      description: O que aconteceu?
+    validations:
+      required: true
+  - type: textarea
+    id: esperado
+    attributes:
+      label: Comportamento esperado
+      description: O que deveria acontecer?
     validations:
       required: true
   - type: textarea
@@ -25,6 +40,30 @@ body:
         3. Observe ...
     validations:
       required: true
+  - type: dropdown
+    id: frequencia
+    attributes:
+      label: Frequência
+      description: O problema acontece sempre ou de forma intermitente?
+      options:
+        - Sempre
+        - Às vezes
+        - Uma vez
+        - Não sei
+    validations:
+      required: true
+  - type: dropdown
+    id: impacto
+    attributes:
+      label: Impacto
+      description: Quanto o problema atrapalha o uso?
+      options:
+        - Bloqueia o uso
+        - Atrapalha o uso
+        - Incômodo pequeno
+        - Não sei
+    validations:
+      required: true
   - type: input
     id: versao
     attributes:
@@ -33,20 +72,45 @@ body:
     validations:
       required: false
   - type: dropdown
-    id: papel
+    id: area
     attributes:
-      label: Papel afetado
+      label: Área afetada
       options:
-        - Professor
-        - Gestão
-        - Responsável
+        - Web
+        - API
+        - Banco de dados
+        - Infraestrutura
         - Não se aplica
     validations:
       required: false
   - type: textarea
-    id: contexto
+    id: ambiente
     attributes:
-      label: Contexto adicional
-      description: Navegador, dispositivo, capturas ou logs, sem dados sensíveis.
+      label: Ambiente
+      description: Navegador, dispositivo e versão do Node, sem dados sensíveis.
+      render: markdown
     validations:
       required: false
+  - type: textarea
+    id: evidencias
+    attributes:
+      label: Evidências
+      description: Capturas, vídeos e logs relevantes, sem segredos nem dados reais.
+      render: markdown
+    validations:
+      required: false
+  - type: input
+    id: relacao
+    attributes:
+      label: Issue relacionada
+      description: Número de uma issue relacionada, quando houver.
+      placeholder: "#123"
+    validations:
+      required: false
+  - type: checkboxes
+    id: privacidade
+    attributes:
+      label: Privacidade
+      options:
+        - label: Confirmei que não incluí segredos, credenciais nem dados reais de alunos, responsáveis ou professores.
+          required: true

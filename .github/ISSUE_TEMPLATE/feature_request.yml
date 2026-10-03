@@ -3,7 +3,15 @@ description: Proponha uma funcionalidade ou melhoria.
 title: "[Melhoria]: "
 labels:
   - enhancement
+  - triagem
 body:
+  - type: checkboxes
+    id: busca
+    attributes:
+      label: Antes de abrir
+      options:
+        - label: Procurei issues abertas e fechadas e não encontrei uma equivalente.
+          required: true
   - type: textarea
     id: problema
     attributes:
@@ -15,7 +23,36 @@ body:
     id: proposta
     attributes:
       label: Proposta
-      description: Descreva o comportamento desejado e as alternativas consideradas.
+      description: Descreva o comportamento desejado.
+    validations:
+      required: true
+  - type: textarea
+    id: alternativas
+    attributes:
+      label: Alternativas consideradas
+      description: Quais outras soluções foram avaliadas e por que foram descartadas?
+    validations:
+      required: false
+  - type: textarea
+    id: criterios
+    attributes:
+      label: Critérios de aceite
+      description: Liste o que precisa estar pronto para considerar a proposta concluída.
+      placeholder: |
+        - [ ] ...
+        - [ ] ...
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Área beneficiada
+      options:
+        - Web
+        - API
+        - Banco de dados
+        - Infraestrutura
+        - Todas
     validations:
       required: true
   - type: dropdown
@@ -29,7 +66,17 @@ body:
         - Todos
         - Não se aplica
     validations:
-      required: false
+      required: true
+  - type: dropdown
+    id: disposicao
+    attributes:
+      label: Disposição para contribuir
+      options:
+        - Posso implementar a mudança
+        - Posso ajudar nos testes
+        - Apenas reporto a proposta
+    validations:
+      required: true
   - type: textarea
     id: contexto
     attributes:
@@ -37,3 +84,10 @@ body:
       description: Referências, esboços ou restrições, sem dados sensíveis.
     validations:
       required: false
+  - type: checkboxes
+    id: privacidade
+    attributes:
+      label: Privacidade
+      options:
+        - label: Confirmei que não incluí segredos, credenciais nem dados reais de alunos, responsáveis ou professores.
+          required: true

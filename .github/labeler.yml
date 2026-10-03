@@ -1,0 +1,27 @@
+# Aplica etiquetas de área aos pull requests conforme os caminhos alterados.
+'area: web':
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'apps/web/**'
+
+'area: api':
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'apps/api/**'
+          - 'packages/contratos/**'
+
+'area: banco':
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'apps/api/prisma/**'
+
+'area: infra':
+  - changed-files:
+      - any-glob-to-any-file:
+          - '.github/**'
+          - '.devcontainer/**'
+          - '.dockerignore'
+          - 'compose.yaml'
+          - 'infra/**'
+          - 'scripts/**'
+          - 'vercel.json'

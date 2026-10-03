@@ -264,6 +264,7 @@ As suítes combinam integração da API, unidade do frontend, guarda editorial, 
 | Guarda editorial     | Nenhum                                                                                                 | `npm run test:texto`                            |
 | E2E (Playwright)     | Aplicativo no ar e banco com seed                                                                      | `npm run test:e2e:docker` ou `npm run test:e2e` |
 | PWA                  | Build de produção e API em `:3001`                                                                     | `npm run test:pwa:docker` ou `npm run test:pwa` |
+| Capturas do README   | Aplicativo no ar e banco com seed                                                                      | `npm run capturas:readme`                       |
 | Smoke do banco       | Compose no ar                                                                                          | `npm run test:db`                               |
 
 Regras:
@@ -290,6 +291,8 @@ A instalação local de navegadores fica como alternativa:
 npm run test:e2e:install
 npm run test:e2e
 ```
+
+As capturas do README são geradas por `tests/e2e/imagens.spec.ts` e gravadas em `docs/imagens/`, com o aplicativo no ar e o seed aplicado. Regenera pelo comando `npm run capturas:readme` (ou `npm run capturas:readme:docker`, na imagem oficial). Os PNGs são versionados e não devem ser editados à mão; mudanças de interface pedem uma nova geração e revisão do diff.
 
 A CI cobre `type-check`, `lint`, `build` e os testes de unidade e integração; ponta a ponta e PWA rodam antes do pull request, como descrito acima.
 

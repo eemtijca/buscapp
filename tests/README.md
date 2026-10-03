@@ -39,6 +39,17 @@ npm run test:db           # smoke test do schema no PostgreSQL do Compose
 - `test:pwa:docker` valida o PWA contra o `vite preview` em `:4173` com a API em `:3001`; `test:pwa` é a alternativa local.
 - `test:db` aplica migrações pendentes e confere tabelas, CHECKs, triggers e o índice parcial de frequência.
 
+## Capturas do README
+
+As imagens do README ficam em `docs/imagens/` e são geradas por `tests/e2e/imagens.spec.ts`, com o aplicativo no ar e o seed aplicado:
+
+```bash
+npm run capturas:readme         # Playwright local
+npm run capturas:readme:docker  # imagem oficial, com o aplicativo no ar
+```
+
+O spec captura o painel da gestão em 1440x900 no Chromium e a chamada do professor em 390x844 no Mobile Chrome, sempre com massa sintética. Não edite os PNGs à mão: regenere pelo comando e revise o diff.
+
 ## Suporte
 
 Os helpers ficam em `tests/suporte`:

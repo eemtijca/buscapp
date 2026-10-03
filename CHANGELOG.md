@@ -20,6 +20,10 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 - CHANGELOG.md e seção de releases no guia de contribuição.
 - GitHub CLI no devcontainer.
 
+### Corrigido
+
+- Compose define `APP_URL` como `http://localhost:3000`, corrigindo o login e as mutações na mesma origem servida pelo contêiner.
+
 ### Modificado
 
 - Guia de contribuição e AGENTS.md passam a exigir etiquetas em issues e pull requests, commits atômicos organizados em um único pull request e abertura somente com o trabalho finalizado.

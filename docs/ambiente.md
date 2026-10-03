@@ -11,7 +11,7 @@ Todas as variáveis da API passam por `apps/api/src/ambiente.ts`, validadas com 
 | `DATABASE_URL_ADMIN`                                                                | Testes            | Conexão dona do schema usada pelas fixtures e pela limpeza dos testes E2E.                     |
 | `APP_DB_PASSWORD`                                                                   | Compose e CI      | Senha aplicada ao papel `buscapp_api` pelo entrypoint do Compose e pelo workflow de migrações. |
 | `PORT` / `HOST`                                                                     | API               | Porta e interface de escuta (padrão `3001` e `0.0.0.0`).                                       |
-| `APP_URL`                                                                           | API               | Origem do frontend liberada no CORS com credenciais (padrão `http://localhost:5173`).          |
+| `APP_URL`                                                                           | API               | Origem do frontend liberada no CORS com credenciais (padrão `http://localhost:5173`; no Compose, a aplicação usa `http://localhost:3000`). |
 | `APP_ORIGINS`                                                                       | API               | Origens adicionais para CORS, separadas por vírgula.                                           |
 | `APP_ORIGIN_SUFFIXES`                                                               | API               | Sufixos HTTPS de previews confiáveis, separados por vírgula e sem wildcard.                    |
 | `WEB_DIST`                                                                          | API               | Caminho do build da SPA servido na mesma origem (padrão `../web/dist`).                        |
@@ -52,7 +52,7 @@ A API abre uma transação curta por operação e define `app.usuario_id` com `s
 
 ### Docker Compose
 
-O `.env` alimenta o Compose; o entrypoint aguarda o PostgreSQL, aplica as migrações, define a senha do papel e inicia a API servindo a SPA. Ver [operacao.md](operacao.md).
+O `.env` alimenta o Compose; o entrypoint aguarda o PostgreSQL, aplica as migrações, define a senha do papel e inicia a API servindo a SPA. No perfil do Compose, a aplicação define `APP_URL` como `http://localhost:3000`, a mesma origem em que serve a SPA; o valor do `.env` vale para o fluxo com `dev:web` e `dev:api`. Ver [operacao.md](operacao.md).
 
 ### Sem Docker
 

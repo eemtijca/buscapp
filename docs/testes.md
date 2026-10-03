@@ -18,7 +18,8 @@ Suítes de integração da API (Vitest), unidade do cache do frontend (Vitest), 
 | Integração da API | `apps/api/src/**/*.test.ts` (25 arquivos)             | Banco do Compose migrado                  | Autenticação e sessões, senhas, matriz de autorização, escopo por requisição, CRUD dos domínios, códigos, anexos, paginação, auditoria, barramento SSE, processamento de imagens, regras e ETag/304. |
 | Unidade do web    | `apps/web/src/**/*.test.ts` (2 arquivos)              | Nenhuma                                   | Cache (deduplicação, frescor, 304, invalidação, GC, namespace) e cliente HTTP (timeout, retry, 401 e cancelamento).                                                                                  |
 | Guarda editorial  | `tests/unit/texto-editorial.test.ts`                  | Nenhuma                                   | Travessão, aspas curvas, setas, segunda pessoa e plural com parênteses em código, documentação e configuração.                                                                                       |
-| E2E               | `tests/e2e/*.spec.ts` (21 especificações, exceto PWA) | API e SPA no ar, banco com seed           | Fluxos dos três papéis, tempo real, notificações, anexos, termômetro, ranking, cache, sessão e resiliência.                                                                                          |
+| E2E               | `tests/e2e/*.spec.ts` (21 especificações, exceto PWA e capturas) | API e SPA no ar, banco com seed           | Fluxos dos três papéis, tempo real, notificações, anexos, termômetro, ranking, cache, sessão e resiliência.                                                                                          |
+| Capturas do README | `tests/e2e/imagens.spec.ts`                          | API e SPA no ar, banco com seed           | PNGs de `docs/imagens/` em 1440x900 e 390x844, com massa sintética e sem dados reais.                                                                                                                |
 | PWA               | `tests/e2e/pwa*.spec.ts` (2 especificações)           | Build via `vite preview` e API em `:3001` | Manifest, service worker, ícones, shell offline, dados persistidos e revalidação por 304.                                                                                                            |
 | Smoke do banco    | `scripts/test-db.sh`                                  | Compose no ar                             | Migrações aplicadas, 34 tabelas, CHECKs, triggers e índice parcial de frequência.                                                                                                                    |
 
@@ -60,6 +61,17 @@ STORAGE_DRIVER=disco \
 SEED_SENHA_ADMIN='Admin123!' SEED_SENHA_PROF='Prof123!' SEED_SENHA_RESP='Resp123!' \
 npm run test:e2e:docker
 ```
+
+### Capturas do README
+
+As imagens do README são geradas por `tests/e2e/imagens.spec.ts` e gravadas em `docs/imagens/`, com o aplicativo no ar e o seed de desenvolvimento aplicado. O spec usa os mesmos helpers dos testes E2E, captura o painel da gestão em 1440x900 no Chromium e a chamada do professor em 390x844 no Mobile Chrome, e não usa dados reais. Para regenerar:
+
+```bash
+npm run capturas:readme         # Playwright local, com o aplicativo no ar
+npm run capturas:readme:docker  # imagem oficial da Microsoft, com o aplicativo no ar
+```
+
+Os PNGs versionados em `docs/imagens/` não são editados à mão. Quando a interface mudar, regenere as capturas pelo comando acima e confira o diff das imagens no pull request.
 
 ## Integração contínua
 

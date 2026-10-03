@@ -31,6 +31,7 @@ Pré-requisitos: Node 20.19 ou superior (ou 22.12 ou superior) e Docker com Comp
 - Ponta a ponta: `npm run test:e2e:docker` e `npm run test:pwa:docker` rodam na imagem oficial com o aplicativo no ar; `npm run test:e2e` e `npm run test:pwa` são a alternativa local.
 - Banco: `npm run db:generate` e `npm run db:migrate` (deploy). Migrações de desenvolvimento com `npx prisma migrate dev --name ajuste` em `apps/api`.
 - Guarda editorial: `npm run test:texto`.
+- Capturas do README: `npm run capturas:readme` ou `npm run capturas:readme:docker`, com o aplicativo no ar e o seed aplicado. Os PNGs ficam em `docs/imagens/` e não são editados à mão.
 
 ## Ferramentas externas
 

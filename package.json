@@ -24,6 +24,8 @@
     "test:e2e:docker": "bash tests/playwright-container.sh",
     "test:e2e:docker:chromium": "bash tests/playwright-container.sh --project=chromium",
     "test:e2e:install": "playwright install --with-deps chromium firefox webkit",
+    "capturas:readme": "playwright test tests/e2e/imagens.spec.ts",
+    "capturas:readme:docker": "bash tests/playwright-container.sh tests/e2e/imagens.spec.ts",
     "test:pwa:run": "playwright test --config=playwright.pwa.config.ts",
     "test:pwa:docker": "TEST_BASE_URL=http://localhost:4173 bash tests/playwright-container.sh --config=playwright.pwa.config.ts --project=chromium",
     "test:db": "bash scripts/test-db.sh",

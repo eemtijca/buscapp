@@ -1,0 +1,89 @@
+{
+  "etiquetas": [
+    {
+      "nome": "bug",
+      "cor": "d73a4a",
+      "descricao": "Comportamento incorreto."
+    },
+    {
+      "nome": "documentation",
+      "cor": "0075ca",
+      "descricao": "Documentação."
+    },
+    {
+      "nome": "enhancement",
+      "cor": "a2eeef",
+      "descricao": "Funcionalidade ou melhoria."
+    },
+    {
+      "nome": "dependencies",
+      "cor": "0366d6",
+      "descricao": "Atualização de dependências."
+    },
+    {
+      "nome": "refactor",
+      "cor": "c7def8",
+      "descricao": "Mudança interna sem alterar comportamento."
+    },
+    {
+      "nome": "testes",
+      "cor": "bfe5bf",
+      "descricao": "Testes e massa de dados."
+    },
+    {
+      "nome": "ci",
+      "cor": "fef2c0",
+      "descricao": "Workflows e automação."
+    },
+    {
+      "nome": "desempenho",
+      "cor": "f9d0c4",
+      "descricao": "Desempenho e eficiência."
+    },
+    {
+      "nome": "manutencao",
+      "cor": "ededed",
+      "descricao": "Manutenção, dependências e tarefas gerais."
+    },
+    {
+      "nome": "area: web",
+      "cor": "d4c5f9",
+      "descricao": "Aplicação web."
+    },
+    {
+      "nome": "area: api",
+      "cor": "d4c5f9",
+      "descricao": "API e contratos."
+    },
+    {
+      "nome": "area: banco",
+      "cor": "d4c5f9",
+      "descricao": "Banco de dados, migrações e RLS."
+    },
+    {
+      "nome": "area: infra",
+      "cor": "d4c5f9",
+      "descricao": "Infraestrutura, workflows e ambiente."
+    },
+    {
+      "nome": "prioridade: alta",
+      "cor": "b60205",
+      "descricao": "Deve ser tratada em seguida."
+    },
+    {
+      "nome": "prioridade: media",
+      "cor": "fbca04",
+      "descricao": "Importante, sem urgência imediata."
+    },
+    {
+      "nome": "prioridade: baixa",
+      "cor": "c2e0c6",
+      "descricao": "Pode aguardar."
+    },
+    {
+      "nome": "triagem",
+      "cor": "ededed",
+      "descricao": "Aguardando triagem de tipo, área e prioridade."
+    }
+  ]
+}

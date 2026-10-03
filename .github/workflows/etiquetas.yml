@@ -1,0 +1,105 @@
+# Etiqueta pull requests pelos caminhos e pelo título, e valida etiquetas e
+# título antes da revisão. O check de validação roda apenas em pull requests
+# fora de rascunho e não se aplica a pull requests do Dependabot.
+name: Etiquetas
+
+on:
+  pull_request_target:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - edited
+      - labeled
+      - unlabeled
+      - ready_for_review
+      - converted_to_draft
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: write
+
+jobs:
+  classificar:
+    name: classificar
+    runs-on: ubuntu-latest
+    steps:
+      - name: Aplicar etiquetas de área pelos caminhos
+        uses: actions/labeler@bf12e9b00b37c5c0ca2b87b79b2daf7891dbda13 # v7.0.0
+      - name: Aplicar etiqueta de tipo pelo título
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const mapa = {
+              feat: 'enhancement',
+              fix: 'bug',
+              docs: 'documentation',
+              refactor: 'refactor',
+              test: 'testes',
+              perf: 'desempenho',
+              ci: 'ci',
+              build: 'manutencao',
+              chore: 'manutencao',
+            };
+            const titulo = context.payload.pull_request.title;
+            const tipo = titulo.match(/^([a-z]+)(?:\([^)]+\))?!?:/)?.[1];
+            const etiqueta = tipo ? mapa[tipo] : undefined;
+            if (etiqueta) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+                labels: [etiqueta],
+              });
+            }
+
+  validar:
+    name: validar
+    if: github.event.pull_request.draft == false
+    needs: classificar
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validar título e etiquetas
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const TIPOS = [
+              'bug',
+              'enhancement',
+              'documentation',
+              'dependencies',
+              'refactor',
+              'testes',
+              'ci',
+              'desempenho',
+              'manutencao',
+            ];
+            const titulo = context.payload.pull_request.title;
+            const convencional = /^[a-z]+(?:\([^)]+\))?!?: .+/.test(titulo);
+            const resposta = await github.rest.issues.listLabelsOnIssue({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              per_page: 100,
+            });
+            const etiquetas = resposta.data.map((etiqueta) => etiqueta.name);
+            const ehDependabot = context.payload.pull_request.user.login === 'dependabot[bot]';
+            const ehDocumentacao = /^docs(?:\([^)]+\))?!?:/.test(titulo);
+            const problemas = [];
+            if (!convencional) {
+              problemas.push('O título deve seguir o padrão Conventional Commits, como em "fix(api): corrige a sessão".');
+            }
+            if (!ehDependabot) {
+              if (!etiquetas.some((etiqueta) => TIPOS.includes(etiqueta))) {
+                problemas.push('Falta uma etiqueta de tipo: bug, enhancement, documentation, refactor, testes, ci, desempenho ou manutencao.');
+              }
+              if (!ehDocumentacao && !etiquetas.some((etiqueta) => etiqueta.startsWith('area: '))) {
+                problemas.push('Falta uma etiqueta de área: area: web, area: api, area: banco ou area: infra.');
+              }
+            }
+            if (problemas.length > 0) {
+              core.setFailed(problemas.join(' '));
+            } else {
+              await core.summary.addRaw('Título e etiquetas em conformidade.').write();
+            }

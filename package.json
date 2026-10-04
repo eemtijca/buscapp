@@ -41,6 +41,7 @@
     "test:unit": "run-s test:unit:texto test:unit:api test:unit:web",
     "test:unit:texto": "vitest run tests/unit/texto-editorial.test.ts",
     "test:texto": "vitest run tests/unit/texto-editorial.test.ts",
+    "versao:verificar": "node scripts/verificar-versao.mjs",
     "test:unit:api": "npm run test -w @buscapp/api",
     "test:unit:web": "npm run test -w @buscapp/web",
     "test:api": "npm run test -w @buscapp/api",

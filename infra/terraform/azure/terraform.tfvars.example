@@ -1,0 +1,15 @@
+# Exemplo de produção. Copie para terraform.tfvars e ajuste os valores.
+
+modo_local          = false
+localizacao         = "brazilsouth"
+ambiente            = "prod"
+imagem_aplicacao    = "buscappprodacr.azurecr.io/buscapp-prod:versao"
+dominio             = "buscapp.exemplo.br"
+sku_app_service     = "P1v3"
+sku_banco           = "GP_Standard_D2ds_v5"
+sku_cache           = "Balanced_B0"
+habilitar_rede_privada                 = true
+habilitar_alta_disponibilidade_banco   = true
+habilitar_geo_backup                   = true
+emails_alarme       = ["operacao@exemplo.br"]
+retencao_logs_dias  = 30

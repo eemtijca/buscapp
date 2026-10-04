@@ -1,0 +1,11 @@
+# Exemplo do modo local com o emulador floci-az. Use com:
+# terraform apply -var-file=terraform.tfvars.local
+
+modo_local         = true
+ambiente           = "local"
+imagem_aplicacao   = "buscapp-api:local"
+sku_banco          = "B_Standard_B1ms"
+desired_count      = 1
+retencao_logs_dias = 30
+habilitar_alarmes  = false
+endereco_banco_local = null

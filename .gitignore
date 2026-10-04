@@ -53,3 +53,14 @@ agent-resources/
 /playwright/.cache/
 /playwright/.auth/
 core.*
+
+# Terraform
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfvars
+*.tfvars.local
+!*.tfvars.example
+crash.log
+crash.*.log

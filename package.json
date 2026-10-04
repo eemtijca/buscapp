@@ -45,7 +45,13 @@
     "test:unit:web": "npm run test -w @buscapp/web",
     "test:api": "npm run test -w @buscapp/api",
     "test:pwa": "VITE_API_URL=http://localhost:3001 run-s build-only test:pwa:run",
-    "etiquetas:sync": "node scripts/sincronizar-etiquetas.mjs"
+    "etiquetas:sync": "node scripts/sincronizar-etiquetas.mjs",
+    "infra:fmt": "terraform fmt -recursive infra/terraform",
+    "infra:validar": "bash infra/terraform/validar.sh",
+    "infra:floci": "bash infra/floci/testar.sh",
+    "infra:floci:aws": "bash infra/floci/testar.sh aws",
+    "infra:floci:azure": "bash infra/floci/testar.sh azure",
+    "infra:floci:gcp": "bash infra/floci/testar.sh gcp"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",

@@ -1,0 +1,87 @@
+name: Infraestrutura
+
+on:
+  pull_request:
+    paths:
+      - 'infra/**'
+      - '.github/workflows/infra.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: infra-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validar:
+    name: Validar Terraform
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Baixar o código
+        uses: actions/checkout@v5
+
+      - name: Preparar o Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Guardar os provedores
+        uses: actions/cache@v4
+        with:
+          path: ~/.terraform.d/plugin-cache
+          key: terraform-providers-${{ hashFiles('infra/terraform/**/.terraform.lock.hcl') }}
+
+      - name: Conferir a formatação
+        run: terraform fmt -check -recursive infra/terraform
+
+      - name: Validar os módulos
+        env:
+          TF_PLUGIN_CACHE_DIR: ~/.terraform.d/plugin-cache
+        run: |
+          mkdir -p "$TF_PLUGIN_CACHE_DIR"
+          for nuvem in aws azure gcp; do
+            terraform -chdir="infra/terraform/${nuvem}" init -no-color -input=false -backend=false
+            terraform -chdir="infra/terraform/${nuvem}" validate -no-color
+          done
+
+  floci:
+    name: Aplicar no Floci (${{ matrix.nuvem }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    needs: validar
+    strategy:
+      fail-fast: false
+      matrix:
+        nuvem: [aws, azure, gcp]
+    steps:
+      - name: Baixar o código
+        uses: actions/checkout@v5
+
+      - name: Preparar o Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Guardar os provedores
+        uses: actions/cache@v4
+        with:
+          path: ~/.terraform.d/plugin-cache
+          key: terraform-providers-${{ hashFiles('infra/terraform/**/.terraform.lock.hcl') }}
+
+      - name: Liberar espaço em disco
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+
+      - name: Guardar as camadas da imagem
+        uses: actions/cache@v4
+        with:
+          path: /tmp/docker-cache
+          key: docker-buscapp-${{ hashFiles('package-lock.json', 'infra/docker/Dockerfile') }}
+
+      - name: Construir a imagem da aplicação
+        run: |
+          docker buildx create --use --driver docker-container --name buscapp >/dev/null
+          docker buildx build --load --cache-from type=local,src=/tmp/docker-cache \
+            --cache-to type=local,dest=/tmp/docker-cache,mode=max \
+            -f infra/docker/Dockerfile -t buscapp-api:local .
+
+      - name: Aplicar e conferir
+        run: bash infra/floci/testar.sh ${{ matrix.nuvem }}

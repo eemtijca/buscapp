@@ -1,0 +1,10 @@
+# Exemplo de produção. Copie para terraform.tfvars e ajuste os valores.
+
+modo_local             = false
+projeto                = "buscapp-prod"
+regiao                 = "us-central1"
+ambiente               = "prod"
+imagem_aplicacao       = "us-central1-docker.pkg.dev/buscapp-prod/buscapp-prod:versao"
+habilitar_rede_privada = true
+habilitar_redis        = true
+emails_alarme          = ["operacao@exemplo.br"]

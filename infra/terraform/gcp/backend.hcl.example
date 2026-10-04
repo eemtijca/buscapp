@@ -1,0 +1,5 @@
+# Exemplo de backend remoto do GCP. Crie o bucket versionado antes de rodar
+# terraform init -backend-config=backend.hcl.
+
+bucket = "buscapp-tfstate"
+prefix = "buscapp/gcp"

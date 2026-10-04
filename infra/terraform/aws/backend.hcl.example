@@ -1,0 +1,8 @@
+# Exemplo de backend remoto. Crie o bucket e a tabela de bloqueio antes de
+# rodar terraform init -backend-config=backend.hcl.
+
+bucket       = "buscapp-tfstate-000000000000"
+key          = "buscapp/aws/terraform.tfstate"
+region       = "us-east-1"
+encrypt      = true
+use_lockfile = true

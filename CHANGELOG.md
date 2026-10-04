@@ -19,6 +19,13 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 - Script de execução do Playwright em contêiner e scripts npm correspondentes.
 - CHANGELOG.md e seção de releases no guia de contribuição.
 - GitHub CLI no devcontainer.
+- Módulos Terraform para AWS, Azure e GCP em `infra/terraform`, com modo local apoiado nos emuladores do Floci e modo de produção com serviços gerenciados.
+- Driver de armazenamento `azure-blob`, com connection string ou identidade gerenciada.
+- Redis opcional no barramento de eventos, que passa a usar o `LISTEN/NOTIFY` do PostgreSQL quando `REDIS_URL` não é informada.
+- Harness `infra/floci` com Compose dos emuladores e script de aplicação, verificação e destruição por nuvem.
+- Workflow `infra.yml` para formatar, validar e aplicar o Terraform no Floci.
+- Documento `docs/implantacao-nuvem.md` e ADR-015 sobre a implantação multicloud.
+- Workflow `expurgo.yml` que dispara a purga de retenção diária com `CRON_SECRET`.
 
 ### Corrigido
 

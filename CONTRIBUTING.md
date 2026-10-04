@@ -115,10 +115,11 @@ Parta da `main` atualizada e use `tipo/descricao-curta`, em minúsculas, com hí
 - `fix/` para correções.
 - `hotfix/` para correções urgentes em produção.
 - `docs/`, `test/`, `refactor/`, `perf/`, `chore/` e `ci/` para os demais casos.
+- `release/` para linhas de manutenção, como `release/1.x`, criadas apenas quando houver uma linha antiga a suportar.
 
 Exemplos presentes no histórico: `feat/seguranca-robustez` e `fix/csp-fontes-botoes-ci`.
 
-Branches criadas por agentes de IA usam o prefixo do agente (`ai/`, `claude/`, `codex/`, `copilot/` ou `cursor/`), conforme a [Conventional Branch](https://conventional-branch.github.io/).
+Branches criadas por agentes de IA seguem esta mesma convenção de tipo, conforme a [Conventional Branch](https://conventional-branch.github.io/). A autoria assistida fica registrada no rodapé `Assisted-by` do commit e no corpo do pull request.
 
 ### Commits
 

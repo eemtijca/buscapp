@@ -6,7 +6,7 @@ BuscApp: plataforma web de gestão escolar para acompanhar frequência, ocorrên
 
 - Leia o `CONTRIBUTING.md` antes de qualquer mudança: ele reúne o fluxo de issues, etiquetas, branches, commits, pull requests, padrões de código, banco, formatação e testes.
 - `tests/unit/texto-editorial.test.ts` varre código, documentação e configuração. Ele reprova travessão, meia-risca, reticências tipográficas, aspas curvas, setas, aspas angulares, entidades HTML de aspas, segunda pessoa e plural escrito com parênteses. Rode `npm run test:texto` depois de escrever texto de interface ou documentação.
-- Commits seguem Conventional Commits em português, no imperativo, com escopo opcional: `fix(api): corrige ...`. Branches usam `tipo/descricao-curta`; branches de agentes usam o prefixo do agente (`ai/`, `claude/`, `codex/`, `copilot/` ou `cursor/`).
+- Commits seguem Conventional Commits em português, no imperativo, com escopo opcional: `fix(api): corrige ...`. Branches usam `tipo/descricao-curta`, inclusive as criadas por agentes de IA; a autoria assistida fica no rodapé `Assisted-by` do commit.
 - TypeScript é estrito e ainda tem `noUncheckedIndexedAccess`; oxlint e ESLint cobrem o restante. O gerenciador é npm, com `package-lock.json`; não use bun, yarn nem pnpm.
 - Nomes de domínio em português (`alunos`, `frequencias`, `turmas`), termos de infraestrutura em inglês quando consagrados (`token`, `backup`).
 - `npm run lint` e `npm test` aplicam correções automáticas (`--fix`); confira o diff antes de commitar.

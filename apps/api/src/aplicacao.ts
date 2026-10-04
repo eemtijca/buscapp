@@ -151,6 +151,10 @@ export async function construirApp(): Promise<FastifyInstance> {
 
   await app.register(cookie);
   await app.register(helmet, {
+    // Cabeçalhos aplicados pela própria API, válidos em qualquer plataforma.
+    frameguard: { action: 'deny' },
+    referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+    hsts: { maxAge: 31536000, includeSubDomains: true },
     contentSecurityPolicy: {
       useDefaults: false,
       directives: {

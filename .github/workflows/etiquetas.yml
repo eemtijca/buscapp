@@ -41,16 +41,30 @@ jobs:
               ci: 'ci',
               build: 'manutencao',
               chore: 'manutencao',
+              deps: 'dependencies',
             };
             const titulo = context.payload.pull_request.title;
-            const tipo = titulo.match(/^([a-z]+)(?:\([^)]+\))?!?:/)?.[1];
-            const etiqueta = tipo ? mapa[tipo] : undefined;
-            if (etiqueta) {
+            const correspondencia = titulo.match(/^([a-z]+)(?:\([^)]+\))?(!)?:/);
+            const tipo = correspondencia?.[1];
+            const quebra = Boolean(correspondencia?.[2]);
+            const etiquetas = [];
+            const etiquetaTipo = tipo ? mapa[tipo] : undefined;
+            if (etiquetaTipo) {
+              etiquetas.push(etiquetaTipo);
+            }
+            if (quebra) {
+              etiquetas.push('versao: maior');
+            } else if (tipo === 'feat') {
+              etiquetas.push('versao: menor');
+            } else if (['fix', 'perf', 'refactor', 'revert', 'deps'].includes(tipo)) {
+              etiquetas.push('versao: correcao');
+            }
+            if (etiquetas.length > 0) {
               await github.rest.issues.addLabels({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: context.payload.pull_request.number,
-                labels: [etiqueta],
+                labels: etiquetas,
               });
             }
 
@@ -77,6 +91,9 @@ jobs:
             ];
             const titulo = context.payload.pull_request.title;
             const convencional = /^[a-z]+(?:\([^)]+\))?!?: .+/.test(titulo);
+            const correspondencia = titulo.match(/^([a-z]+)(?:\([^)]+\))?(!)?:/);
+            const tipo = correspondencia?.[1];
+            const quebra = Boolean(correspondencia?.[2]);
             const resposta = await github.rest.issues.listLabelsOnIssue({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -85,17 +102,34 @@ jobs:
             });
             const etiquetas = resposta.data.map((etiqueta) => etiqueta.name);
             const ehDependabot = context.payload.pull_request.user.login === 'dependabot[bot]';
+            const ehReleasePlease =
+              context.payload.pull_request.user.login === 'release-please[bot]' ||
+              etiquetas.some((etiqueta) => etiqueta.startsWith('autorelease: '));
             const ehDocumentacao = /^docs(?:\([^)]+\))?!?:/.test(titulo);
             const problemas = [];
             if (!convencional) {
               problemas.push('O título deve seguir o padrão Conventional Commits, como em "fix(api): corrige a sessão".');
             }
-            if (!ehDependabot) {
+            if (!ehDependabot && !ehReleasePlease) {
               if (!etiquetas.some((etiqueta) => TIPOS.includes(etiqueta))) {
                 problemas.push('Falta uma etiqueta de tipo: bug, enhancement, documentation, refactor, testes, ci, desempenho ou manutencao.');
               }
               if (!ehDocumentacao && !etiquetas.some((etiqueta) => etiqueta.startsWith('area: '))) {
                 problemas.push('Falta uma etiqueta de área: area: web, area: api, area: banco ou area: infra.');
+              }
+              const etiquetasVersao = etiquetas.filter((etiqueta) => etiqueta.startsWith('versao: '));
+              const versaoEsperada = quebra
+                ? 'versao: maior'
+                : tipo === 'feat'
+                  ? 'versao: menor'
+                  : ['fix', 'perf', 'refactor', 'revert', 'deps'].includes(tipo)
+                    ? 'versao: correcao'
+                    : undefined;
+              if (versaoEsperada && !etiquetasVersao.includes(versaoEsperada)) {
+                problemas.push(`Falta a etiqueta de impacto: ${versaoEsperada}.`);
+              }
+              if (!versaoEsperada && etiquetasVersao.length > 0) {
+                problemas.push(`O título não indica impacto de versão; remova ${etiquetasVersao.join(', ')}.`);
               }
             }
             if (problemas.length > 0) {

@@ -88,6 +88,13 @@ destruir_terraform() {
 
 testar_aws() {
   log 'Aplicando o Terraform da AWS.'
+  # O provider só assina corretamente as leituras do ELB quando o endpoint
+  # global está definido, como o próprio floci env exporta.
+  export AWS_ENDPOINT_URL="http://localhost:${porta_aws}"
+  export AWS_DEFAULT_REGION="${AWS_DEFAULT_REGION:-us-east-1}"
+  export AWS_ACCESS_KEY_ID=test
+  export AWS_SECRET_ACCESS_KEY=test
+  unset AWS_SESSION_TOKEN
   local conteiner_floci="${FLOCI_AWS_CONTAINER:-}"
   if [ -z "$conteiner_floci" ]; then
     if docker inspect buscapp-floci-aws >/dev/null 2>&1; then

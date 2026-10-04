@@ -44,7 +44,7 @@ infra/
     gcp/
 ```
 
-Cada módulo tem `versions.tf`, `providers.tf`, `variables.tf`, `locals.tf`, os recursos separados por assunto, `outputs.tf` e os exemplos `terraform.tfvars.example`, `terraform.tfvars.local.example` e, na AWS, `backend.hcl.example`. Os arquivos `.tfvars` reais não são versionados.
+Cada módulo tem `versions.tf`, `providers.tf`, `variables.tf`, `locals.tf`, os recursos separados por assunto, `outputs.tf` e os exemplos `terraform.tfvars.example`, `terraform.tfvars.local.example` e `backend.hcl.example` em cada nuvem. Os arquivos `.tfvars` reais não são versionados.
 
 ## Comandos
 
@@ -63,7 +63,7 @@ O script `infra/floci/testar.sh` constrói a imagem `buscapp-api:local` quando n
 
 1. Publique a imagem no registro da nuvem e informe `imagem_aplicacao`.
 2. Copie `terraform.tfvars.example` para `terraform.tfvars` e ajuste os valores. Na AWS, informe também `certificado_arn`; o balanceador só encaminha HTTP na ausência do certificado no modo local.
-3. Configure o backend remoto. Na AWS há um exemplo em `backend.hcl.example` com bucket versionado, criptografia e lockfile; no Azure e no GCP use o backend nativo correspondente.
+3. Configure o backend remoto. Cada nuvem tem um exemplo em `backend.hcl.example`: na AWS com bucket versionado, criptografia e lockfile; no Azure com conta de armazenamento e autenticação do Entra ID; no GCP com bucket versionado.
 4. Rode `terraform init` e `terraform plan` e revise o plano antes de aplicar. O repositório não aplica em produção por conta própria.
 
 Segredos como a senha do banco e o `AUTH_PEPPER` nascem de valores efêmeros e chegam aos cofres por argumentos write-only, sem registro no state. O caminho de produção de cada nuvem foi validado por `terraform validate`; os testes automatizados cobrem o modo local.
@@ -71,6 +71,18 @@ Segredos como a senha do banco e o `AUTH_PEPPER` nascem de valores efêmeros e c
 ## Migrações
 
 O entrypoint do contêiner aguarda o banco, aplica as migrações do Prisma e prepara o papel `buscapp_api` antes de subir a API. Em mais de uma réplica as migrações podem competir; o Prisma e o papel usam travas próprias, mas o primeiro deploy deve acontecer com uma réplica antes de escalar.
+
+## Agendador do expurgo
+
+A rota `POST /api/tarefas/expurgo` aplica a retenção de anexos, códigos, sessões e contadores e exige `Authorization: Bearer CRON_SECRET`. Sem o segredo configurado a rota responde 404; com segredo inválido, 403.
+
+O workflow `expurgo.yml` dispara a rota todos os dias às 4h (UTC) e também aceita execução manual. Configure o segredo `CRON_SECRET` no repositório e, se quiser apontar para outro endereço, a variável `EXPURGO_APP_URL` (o padrão é o endereço publicado na Vercel).
+
+Em implantações na nuvem, a mesma chamada pode ser feita por um agendador nativo:
+
+- AWS: EventBridge Scheduler com uma função Lambda que faz a requisição HTTP, ou uma tarefa agendada do ECS.
+- Azure: um job agendado do Container Apps ou um fluxo do Logic Apps.
+- GCP: Cloud Scheduler com destino HTTP.
 
 ## Limites do modo local
 
@@ -88,4 +100,4 @@ O entrypoint do contêiner aguarda o banco, aplica as migrações do Prisma e pr
 - O bucket de anexos não aceita acesso público; o download continua passando pela API.
 - As tarefas e o banco ficam em sub-redes privadas, com grupos de segurança encadeados e sem portas de banco expostas.
 - As roles seguem o menor privilégio, com escopo nos recursos criados pelo módulo.
-- O domínio próprio é opcional. Sem ele, o TLS usa os endpoints gerenciados de cada plataforma.
+- O domínio próprio é opcional. Sem ele, o TLS usa os endpoints gerenciados de cada plataforma. Na AWS o alias é criado no Route 53 quando `dominio` e `zona_hospedada_id` são informados, junto do `certificado_arn` validado. No Azure e no GCP o binding do hostname com certificado gerenciado acontece fora do Terraform; nesses dois provedores a variável `dominio` apenas compõe o `APP_URL` e deve ser preenchida depois do binding.

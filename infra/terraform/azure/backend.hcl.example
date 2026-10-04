@@ -1,0 +1,8 @@
+# Exemplo de backend remoto do Azure. Crie o grupo, a conta e o contêiner
+# antes de rodar terraform init -backend-config=backend.hcl.
+
+resource_group_name  = "rg-tfstate"
+storage_account_name = "sttfstate000000000000"
+container_name       = "tfstate"
+key                  = "buscapp/azure/terraform.tfstate"
+use_azuread_auth     = true

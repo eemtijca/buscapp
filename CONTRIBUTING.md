@@ -115,10 +115,11 @@ Parta da `main` atualizada e use `tipo/descricao-curta`, em minúsculas, com hí
 - `fix/` para correções.
 - `hotfix/` para correções urgentes em produção.
 - `docs/`, `test/`, `refactor/`, `perf/`, `chore/` e `ci/` para os demais casos.
+- `release/` para linhas de manutenção, como `release/1.x`, criadas apenas quando houver uma linha antiga a suportar.
 
 Exemplos presentes no histórico: `feat/seguranca-robustez` e `fix/csp-fontes-botoes-ci`.
 
-Branches criadas por agentes de IA usam o prefixo do agente (`ai/`, `claude/`, `codex/`, `copilot/` ou `cursor/`), conforme a [Conventional Branch](https://conventional-branch.github.io/).
+Branches criadas por agentes de IA seguem esta mesma convenção de tipo, conforme a [Conventional Branch](https://conventional-branch.github.io/). A autoria assistida fica registrada no rodapé `Assisted-by` do commit e no corpo do pull request.
 
 ### Commits
 
@@ -320,10 +321,12 @@ Os tokens visuais ficam em `apps/web/src/assets/cores.css`, sobre a base do Boot
 
 As mudanças relevantes são registradas em [CHANGELOG.md](CHANGELOG.md), no formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/), com versionamento semântico. Mova as entradas da seção Não publicado para a versão correspondente ao publicar.
 
+Enquanto a primeira versão pública não é lançada, a versão do projeto permanece fixada em `0.1.0` e as mudanças ficam na seção Não publicado. A primeira release será a `v1.0.0`; a partir dela, o versionamento semântico passa a reger as versões.
+
 Crie releases pelo GitHub CLI:
 
 ```bash
-gh release create v1.1.0 --generate-notes
+gh release create vX.Y.Z --generate-notes
 ```
 
 O workflow `publicacao.yml` publica a imagem no GHCR quando um release estável é publicado.

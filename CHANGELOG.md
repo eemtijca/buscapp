@@ -25,6 +25,7 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 - Harness `infra/floci` com Compose dos emuladores e script de aplicação, verificação e destruição por nuvem.
 - Workflow `infra.yml` para formatar, validar e aplicar o Terraform no Floci.
 - Documento `docs/implantacao-nuvem.md` e ADR-015 sobre a implantação multicloud.
+- Workflow `expurgo.yml` que dispara a purga de retenção diária com `CRON_SECRET`.
 
 ### Corrigido
 

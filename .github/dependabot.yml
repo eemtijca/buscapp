@@ -13,7 +13,7 @@ updates:
       interval: weekly
     open-pull-requests-limit: 10
     commit-message:
-      prefix: 'chore(deps)'
+      prefix: 'deps'
     groups:
       npm:
         patterns: ['*']
@@ -28,7 +28,7 @@ updates:
     schedule:
       interval: weekly
     commit-message:
-      prefix: 'chore(deps)'
+      prefix: 'deps'
     groups:
       github-actions:
         patterns: ['*']
@@ -43,7 +43,7 @@ updates:
     schedule:
       interval: weekly
     commit-message:
-      prefix: 'chore(deps)'
+      prefix: 'deps'
     groups:
       docker:
         patterns: ['*']
@@ -58,7 +58,7 @@ updates:
     schedule:
       interval: weekly
     commit-message:
-      prefix: 'chore(deps)'
+      prefix: 'deps'
     groups:
       devcontainers:
         patterns: ['*']

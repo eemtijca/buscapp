@@ -323,6 +323,8 @@ As mudanças relevantes são registradas em [CHANGELOG.md](CHANGELOG.md), no for
 
 Enquanto a primeira versão pública não é lançada, a versão do projeto permanece fixada em `0.1.0` e as mudanças ficam na seção Não publicado. A primeira release será a `v1.0.0`; a partir dela, o versionamento semântico passa a reger as versões.
 
+O fluxo de releases e a política de suporte estão em [docs/releases.md](docs/releases.md).
+
 Crie releases pelo GitHub CLI:
 
 ```bash

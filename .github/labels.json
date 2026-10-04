@@ -84,6 +84,36 @@
       "nome": "triagem",
       "cor": "ededed",
       "descricao": "Aguardando triagem de tipo, área e prioridade."
+    },
+    {
+      "nome": "versao: maior",
+      "cor": "b60205",
+      "descricao": "Mudança incompatível que exige uma versão maior."
+    },
+    {
+      "nome": "versao: menor",
+      "cor": "0e8a16",
+      "descricao": "Funcionalidade nova compatível que exige uma versão menor."
+    },
+    {
+      "nome": "versao: correcao",
+      "cor": "fbca04",
+      "descricao": "Correção compatível que exige uma versão de correção."
+    },
+    {
+      "nome": "autorelease: pending",
+      "cor": "ededed",
+      "descricao": "Pull request de release aguardando merge."
+    },
+    {
+      "nome": "autorelease: tagged",
+      "cor": "ededed",
+      "descricao": "Release criada a partir do pull request."
+    },
+    {
+      "nome": "autorelease: published",
+      "cor": "ededed",
+      "descricao": "Release publicada após o merge."
     }
   ]
 }

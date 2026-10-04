@@ -178,14 +178,29 @@ EOF
 testar_gcp() {
   log 'Aplicando o Terraform do GCP.'
   export GOOGLE_OAUTH_ACCESS_TOKEN=floci
+
+  cat > infra/terraform/gcp/terraform.tfvars.local <<'EOF'
+# Arquivo gerado pelo harness do Floci; não é versionado.
+modo_local              = true
+ambiente                = "local"
+imagem_aplicacao        = "buscapp-api:local"
+tamanho_instancia_banco = "db-f1-micro"
+habilitar_alarmes       = false
+habilitar_redis         = false
+url_banco_local         = null
+url_migrate_local       = null
+url_redis_local         = null
+EOF
+
   iniciar_terraform infra/terraform/gcp
   timeout 1800 terraform -chdir=infra/terraform/gcp apply -no-color -input=false -auto-approve \
     -var-file=terraform.tfvars.local
 
-  local url
+  local url fqdn
   url="$(terraform -chdir=infra/terraform/gcp output -raw url_servico_cloud_run)"
-  log "Conferindo a saúde no Cloud Run ${url}."
-  curl -s -o /dev/null --max-time 10 "${url}/api/saude"
+  fqdn="$(printf '%s' "$url" | sed -E 's#https?://([^:/]+).*#\1#')"
+  log "Conferindo a saúde no Cloud Run ${fqdn}."
+  curl -s -o /dev/null --max-time 10 -H "Host: ${fqdn}" "http://localhost:${porta_gcp}/api/saude"
 
   if [ "$MANTER" != 'true' ]; then
     timeout 1800 terraform -chdir=infra/terraform/gcp destroy -no-color -input=false \

@@ -18,6 +18,7 @@
 | Rodar e escrever testes               | [testes.md](testes.md) e [../tests/README.md](../tests/README.md) |
 | Revisar segurança                     | [seguranca.md](seguranca.md) e [../SECURITY.md](../SECURITY.md)   |
 | Publicar                              | [deploy.md](deploy.md)                                            |
+| Implantar em AWS, Azure ou GCP        | [implantacao-nuvem.md](implantacao-nuvem.md)                      |
 | Contribuir                            | [../CONTRIBUTING.md](../CONTRIBUTING.md)                          |
 
 ## Decisões de arquitetura
@@ -38,6 +39,7 @@ As decisões estruturais ficam registradas como ADRs (Architecture Decision Reco
 - [ADR-012: cabeçalhos de segurança e verificação de origem](adr/012-cabecalhos-de-seguranca-e-origem.md)
 - [ADR-013: retenção e expurgo agendado](adr/013-retencao-e-expurgo-agendado.md)
 - [ADR-014: exportação e anonimização de dados do titular](adr/014-lgpd-exportacao-e-anonimizacao.md)
+- [ADR-015: implantação em AWS, Azure e GCP com Terraform](adr/015-implantacao-multinuvem.md)
 
 Novas decisões seguem o formato descrito em [../CONTRIBUTING.md](../CONTRIBUTING.md).
 

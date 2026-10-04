@@ -1,0 +1,44 @@
+# Emuladores Floci usados nos testes locais e no CI. As portas podem ser
+# trocadas por variáveis de ambiente quando as padrão já estiverem em uso.
+name: buscapp-floci
+
+services:
+  floci:
+    image: floci/floci:2.1.0
+    container_name: ${FLOCI_AWS_CONTAINER:-buscapp-floci-aws}
+    ports:
+      - '${FLOCI_AWS_PORT:-4566}:4566'
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - floci-aws-data:/app/data
+    environment:
+      FLOCI_STORAGE_MODE: ${FLOCI_STORAGE_MODE:-hybrid}
+
+  floci-az:
+    image: floci/floci-az:0.13.0
+    container_name: ${FLOCI_AZ_CONTAINER:-buscapp-floci-az}
+    ports:
+      - '${FLOCI_AZ_PORT:-4577}:4577'
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - floci-az-data:/app/data
+    environment:
+      FLOCI_AZ_TLS_ENABLED: 'true'
+      FLOCI_AZ_SERVICES_CONTAINER_APPS_MOCKED: 'false'
+      FLOCI_AZ_STORAGE_MODE: ${FLOCI_STORAGE_MODE:-hybrid}
+
+  floci-gcp:
+    image: floci/floci-gcp:0.9.0
+    container_name: ${FLOCI_GCP_CONTAINER:-buscapp-floci-gcp}
+    ports:
+      - '${FLOCI_GCP_PORT:-4588}:4588'
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - floci-gcp-data:/app/data
+    environment:
+      FLOCI_GCP_STORAGE_MODE: ${FLOCI_STORAGE_MODE:-hybrid}
+
+volumes:
+  floci-aws-data:
+  floci-az-data:
+  floci-gcp-data:

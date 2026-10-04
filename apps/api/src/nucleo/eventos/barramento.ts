@@ -59,7 +59,8 @@ function entregarLocal(mensagem: MensagemEvento): void {
   }
 }
 
-function garantirPublicador(): Redis {
+function garantirPublicador(): Redis | null {
+  if (!ambiente.REDIS_URL) return null;
   publicador ??= new Redis(ambiente.REDIS_URL, {
     connectTimeout: 3_000,
     maxRetriesPerRequest: 1,
@@ -71,11 +72,14 @@ function garantirPublicador(): Redis {
 }
 
 async function publicar(mensagem: string): Promise<void> {
-  try {
-    await garantirPublicador().publish(CANAL, mensagem);
-    return;
-  } catch {
-    /* Redis indisponível: publica pelo Postgres. */
+  const cliente = garantirPublicador();
+  if (cliente) {
+    try {
+      await cliente.publish(CANAL, mensagem);
+      return;
+    } catch {
+      /* Redis indisponível: publica pelo Postgres. */
+    }
   }
 
   try {
@@ -105,7 +109,7 @@ function tratarMensagem(bruta: string): void {
 }
 
 async function conectarAssinante(): Promise<void> {
-  if (assinante) return;
+  if (!ambiente.REDIS_URL || assinante) return;
   // O assinante precisa enfileirar o `subscribe` até a conexão ficar pronta.
   assinante = new Redis(ambiente.REDIS_URL, {
     connectTimeout: 3_000,
@@ -156,10 +160,17 @@ export async function iniciarBarramento(): Promise<void> {
   iniciado = true;
   escutaAtiva = true;
 
-  await conectarAssinante().catch(() => undefined);
+  // A primeira assinatura tem espera limitada para o boot não travar quando o
+  // Redis está indisponível; o ioredis segue tentando conectar em segundo plano.
+  await Promise.race([
+    conectarAssinante().catch(() => undefined),
+    new Promise((resolver) => {
+      const limite = setTimeout(resolver, 5_000);
+      limite.unref();
+    }),
+  ]);
   await conectarEscuta().catch(() => agendarReconexaoDaEscuta());
 }
-
 /** Encerra assinaturas e conexões; usado no shutdown e no fim dos testes. */
 export async function encerrarBarramento(): Promise<void> {
   escutaAtiva = false;

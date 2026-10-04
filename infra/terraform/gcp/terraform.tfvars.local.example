@@ -1,0 +1,15 @@
+# Exemplo do modo local com o emulador floci-gcp. Use com:
+# GOOGLE_OAUTH_ACCESS_TOKEN=floci terraform apply -var-file=terraform.tfvars.local
+#
+# Os endereços locais podem ser sobrescritos quando o DNS do emulador não
+# resolve; as variáveis aceitam null para usar o IP do Cloud SQL emulado.
+
+modo_local              = true
+ambiente                = "local"
+imagem_aplicacao        = "buscapp-api:local"
+tamanho_instancia_banco = "db-f1-micro"
+habilitar_alarmes       = false
+habilitar_redis         = false
+url_banco_local         = null
+url_migrate_local       = null
+url_redis_local         = null

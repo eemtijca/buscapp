@@ -1,0 +1,44 @@
+# Agenda diária da purga de retenção, para implantações sem cron da Vercel.
+name: Expurgo agendado
+
+on:
+  schedule:
+    - cron: "0 4 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: expurgo
+  cancel-in-progress: false
+
+jobs:
+  expurgar:
+    name: Aplicar a retenção
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      APP_URL: ${{ vars.EXPURGO_APP_URL || 'https://buscappjca.vercel.app' }}
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+    steps:
+      - name: Verificar configuração da agenda
+        id: configuracao
+        shell: bash
+        run: |
+          if [[ -z "$CRON_SECRET" ]]; then
+            echo "A agenda aguarda o segredo CRON_SECRET do repositório."
+            echo "pronta=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "pronta=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Disparar o expurgo
+        if: steps.configuracao.outputs.pronta == 'true'
+        shell: bash
+        run: |
+          [[ "$APP_URL" == https://* ]] || { echo "A agenda exige um endereço HTTPS."; exit 1; }
+          curl --fail-with-body --silent --show-error \
+            --connect-timeout 15 --max-time 300 --retry 2 --retry-delay 10 \
+            --request POST \
+            --header "Authorization: Bearer $CRON_SECRET" \
+            --url "${APP_URL%/}/api/tarefas/expurgo"

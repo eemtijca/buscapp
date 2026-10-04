@@ -1,0 +1,103 @@
+# Implantação de produção: roda em release estável ou por dispatch com a tag.
+# Para reimplantar uma versão, o ref do workflow precisa ser a tag:
+# gh workflow run implantacao.yml --ref v1.0.0
+name: Implantação
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      versao:
+        description: Tag a reimplantar, como v1.0.0
+        required: true
+        type: string
+
+concurrency:
+  group: implantacao
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  validar:
+    if: github.event_name != 'release' || github.event.release.prerelease == false
+    runs-on: ubuntu-latest
+    outputs:
+      versao: ${{ steps.versao.outputs.valor }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.release.tag_name || inputs.versao }}
+
+      - name: Conferir a tag com o package.json
+        id: versao
+        shell: bash
+        run: |
+          tag="${{ github.event.release.tag_name || inputs.versao }}"
+          pkg="$(node -p "require('./package.json').version")"
+          if [ "v$pkg" != "$tag" ]; then
+            echo "A tag $tag não corresponde à versão $pkg do package.json." >&2
+            exit 1
+          fi
+          echo "valor=$tag" >> "$GITHUB_OUTPUT"
+
+  migrar:
+    needs: validar
+    runs-on: ubuntu-latest
+    environment: release
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.validar.outputs.versao }}
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Aplicar as migrações no banco de produção
+        run: npm run db:migrate
+        env:
+          DATABASE_URL: ${{ secrets.DIRECT_URL_PROD }}
+
+      - name: Definir a senha do papel de runtime
+        run: node infra/docker/role.mjs
+        env:
+          MIGRATE_DATABASE_URL: ${{ secrets.DIRECT_URL_PROD }}
+          APP_DB_PASSWORD: ${{ secrets.APP_DB_PASSWORD_PROD }}
+
+  implantar:
+    needs: [validar, migrar]
+    runs-on: ubuntu-latest
+    environment: release
+    if: vars.DEPLOY_TARGET == '' || vars.DEPLOY_TARGET == 'vercel'
+    env:
+      VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.validar.outputs.versao }}
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+
+      - name: Publicar na Vercel
+        run: |
+          npx --yes vercel@latest pull --yes --environment=production --token="$VERCEL_TOKEN"
+          npx --yes vercel@latest build --prod --token="$VERCEL_TOKEN"
+          npx --yes vercel@latest deploy --prebuilt --prod --token="$VERCEL_TOKEN"
+
+  verificar:
+    needs: [validar, implantar]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Conferir a saúde
+        run: curl -fsS --retry 6 --retry-delay 10 --retry-all-errors "${{ vars.APP_URL }}/api/saude"

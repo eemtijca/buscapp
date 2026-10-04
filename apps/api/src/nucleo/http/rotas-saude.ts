@@ -5,6 +5,9 @@ import { prisma } from '../../nucleo/banco/cliente.js';
 import { contarConexoes } from '../../nucleo/eventos/barramento.js';
 import { resumoMetricas } from '../../nucleo/http/metricas.js';
 
+// Revisão implantada, útil para conferir o deploy em qualquer provedor.
+const COMMIT = process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.GIT_COMMIT ?? 'local';
+
 export const rotasSaude: FastifyPluginAsyncZod = async (app) => {
   app.get(
     '/api/saude',
@@ -16,6 +19,7 @@ export const rotasSaude: FastifyPluginAsyncZod = async (app) => {
           200: z.object({
             status: z.literal('ok'),
             hora: z.string(),
+            commit: z.string(),
           }),
         },
       },
@@ -23,6 +27,7 @@ export const rotasSaude: FastifyPluginAsyncZod = async (app) => {
     async () => ({
       status: 'ok' as const,
       hora: new Date().toISOString(),
+      commit: COMMIT,
     }),
   );
 

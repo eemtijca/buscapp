@@ -1,26 +1,32 @@
+# Publica a imagem no GHCR em release estável ou por dispatch manual.
 name: Publicação da imagem
 
 on:
   release:
     types: [published]
   workflow_dispatch:
+    inputs:
+      versao:
+        description: Versão da imagem, sem o v, como 1.0.0
+        required: true
+        type: string
 
 concurrency:
   group: publicacao-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
 
 jobs:
   imagem:
-    runs-on: ubuntu-latest
-    # Publica só releases estáveis; o dispatch manual ignora a checagem de pré-release.
     if: github.event_name != 'release' || github.event.release.prerelease == false
-
-    permissions:
-      contents: read
-      packages: write
-
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.release.tag_name || github.ref }}
 
       - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
@@ -30,30 +36,24 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Sempre :latest e :<sha>; quando o ref for uma tag, publica também a tag da versão.
-      - name: Define as tags da imagem
-        id: tags
-        env:
-          REPO: ${{ github.repository }}
-          SHA: ${{ github.sha }}
-          REF_TYPE: ${{ github.ref_type }}
-          REF_NAME: ${{ github.ref_name }}
-        run: |
-          {
-            echo 'valor<<EOF'
-            echo "ghcr.io/$REPO:latest"
-            echo "ghcr.io/$REPO:$SHA"
-            if [ "$REF_TYPE" = "tag" ]; then
-              echo "ghcr.io/$REPO:$REF_NAME"
-            fi
-            echo EOF
-          } >> "$GITHUB_OUTPUT"
+      - name: Definir as tags e os rótulos
+        id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=${{ inputs.versao }},enable=${{ github.event_name == 'workflow_dispatch' }}
+            type=sha
+          flavor: latest=auto
 
       - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: .
           file: infra/docker/Dockerfile
           push: true
-          tags: ${{ steps.tags.outputs.valor }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

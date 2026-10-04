@@ -44,7 +44,7 @@ const esquema = z
     AUTH_PEPPER: z.string().min(16, 'AUTH_PEPPER deve ter ao menos 16 caracteres'),
     SESSAO_COOKIE: z.string().default('buscapp_sessao'),
     COOKIE_SAMESITE: z.enum(['lax', 'strict', 'none']).default('lax'),
-    STORAGE_DRIVER: z.enum(['disco', 's3']).default('disco'),
+    STORAGE_DRIVER: z.enum(['disco', 's3', 'azure-blob']).default('disco'),
     UPLOAD_DIR: z.string().default('uploads'),
     S3_BUCKET: z.string().optional(),
     S3_REGION: z.string().default('us-east-1'),
@@ -52,6 +52,9 @@ const esquema = z
     S3_ACCESS_KEY_ID: z.string().optional(),
     S3_SECRET_ACCESS_KEY: z.string().optional(),
     S3_UPLOAD_URL_EXPIRA_S: z.coerce.number().int().positive().default(300),
+    AZURE_STORAGE_CONTAINER: z.string().optional(),
+    AZURE_STORAGE_CONNECTION_STRING: z.string().optional(),
+    AZURE_STORAGE_ACCOUNT_URL: z.string().optional(),
     UPLOAD_DIRETO_MAX_BYTES: z.coerce
       .number()
       .int()
@@ -71,7 +74,7 @@ const esquema = z
       .enum(['true', 'false'])
       .default('false')
       .transform((valor) => valor === 'true'),
-    REDIS_URL: z.string().min(1, 'REDIS_URL é obrigatória para o barramento de eventos.'),
+    REDIS_URL: z.string().optional(),
     // Conexão de sessão usada no LISTEN; sem ela, cai para MIGRATE_DATABASE_URL ou DATABASE_URL.
     DATABASE_URL_ESCUTA: z.string().optional(),
     // Segredo do agendador do expurgo; sem ele, a rota fica desabilitada.
@@ -93,6 +96,32 @@ const esquema = z
         path: ['COOKIE_SECURE'],
         message: 'COOKIE_SAMESITE=none exige COOKIE_SECURE=true',
       });
+    }
+
+    if (valores.STORAGE_DRIVER === 's3' && !valores.S3_BUCKET) {
+      contexto.addIssue({
+        code: 'custom',
+        path: ['S3_BUCKET'],
+        message: 'S3_BUCKET é obrigatória quando STORAGE_DRIVER=s3',
+      });
+    }
+
+    if (valores.STORAGE_DRIVER === 'azure-blob') {
+      if (!valores.AZURE_STORAGE_CONTAINER) {
+        contexto.addIssue({
+          code: 'custom',
+          path: ['AZURE_STORAGE_CONTAINER'],
+          message: 'AZURE_STORAGE_CONTAINER é obrigatório quando STORAGE_DRIVER=azure-blob',
+        });
+      }
+      if (!valores.AZURE_STORAGE_CONNECTION_STRING && !valores.AZURE_STORAGE_ACCOUNT_URL) {
+        contexto.addIssue({
+          code: 'custom',
+          path: ['AZURE_STORAGE_CONNECTION_STRING'],
+          message:
+            'Informe AZURE_STORAGE_CONNECTION_STRING ou AZURE_STORAGE_ACCOUNT_URL quando STORAGE_DRIVER=azure-blob',
+        });
+      }
     }
   });
 

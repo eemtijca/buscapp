@@ -183,6 +183,9 @@ A convenção das suítes está em [docs/testes.md](docs/testes.md) e [tests/REA
 
 ## Deploy
 
+> [!NOTE]
+> A implantação na Vercel está pausada; a publicação de imagem no GHCR segue ativa, por dispatch manual. O passo a passo de reativação está em [docs/portabilidade.md](docs/portabilidade.md).
+
 O perfil full-stack usa Vercel Services, com a SPA servida pela API, Redis para o SSE e `DB_POOL_MAX=1`. O passo a passo, as variáveis de produção e o workflow de migrações estão em [docs/deploy.md](docs/deploy.md).
 
 ## Privacidade e dados

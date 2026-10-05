@@ -217,13 +217,13 @@ Toda mudança passa por revisão e pelos workflows do GitHub Actions:
 | `migracoes.yml`  | Aplica as migrações em produção e a senha do papel em push para `main` com mudanças no schema.                     |
 | `publicacao.yml` | Publica a imagem no GHCR ao liberar uma release estável e por dispatch manual.                                     |
 
-A `main` é protegida por rulesets: pull request obrigatório, checks verdes, conversas resolvidas e merge commit como único método. A autoaprovação não existe no GitHub; donos da organização podem mesclar os próprios pull requests com o bypass da regra de revisão, mas continuam sujeitos aos checks de qualidade.
+A `main` é protegida por rulesets: pull request obrigatório, checks verdes, conversas resolvidas e squash como único método. Todo pull request precisa da aprovação de um mantenedor do [CODEOWNERS](.github/CODEOWNERS); depois da aprovação, quem abriu pode mesclar. A autoaprovação não existe no GitHub; donos da organização podem mesclar com o bypass da regra de revisão, mas continuam sujeitos aos checks de qualidade.
 
 Corrija as falhas antes de pedir nova revisão. Pull requests sem CI verde não são mesclados. O check `validar` volta a rodar quando o título ou as etiquetas mudam; se faltar etiqueta, aplique com `gh pr edit --add-label`. Evite force-push depois que a revisão começar; se precisar reescrever a história, explique o motivo na conversa.
 
 ### Estratégia de merge
 
-Mescle por merge commit, preservando os commits da branch e o contexto da revisão. Apague a branch após o merge. Não faça force-push em `main` nem reescreva o histórico já mesclado.
+Mescle por squash, em um único commit por pull request. Apague a branch após o merge. Não faça force-push em `main` nem reescreva o histórico já mesclado.
 
 ## Padrões de código
 
@@ -332,6 +332,8 @@ gh release create vX.Y.Z --generate-notes
 ```
 
 O workflow `publicacao.yml` publica a imagem no GHCR quando um release estável é publicado.
+
+A implantação na Vercel está pausada; consulte [docs/portabilidade.md](docs/portabilidade.md) para reativar.
 
 ## Suporte e dúvidas
 

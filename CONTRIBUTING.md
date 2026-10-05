@@ -333,6 +333,8 @@ gh release create vX.Y.Z --generate-notes
 
 O workflow `publicacao.yml` publica a imagem no GHCR quando um release estável é publicado.
 
+A implantação na Vercel está pausada; consulte [docs/portabilidade.md](docs/portabilidade.md) para reativar.
+
 ## Suporte e dúvidas
 
 Use as issues para dúvidas, sugestões e problemas. A triagem acontece em até 7 dias. Para vulnerabilidades, siga [SECURITY.md](SECURITY.md); para conduta, o [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).

@@ -1,5 +1,8 @@
 # Deploy
 
+> [!NOTE]
+> A implantação na Vercel está pausada. Este documento permanece como referência para reativação.
+
 A aplicação pode ser publicada de três formas: imagem Docker (GHCR), Docker Compose e Vercel. O banco é sempre um PostgreSQL externo ao processo, gerenciado ou no Compose.
 
 ## Artefatos

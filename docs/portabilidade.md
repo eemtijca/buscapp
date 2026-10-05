@@ -37,3 +37,14 @@ O release é o artefato: a tag `vX.Y.Z` e a imagem publicada no GHCR são a font
 1. Gerar a imagem pela `publicacao.yml` (dispatch manual) ou com `docker build`.
 2. Executar o contêiner com banco e Redis de ensaio e conferir `/api/saude`.
 3. Rodar `npm run infra:floci` para exercitar o Terraform nos emuladores.
+
+## Implantação pausada
+
+A implantação na Vercel foi encerrada e as agendas e migrações vinculadas a ela estão desativadas. A publicação de imagem no GHCR segue ativa, por dispatch manual.
+
+Para reativar a implantação:
+
+1. recrie o projeto na plataforma escolhida e refaça o vínculo local (`vercel link` ou equivalente);
+2. grave novamente `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`, `APP_URL` e os segredos de banco;
+3. reative os workflows `Implantação`, `Migrações do banco` e a agenda de limpeza;
+4. ajuste `DEPLOY_TARGET` para o novo alvo e rode um release de ensaio.

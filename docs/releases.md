@@ -21,6 +21,9 @@ A primeira release será a `v1.0.0`. A partir dela:
 3. o workflow de implantação roda no ambiente `release`: valida a versão, aplica migrações, publica a imagem no GHCR e faz o deploy na Vercel;
 4. o deploy de produção acontece somente por tag; os previews continuam por pull request.
 
+> [!NOTE]
+> Enquanto a implantação estiver pausada, o release publica a tag e a imagem no GHCR, sem deploy. O deploy volta quando um alvo for reativado.
+
 ## Etiquetas de versão
 
 - `versao: maior`, `versao: menor` e `versao: correcao` são aplicadas pelo workflow de etiquetas conforme o título do pull request.

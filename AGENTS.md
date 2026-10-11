@@ -1,15 +1,15 @@
 # AGENTS.md
 
-BuscApp: plataforma web de gestão escolar para acompanhar frequência, ocorrências, justificativas de falta e a comunicação entre professores, gestão e responsáveis. Monorepo npm workspaces com SPA Vue 3 e Vite (`apps/web`), API Fastify 5 (`apps/api`), contratos Zod (`packages/contratos`), PostgreSQL 17 com Prisma 7 e adaptador `pg` e Redis para o SSE. Autenticação própria com scrypt, pepper e sessão opaca em cookie. Código, comentários, documentação, testes e commits são em português.
+BuscApp: plataforma web de gestão escolar para acompanhar frequência, ocorrências, justificativas de falta e a comunicação entre professores, gestão e responsáveis. Monorepo pnpm workspaces com SPA Vue 3 e Vite (`apps/web`), API Fastify 5 (`apps/api`), contratos Zod (`packages/contratos`), PostgreSQL 17 com Prisma 7 e adaptador `pg` e Redis para o SSE. Autenticação própria com scrypt, pepper e sessão opaca em cookie. Código, comentários, documentação, testes e commits são em português.
 
 ## Diretrizes do repositório
 
 - Leia o `CONTRIBUTING.md` antes de qualquer mudança: ele reúne o fluxo de issues, etiquetas, branches, commits, pull requests, padrões de código, banco, formatação e testes.
-- `tests/unit/texto-editorial.test.ts` varre código, documentação e configuração. Ele reprova travessão, meia-risca, reticências tipográficas, aspas curvas, setas, aspas angulares, entidades HTML de aspas, segunda pessoa e plural escrito com parênteses. Rode `npm run test:texto` depois de escrever texto de interface ou documentação.
+- `tests/unit/texto-editorial.test.ts` varre código, documentação e configuração. Ele reprova travessão, meia-risca, reticências tipográficas, aspas curvas, setas, aspas angulares, entidades HTML de aspas, segunda pessoa e plural escrito com parênteses. Rode `pnpm run test:texto` depois de escrever texto de interface ou documentação.
 - Commits seguem Conventional Commits em português, no imperativo, com escopo opcional: `fix(api): corrige ...`. Branches usam `tipo/descricao-curta`, inclusive as criadas por agentes de IA; a autoria assistida fica no rodapé `Assisted-by` do commit.
-- TypeScript é estrito e ainda tem `noUncheckedIndexedAccess`; oxlint e ESLint cobrem o restante. O gerenciador é npm, com `package-lock.json`; não use bun, yarn nem pnpm.
+- TypeScript é estrito e ainda tem `noUncheckedIndexedAccess`; oxlint e ESLint cobrem o restante. O gerenciador é pnpm, com `pnpm-lock.yaml`; não use bun, yarn nem npm nos comandos.
 - Nomes de domínio em português (`alunos`, `frequencias`, `turmas`), termos de infraestrutura em inglês quando consagrados (`token`, `backup`).
-- `npm run lint` e `npm test` aplicam correções automáticas (`--fix`); confira o diff antes de commitar.
+- `pnpm run lint` e `pnpm test` aplicam correções automáticas (`--fix`); confira o diff antes de commitar.
 
 ## Padrões de código
 
@@ -24,23 +24,23 @@ BuscApp: plataforma web de gestão escolar para acompanhar frequência, ocorrên
 
 Pré-requisitos: Node 20.19 ou superior (ou 22.12 ou superior) e Docker com Compose. O CI usa Node 24.
 
-- Ambiente local: `npm ci`; `cp .env.example .env` com `AUTH_PEPPER` de 32 caracteres ou mais; `npm run compose:up`; `npm run seed -w @buscapp/api`; `npm run dev:web` na porta 5173 e `npm run dev:api` na porta 3001.
-- Docker: `npm run compose:up` sobe a aplicação em `http://localhost:3000` e o PostgreSQL em `localhost:5433`; as credenciais de desenvolvimento estão em `docs/ambiente.md`.
-- Ordem de verificação antes do pull request: `npm run type-check`, `npm run lint` e `npm run test:unit`. `npm run test` encadeia tipos, lint, build e unidade.
-- `npm run test:unit` exige o Compose migrado, `NODE_ENV=test`, `AUTH_PEPPER`, `DATABASE_URL`, `MIGRATE_DATABASE_URL`, `REDIS_URL` e `STORAGE_DRIVER=disco`.
-- Ponta a ponta: `npm run test:e2e:docker` e `npm run test:pwa:docker` rodam na imagem oficial com o aplicativo no ar; `npm run test:e2e` e `npm run test:pwa` são a alternativa local.
-- Banco: `npm run db:generate` e `npm run db:migrate` (deploy). Migrações de desenvolvimento com `npx prisma migrate dev --name ajuste` em `apps/api`.
-- Guarda editorial: `npm run test:texto`.
-- Capturas do README: `npm run capturas:readme` ou `npm run capturas:readme:docker`, com o aplicativo no ar e o seed aplicado. Os PNGs ficam em `docs/imagens/` e não são editados à mão.
+- Ambiente local: `pnpm install --frozen-lockfile`; `cp .env.example .env` com `AUTH_PEPPER` de 32 caracteres ou mais; `pnpm run compose:up`; `pnpm --filter @buscapp/api run seed`; `pnpm run dev:web` na porta 5173 e `pnpm run dev:api` na porta 3001.
+- Docker: `pnpm run compose:up` sobe a aplicação em `http://localhost:3000` e o PostgreSQL em `localhost:5433`; as credenciais de desenvolvimento estão em `docs/ambiente.md`.
+- Ordem de verificação antes do pull request: `pnpm run type-check`, `pnpm run lint` e `pnpm run test:unit`. `pnpm run test` encadeia tipos, lint, build e unidade.
+- `pnpm run test:unit` exige o Compose migrado, `NODE_ENV=test`, `AUTH_PEPPER`, `DATABASE_URL`, `MIGRATE_DATABASE_URL`, `REDIS_URL` e `STORAGE_DRIVER=disco`.
+- Ponta a ponta: `pnpm run test:e2e:docker` e `pnpm run test:pwa:docker` rodam na imagem oficial com o aplicativo no ar; `pnpm run test:e2e` e `pnpm run test:pwa` são a alternativa local.
+- Banco: `pnpm run db:generate` e `pnpm run db:migrate` (deploy). Migrações de desenvolvimento com `pnpm exec prisma migrate dev --name ajuste` em `apps/api`.
+- Guarda editorial: `pnpm run test:texto`.
+- Capturas do README: `pnpm run capturas:readme` ou `pnpm run capturas:readme:docker`, com o aplicativo no ar e o seed aplicado. Os PNGs ficam em `docs/imagens/` e não são editados à mão.
 
 ## Ferramentas externas
 
 - GitHub: opere issues, pull requests, execuções de workflow e releases pelo GitHub CLI (`gh`), não pela interface web. Confirme a sessão com `gh auth status` e, se necessário, autentique com `gh auth login`. Exemplos: `gh issue create`, `gh pr create`, `gh pr checks --watch`, `gh run watch` e `gh release create`. Nunca inclua segredos ou dados de alunos.
-- Playwright: rode a suíte na imagem oficial da Microsoft, com o aplicativo no ar, usando `npm run test:e2e:docker` (ou `npm run test:e2e:docker:chromium`) e `npm run test:pwa:docker`. O script `tests/playwright-container.sh` aceita `PLAYWRIGHT_IMAGE`, `PLAYWRIGHT_DOCKER_NETWORK` e `PLAYWRIGHT_DOCKER_USER`. Mantenha a versão da imagem igual à do `@playwright/test`. A instalação local (`npm run test:e2e:install`) é alternativa.
+- Playwright: rode a suíte na imagem oficial da Microsoft, com o aplicativo no ar, usando `pnpm run test:e2e:docker` (ou `pnpm run test:e2e:docker:chromium`) e `pnpm run test:pwa:docker`. O script `tests/playwright-container.sh` aceita `PLAYWRIGHT_IMAGE`, `PLAYWRIGHT_DOCKER_NETWORK` e `PLAYWRIGHT_DOCKER_USER`. Mantenha a versão da imagem igual à do `@playwright/test`. A instalação local (`pnpm run test:e2e:install`) é alternativa.
 
 ## Fluxo de issues e pull requests
 
-- Aplique etiquetas em toda issue e todo pull request: uma de tipo e, fora do tipo `docs`, uma de área. Use `gh issue create --label "bug" --label "area: web"` e `gh pr edit <número> --add-label "area: api"`. O catálogo fica em `.github/labels.json` e é sincronizado com `npm run etiquetas:sync`. Pull requests do Dependabot recebem `dependencies` e dispensam as demais.
+- Aplique etiquetas em toda issue e todo pull request: uma de tipo e, fora do tipo `docs`, uma de área. Use `gh issue create --label "bug" --label "area: web"` e `gh pr edit <número> --add-label "area: api"`. O catálogo fica em `.github/labels.json` e é sincronizado com `pnpm run etiquetas:sync`. Pull requests do Dependabot recebem `dependencies` e dispensam as demais.
 - Faça apenas commits atômicos: uma mudança lógica completa por commit, sem trabalho em andamento nem correção de revisão. Use `git commit --fixup` durante o desenvolvimento e `git rebase -i --autosquash` antes de publicar.
 - Organize todos os commits do assunto em uma única branch e um único pull request. Abra o pull request somente quando estiver finalizado, com título em Conventional Commits, verificações locais, documentação e CHANGELOG prontos. Não use `gh pr create --fill`.
 - Todo pull request precisa da aprovação de um mantenedor do `.github/CODEOWNERS` antes do merge; quem abriu pode mesclar depois da aprovação. Agentes não mesclam sem essa aprovação.

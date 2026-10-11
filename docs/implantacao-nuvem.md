@@ -49,12 +49,12 @@ Cada módulo tem `versions.tf`, `providers.tf`, `variables.tf`, `locals.tf`, os 
 ## Comandos
 
 ```bash
-npm run infra:fmt        # formata todos os módulos
-npm run infra:validar    # init sem backend e validate nas três nuvens
-npm run infra:floci      # aplica e destrói nas três nuvens pelo Floci
-npm run infra:floci:aws  # apenas AWS
-npm run infra:floci:azure
-npm run infra:floci:gcp
+pnpm run infra:fmt        # formata todos os módulos
+pnpm run infra:validar    # init sem backend e validate nas três nuvens
+pnpm run infra:floci      # aplica e destrói nas três nuvens pelo Floci
+pnpm run infra:floci:aws  # apenas AWS
+pnpm run infra:floci:azure
+pnpm run infra:floci:gcp
 ```
 
 O script `infra/floci/testar.sh` constrói a imagem `buscapp-api:local` quando necessário, sobe os emuladores quando as portas padrão não respondem, aplica o Terraform, confere `GET /api/saude` e `GET /api/saude/pronto` e destrói os recursos. Use `MANTER=true` para preservar o ambiente após o teste.

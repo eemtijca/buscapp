@@ -7,8 +7,8 @@ Suítes de guarda editorial, integração da API, unidade do cache do frontend, 
 Banco migrado e populado, com a API e a SPA no ar para os testes de ponta a ponta:
 
 ```bash
-npm run compose:up
-npm run seed -w @buscapp/api
+pnpm run compose:up
+pnpm --filter @buscapp/api run seed
 ```
 
 Para os testes de integração da API, exporte as variáveis do banco:
@@ -25,17 +25,17 @@ export STORAGE_DRIVER=disco
 ## Suítes
 
 ```bash
-npm run test              # type-check, lint, build da SPA e testes de unidade
-npm run test:unit         # guarda editorial, integração da API e unidade do web (Vitest)
-npm run test:texto        # apenas a guarda editorial
-npm run test:unit:web     # apenas a unidade do cache do frontend
-npm run test:e2e:docker   # Playwright na imagem oficial, com o aplicativo no ar
-npm run test:pwa:docker   # PWA na imagem oficial, com o preview no ar
-npm run test:db           # smoke test do schema no PostgreSQL do Compose
+pnpm run test              # type-check, lint, build da SPA e testes de unidade
+pnpm run test:unit         # guarda editorial, integração da API e unidade do web (Vitest)
+pnpm run test:texto        # apenas a guarda editorial
+pnpm run test:unit:web     # apenas a unidade do cache do frontend
+pnpm run test:e2e:docker   # Playwright na imagem oficial, com o aplicativo no ar
+pnpm run test:pwa:docker   # PWA na imagem oficial, com o preview no ar
+pnpm run test:db           # smoke test do schema no PostgreSQL do Compose
 ```
 
 - `test:unit` roda `tests/unit/texto-editorial.test.ts`, `apps/api/src/**/*.test.ts` com `construirApp()` e `app.inject`, em série, contra o PostgreSQL do Compose, e `apps/web/src/**/*.test.ts` para o cache do frontend. Cada arquivo cria e limpa a própria massa.
-- `test:e2e:docker` roda o Playwright na imagem oficial da Microsoft com o aplicativo no ar; `test:e2e` é a alternativa local e sobe `npm run dev:api` em `:3001` com `npm run dev:web` em `:5173`, nos projetos Chromium, Firefox, WebKit, Mobile Chrome e Mobile Safari.
+- `test:e2e:docker` roda o Playwright na imagem oficial da Microsoft com o aplicativo no ar; `test:e2e` é a alternativa local e sobe `pnpm run dev:api` em `:3001` com `pnpm run dev:web` em `:5173`, nos projetos Chromium, Firefox, WebKit, Mobile Chrome e Mobile Safari.
 - `test:pwa:docker` valida o PWA contra o `vite preview` em `:4173` com a API em `:3001`; `test:pwa` é a alternativa local.
 - `test:db` aplica migrações pendentes e confere tabelas, CHECKs, triggers e o índice parcial de frequência.
 
@@ -44,8 +44,8 @@ npm run test:db           # smoke test do schema no PostgreSQL do Compose
 As imagens do README ficam em `docs/imagens/` e são geradas por `tests/e2e/imagens.spec.ts`, com o aplicativo no ar e o seed aplicado:
 
 ```bash
-npm run capturas:readme         # Playwright local
-npm run capturas:readme:docker  # imagem oficial, com o aplicativo no ar
+pnpm run capturas:readme         # Playwright local
+pnpm run capturas:readme:docker  # imagem oficial, com o aplicativo no ar
 ```
 
 O spec captura o painel da gestão em 1440x900 no Chromium e a chamada do professor em 390x844 no Mobile Chrome, sempre com massa sintética. Não edite os PNGs à mão: regenere pelo comando e revise o diff.

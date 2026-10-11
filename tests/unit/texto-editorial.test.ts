@@ -22,7 +22,7 @@ const FORA_DO_ESCOPO = new Set([
 ]);
 
 const ARQUIVOS_IGNORADOS = new Set([
-  "package-lock.json",
+  "pnpm-lock.yaml",
   "devcontainer-lock.json",
   "tsconfig.tsbuildinfo",
 ]);

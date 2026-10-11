@@ -1,6 +1,6 @@
 # Arquitetura
 
-Monorepo npm workspaces com três pacotes: a SPA Vue 3 (`apps/web`), a API Fastify 5 (`apps/api`) e os contratos Zod (`packages/contratos`), consumidos pela API. O PostgreSQL é acessado via Prisma 7.10 com `@prisma/adapter-pg`. A topologia padrão é de mesma origem: a API serve o build da SPA, o que mantém o cookie de sessão first-party.
+Monorepo pnpm workspaces com três pacotes: a SPA Vue 3 (`apps/web`), a API Fastify 5 (`apps/api`) e os contratos Zod (`packages/contratos`), consumidos pela API. O PostgreSQL é acessado via Prisma 7.10 com `@prisma/adapter-pg`. A topologia padrão é de mesma origem: a API serve o build da SPA, o que mantém o cookie de sessão first-party.
 
 ## Visão geral
 

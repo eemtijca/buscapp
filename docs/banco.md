@@ -7,20 +7,20 @@ A descrição das entidades e do vocabulário do domínio está em [modelo-de-da
 ## Comandos
 
 ```bash
-npm run db:generate                # regenera o Prisma Client
-npm run db:migrate                 # aplica as migrações (prisma migrate deploy)
-npm run -w @buscapp/api generate   # alias de db:generate
-npm run seed -w @buscapp/api       # fixtures de desenvolvimento
-npm run test:db                    # smoke test do schema no Compose
+pnpm run db:generate                # regenera o Prisma Client
+pnpm run db:migrate                 # aplica as migrações (prisma migrate deploy)
+pnpm --filter @buscapp/api run generate   # alias de db:generate
+pnpm --filter @buscapp/api run seed       # fixtures de desenvolvimento
+pnpm run test:db                    # smoke test do schema no Compose
 ```
 
 Comandos diretos úteis, executados em `apps/api`:
 
 ```bash
-npx prisma validate
-npx prisma migrate status
-npx prisma migrate dev --name ajuste
-npx prisma studio
+pnpm exec prisma validate
+pnpm exec prisma migrate status
+pnpm exec prisma migrate dev --name ajuste
+pnpm exec prisma studio
 ```
 
 Nunca edite uma migração já aplicada. Crie uma nova com `prisma migrate dev`.

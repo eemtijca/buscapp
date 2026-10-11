@@ -1,21 +1,22 @@
-// Verifica se a versão da raiz, dos workspaces e do lockfile está sincronizada.
+// Verifica se a versão da raiz, dos workspaces e dos importers do lockfile está sincronizada.
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const raiz = JSON.parse(readFileSync('package.json', 'utf8'));
-const lock = JSON.parse(readFileSync('package-lock.json', 'utf8'));
+const lock = readFileSync('pnpm-lock.yaml', 'utf8');
+const linhas = new Set(lock.split('\n'));
 const alvos = ['.', 'apps/api', 'apps/web', 'packages/contratos'];
 const divergencias = [];
 
 for (const caminho of alvos) {
   const pacote = caminho === '.' ? raiz : JSON.parse(readFileSync(resolve(caminho, 'package.json'), 'utf8'));
-  const chave = caminho === '.' ? '' : caminho;
-  const trava = lock.packages?.[chave]?.version;
   if (pacote.version !== raiz.version) {
     divergencias.push(`${caminho}: ${pacote.version}, diferente da raiz ${raiz.version}`);
   }
-  if (trava !== raiz.version) {
-    divergencias.push(`${caminho}: lockfile em ${trava}, diferente da raiz ${raiz.version}`);
+  // O lockfile do pnpm não guarda a versão do próprio pacote em cada importer;
+  // confere se a seção do pacote existe para pegar lockfile desatualizado.
+  if (!linhas.has(`  ${caminho}:`)) {
+    divergencias.push(`${caminho}: seção ausente no pnpm-lock.yaml`);
   }
 }
 

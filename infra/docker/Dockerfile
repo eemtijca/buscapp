@@ -3,35 +3,39 @@
 # Base fixada por digest (índice multi-arquitetura do node:24-slim) para builds reproduzíveis.
 FROM node:24-slim@sha256:0e0ff40c39bc087845bfb27465a0df4ea419520094bc35842ff83dd8cbe6f9b6 AS base
 WORKDIR /app
-ENV npm_config_update_notifier=false
-RUN apt-get update \
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+RUN corepack enable \
+  && apt-get update \
   && apt-get install -y --no-install-recommends openssl \
   && rm -rf /var/lib/apt/lists/*
 
 FROM base AS deps
-COPY package.json package-lock.json ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/web/package.json apps/web/package.json
 COPY apps/api/package.json apps/api/package.json
 COPY packages/contratos/package.json packages/contratos/package.json
 # O estágio de build executa os builds necessários explicitamente; scripts de instalação
 # não têm as fontes disponíveis nesta camada.
-RUN npm ci --ignore-scripts
+RUN pnpm install --frozen-lockfile --ignore-scripts
 
 FROM deps AS build
 COPY . .
-RUN npm run build -w @buscapp/contratos && npm run build -w @buscapp/web && npm run build -w @buscapp/api
+RUN pnpm --filter @buscapp/contratos run build \
+  && pnpm --filter @buscapp/web run build \
+  && pnpm --filter @buscapp/api run build
 
 FROM base AS runtime
 ENV NODE_ENV=production
-COPY package.json package-lock.json ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/web/package.json apps/web/package.json
 COPY apps/api/package.json apps/api/package.json
 COPY packages/contratos/package.json packages/contratos/package.json
-# `--ignore-scripts` bloqueia scripts de instalação; o schema engine do Prisma é
-# baixado explicitamente abaixo (o entrypoint o usa em `prisma migrate deploy`).
-RUN npm ci --omit=dev --ignore-scripts \
-  && node node_modules/@prisma/engines/scripts/postinstall.js \
-  && chown -R node:node node_modules/@prisma node_modules/prisma
+# `--ignore-scripts` bloqueia scripts de instalação; em seguida, `pnpm rebuild --pending`
+# executa os scripts autorizados que faltam (o schema engine do Prisma usado pelo
+# entrypoint em `prisma migrate deploy`).
+RUN pnpm install --prod --frozen-lockfile --ignore-scripts \
+  && pnpm rebuild --pending \
+  && chown -R node:node node_modules apps/api/node_modules apps/web/node_modules packages/contratos/node_modules
 
 COPY --from=build /app/apps/api/dist apps/api/dist
 COPY --from=build /app/apps/web/dist apps/web/dist

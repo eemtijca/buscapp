@@ -35,6 +35,7 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Modificado
 
+- Monorepo migrado de npm workspaces para pnpm, com `packageManager` fixado, `pnpm-lock.yaml` versionado, `pnpm-workspace.yaml` para os pacotes e scripts de build, `workspace:*` nos contratos, Dockerfile e workflows ajustados e `pnpm exec`/`pnpm dlx` no lugar de `npx`.
 - Guia de contribuição e AGENTS.md passam a exigir etiquetas em issues e pull requests, commits atômicos organizados em um único pull request e abertura somente com o trabalho finalizado.
 - Textos de interface, mensagens e documentação ajustados à convenção editorial, com pluralização correta e sem segunda pessoa.
 - Nomes exibidos dos workflows alinhados ao padrão em português.

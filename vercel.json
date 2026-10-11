@@ -4,14 +4,14 @@
     "web": {
       "root": "apps/web/",
       "framework": "vite",
-      "buildCommand": "npm run build-only",
+      "buildCommand": "pnpm run build-only",
       "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
     },
     "api": {
       "root": "apps/api/",
       "framework": "fastify",
       "entrypoint": "src/server.ts",
-      "buildCommand": "npm run build"
+      "buildCommand": "pnpm run build"
     }
   },
   "rewrites": [

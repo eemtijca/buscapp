@@ -11,7 +11,7 @@ test-results
 blob-report
 .playwright
 .vscode
-package-lock.json
+pnpm-lock.yaml
 *.min.js
 *.min.css
 *.tsbuildinfo

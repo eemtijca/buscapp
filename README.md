@@ -112,8 +112,8 @@ A aplicação publicada fica em https://buscappjca.vercel.app. O ambiente de des
 ```bash
 cp .env.example .env
 # Preencha AUTH_PEPPER com pelo menos 32 caracteres
-npm run compose:up
-npm run seed -w @buscapp/api
+pnpm run compose:up
+pnpm --filter @buscapp/api run seed
 ```
 
 A aplicação fica em `http://localhost:3000`, com o PostgreSQL em `localhost:5433`. As migrações são aplicadas na partida e o driver de disco guarda os anexos no volume `uploads`.
@@ -150,7 +150,7 @@ A referência completa está em [docs/ambiente.md](docs/ambiente.md).
 
 ## Arquitetura
 
-Monorepo npm workspaces com a SPA Vue 3 (`apps/web`), a API Fastify 5 (`apps/api`) e os contratos Zod (`packages/contratos`). A topologia padrão é de mesma origem: a API serve o build da SPA e mantém o cookie de sessão first-party.
+Monorepo pnpm workspaces com a SPA Vue 3 (`apps/web`), a API Fastify 5 (`apps/api`) e os contratos Zod (`packages/contratos`). A topologia padrão é de mesma origem: a API serve o build da SPA e mantém o cookie de sessão first-party.
 
 ```mermaid
 flowchart LR
@@ -170,14 +170,14 @@ As camadas, o fluxo de uma requisição autenticada e as decisões registradas e
 
 | Comando                     | Efeito                                                         |
 | --------------------------- | -------------------------------------------------------------- |
-| `npm run type-check`        | Verificação de tipos de todos os workspaces.                   |
-| `npm run lint`              | oxlint e ESLint com correção automática.                       |
-| `npm run test:unit`         | Guarda editorial, integração da API e unidade do web.          |
-| `npm run test:e2e`          | Playwright local com API e SPA de desenvolvimento.             |
-| `npm run test:e2e:docker`   | Playwright na imagem oficial, com o aplicativo no ar.          |
-| `npm run test:pwa:docker`   | PWA contra o build de produção.                                |
-| `npm run test:db`           | Smoke test do schema no PostgreSQL do Compose.                 |
-| `npm run capturas:readme`   | Regenera as capturas do README em `docs/imagens/`.             |
+| `pnpm run type-check`        | Verificação de tipos de todos os workspaces.                   |
+| `pnpm run lint`              | oxlint e ESLint com correção automática.                       |
+| `pnpm run test:unit`         | Guarda editorial, integração da API e unidade do web.          |
+| `pnpm run test:e2e`          | Playwright local com API e SPA de desenvolvimento.             |
+| `pnpm run test:e2e:docker`   | Playwright na imagem oficial, com o aplicativo no ar.          |
+| `pnpm run test:pwa:docker`   | PWA contra o build de produção.                                |
+| `pnpm run test:db`           | Smoke test do schema no PostgreSQL do Compose.                 |
+| `pnpm run capturas:readme`   | Regenera as capturas do README em `docs/imagens/`.             |
 
 A convenção das suítes está em [docs/testes.md](docs/testes.md) e [tests/README.md](tests/README.md).
 

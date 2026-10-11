@@ -6,7 +6,7 @@
 
 version: 2
 updates:
-  # npm (workspaces com lockfile único na raiz; cobre apps/* e packages/*)
+  # npm (o Dependabot lê o pnpm-lock.yaml pelo ecossistema npm)
   - package-ecosystem: 'npm'
     directory: '/'
     schedule:

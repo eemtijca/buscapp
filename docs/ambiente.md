@@ -60,18 +60,18 @@ O `.env` alimenta o Compose; o entrypoint aguarda o PostgreSQL, aplica as migra�
 Com um PostgreSQL gerenciado e Node instalado:
 
 ```bash
-npm install
+pnpm install
 cp .env.example .env
-npm run db:migrate
-npm run dev:api
-VITE_API_URL=http://localhost:3001 npm run dev:web
+pnpm run db:migrate
+pnpm run dev:api
+VITE_API_URL=http://localhost:3001 pnpm run dev:web
 ```
 
 Para subir tudo em um processo único, que serve a SPA e a API na mesma origem:
 
 ```bash
-npm run build-only
-npm run build -w @buscapp/api
+pnpm run build-only
+pnpm --filter @buscapp/api run build
 node apps/api/dist/src/server.js
 ```
 
@@ -92,7 +92,7 @@ Detalhes em [deploy.md](deploy.md).
 ## Seed de desenvolvimento
 
 ```bash
-npm run seed -w @buscapp/api
+pnpm --filter @buscapp/api run seed
 ```
 
 O seed é idempotente e cria perfis, turmas, alunos, frequências e demais fixtures. Os códigos de redefinição de exemplo são gravados apenas como HMAC, coerentes com o fluxo real. Credenciais:

@@ -21,7 +21,7 @@ import('pg')
 done
 
 echo "Aplicando migrações..."
-npx prisma migrate deploy
+./node_modules/.bin/prisma migrate deploy
 
 echo "Preparando o papel de runtime..."
 node role.mjs

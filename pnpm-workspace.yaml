@@ -1,0 +1,19 @@
+# Monorepo pnpm: os pacotes que formam o workspace.
+packages:
+  - 'apps/*'
+  - 'packages/*'
+
+# allowBuilds autoriza apenas os scripts de instalação necessários ao build.
+allowBuilds:
+  '@parcel/watcher': true
+  '@prisma/engines': true
+  '@swc/core': true
+  esbuild: true
+  prisma: true
+  sharp: true
+  unrs-resolver: true
+  vue-demi: true
+
+# O npm executava pré-scripts (o pretest da API gera o cliente Prisma);
+# o pnpm os desliga por padrão desde a versão 7.
+enablePrePostScripts: true

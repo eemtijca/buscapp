@@ -5,14 +5,14 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 if ! docker compose ps --status running --format '{{.Name}}' | grep -q buscapp-postgres; then
-  echo "ERRO: o PostgreSQL do Compose não está em execução. Rode 'npm run compose:up'."
+  echo "ERRO: o PostgreSQL do Compose não está em execução. Rode 'pnpm run compose:up'."
   exit 1
 fi
 
 URL_BANCO="${DATABASE_URL_TESTE:-postgresql://buscapp:buscapp@127.0.0.1:5433/buscapp}"
 
 echo "==> Aplicando migrações pendentes"
-DATABASE_URL="$URL_BANCO" npx -w @buscapp/api prisma migrate deploy
+DATABASE_URL="$URL_BANCO" pnpm --filter @buscapp/api exec prisma migrate deploy
 
 echo "==> Conferindo objetos essenciais"
 docker compose exec -T postgres psql -U buscapp -d buscapp -v ON_ERROR_STOP=1 <<'SQL'

@@ -7,7 +7,7 @@ dotenv.config();
  * Configuração dedicada aos testes de PWA. Roda contra o build de produção
  * via `vite preview` (o service worker só existe no build, não no dev server).
  * A API roda em paralelo para os testes de dados offline.
- * Uso: npm run test:pwa
+ * Uso: pnpm run test:pwa
  */
 export default defineConfig({
   testDir: './tests/e2e',
@@ -36,13 +36,13 @@ export default defineConfig({
       ? undefined
       : [
           {
-            command: 'APP_ORIGINS=http://localhost:4173 npm run dev:api',
+            command: 'APP_ORIGINS=http://localhost:4173 pnpm run dev:api',
             url: 'http://localhost:3001/api/saude',
             reuseExistingServer: !process.env.CI,
             timeout: 120_000,
           },
           {
-            command: 'npm run preview -w @buscapp/web -- --port 4173 --strictPort',
+            command: 'pnpm --filter @buscapp/web run preview -- --port 4173 --strictPort',
             url: 'http://localhost:4173',
             reuseExistingServer: !process.env.CI,
             timeout: 30_000,

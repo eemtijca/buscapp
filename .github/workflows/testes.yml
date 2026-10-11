@@ -15,15 +15,17 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
+
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24
-          cache: npm
+          cache: pnpm
 
-      - run: npm ci
+      - run: pnpm install --frozen-lockfile
 
       - name: Gera o cliente Prisma
-        run: npm run db:generate
+        run: pnpm run db:generate
 
       # Sobe app + PostgreSQL, aplica as migrações no entrypoint e valida a saúde da API.
       - run: docker compose up -d --build
@@ -42,7 +44,7 @@ jobs:
           exit 1
 
       - name: Valida o runtime Vercel sem SPA
-        run: npm run test:runtime:vercel
+        run: pnpm run test:runtime:vercel
 
       # Integração da API e unidade do cache contra o PostgreSQL e o Redis do Compose.
       - name: Roda os testes de unidade e integração
@@ -53,7 +55,7 @@ jobs:
           MIGRATE_DATABASE_URL: postgresql://buscapp:buscapp@127.0.0.1:5433/buscapp
           REDIS_URL: redis://127.0.0.1:6379
           STORAGE_DRIVER: disco
-        run: npm run test:unit
+        run: pnpm run test:unit
 
       - name: Exibe os logs em caso de falha
         if: failure()

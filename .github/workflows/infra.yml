@@ -74,7 +74,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: /tmp/docker-cache
-          key: docker-buscapp-${{ hashFiles('package-lock.json', 'infra/docker/Dockerfile') }}
+          key: docker-buscapp-${{ hashFiles('pnpm-lock.yaml', 'infra/docker/Dockerfile') }}
 
       - name: Construir a imagem da aplicação
         run: |

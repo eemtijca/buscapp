@@ -7,8 +7,8 @@ Runbooks e resolução de problemas. Para configuração, ver [ambiente.md](ambi
 ### Subir e derrubar o Compose
 
 ```bash
-npm run compose:up     # build e start do app e do PostgreSQL, com migrações no start
-npm run compose:down   # derruba os containers
+pnpm run compose:up     # build e start do app e do PostgreSQL, com migrações no start
+pnpm run compose:down   # derruba os containers
 docker compose logs -f app
 ```
 
@@ -18,8 +18,8 @@ O app fica em `http://localhost:3000` e o PostgreSQL em `localhost:5433`. O volu
 
 ```bash
 docker compose down -v
-npm run compose:up
-npm run seed -w @buscapp/api
+pnpm run compose:up
+pnpm --filter @buscapp/api run seed
 ```
 
 O `-v` remove os volumes `pgdata` e `uploads`. Nunca use `-v` em ambiente com dados reais.
@@ -27,8 +27,8 @@ O `-v` remove os volumes `pgdata` e `uploads`. Nunca use `-v` em ambiente com da
 ### Migrações
 
 ```bash
-npm run db:migrate        # aplica no MIGRATE_DATABASE_URL
-npm run test:db           # valida o schema aplicado no Compose
+pnpm run db:migrate        # aplica no MIGRATE_DATABASE_URL
+pnpm run test:db           # valida o schema aplicado no Compose
 ```
 
 No container, as migrações rodam no entrypoint. Em produção, o workflow `migracoes.yml` aplica e define a senha do papel. Ver [banco.md](banco.md).
@@ -36,7 +36,7 @@ No container, as migrações rodam no entrypoint. Em produção, o workflow `mig
 ### Seed
 
 ```bash
-npm run seed -w @buscapp/api
+pnpm --filter @buscapp/api run seed
 ```
 
 Cria usuários e fixtures de desenvolvimento, de forma idempotente. O entrypoint do Compose executa o seed quando `SEED=true`.
@@ -92,4 +92,4 @@ Não existe backup automático. A exportação existente é a de dados do titula
 | Login falha com mensagem genérica        | Credenciais incorretas, conta inativa ou perfil pendente sem ativação.                                        |
 | SSE desconecta com frequência            | Verifique proxy e o limite de duração da função no provedor serverless; o EventSource reconecta sozinho.      |
 | Testes E2E falham no login               | Banco sem seed ou senhas de seed divergentes. Rode o seed e confira `SEED_SENHA_*`.                           |
-| Testes da API falham por conexão         | PostgreSQL do Compose fora do ar ou variáveis de teste ausentes. Suba o Compose e rode `npm run test:db`.     |
+| Testes da API falham por conexão         | PostgreSQL do Compose fora do ar ou variáveis de teste ausentes. Suba o Compose e rode `pnpm run test:db`.     |

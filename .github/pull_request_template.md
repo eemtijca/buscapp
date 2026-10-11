@@ -50,9 +50,9 @@ Informe se houve apoio de ferramentas de IA e como o resultado foi revisado. A r
 - [ ] Se precisei mexer depois da abertura, converti para rascunho com `gh pr ready --undo` e só marquei como pronto com tudo verde.
 - [ ] Segui o padrão de branches e commits do [CONTRIBUTING.md](../CONTRIBUTING.md).
 - [ ] Revisei o próprio diff antes de pedir revisão.
-- [ ] Rodei `npm run type-check`, `npm run lint` e `npm run test:texto`.
-- [ ] Rodei `npm run test:unit` com o Compose migrado.
-- [ ] Rodei `npm run test:e2e:docker` e `npm run test:pwa:docker` quando a mudança afeta a interface.
+- [ ] Rodei `pnpm run type-check`, `pnpm run lint` e `pnpm run test:texto`.
+- [ ] Rodei `pnpm run test:unit` com o Compose migrado.
+- [ ] Rodei `pnpm run test:e2e:docker` e `pnpm run test:pwa:docker` quando a mudança afeta a interface.
 - [ ] Atualizei a documentação correspondente e o CHANGELOG.md.
 - [ ] Revisei a segurança quando a mudança toca dependências, autenticação, permissões, workflows ou dados sensíveis.
 - [ ] Não incluí segredos nem dados reais de alunos, responsáveis ou professores.

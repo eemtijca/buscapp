@@ -17,12 +17,12 @@ Guia de desenvolvimento do BuscApp: como preparar o ambiente, abrir issues, prop
 Pré-requisitos: Node 20.19 ou superior (ou 22.12 ou superior) e Docker com Compose. Também é possível usar um PostgreSQL 15 ou superior próprio, conforme [docs/ambiente.md](docs/ambiente.md).
 
 ```bash
-npm install
+pnpm install
 cp .env.example .env  # preencha AUTH_PEPPER com pelo menos 32 caracteres
-npm run compose:up
-npm run seed -w @buscapp/api
-npm run dev:web       # SPA em http://localhost:5173
-npm run dev:api       # API em http://localhost:3001
+pnpm run compose:up
+pnpm --filter @buscapp/api run seed
+pnpm run dev:web       # SPA em http://localhost:5173
+pnpm run dev:api       # API em http://localhost:3001
 ```
 
 O Compose sobe a aplicação em `http://localhost:3000` com o PostgreSQL em `localhost:5433`. As credenciais de desenvolvimento estão em [docs/ambiente.md](docs/ambiente.md).
@@ -31,15 +31,15 @@ Comandos úteis na raiz:
 
 | Comando                               | Efeito                                         |
 | ------------------------------------- | ---------------------------------------------- |
-| `npm run compose:up`                  | Sobe a aplicação e o banco via Docker Compose. |
-| `npm run compose:down`                | Derruba o ambiente.                            |
-| `npm run dev:web` / `npm run dev:api` | Servidores de desenvolvimento isolados.        |
-| `npm run seed -w @buscapp/api`        | Semeia dados de desenvolvimento.               |
-| `npm run db:generate`                 | Regenera o cliente Prisma.                     |
-| `npm run db:migrate`                  | Aplica as migrações pendentes.                 |
-| `npm run test:texto`                  | Confere a convenção editorial do repositório.  |
-| `npm run format`                      | Roda o Prettier nos diretórios de código.      |
-| `npm run etiquetas:sync`              | Sincroniza as etiquetas com o catálogo do GitHub. |
+| `pnpm run compose:up`                  | Sobe a aplicação e o banco via Docker Compose. |
+| `pnpm run compose:down`                | Derruba o ambiente.                            |
+| `pnpm run dev:web` / `pnpm run dev:api` | Servidores de desenvolvimento isolados.        |
+| `pnpm --filter @buscapp/api run seed`        | Semeia dados de desenvolvimento.               |
+| `pnpm run db:generate`                 | Regenera o cliente Prisma.                     |
+| `pnpm run db:migrate`                  | Aplica as migrações pendentes.                 |
+| `pnpm run test:texto`                  | Confere a convenção editorial do repositório.  |
+| `pnpm run format`                      | Roda o Prettier nos diretórios de código.      |
+| `pnpm run etiquetas:sync`              | Sincroniza as etiquetas com o catálogo do GitHub. |
 
 Cada workspace declara no próprio `package.json` as ferramentas de build que seus scripts usam, para que o install filtrado por serviço funcione sem depender do hoisting do root.
 
@@ -94,7 +94,7 @@ Toda issue e todo pull request recebe ao menos uma etiqueta de tipo e uma de ár
 | Prioridade | `prioridade: alta`, `prioridade: media`, `prioridade: baixa`                                  | Urgência definida na triagem.                          |
 | Triagem    | `triagem`                                                                                     | Aguardando confirmação de tipo, área e prioridade.     |
 
-O catálogo fica em [.github/labels.json](../.github/labels.json) e é aplicado com `npm run etiquetas:sync`, que cria ou atualiza as etiquetas pelo GitHub CLI. O workflow `etiquetas.yml` aplica `area:` pelos caminhos alterados e o tipo pelo prefixo do título, e o check `validar` reprova pull requests sem etiqueta obrigatória ou com título fora do padrão Conventional Commits. Pull requests do tipo `docs` dispensam etiqueta de área.
+O catálogo fica em [.github/labels.json](../.github/labels.json) e é aplicado com `pnpm run etiquetas:sync`, que cria ou atualiza as etiquetas pelo GitHub CLI. O workflow `etiquetas.yml` aplica `area:` pelos caminhos alterados e o tipo pelo prefixo do título, e o check `validar` reprova pull requests sem etiqueta obrigatória ou com título fora do padrão Conventional Commits. Pull requests do tipo `docs` dispensam etiqueta de área.
 
 Antes de criar uma etiqueta nova, confirme que ela tem público, dono e regra automatizada no mesmo pull request, seja pelo catálogo, pelo mapeamento de caminhos ou pelo título. Etiqueta sem automação tende a não ser aplicada.
 
@@ -194,12 +194,12 @@ Quando a mudança tocar dependências, autenticação, permissões, workflows ou
 Antes de abrir, rode as verificações locais:
 
 ```bash
-npm run type-check
-npm run lint
-npm run test:texto
-npm run test:unit     # integração da API e unidade do web, com o Compose no ar
-npm run test:e2e:docker   # Playwright na imagem oficial, com o aplicativo no ar
-npm run test:pwa:docker   # PWA na imagem oficial, com o build de produção no ar
+pnpm run type-check
+pnpm run lint
+pnpm run test:texto
+pnpm run test:unit     # integração da API e unidade do web, com o Compose no ar
+pnpm run test:e2e:docker   # Playwright na imagem oficial, com o aplicativo no ar
+pnpm run test:pwa:docker   # PWA na imagem oficial, com o build de produção no ar
 ```
 
 Preencha o checklist do template de pull request. Ao alterar comportamento, atualize a documentação correspondente e os testes.
@@ -210,9 +210,9 @@ Toda mudança passa por revisão e pelos workflows do GitHub Actions:
 
 | Workflow         | Etapas                                                                                                             |
 | ---------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `qualidade.yml`  | `npm ci`, `type-check`, `lint` e `build-only` em pull requests e por dispatch manual.                              |
+| `qualidade.yml`  | `pnpm install --frozen-lockfile`, `type-check`, `lint` e `build-only` em pull requests e por dispatch manual.                              |
 | `etiquetas.yml`  | Aplica etiquetas de área e de tipo e valida o título e as etiquetas em pull requests fora de rascunho.            |
-| `testes.yml`     | Sobe o Compose, espera `/api/saude`, valida o runtime da Vercel e roda `npm run test:unit` com PostgreSQL e Redis. |
+| `testes.yml`     | Sobe o Compose, espera `/api/saude`, valida o runtime da Vercel e roda `pnpm run test:unit` com PostgreSQL e Redis. |
 | `codeql.yml`     | Análise CodeQL de javascript-typescript em push, pull request e agenda semanal.                                    |
 | `migracoes.yml`  | Aplica as migrações em produção e a senha do papel em push para `main` com mudanças no schema.                     |
 | `publicacao.yml` | Publica a imagem no GHCR ao liberar uma release estável e por dispatch manual.                                     |
@@ -240,11 +240,11 @@ Mescle por squash, em um único commit por pull request. Apague a branch após o
 
 ### Banco e migrações
 
-Crie migrações com `npx prisma migrate dev --name ajuste` em `apps/api`. Nunca edite uma migração aplicada; qualquer ajuste entra como migração nova. O detalhamento de papéis, RLS e retenção está em [docs/banco.md](docs/banco.md).
+Crie migrações com `pnpm exec prisma migrate dev --name ajuste` em `apps/api`. Nunca edite uma migração aplicada; qualquer ajuste entra como migração nova. O detalhamento de papéis, RLS e retenção está em [docs/banco.md](docs/banco.md).
 
 ### Formatação e análise estática
 
-O Prettier e o ESLint cuidam do estilo; o oxlint cobre regras adicionais. Rode `npm run lint` e `npm run format` antes de commitar. Não desative regras sem justificativa no código.
+O Prettier e o ESLint cuidam do estilo; o oxlint cobre regras adicionais. Rode `pnpm run lint` e `pnpm run format` antes de commitar. Não desative regras sem justificativa no código.
 
 ### Comentários no código
 
@@ -261,12 +261,12 @@ As suítes combinam integração da API, unidade do frontend, guarda editorial, 
 
 | Suíte                | Requisito                                                                                              | Comando                                         |
 | -------------------- | ------------------------------------------------------------------------------------------------------ | ----------------------------------------------- |
-| Unidade e integração | Compose migrado, Redis, `AUTH_PEPPER`, `DATABASE_URL`, `MIGRATE_DATABASE_URL` e `STORAGE_DRIVER=disco` | `npm run test:unit`                             |
-| Guarda editorial     | Nenhum                                                                                                 | `npm run test:texto`                            |
-| E2E (Playwright)     | Aplicativo no ar e banco com seed                                                                      | `npm run test:e2e:docker` ou `npm run test:e2e` |
-| PWA                  | Build de produção e API em `:3001`                                                                     | `npm run test:pwa:docker` ou `npm run test:pwa` |
-| Capturas do README   | Aplicativo no ar e banco com seed                                                                      | `npm run capturas:readme`                       |
-| Smoke do banco       | Compose no ar                                                                                          | `npm run test:db`                               |
+| Unidade e integração | Compose migrado, Redis, `AUTH_PEPPER`, `DATABASE_URL`, `MIGRATE_DATABASE_URL` e `STORAGE_DRIVER=disco` | `pnpm run test:unit`                             |
+| Guarda editorial     | Nenhum                                                                                                 | `pnpm run test:texto`                            |
+| E2E (Playwright)     | Aplicativo no ar e banco com seed                                                                      | `pnpm run test:e2e:docker` ou `pnpm run test:e2e` |
+| PWA                  | Build de produção e API em `:3001`                                                                     | `pnpm run test:pwa:docker` ou `pnpm run test:pwa` |
+| Capturas do README   | Aplicativo no ar e banco com seed                                                                      | `pnpm run capturas:readme`                       |
+| Smoke do banco       | Compose no ar                                                                                          | `pnpm run test:db`                               |
 
 Regras:
 
@@ -279,9 +279,9 @@ Regras:
 O Playwright roda primariamente na imagem oficial da Microsoft, sem instalar navegadores no host, com o aplicativo no ar:
 
 ```bash
-npm run test:e2e:docker            # todos os projetos
-npm run test:e2e:docker:chromium   # apenas o Chromium
-npm run test:pwa:docker            # PWA
+pnpm run test:e2e:docker            # todos os projetos
+pnpm run test:e2e:docker:chromium   # apenas o Chromium
+pnpm run test:pwa:docker            # PWA
 ```
 
 A variável `TEST_BASE_URL` aponta para o aplicativo (padrão `http://localhost:5173` na suíte principal e `http://localhost:4173` no PWA), e `tests/playwright-container.sh` aceita `PLAYWRIGHT_IMAGE`, `PLAYWRIGHT_DOCKER_NETWORK` e `PLAYWRIGHT_DOCKER_USER`. Mantenha a versão da imagem igual à do `@playwright/test` em `package.json`.
@@ -289,11 +289,11 @@ A variável `TEST_BASE_URL` aponta para o aplicativo (padrão `http://localhost:
 A instalação local de navegadores fica como alternativa:
 
 ```bash
-npm run test:e2e:install
-npm run test:e2e
+pnpm run test:e2e:install
+pnpm run test:e2e
 ```
 
-As capturas do README são geradas por `tests/e2e/imagens.spec.ts` e gravadas em `docs/imagens/`, com o aplicativo no ar e o seed aplicado. Regenera pelo comando `npm run capturas:readme` (ou `npm run capturas:readme:docker`, na imagem oficial). Os PNGs são versionados e não devem ser editados à mão; mudanças de interface pedem uma nova geração e revisão do diff.
+As capturas do README são geradas por `tests/e2e/imagens.spec.ts` e gravadas em `docs/imagens/`, com o aplicativo no ar e o seed aplicado. Regenera pelo comando `pnpm run capturas:readme` (ou `pnpm run capturas:readme:docker`, na imagem oficial). Os PNGs são versionados e não devem ser editados à mão; mudanças de interface pedem uma nova geração e revisão do diff.
 
 A CI cobre `type-check`, `lint`, `build` e os testes de unidade e integração; ponta a ponta e PWA rodam antes do pull request, como descrito acima.
 

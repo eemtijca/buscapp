@@ -39,14 +39,14 @@ O `vercel.json` da raiz define dois serviços no mesmo projeto:
     "web": {
       "root": "apps/web/",
       "framework": "vite",
-      "buildCommand": "npm run build-only",
+      "buildCommand": "pnpm run build-only",
       "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
     },
     "api": {
       "root": "apps/api/",
       "framework": "fastify",
       "entrypoint": "src/server.ts",
-      "buildCommand": "npm run build"
+      "buildCommand": "pnpm run build"
     }
   },
   "rewrites": [
@@ -71,7 +71,7 @@ Build no monorepo:
 
 - A Vercel instala dependências por serviço. Por isso o `prepare` do root é ignorado no ambiente da Vercel e cada workspace declara as ferramentas que os próprios scripts usam (`typescript`, `@types/node`, `vue-tsc` e `@tsconfig/node24` onde se aplica). No desenvolvimento local, o `prepare` continua compilando os contratos.
 - A API carrega `@fastify/static` somente quando `WEB_DIST` contém `index.html`. O perfil Vercel usa `/tmp/sem-spa` e não avalia o plugin CommonJS no startup da Function.
-- O `buildCommand` do serviço `api` roda `npm run build`, que compila `@buscapp/contratos`, gera o Prisma Client e transpila a API. O serviço `web` roda `npm run build-only`, que não depende dos contratos.
+- O `buildCommand` do serviço `api` roda `pnpm run build`, que compila `@buscapp/contratos`, gera o Prisma Client e transpila a API. O serviço `web` roda `pnpm run build-only`, que não depende dos contratos.
 - Não defina `NODE_ENV` manualmente no projeto da Vercel, para não omitir as devDependencies no install.
 - O preset `fastify` da Vercel ignora o `entrypoint` do `vercel.json` e detecta o servidor pelo nome do arquivo: `app`, `index` ou `server`, na raiz do serviço ou em `src/`, desde que o arquivo importe `fastify` e chame `listen()`. Por isso a API separa `src/aplicacao.ts` (fábrica Fastify, usada pelos testes) de `src/server.ts` (entrada do processo). Renomear esses arquivos ou mover a chamada de `listen()` para fora de `server.ts` faz a função subir sem handler e as requisições expirarem.
 
@@ -85,13 +85,13 @@ Limites do perfil serverless:
 Para desenvolver com a mesma topologia:
 
 ```bash
-npx vercel dev -L
+pnpm dlx vercel dev -L
 ```
 
 Com o Compose em execução, o smoke test reproduz o startup da Function sem SPA e valida CORS, login e o bloqueio de origens não confiáveis:
 
 ```bash
-npm run test:runtime:vercel
+pnpm run test:runtime:vercel
 ```
 
 ## Vercel SPA separada
@@ -103,7 +103,7 @@ Publique a SPA com root em `apps/web`, defina `VITE_API_URL` com o endereço da 
 ```bash
 cp .env.example .env
 # Preencha AUTH_PEPPER e, se quiser, SEED=true
-npm run compose:up
+pnpm run compose:up
 ```
 
 O entrypoint aguarda o PostgreSQL, aplica as migrações, define a senha do papel e inicia a API servindo a SPA. As imagens ficam no volume `uploads` no driver de disco.
@@ -113,18 +113,18 @@ O entrypoint aguarda o PostgreSQL, aplica as migrações, define a senha do pape
 Com um PostgreSQL gerenciado e Node instalado:
 
 ```bash
-npm install
+pnpm install
 cp .env.example .env
-npm run db:migrate
-npm run dev:api
-VITE_API_URL=http://localhost:3001 npm run dev:web
+pnpm run db:migrate
+pnpm run dev:api
+VITE_API_URL=http://localhost:3001 pnpm run dev:web
 ```
 
 Para um processo único que serve a SPA e a API na mesma origem:
 
 ```bash
-npm run build-only
-npm run build -w @buscapp/api
+pnpm run build-only
+pnpm --filter @buscapp/api run build
 node apps/api/dist/src/server.js
 ```
 

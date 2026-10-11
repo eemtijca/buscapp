@@ -28,4 +28,4 @@ if (!disponivel('zod') || !disponivel('typescript')) {
   process.exit(0);
 }
 
-execSync('npm run build -w @buscapp/contratos', { stdio: 'inherit' });
+execSync('pnpm --filter @buscapp/contratos run build', { stdio: 'inherit' });

@@ -28,14 +28,14 @@ Suítes de integração da API (Vitest), unidade do cache do frontend (Vitest), 
 Na raiz, com o Compose no ar:
 
 ```bash
-npm run test              # type-check, lint, build da SPA e testes de unidade
-npm run test:unit         # guarda editorial, integração da API e unidade do web (Vitest)
-npm run test:texto        # apenas a guarda editorial
-npm run test:e2e:docker   # Playwright na imagem oficial, com o aplicativo no ar
-npm run test:pwa:docker   # PWA na imagem oficial, com o preview no ar
-npm run test:e2e          # alternativa local, sobe API e SPA automaticamente
-npm run test:pwa          # alternativa local do PWA
-npm run test:db           # smoke test do schema
+pnpm run test              # type-check, lint, build da SPA e testes de unidade
+pnpm run test:unit         # guarda editorial, integração da API e unidade do web (Vitest)
+pnpm run test:texto        # apenas a guarda editorial
+pnpm run test:e2e:docker   # Playwright na imagem oficial, com o aplicativo no ar
+pnpm run test:pwa:docker   # PWA na imagem oficial, com o preview no ar
+pnpm run test:e2e          # alternativa local, sobe API e SPA automaticamente
+pnpm run test:pwa          # alternativa local do PWA
+pnpm run test:db           # smoke test do schema
 ```
 
 Os testes de API precisam de `DATABASE_URL` (papel restrito), `MIGRATE_DATABASE_URL` (dono, usado pelo cliente administrativo), `AUTH_PEPPER` e `STORAGE_DRIVER=disco`. Uma execução típica contra o PostgreSQL do Compose:
@@ -46,7 +46,7 @@ AUTH_PEPPER='dev-pepper-local-com-mais-de-16-caracteres' \
 DATABASE_URL='postgresql://buscapp_api:buscapp_api@127.0.0.1:5433/buscapp' \
 MIGRATE_DATABASE_URL='postgresql://buscapp:buscapp@127.0.0.1:5433/buscapp' \
 STORAGE_DRIVER=disco \
-npm run test:unit
+pnpm run test:unit
 ```
 
 Os testes E2E esperam o seed de desenvolvimento aplicado e usam `DATABASE_URL_ADMIN` (dono do schema) para fixtures e limpeza direta no banco; a API continua com `DATABASE_URL` no papel restrito. As senhas vêm de `SEED_SENHA_*`:
@@ -59,7 +59,7 @@ DATABASE_URL_ADMIN='postgresql://buscapp:buscapp@127.0.0.1:5433/buscapp' \
 MIGRATE_DATABASE_URL='postgresql://buscapp:buscapp@127.0.0.1:5433/buscapp' \
 STORAGE_DRIVER=disco \
 SEED_SENHA_ADMIN='Admin123!' SEED_SENHA_PROF='Prof123!' SEED_SENHA_RESP='Resp123!' \
-npm run test:e2e:docker
+pnpm run test:e2e:docker
 ```
 
 ### Capturas do README
@@ -67,8 +67,8 @@ npm run test:e2e:docker
 As imagens do README são geradas por `tests/e2e/imagens.spec.ts` e gravadas em `docs/imagens/`, com o aplicativo no ar e o seed de desenvolvimento aplicado. O spec usa os mesmos helpers dos testes E2E, captura o painel da gestão em 1440x900 no Chromium e a chamada do professor em 390x844 no Mobile Chrome, e não usa dados reais. Para regenerar:
 
 ```bash
-npm run capturas:readme         # Playwright local, com o aplicativo no ar
-npm run capturas:readme:docker  # imagem oficial da Microsoft, com o aplicativo no ar
+pnpm run capturas:readme         # Playwright local, com o aplicativo no ar
+pnpm run capturas:readme:docker  # imagem oficial da Microsoft, com o aplicativo no ar
 ```
 
 Os PNGs versionados em `docs/imagens/` não são editados à mão. Quando a interface mudar, regenere as capturas pelo comando acima e confira o diff das imagens no pull request.
@@ -77,8 +77,8 @@ Os PNGs versionados em `docs/imagens/` não são editados à mão. Quando a inte
 
 | Workflow         | Etapas                                                                                                 |
 | ---------------- | ------------------------------------------------------------------------------------------------------ |
-| `qualidade.yml`  | `npm ci`, `type-check`, `lint` e `build-only` em pull requests e por dispatch manual.                  |
-| `testes.yml`     | `docker compose up -d --build`, espera `/api/saude` e roda `npm run test:unit` com PostgreSQL e Redis. |
+| `qualidade.yml`  | `pnpm install --frozen-lockfile`, `type-check`, `lint` e `build-only` em pull requests e por dispatch manual.                  |
+| `testes.yml`     | `docker compose up -d --build`, espera `/api/saude` e roda `pnpm run test:unit` com PostgreSQL e Redis. |
 | `migracoes.yml`  | `prisma migrate deploy` e aplicação da senha do papel em push para `main` com mudanças no schema.      |
 | `publicacao.yml` | Build da imagem e push para o GHCR ao publicar um release estável, além de dispatch manual.            |
 | `codeql.yml`     | Análise CodeQL para javascript-typescript em push, pull request e agenda semanal.                      |

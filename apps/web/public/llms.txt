@@ -1,0 +1,25 @@
+# BuscApp
+
+> Plataforma de gestão escolar: frequência, ocorrências, justificativas de falta e comunicação entre professores, gestão e responsáveis.
+
+A API responde JSON sob `/api` e usa o envelope `{ erro: { codigo, mensagem, detalhes? } }`. Datas civis usam `yyyy-mm-dd`, listagens usam `limite` e `offset`, e frequências e mensagens aceitam `client_request_id` para chamadas idempotentes. As mutações exigem origem confiável e sessão por cookie.
+
+## Contrato e documentação
+
+- [Especificação OpenAPI 3.1](/api/docs/openapi.json): contrato completo com schemas, exemplos e respostas de erro por operação.
+- [Interface Swagger UI](/api/docs): navegação interativa; o "Try it out" reaproveita a sessão do navegador.
+- [Referência da API](https://github.com/eemtijca/buscapp/blob/main/docs/api.md): convenções, fluxos e catálogo de erros.
+- [Arquitetura](https://github.com/eemtijca/buscapp/blob/main/docs/arquitetura.md) e [regras por módulo](https://github.com/eemtijca/buscapp/blob/main/docs/modulos.md).
+
+## Orientação para agentes
+
+- Use a especificação OpenAPI como fonte da verdade para requisições, respostas e erros.
+- Faça login em `POST /api/auth/login` para obter o cookie de sessão antes das rotas privadas.
+- Confirme o estado do recurso antes de mutações e trate `409` como conflito de duplicidade ou de uso.
+- Não chame rotas destrutivas, como anonimização, expurgo e exclusões, sem pedido explícito.
+- Prefira `client_request_id` em frequências e mensagens para repetir chamadas com segurança.
+
+## Optional
+
+- [Modelo de dados](https://github.com/eemtijca/buscapp/blob/main/docs/modelo-de-dados.md): entidades, enums e glossário.
+- [Segurança](https://github.com/eemtijca/buscapp/blob/main/docs/seguranca.md): controles, decisões e lacunas conhecidas.

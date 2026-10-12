@@ -2,6 +2,23 @@
 
 Rotas HTTP da API Fastify. Todas ficam sob `/api` e respondem JSON, exceto o download de anexo e o stream SSE. Os contratos de entrada e saída ficam em `packages/contratos/src/`.
 
+## Documentação interativa
+
+A especificação OpenAPI 3.1 é gerada dos schemas Zod das rotas e publicada em `GET /api/docs/openapi.json`; a interface Swagger UI fica em `GET /api/docs`. Cada operação traz `operationId` estável, resumo, descrição, exemplos e as respostas de erro do envelope. O "Try it out" reaproveita o cookie da sessão do navegador: entre no aplicativo antes de testar.
+
+- Em desenvolvimento: `http://localhost:3001/api/docs` com `pnpm run dev:api`, ou `http://localhost:3000/api/docs` com o Compose.
+- Lint da especificação: `pnpm run openapi:lint`, com o ambiente no ar. O Redocly roda com `recommended-strict` e o ruleset fica em `redocly.yaml`.
+- Guarda de cobertura: `apps/api/src/nucleo/http/documentacao.test.ts` confere a especificação publicada, o mapa de respostas de erro, o esquema de segurança e o CSP por URL.
+
+> [!NOTE]
+> A interface da documentação recebe `'unsafe-eval'` apenas na própria rota, exigido pela validação do "Try it out" (ajv); o restante da API mantém `script-src 'self'`. Ver [ADR-016](adr/016-documentacao-interativa-e-csp.md).
+
+## Consumo por agentes de IA
+
+- A especificação em `/api/docs/openapi.json` é a fonte da verdade para modelos e agentes: operações, schemas, exemplos e erros.
+- O índice [../apps/web/public/llms.txt](../apps/web/public/llms.txt) é servido em `/llms.txt` e aponta o contrato, a referência e a orientação de uso seguro.
+- Os `operationId` em português são estáveis e viram nome de ferramenta em geradores de SDK e de servidores MCP.
+
 ## Convenções
 
 - **Sessão:** rotas privadas resolvem o usuário pelo cookie `buscapp_sessao` (HttpOnly). Sem sessão válida respondem `401` com `{ erro: { codigo: 'nao_autenticado', mensagem } }`. A exceção é `GET /api/auth/me`, uma sonda que sempre responde `200` com `perfil: null` quando não há sessão, para o frontend descobrir o estado sem gerar erro. O frontend usa `credentials: 'include'`.

@@ -54,6 +54,9 @@ export const rotasOcorrencias: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['ocorrencias'],
         summary: 'Lista as ocorrências visíveis para o usuário autenticado',
+        operationId: 'listarOcorrencias',
+        description:
+          'Lista as ocorrências visíveis para o perfil com filtros de aluno, status, tipo e pendência de presença do responsável.',
         querystring: listarOcorrenciasSchema,
         response: { 200: z.object({ ocorrencias: z.array(ocorrenciaSchema) }) },
       },
@@ -68,6 +71,9 @@ export const rotasOcorrencias: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['ocorrencias'],
         summary: 'Retorna uma ocorrência visível para o usuário autenticado',
+        operationId: 'obterOcorrencia',
+        description:
+          'Retorna uma ocorrência visível para o perfil; registros fora do escopo respondem 404.',
         params: parametrosOcorrencia,
         response: { 200: z.object({ ocorrencia: ocorrenciaSchema }) },
       },
@@ -82,6 +88,9 @@ export const rotasOcorrencias: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['ocorrencias'],
         summary: 'Registra uma ocorrência para um aluno visível',
+        operationId: 'criarOcorrencia',
+        description:
+          'Registra uma ocorrência para um aluno visível; tipo e tags de comportamento são validados.',
         body: criarOcorrenciaSchema,
         response: { 201: z.object({ ocorrencia: ocorrenciaSchema }) },
       },
@@ -100,6 +109,9 @@ export const rotasOcorrencias: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['ocorrencias'],
         summary: 'Atualiza status e presença do responsável de uma ocorrência',
+        operationId: 'atualizarOcorrencia',
+        description:
+          'Atualiza status e presença do responsável; a confirmação pode disparar notificações.',
         params: parametrosOcorrencia,
         body: atualizarOcorrenciaSchema,
         response: { 200: z.object({ ocorrencia: ocorrenciaSchema }) },
@@ -115,6 +127,9 @@ export const rotasOcorrencias: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['ocorrencias'],
         summary: 'Lista os registros de comportamento visíveis para o usuário autenticado',
+        operationId: 'listarRegistrosComportamento',
+        description:
+          'Lista os registros de comportamento de um aluno visível no intervalo de datas informado.',
         querystring: listarRegistrosComportamentoSchema,
         response: { 200: z.object({ registros: z.array(registroComportamentoSchema) }) },
       },
@@ -131,6 +146,8 @@ export const rotasOcorrencias: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['ocorrencias'],
         summary: 'Registra um comportamento para um aluno da turma do professor',
+        operationId: 'criarRegistroComportamento',
+        description: 'Registra um comportamento com as tags do catálogo para um aluno visível.',
         body: criarRegistroComportamentoSchema,
         response: { 201: z.object({ registro: registroComportamentoSchema }) },
       },

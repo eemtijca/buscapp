@@ -60,6 +60,9 @@ export const rotasEstrutura: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['estrutura'],
         summary: 'Lista as turmas visíveis para o usuário autenticado',
+        operationId: 'listarTurmas',
+        description:
+          'Lista as turmas visíveis para o perfil, com filtros por ano letivo e situação.',
         querystring: listarTurmasSchema,
         response: { 200: z.object({ turmas: z.array(turmaSchema) }) },
       },
@@ -74,6 +77,8 @@ export const rotasEstrutura: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['estrutura'],
         summary: 'Cadastra uma turma no ano letivo informado',
+        operationId: 'criarTurma',
+        description: 'Cadastra uma turma vinculada a um ano letivo existente.',
         body: criarTurmaSchema,
         response: { 201: z.object({ turma: turmaSchema }) },
       },
@@ -92,6 +97,8 @@ export const rotasEstrutura: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['estrutura'],
         summary: 'Atualiza série, letra, capacidade e situação de uma turma',
+        operationId: 'atualizarTurma',
+        description: 'Atualiza série, identificação, capacidade e situação da turma.',
         params: parametrosPorId,
         body: atualizarTurmaSchema,
         response: { 200: z.object({ turma: turmaSchema }) },
@@ -107,6 +114,8 @@ export const rotasEstrutura: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['estrutura'],
         summary: 'Ativa ou inativa uma turma',
+        operationId: 'atualizarStatusTurma',
+        description: 'Ativa ou inativa a turma; turmas com dados vinculados podem responder 409.',
         params: parametrosPorId,
         body: statusGenericoSchema,
         response: { 200: z.object({ turma: turmaSchema }) },
@@ -126,6 +135,8 @@ export const rotasEstrutura: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['estrutura'],
         summary: 'Lista as disciplinas cadastradas',
+        operationId: 'listarDisciplinas',
+        description: 'Lista as disciplinas cadastradas.',
         querystring: listarDisciplinasSchema,
         response: { 200: z.object({ disciplinas: z.array(disciplinaSchema) }) },
       },
@@ -140,6 +151,8 @@ export const rotasEstrutura: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['estrutura'],
         summary: 'Cadastra uma disciplina',
+        operationId: 'criarDisciplina',
+        description: 'Cadastra uma disciplina para uso nas atribuições e ocorrências.',
         body: criarDisciplinaSchema,
         response: { 201: z.object({ disciplina: disciplinaSchema }) },
       },
@@ -158,6 +171,8 @@ export const rotasEstrutura: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['estrutura'],
         summary: 'Atualiza uma disciplina',
+        operationId: 'atualizarDisciplina',
+        description: 'Atualiza nome e situação da disciplina.',
         params: parametrosPorId,
         body: atualizarDisciplinaSchema,
         response: { 200: z.object({ disciplina: disciplinaSchema }) },
@@ -175,6 +190,8 @@ export const rotasEstrutura: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['estrutura'],
         summary: 'Ativa ou inativa uma disciplina',
+        operationId: 'atualizarStatusDisciplina',
+        description: 'Ativa ou inativa a disciplina; disciplinas em uso podem responder 409.',
         params: parametrosPorId,
         body: statusGenericoSchema,
         response: { 200: z.object({ disciplina: disciplinaSchema }) },
@@ -194,6 +211,8 @@ export const rotasEstrutura: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['estrutura'],
         summary: 'Lista as atribuições de professores com seus vínculos',
+        operationId: 'listarAtribuicoes',
+        description: 'Lista as atribuições de professores com os vínculos de turma e disciplina.',
         querystring: listarAtribuicoesSchema,
         response: { 200: z.object({ atribuicoes: z.array(atribuicaoProfessorSchema) }) },
       },
@@ -208,6 +227,8 @@ export const rotasEstrutura: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['estrutura'],
         summary: 'Cria uma atribuição de professor',
+        operationId: 'criarAtribuicao',
+        description: 'Cria a atribuição de um professor a uma turma e disciplina.',
         body: criarAtribuicaoSchema,
         response: { 201: z.object({ atribuicao: atribuicaoProfessorSchema }) },
       },
@@ -226,6 +247,8 @@ export const rotasEstrutura: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['estrutura'],
         summary: 'Atualiza uma atribuição de professor',
+        operationId: 'atualizarAtribuicao',
+        description: 'Atualiza a atribuição de professor.',
         params: parametrosPorId,
         body: atualizarAtribuicaoSchema,
         response: { 200: z.object({ atribuicao: atribuicaoProfessorSchema }) },
@@ -243,6 +266,8 @@ export const rotasEstrutura: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['estrutura'],
         summary: 'Ativa ou encerra uma atribuição de professor',
+        operationId: 'atualizarStatusAtribuicao',
+        description: 'Ativa ou encerra a atribuição; o encerramento mantém o histórico.',
         params: parametrosPorId,
         body: statusGenericoSchema,
         response: { 200: z.object({ atribuicao: atribuicaoProfessorSchema }) },
@@ -262,6 +287,8 @@ export const rotasEstrutura: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['estrutura'],
         summary: 'Lista os anos letivos do mais recente para o mais antigo',
+        operationId: 'listarAnosLetivos',
+        description: 'Lista os anos letivos do mais recente para o mais antigo, sem paginação.',
         response: { 200: z.object({ anos_letivos: z.array(anoLetivoSchema) }) },
       },
     },
@@ -275,6 +302,8 @@ export const rotasEstrutura: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['estrutura'],
         summary: 'Cadastra um ano letivo como planejado',
+        operationId: 'criarAnoLetivo',
+        description: 'Cadastra um ano letivo planejado; anos repetidos respondem 409.',
         body: criarAnoLetivoSchema,
         response: { 201: z.object({ ano_letivo: anoLetivoSchema }) },
       },
@@ -293,6 +322,8 @@ export const rotasEstrutura: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['estrutura'],
         summary: 'Atualiza ano e período de um ano letivo',
+        operationId: 'atualizarAnoLetivo',
+        description: 'Atualiza ano e período do ano letivo.',
         params: parametrosPorId,
         body: atualizarAnoLetivoSchema,
         response: { 200: z.object({ ano_letivo: anoLetivoSchema }) },
@@ -310,6 +341,9 @@ export const rotasEstrutura: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['estrutura'],
         summary: 'Realiza a virada de ano: arquiva o vigente e ativa o ano alvo',
+        operationId: 'ativarAnoLetivo',
+        description:
+          'Executa a virada de ano: arquiva o vigente e ativa o ano alvo em uma transação, com auditoria.',
         params: parametrosPorId,
         response: { 200: z.object({ ano_letivo: anoLetivoSchema }) },
       },
@@ -328,6 +362,8 @@ export const rotasEstrutura: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['estrutura'],
         summary: 'Lista as enturmações visíveis para o usuário autenticado',
+        operationId: 'listarEnturmacoes',
+        description: 'Lista as enturmações visíveis para o perfil.',
         querystring: listarEnturmacoesSchema,
         response: { 200: z.object({ enturmacoes: z.array(enturmacaoSchema) }) },
       },
@@ -344,6 +380,8 @@ export const rotasEstrutura: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['estrutura'],
         summary: 'Enturma o aluno, encerrando a matrícula anterior quando houver',
+        operationId: 'criarEnturmacao',
+        description: 'Enturma o aluno na turma; a matrícula anterior é encerrada quando houver.',
         body: criarEnturmacaoSchema,
         response: { 201: z.object({ enturmacao: enturmacaoSchema }) },
       },
@@ -362,6 +400,8 @@ export const rotasEstrutura: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['estrutura'],
         summary: 'Atualiza turma, status e encerramento de uma enturmação',
+        operationId: 'atualizarEnturmacao',
+        description: 'Atualiza turma, situação e encerramento da enturmação.',
         params: parametrosPorId,
         body: atualizarEnturmacaoSchema,
         response: { 200: z.object({ enturmacao: enturmacaoSchema }) },

@@ -22,6 +22,9 @@ export const rotasTarefas: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['tarefas'],
         summary: 'Aplica a retenção de anexos, códigos, sessões e contadores (agendador)',
+        operationId: 'executarExpurgo',
+        description:
+          'Aplica a retenção de anexos, códigos, sessões e contadores. Exige o segredo do agendador no cabeçalho Authorization.',
         response: { 200: expurgoRespostaSchema },
       },
     },

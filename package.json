@@ -26,6 +26,7 @@
     "test:pwa:run": "playwright test --config=playwright.pwa.config.ts",
     "test:pwa:docker": "TEST_BASE_URL=http://localhost:4173 bash tests/playwright-container.sh --config=playwright.pwa.config.ts --project=chromium",
     "test:db": "bash scripts/test-db.sh",
+    "openapi:lint": "node scripts/verificar-openapi.mjs && redocly lint apps/api/openapi.json",
     "test:runtime:vercel": "node scripts/verificar-runtime-vercel.mjs",
     "test:typecheck": "run-s type-check",
     "test:lint": "run-s lint:*",
@@ -53,6 +54,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.64.0",
+    "@redocly/cli": "^2.62.1",
     "@tsconfig/node24": "^24.0.5",
     "@types/node": "^24.19.1",
     "@types/pg": "^8.23.1",

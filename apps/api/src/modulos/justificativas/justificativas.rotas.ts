@@ -36,6 +36,9 @@ export const rotasJustificativas: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['justificativas'],
         summary: 'Lista as justificativas visíveis para o usuário autenticado',
+        operationId: 'listarJustificativas',
+        description:
+          'Lista as justificativas visíveis para o perfil com filtros de status, aluno e intervalo de datas.',
         querystring: listarJustificativasSchema,
         response: { 200: z.object({ justificativas: z.array(justificativaSchema) }) },
       },
@@ -50,6 +53,9 @@ export const rotasJustificativas: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['justificativas'],
         summary: 'Retorna uma justificativa visível para o usuário autenticado',
+        operationId: 'obterJustificativa',
+        description:
+          'Retorna uma justificativa visível para o perfil; registros fora do escopo respondem 404.',
         params: parametrosJustificativa,
         response: { 200: z.object({ justificativa: justificativaSchema }) },
       },
@@ -64,6 +70,9 @@ export const rotasJustificativas: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['justificativas'],
         summary: 'Envia uma justificativa de falta (responsável ou gestão)',
+        operationId: 'criarJustificativa',
+        description:
+          'Envia uma justificativa de falta com anexos opcionais, pela gestão ou pelo responsável.',
         body: criarJustificativaSchema,
         response: { 201: z.object({ justificativa: justificativaSchema }) },
       },
@@ -82,6 +91,9 @@ export const rotasJustificativas: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['justificativas'],
         summary: 'Avalia (aceita ou recusa) uma justificativa pendente',
+        operationId: 'avaliarJustificativa',
+        description:
+          'Aceita ou recusa a justificativa pendente e aplica a auto-justificativa das faltas cobertas. Avaliação repetida responde 409.',
         params: parametrosJustificativa,
         body: avaliarJustificativaSchema,
         response: { 200: z.object({ justificativa: justificativaSchema }) },

@@ -28,6 +28,10 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 - Workflow `infra.yml` para formatar, validar e aplicar o Terraform no Floci.
 - Documento `docs/implantacao-nuvem.md` e ADR-015 sobre a implantação multicloud.
 - Workflow `expurgo.yml` que dispara a purga de retenção diária com `CRON_SECRET`.
+- Documentação interativa da API em `GET /api/docs`, com especificação OpenAPI 3.1 gerada dos schemas Zod das rotas, `operationId` e descrição em cada operação, respostas de erro com exemplos do envelope e esquema de segurança por cookie.
+- Lint da especificação OpenAPI com Redocly CLI (`pnpm run openapi:lint`) no workflow de testes, com o ruleset em `redocly.yaml`.
+- Índice `apps/web/public/llms.txt` para agentes de IA, com o contrato, a referência e a orientação de uso seguro.
+- ADR-016 sobre a documentação interativa e o CSP por URL.
 
 ### Corrigido
 
@@ -40,3 +44,6 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 - Textos de interface, mensagens e documentação ajustados à convenção editorial, com pluralização correta e sem segunda pessoa.
 - Nomes exibidos dos workflows alinhados ao padrão em português.
 - Referências da arquitetura e dos testes atualizadas.
+- CSP passa a ser aplicado por URL: `script-src 'self'` em toda a API e `'unsafe-eval'` apenas nas rotas da documentação interativa, exigido pela validação do "Try it out".
+- Documentação interativa degrada para uma página mínima em runtimes sem `require` de módulos ESM, quando o Swagger UI não pode ser carregado; a especificação segue publicada.
+- Contrato de auditoria usa `z.unknown()` sem `nullable()` extra, que gerava um `anyOf` vazio no JSON Schema.

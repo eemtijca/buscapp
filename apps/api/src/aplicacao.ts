@@ -13,6 +13,11 @@ import {
 } from 'fastify-type-provider-zod';
 import { ambiente, deveAvisarTrustProxy, origemAutorizada } from './ambiente.js';
 import { contextoBanco } from './nucleo/banco/contexto.js';
+import {
+  politicaDeSeguranca,
+  registrarDocumentacao,
+  registrarInterfaceDocumentacao,
+} from './nucleo/http/documentacao.js';
 import { registrarCacheHttp } from './nucleo/http/etag.js';
 import { ErroHttp } from './nucleo/http/erros.js';
 import { encerrarBarramento, iniciarBarramento } from './nucleo/eventos/barramento.js';
@@ -155,26 +160,19 @@ export async function construirApp(): Promise<FastifyInstance> {
     frameguard: { action: 'deny' },
     referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
     hsts: { maxAge: 31536000, includeSubDomains: true },
-    contentSecurityPolicy: {
-      useDefaults: false,
-      directives: {
-        'default-src': ["'self'"],
-        'script-src': ["'self'"],
-        'style-src': ["'self'", "'unsafe-inline'"],
-        'img-src': ["'self'", 'data:', 'blob:'],
-        'font-src': ["'self'"],
-        'connect-src': ["'self'"],
-        'object-src': ["'none'"],
-        'base-uri': ["'self'"],
-        'form-action': ["'self'"],
-        'frame-ancestors': ["'none'"],
-        // O upgrade só faz sentido em HTTPS de produção; em desenvolvimento quebraria o localhost.
-        ...(ambiente.NODE_ENV === 'production'
-          ? { 'upgrade-insecure-requests': [] as string[] }
-          : {}),
-      },
-    },
+    // O CSP é aplicado por URL logo abaixo; a documentação interativa precisa
+    // de `unsafe-eval` para a validação do "Try it out" e o restante não.
+    contentSecurityPolicy: false,
   });
+
+  app.addHook('onSend', (pedido, resposta, payload, concluir) => {
+    // Rotas podem fixar o próprio CSP (o download de anexo usa `sandbox`).
+    if (!resposta.getHeader('content-security-policy')) {
+      resposta.header('content-security-policy', politicaDeSeguranca(pedido.url));
+    }
+    concluir(null, payload);
+  });
+
   await app.register(cors, {
     origin: (origem, concluir) => {
       concluir(null, origem && origemAutorizada(origem) ? origem : false);
@@ -203,6 +201,8 @@ export async function construirApp(): Promise<FastifyInstance> {
       },
     }),
   });
+  // A especificação precisa ser registrada antes das rotas para capturá-las.
+  await registrarDocumentacao(app);
   await app.register(rotasSaude);
   await app.register(rotasEventos);
   await app.register(rotasAuth);
@@ -221,6 +221,8 @@ export async function construirApp(): Promise<FastifyInstance> {
   await app.register(rotasConfiguracoes);
   await app.register(rotasLgpd);
   await app.register(rotasTarefas);
+
+  await registrarInterfaceDocumentacao(app);
 
   const distWeb = path.resolve(process.cwd(), ambiente.WEB_DIST);
   if (existsSync(path.join(distWeb, 'index.html'))) {

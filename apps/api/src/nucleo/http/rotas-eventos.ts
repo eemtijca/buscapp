@@ -11,6 +11,9 @@ export const rotasEventos: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['eventos'],
         summary: 'Stream SSE de invalidação para atualização em tempo real',
+        operationId: 'assinarEventos',
+        description:
+          'Abre um stream SSE com eventos de invalidação de dados. O cliente revalida os recursos indicados no evento e reconecta quando a conexão cair.',
       },
     },
     async (pedido, resposta) => {

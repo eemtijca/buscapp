@@ -22,6 +22,8 @@ export const rotasNotificacoes: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['notificacoes'],
         summary: 'Lista as notificações do usuário autenticado',
+        operationId: 'listarNotificacoes',
+        description: 'Lista as notificações do usuário autenticado com filtro de lidas e limite.',
         querystring: listarNotificacoesSchema,
         response: { 200: listarNotificacoesRespostaSchema },
       },
@@ -36,6 +38,8 @@ export const rotasNotificacoes: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['notificacoes'],
         summary: 'Marca todas as notificações não lidas do usuário como lidas',
+        operationId: 'marcarNotificacoesLidas',
+        description: 'Marca todas as notificações não lidas do usuário como lidas.',
         response: { 200: notificacoesAtualizadasSchema },
       },
     },
@@ -49,6 +53,8 @@ export const rotasNotificacoes: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['notificacoes'],
         summary: 'Marca como lidas as notificações de mensagem de uma conversa',
+        operationId: 'marcarNotificacoesDaConversa',
+        description: 'Marca como lidas as notificações de mensagem de uma conversa.',
         params: parametrosConversa,
         response: { 200: notificacoesAtualizadasSchema },
       },
@@ -63,6 +69,9 @@ export const rotasNotificacoes: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['notificacoes'],
         summary: 'Marca uma notificação do usuário como lida',
+        operationId: 'marcarNotificacaoLida',
+        description:
+          'Marca uma notificação do usuário como lida; notificação inexistente responde 404.',
         params: parametrosNotificacao,
         response: { 200: notificacaoRespostaSchema },
       },
@@ -79,6 +88,8 @@ export const rotasNotificacoes: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['notificacoes'],
         summary: 'Remove todas as notificações do usuário autenticado',
+        operationId: 'removerNotificacoes',
+        description: 'Remove todas as notificações do usuário autenticado.',
         response: { 200: notificacoesRemovidasSchema },
       },
     },

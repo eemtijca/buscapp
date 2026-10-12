@@ -38,7 +38,7 @@ As ameaças consideradas incluem enumeração de contas, força bruta de senhas 
 - CORS com credenciais restrito a `APP_URL` e `APP_ORIGINS`.
 - Não há token CSRF explícito. A proteção é a verificação de `Origin` em métodos mutantes sob `/api` (403 quando não confere), somada ao cookie `SameSite=Lax` e ao CORS restrito. `COOKIE_SAMESITE=none` remove a proteção principal e exige `Secure`. Ver [ADR-012](adr/012-cabecalhos-de-seguranca-e-origem.md).
 - `@fastify/rate-limit` com store no Postgres limita login (10/min, com chave por IP e email), solicitação de código (3/5 min) e redefinição de senha (5/15 min), além do upload de anexos (20/h). O bloqueio por email no fluxo de código complementa a defesa.
-- `@fastify/helmet` aplica CSP, HSTS, `X-Content-Type-Options`, `X-Frame-Options` e `Referrer-Policy`; a SPA recebe os mesmos cabeçalhos pelo `vercel.json`. Ver [ADR-012](adr/012-cabecalhos-de-seguranca-e-origem.md).
+- `@fastify/helmet` aplica HSTS, `X-Content-Type-Options`, `X-Frame-Options` e `Referrer-Policy`. O CSP é gerado por URL em `apps/api/src/nucleo/http/documentacao.ts`: `script-src 'self'` em toda a API, com `'unsafe-eval'` restrito à rota `/api/docs`, exigido pela validação do "Try it out" do Swagger UI. A SPA recebe a política estrita pelo `vercel.json`. Ver [ADR-012](adr/012-cabecalhos-de-seguranca-e-origem.md) e [ADR-016](adr/016-documentacao-interativa-e-csp.md).
 - `TRUST_PROXY` controla o uso de `X-Forwarded-For` para o IP real do cliente, necessário atrás de proxy.
 
 ## Dados e arquivos
@@ -77,6 +77,7 @@ As ameaças consideradas incluem enumeração de contas, força bruta de senhas 
 - **Retenção:** expurgo agendado de anexos, códigos, sessões encerradas e contadores de rate limiting.
 - **Sessão expirada no cliente:** requisições autenticadas que recebem 401 recarregam a SPA no login com `?destino=` (aceito apenas se for caminho interno), voltando à rota de origem após autenticar. O cliente HTTP usa timeout de 15 s, repetição com backoff apenas em GET (até 3 tentativas) e não repete métodos com efeito.
 - **Metadados de imagem:** no envio, imagens são regravadas no servidor com `sharp` (orientação aplicada, lado máximo de 1600 px) e sem EXIF, removendo geolocalização e dados de câmera. Em falha, o original é mantido e o caso é registrado no log.
+- **Documentação interativa:** a especificação OpenAPI 3.1 em `/api/docs/openapi.json` é gerada dos schemas Zod das rotas, sem expor detalhes internos; o CSP estrito permanece em toda a API e o `'unsafe-eval'` fica restrito à rota da interface, exigido pelo "Try it out". Ver [ADR-016](adr/016-documentacao-interativa-e-csp.md).
 
 ## Resposta a incidentes
 

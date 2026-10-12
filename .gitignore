@@ -15,6 +15,7 @@ coverage
 *.local
 uploads
 apps/api/generated
+apps/api/openapi.json
 
 # Editor directories and files
 .vscode/*

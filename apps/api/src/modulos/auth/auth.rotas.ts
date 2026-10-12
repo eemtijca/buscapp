@@ -62,6 +62,9 @@ export const rotasAuth: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['auth'],
         summary: 'Autentica com email e senha e cria a sessão',
+        operationId: 'iniciarSessao',
+        description:
+          'Confere email e senha, aplica o limite de tentativas e grava o cookie de sessão. Use lembrar para estender a validade do cookie.',
         body: loginSchema,
         response: {
           200: z.object({ perfil: perfilAutenticadoSchema }),
@@ -113,6 +116,9 @@ export const rotasAuth: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['auth'],
         summary: 'Revoga a sessão atual',
+        operationId: 'encerrarSessao',
+        description:
+          'Revoga a sessão do cookie atual e limpa o cookie. Sem sessão válida a resposta continua 200.',
         response: { 200: respostaOkSchema },
       },
     },
@@ -141,6 +147,9 @@ export const rotasAuth: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['auth'],
         summary: 'Lista as sessões ativas do usuário autenticado',
+        operationId: 'listarSessoes',
+        description:
+          'Lista as sessões ativas do usuário autenticado, identificando a sessão atual.',
         response: { 200: listarSessoesRespostaSchema },
       },
     },
@@ -157,6 +166,9 @@ export const rotasAuth: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['auth'],
         summary: 'Revoga as outras sessões ativas, preservando a atual',
+        operationId: 'revogarOutrasSessoes',
+        description:
+          'Revoga todas as sessões do usuário exceto a atual, útil após suspeita de acesso indevido.',
         response: { 200: revogarSessoesRespostaSchema },
       },
     },
@@ -180,6 +192,9 @@ export const rotasAuth: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['auth'],
         summary: 'Sonda a sessão atual; perfil é null quando não autenticado',
+        operationId: 'obterPerfilAtual',
+        description:
+          'Sonda a sessão atual sem gerar erro: o perfil vem null quando não há sessão válida. Use para descobrir o estado sem tratar 401.',
         response: { 200: z.object({ perfil: perfilAutenticadoSchema.nullable() }) },
       },
     },
@@ -197,6 +212,9 @@ export const rotasAuth: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['auth'],
         summary: 'Registra a solicitação de código e notifica a gestão',
+        operationId: 'solicitarCodigoRedefinicao',
+        description:
+          'Registra a solicitação de código de redefinição na fila da gestão, sem revelar se o email existe. Limite de 3 solicitações a cada 5 minutos por IP e email.',
         body: solicitarCodigoSchema,
         response: { 200: respostaOkSchema },
       },
@@ -216,6 +234,9 @@ export const rotasAuth: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['auth'],
         summary: 'Redefine a senha com código de 6 dígitos',
+        operationId: 'redefinirSenhaComCodigo',
+        description:
+          'Define a nova senha com o código informado pela gestão. A senha precisa ter 8 caracteres ou mais, com maiúscula, minúscula, número e símbolo.',
         body: redefinirSenhaSchema,
         response: { 200: respostaOkSchema },
       },

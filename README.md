@@ -229,7 +229,7 @@ Em uma issue no GitHub. Vulnerabilidades seguem o [SECURITY.md](SECURITY.md).
 | [docs/ambiente.md](docs/ambiente.md)               | Variáveis de ambiente e execução local               |
 | [docs/arquitetura.md](docs/arquitetura.md)         | Camadas, fluxo de requisição e organização do código |
 | [docs/banco.md](docs/banco.md)                     | Migrações, papéis, RLS e retenção                    |
-| [docs/api.md](docs/api.md)                         | Referência das rotas HTTP                            |
+| [docs/api.md](docs/api.md)                         | Referência das rotas HTTP e Swagger UI em /api/docs  |
 | [docs/modelo-de-dados.md](docs/modelo-de-dados.md) | Entidades, enums e glossário                         |
 | [docs/modulos.md](docs/modulos.md)                 | Regras de cada módulo e módulos de acesso            |
 | [docs/interface.md](docs/interface.md)             | Design system, rotas, componentes e acessibilidade   |

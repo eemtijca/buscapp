@@ -20,6 +20,9 @@ export const rotasLgpd: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['lgpd'],
         summary: 'Exporta os dados pessoais do aluno (direito de acesso)',
+        operationId: 'exportarTitular',
+        description:
+          'Exporta os dados pessoais do aluno para atender ao direito de acesso, restrito à gestão.',
         params: parametrosAluno,
         response: { 200: exportacaoTitularSchema },
       },
@@ -34,6 +37,9 @@ export const rotasLgpd: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['lgpd'],
         summary: 'Anonimiza os dados pessoais do aluno e remove os anexos (irreversível)',
+        operationId: 'anonimizarTitular',
+        description:
+          'Anonimiza os dados pessoais do aluno e remove os anexos. Ação irreversível, restrita à gestão e registrada em auditoria.',
         params: parametrosAluno,
         body: anonimizarAlunoSchema,
         response: { 200: anonimizacaoRespostaSchema },

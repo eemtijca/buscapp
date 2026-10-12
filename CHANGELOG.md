@@ -42,6 +42,10 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 - Compose define `APP_URL` como `http://localhost:3000`, corrigindo o login e as mutações na mesma origem servida pelo contêiner.
 
+- Busca de alunos passa a consultar o servidor, em vez de filtrar apenas a página carregada, e encontra alunos fora das primeiras matrículas.
+
+- O chat carrega a conversa aberta por link direto mesmo quando ela está fora da primeira página da lista.
+
 ### Modificado
 
 - Monorepo migrado de npm workspaces para pnpm, com `packageManager` fixado, `pnpm-lock.yaml` versionado, `pnpm-workspace.yaml` para os pacotes e scripts de build, `workspace:*` nos contratos, Dockerfile e workflows ajustados e `pnpm exec`/`pnpm dlx` no lugar de `npx`.

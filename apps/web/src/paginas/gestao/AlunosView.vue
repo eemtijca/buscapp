@@ -7,14 +7,14 @@ import EstadoErro from '@/componentes/EstadoErro.vue';
 const router = useRouter();
 const route = useRoute();
 const limite = ref(50);
-const { alunos, pendente, atualizando, erro, recarregar } = useAlunos(() => ({
-  limite: limite.value,
-}));
-
 const busca = ref((route.query.busca as string) ?? '');
 const filtroStatus = ref<'todos' | 'ativo' | 'egresso' | 'transferido' | 'inativo'>(
   (route.query.status as 'ativo' | 'egresso' | 'transferido' | 'inativo') ?? 'todos',
 );
+const { alunos, pendente, atualizando, erro, recarregar } = useAlunos(() => ({
+  limite: limite.value,
+  busca: busca.value.trim() || undefined,
+}));
 
 // Filtros ficam na URL para preservar o contexto no refresh e permitir link direto.
 watch([busca, filtroStatus], () => {

@@ -27,8 +27,9 @@ jobs:
       - name: Gera o cliente Prisma
         run: pnpm run db:generate
 
-      # Sobe app + PostgreSQL, aplica as migrações no entrypoint e valida a saúde da API.
-      - run: docker compose up -d --build
+      # Sobe app + PostgreSQL com o seed de desenvolvimento (compose.ci.yml), aplica as
+      # migrações no entrypoint e valida a saúde da API.
+      - run: docker compose -f compose.yaml -f compose.ci.yml up -d --build
 
       - name: Aguarda a API responder
         run: |
@@ -40,7 +41,7 @@ jobs:
             sleep 5
           done
           echo "API não respondeu no tempo esperado."
-          docker compose logs app
+          docker compose -f compose.yaml -f compose.ci.yml logs app
           exit 1
 
       - name: Valida o runtime Vercel sem SPA
@@ -63,8 +64,8 @@ jobs:
 
       - name: Exibe os logs em caso de falha
         if: failure()
-        run: docker compose logs
+        run: docker compose -f compose.yaml -f compose.ci.yml logs
 
       - name: Derruba o ambiente
         if: always()
-        run: docker compose down -v
+        run: docker compose -f compose.yaml -f compose.ci.yml down -v

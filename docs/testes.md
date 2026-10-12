@@ -49,7 +49,7 @@ STORAGE_DRIVER=disco \
 pnpm run test:unit
 ```
 
-Os testes E2E esperam o seed de desenvolvimento aplicado e usam `DATABASE_URL_ADMIN` (dono do schema) para fixtures e limpeza direta no banco; a API continua com `DATABASE_URL` no papel restrito. As senhas vêm de `SEED_SENHA_*`:
+Os testes E2E esperam o seed de desenvolvimento aplicado e usam `DATABASE_URL_ADMIN` (dono do schema) para fixtures e limpeza direta no banco; a API continua com `DATABASE_URL` no papel restrito. O seed padrão simula um ano letivo com 9 turmas e cerca de 42 alunos por turma; os parâmetros `SEED_PERFIL`, `SEED_SEMENTE` e `SEED_LIMPAR` estão em [ambiente.md](ambiente.md). As senhas vêm de `SEED_SENHA_*`:
 
 ```bash
 NODE_ENV=test \
@@ -64,7 +64,7 @@ pnpm run test:e2e:docker
 
 ### Capturas do README
 
-As imagens do README são geradas por `tests/e2e/imagens.spec.ts` e gravadas em `docs/imagens/`, com o aplicativo no ar e o seed de desenvolvimento aplicado. O spec usa os mesmos helpers dos testes E2E, captura o painel da gestão em 1440x900 no Chromium e a chamada do professor em 390x844 no Mobile Chrome, e não usa dados reais. Para regenerar:
+As imagens do README são geradas por `tests/e2e/imagens.spec.ts` e gravadas em `docs/imagens/`, com o aplicativo no ar e o seed de desenvolvimento aplicado. O spec cobre o ranking da gestão em 1440x900 no Chromium, a chamada do professor em 390x844 no Mobile Chrome, a central de ocorrências da gestão em 1440x900 e o chat do responsável em 390x844, sem dados reais. Cada captura confere a presença da massa e falha com a orientação de rodar o seed quando ela falta. Para regenerar:
 
 ```bash
 pnpm run capturas:readme         # Playwright local, com o aplicativo no ar
@@ -78,7 +78,7 @@ Os PNGs versionados em `docs/imagens/` não são editados à mão. Quando a inte
 | Workflow         | Etapas                                                                                                 |
 | ---------------- | ------------------------------------------------------------------------------------------------------ |
 | `qualidade.yml`  | `pnpm install --frozen-lockfile`, `type-check`, `lint` e `build-only` em pull requests e por dispatch manual.                  |
-| `testes.yml`     | `docker compose up -d --build`, espera `/api/saude` e roda `pnpm run test:unit` com PostgreSQL e Redis. |
+| `testes.yml`     | `docker compose -f compose.yaml -f compose.ci.yml up -d --build` com o seed aplicado, espera `/api/saude` e roda `pnpm run test:unit` com PostgreSQL e Redis. |
 | `migracoes.yml`  | `prisma migrate deploy` e aplicação da senha do papel em push para `main` com mudanças no schema.      |
 | `publicacao.yml` | Build da imagem e push para o GHCR ao publicar um release estável, além de dispatch manual.            |
 | `codeql.yml`     | Análise CodeQL para javascript-typescript em push, pull request e agenda semanal.                      |

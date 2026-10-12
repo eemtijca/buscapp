@@ -33,6 +33,9 @@ Todas as variáveis da API passam por `apps/api/src/ambiente.ts`, validadas com 
 | `DATABASE_URL_ESCUTA`                                                               | API               | Conexão de sessão do `LISTEN`; vazia usa `MIGRATE_DATABASE_URL`.                               |
 | `CRON_SECRET`                                                                       | API               | Segredo do agendador do expurgo; sem ele a rota responde 404.                                  |
 | `SEED`                                                                              | Compose           | Com `SEED=true`, o entrypoint do container popula o banco na partida.                          |
+| `SEED_PERFIL`                                                                       | Seed              | Volume da massa: `leve`, `padrao` (padrão) ou `pesado`.                                        |
+| `SEED_SEMENTE`                                                                      | Seed              | Semente do gerador determinístico próprio (padrão `buscapp-dev`).                              |
+| `SEED_LIMPAR`                                                                       | Seed              | Com `true`, remove a massa anterior criada pelo seed antes de reaplicar.                       |
 | `SEED_SENHA_ADMIN`, `SEED_SENHA_PROF`, `SEED_SENHA_RESP`                            | Seed              | Senhas dos usuários de teste criados pelo seed de desenvolvimento.                             |
 | `VITE_API_URL`                                                                      | Frontend          | URL base da API. Vazio (padrão) usa a mesma origem; defina ao hospedar a SPA separada da API.  |
 
@@ -95,7 +98,17 @@ Detalhes em [deploy.md](deploy.md).
 pnpm --filter @buscapp/api run seed
 ```
 
-O seed é idempotente e cria perfis, turmas, alunos, frequências e demais fixtures. Os códigos de redefinição de exemplo são gravados apenas como HMAC, coerentes com o fluxo real. Credenciais:
+O seed é idempotente e usa UUIDs canônicos compartilhados com os testes de ponta a ponta. A massa padrão simula o ano letivo corrente com 9 turmas de 1ª a 3ª série (turmas A a C), cerca de 42 alunos por turma, frequências de fevereiro até hoje, justificativas, ocorrências, conversas de chat, notificações, auditoria e monitoramento. Os nomes são sintéticos e os códigos de redefinição de exemplo são gravados apenas como HMAC, coerentes com o fluxo real.
+
+| Variável       | Padrão        | Efeito                                                                                                                                                             |
+| -------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `SEED_PERFIL`  | `padrao`      | Volume da massa: `leve` (35 a 37 alunos por turma e densidade menor), `padrao` (cerca de 42) e `pesado` (48 a 50 alunos e densidade maior).                        |
+| `SEED_SEMENTE` | `buscapp-dev` | Semente do gerador determinístico próprio; a mesma semente recria exatamente a mesma massa.                                                                        |
+| `SEED_LIMPAR`  | `false`       | Com `true`, remove antes a massa criada pelo seed (marcador `5eed...`), sem tocar nas fixtures canônicas, nos dados dos testes nem em dados reais.                 |
+
+O resumo final da execução imprime as contagens de turmas, alunos, frequências, justificativas, ocorrências, conversas, notificações, monitoramento, auditoria e registros de comportamento. Para recriar a massa do zero, use `SEED_LIMPAR=true`; para mudar o cenário, combine a limpeza com outra `SEED_SEMENTE`.
+
+Credenciais:
 
 | Papel       | Email                | Senha     |
 | ----------- | -------------------- | --------- |

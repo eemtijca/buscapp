@@ -249,7 +249,9 @@ export const Consultas = {
     chave: 'conversas',
     staleTime: TEMPOS.operacional,
     tabelas: ['conversas', 'mensagens'],
-    executar: (etag) => buscar('/api/conversas', undefined, etag),
+    // O teto da API garante que a conversa aberta por link direto (por exemplo,
+    // recém-criada pelo ranking, ainda sem mensagens) esteja na lista carregada.
+    executar: (etag) => buscar('/api/conversas', { limite: '200' }, etag),
   }),
 
   mensagens: (conversaId: string): OpcoesConsulta<{ mensagens: MensagemApi[] }> => ({

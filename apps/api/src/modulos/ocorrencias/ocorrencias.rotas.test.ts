@@ -347,9 +347,7 @@ describe('GET /api/ocorrencias', () => {
       cookies: { buscapp_sessao: cookieGestao },
     });
     expect(pendentes.statusCode).toBe(200);
-    expect(pendentes.json().ocorrencias.map((o: { id: string }) => o.id)).toEqual([
-      ocorrenciaFilhoId,
-    ]);
+    expect(apenasOcorrenciasDoTeste(pendentes.json().ocorrencias)).toEqual([ocorrenciaFilhoId]);
 
     const abertas = await app.inject({
       method: 'GET',

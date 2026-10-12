@@ -48,7 +48,7 @@ pnpm run capturas:readme         # Playwright local
 pnpm run capturas:readme:docker  # imagem oficial, com o aplicativo no ar
 ```
 
-O spec captura o painel da gestão em 1440x900 no Chromium e a chamada do professor em 390x844 no Mobile Chrome, sempre com massa sintética. Não edite os PNGs à mão: regenere pelo comando e revise o diff.
+O spec captura o ranking da gestão em 1440x900 no Chromium, a chamada do professor em 390x844 no Mobile Chrome, a central de ocorrências da gestão em 1440x900 e o chat do responsável em 390x844, sempre com massa sintética. Cada captura verifica a presença da massa e falha com orientação para rodar o seed quando ela falta. Não edite os PNGs à mão: regenere pelo comando e revise o diff.
 
 ## Suporte
 
@@ -65,4 +65,4 @@ Os helpers ficam em `tests/suporte`:
 
 ## Massa e limpeza
 
-A massa usa emails datados e o domínio de desenvolvimento. Os testes de API limpam no `afterAll`; os E2E limpam pelas funções de `tests/suporte/api.ts`. Nunca use dados reais. O seed de desenvolvimento é pré-requisito dos testes E2E, e as senhas vêm de `SEED_SENHA_*`.
+A massa usa emails datados e o domínio de desenvolvimento. Os testes de API limpam no `afterAll`; os E2E limpam pelas funções de `tests/suporte/api.ts`. Nunca use dados reais. O seed de desenvolvimento é pré-requisito dos testes E2E, simula o ano letivo corrente com 9 turmas e cerca de 42 alunos por turma e aceita os parâmetros `SEED_PERFIL`, `SEED_SEMENTE` e `SEED_LIMPAR`; as senhas vêm de `SEED_SENHA_*`.

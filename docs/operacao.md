@@ -39,7 +39,7 @@ No container, as migrações rodam no entrypoint. Em produção, o workflow `mig
 pnpm --filter @buscapp/api run seed
 ```
 
-Cria usuários e fixtures de desenvolvimento, de forma idempotente. O entrypoint do Compose executa o seed quando `SEED=true`.
+Cria usuários e fixtures de desenvolvimento, de forma idempotente, e simula o ano letivo corrente com 9 turmas e massa realista de frequências, justificativas, ocorrências, chat, notificações, auditoria e monitoramento. O entrypoint do Compose executa o seed quando `SEED=true`, e o overlay `compose.ci.yml` liga a massa na integração contínua. Os parâmetros `SEED_PERFIL`, `SEED_SEMENTE` e `SEED_LIMPAR` estão em [ambiente.md](ambiente.md).
 
 ## Códigos de redefinição
 

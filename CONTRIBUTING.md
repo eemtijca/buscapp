@@ -301,6 +301,12 @@ A CI cobre `type-check`, `lint`, `build` e os testes de unidade e integração; 
 
 Mudanças estruturais ganham uma nota curta em [docs/adr/](docs/adr/), com estado, contexto, decisão, alternativas e consequências. Novas notas seguem a numeração sequencial e o formato dos ADRs existentes. O índice fica em [docs/README.md](docs/README.md).
 
+### Documentação da API
+
+Toda mudança de rota ou de contrato atualiza a especificação gerada dos schemas Zod das rotas e o arquivo [apps/api/openapi.json](apps/api/openapi.json), obtido com `pnpm run openapi:lint` com o aplicativo no ar. Mudanças de convenção também atualizam [docs/api.md](docs/api.md) e as orientações de uso por agentes em [apps/web/public/llms.txt](apps/web/public/llms.txt). A interface em `GET /api/docs` reflete a especificação na hora.
+
+Antes do pull request, rode `pnpm run openapi:lint`; a guarda [apps/api/src/nucleo/http/documentacao.test.ts](apps/api/src/nucleo/http/documentacao.test.ts) reprova rota registrada sem entrada no mapa de erros.
+
 ### Padrão da documentação
 
 Toda a documentação usa português brasileiro com acentuação e cedilha corretas, em tom técnico e impessoal. Evite primeira pessoa, exclamações e frases de preenchimento.

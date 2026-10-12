@@ -54,5 +54,6 @@ Informe se houve apoio de ferramentas de IA e como o resultado foi revisado. A r
 - [ ] Rodei `pnpm run test:unit` com o Compose migrado.
 - [ ] Rodei `pnpm run test:e2e:docker` e `pnpm run test:pwa:docker` quando a mudança afeta a interface.
 - [ ] Atualizei a documentação correspondente e o CHANGELOG.md.
+- [ ] Atualizei `apps/api/openapi.json`, `docs/api.md` e `apps/web/public/llms.txt` quando o contrato da API mudou.
 - [ ] Revisei a segurança quando a mudança toca dependências, autenticação, permissões, workflows ou dados sensíveis.
 - [ ] Não incluí segredos nem dados reais de alunos, responsáveis ou professores.

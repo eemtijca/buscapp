@@ -326,14 +326,20 @@ describe('Autorização e escopo do chat', () => {
   });
 
   it('gestão lista todas as conversas', async () => {
-    const resposta = await app.inject({
-      method: 'GET',
-      url: '/api/conversas',
-      cookies: { buscapp_sessao: cookieGestao },
-    });
-    expect(resposta.statusCode).toBe(200);
-    const ids = (resposta.json().conversas as Array<{ id: string }>).map((conversa) => conversa.id);
-    expect(ids).toContain(conversaId);
+    // A massa do seed pode passar de uma página; percorre até encontrar a conversa.
+    const ids = new Set<string>();
+    for (let offset = 0; offset < 1000; offset += 200) {
+      const resposta = await app.inject({
+        method: 'GET',
+        url: `/api/conversas?limite=200&offset=${offset}`,
+        cookies: { buscapp_sessao: cookieGestao },
+      });
+      expect(resposta.statusCode).toBe(200);
+      const conversas = resposta.json().conversas as Array<{ id: string }>;
+      conversas.forEach((conversa) => ids.add(conversa.id));
+      if (conversas.length < 200) break;
+    }
+    expect(ids.has(conversaId)).toBe(true);
   });
 });
 

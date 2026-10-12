@@ -34,7 +34,7 @@ As rotas usam `createWebHistory` com fallback para `index.html`, servido pela AP
 4. Rota protegida sem sessão redireciona para o login.
 5. Papel sem permissão vai para `/403`; módulo ausente volta à home com aviso na página.
 
-Páginas públicas: `/` (login), `/solicitar-codigo` e `/redefinir-senha-codigo`.
+Páginas públicas: `/` (login), `/solicitar-codigo` e `/redefinir-senha-codigo`. A tela de login reúne os links do repositório no GitHub, da documentação da API e o diálogo Sobre, com os desenvolvedores, o repositório, a instituição e a licença; o mesmo Sobre fica no menu do usuário. A raiz publica o link oculto para `/llms.txt`, que orienta agentes de IA.
 
 ## Páginas por papel
 

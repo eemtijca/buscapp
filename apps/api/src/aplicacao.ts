@@ -170,6 +170,10 @@ export async function construirApp(): Promise<FastifyInstance> {
     if (!resposta.getHeader('content-security-policy')) {
       resposta.header('content-security-policy', politicaDeSeguranca(pedido.url));
     }
+    // O HTML aponta o índice para agentes de IA; o SPA também é servido por estático.
+    if (String(resposta.getHeader('content-type') ?? '').includes('text/html')) {
+      resposta.header('link', '</llms.txt>; rel="alternate"; type="text/markdown"');
+    }
     concluir(null, payload);
   });
 

@@ -31,6 +31,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 - Documentação interativa da API em `GET /api/docs`, com especificação OpenAPI 3.1 gerada dos schemas Zod das rotas, `operationId` e descrição em cada operação, respostas de erro com exemplos do envelope e esquema de segurança por cookie.
 - Lint da especificação OpenAPI com Redocly CLI (`pnpm run openapi:lint`) no workflow de testes, com o ruleset em `redocly.yaml`.
 - Índice `apps/web/public/llms.txt` para agentes de IA, com o contrato, a referência e a orientação de uso seguro.
+- Descoberta do índice para agentes de IA na raiz: link oculto no `index.html` que passa a apontar o domínio que atende a página, `rel=alternate` no HTML e cabeçalho `Link` nas respostas HTML.
+- Tela de login com os links do repositório no GitHub e da documentação da API, e diálogo Sobre com os desenvolvedores, o repositório, a instituição e a licença, também aberto no menu do usuário.
 - ADR-016 sobre a documentação interativa e o CSP por URL.
 
 ### Corrigido

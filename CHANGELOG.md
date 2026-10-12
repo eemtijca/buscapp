@@ -35,6 +35,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Corrigido
 
+- A suíte de ponta a ponta volta a rodar: a imagem oficial do Playwright sobe para a v1.64.0, alinhada à versão do `@playwright/test` instalada, o script repassa `API_URL` ao contêiner quando definida e os testes de cópia concedem a permissão no endereço configurado, para rodar contra o aplicativo do Compose.
+
 - Compose define `APP_URL` como `http://localhost:3000`, corrigindo o login e as mutações na mesma origem servida pelo contêiner.
 
 ### Modificado

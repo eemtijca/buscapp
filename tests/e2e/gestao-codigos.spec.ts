@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { login } from '../suporte/sessao.js';
-import { SENHA_ADMIN } from '../suporte/dados.js';
+import { BASE_URL, SENHA_ADMIN } from '../suporte/dados.js';
 import { emailUnico } from '../suporte/dados.js';
 import {
   apiFetch,
@@ -606,7 +606,7 @@ test.describe('Códigos: Copiar ao clicar', () => {
 
   test('CT127 - Clique no código do modal copia e dá feedback', async ({ page, context }) => {
     await context.grantPermissions(['clipboard-read', 'clipboard-write'], {
-      origin: 'http://localhost:5173',
+      origin: BASE_URL,
     });
     const email = emailUnico('pwcopy');
     let userId = '';
@@ -646,7 +646,7 @@ test.describe('Códigos: Copiar ao clicar', () => {
 
   test('CT127b - Clique no código da tabela copia', async ({ page, context }) => {
     await context.grantPermissions(['clipboard-read', 'clipboard-write'], {
-      origin: 'http://localhost:5173',
+      origin: BASE_URL,
     });
     const email = emailUnico('pwtbl');
     let userId = '';

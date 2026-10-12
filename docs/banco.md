@@ -81,7 +81,7 @@ São 31 triggers, incluindo os seis de domínio e o `trg_set_updated_at` present
 
 ## Seeds
 
-`apps/api/prisma/seeds/dev.ts` é idempotente e usa UUIDs canônicos compartilhados com `tests/suporte/dados.ts`. Cria 7 perfis, 1 ano letivo, 3 turmas, 9 alunos, enturmações, atribuições, vínculos, 120 frequências, ocorrências, notificações, códigos de redefinição e ações de monitoramento. As senhas vêm de `SEED_SENHA_*`. Os códigos de exemplo são gravados apenas como HMAC, coerentes com o fluxo real.
+`apps/api/prisma/seeds/dev.ts` é idempotente e usa UUIDs canônicos compartilhados com `tests/suporte/dados.ts`. Cria 7 perfis canônicos, 1 ano letivo, 9 turmas, cerca de 42 alunos por turma, enturmações, atribuições, vínculos, frequências de fevereiro até hoje, justificativas, ocorrências, conversas de chat, notificações, códigos de redefinição, auditoria e ações de monitoramento. A massa sintética usa o marcador `5eed...` nos IDs, o que permite a `SEED_LIMPAR=true` remover apenas o que o seed criou. As senhas vêm de `SEED_SENHA_*` e os parâmetros de volume estão em [ambiente.md](ambiente.md). Os códigos de exemplo são gravados apenas como HMAC, coerentes com o fluxo real.
 
 ## Retenção
 

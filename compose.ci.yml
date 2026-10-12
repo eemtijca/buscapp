@@ -1,0 +1,9 @@
+# Overlay do Compose para a integração contínua: sobe o mesmo ambiente do
+# compose.yaml, mas com o seed de desenvolvimento aplicado na partida, para que
+# os testes de ponta a ponta encontrem as fixtures canônicas e a massa realista.
+# Uso: docker compose -f compose.yaml -f compose.ci.yml up -d --build
+services:
+  app:
+    environment:
+      SEED: 'true'
+      SEED_PERFIL: padrao

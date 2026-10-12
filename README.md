@@ -48,6 +48,10 @@ A aplicação publicada fica em https://buscappjca.vercel.app. O ambiente de des
 
 ![Chamada do professor no celular](docs/imagens/chamada-professor-mobile.png)
 
+![Ocorrências da gestão no desktop](docs/imagens/ocorrencias-gestao-desktop.png)
+
+![Chat do responsável no celular](docs/imagens/chat-responsavel-mobile.png)
+
 ## Funcionalidades
 
 ### Acesso e perfis
@@ -124,7 +128,7 @@ Instruções completas, incluindo Supabase e banco gerenciado, estão em [docs/a
 
 ### Credenciais de desenvolvimento
 
-As credenciais do seed são as mesmas da seção de demonstração. O seed cria turmas, alunos, frequências e ocorrências de exemplo para exercitar os três perfis.
+As credenciais do seed são as mesmas da seção de demonstração. O seed é determinístico e idempotente: simula o ano letivo corrente com 9 turmas de 1ª a 3ª série, cerca de 42 alunos por turma, frequências de fevereiro até hoje, justificativas, ocorrências, chat, notificações, auditoria e monitoramento, tudo com nomes sintéticos. Ajuste o volume com `SEED_PERFIL` (`leve`, `padrao` ou `pesado`), mude o cenário com `SEED_SEMENTE` e recrie a massa do zero com `SEED_LIMPAR=true`. A referência completa está em [docs/ambiente.md](docs/ambiente.md).
 
 ## Como usar
 

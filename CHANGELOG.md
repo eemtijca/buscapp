@@ -34,6 +34,7 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 - Descoberta do índice para agentes de IA na raiz: link oculto no `index.html` que passa a apontar o domínio que atende a página, `rel=alternate` no HTML e cabeçalho `Link` nas respostas HTML.
 - Tela de login com os links do repositório no GitHub e da documentação da API, e diálogo Sobre com os desenvolvedores, o repositório, a instituição e a licença, também aberto no menu do usuário.
 - ADR-016 sobre a documentação interativa e o CSP por URL.
+- Seed de desenvolvimento realista e determinístico: simula o ano letivo corrente com 9 turmas de 1ª a 3ª série, cerca de 42 alunos por turma, frequências em cauda longa, justificativas avaliadas e pendentes, ocorrências com tags, conversas de chat em horário letivo, notificações, auditoria e monitoramento, com os parâmetros `SEED_PERFIL`, `SEED_SEMENTE` e `SEED_LIMPAR` e limpeza por marcador próprio.
 
 ### Corrigido
 

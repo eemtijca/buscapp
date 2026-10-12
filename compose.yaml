@@ -45,6 +45,9 @@ services:
       # Fuso da escola e seed de desenvolvimento (ver .env.example).
       TZ_ESCOLA: ${TZ_ESCOLA:-America/Sao_Paulo}
       SEED: ${SEED:-false}
+      SEED_PERFIL: ${SEED_PERFIL:-padrao}
+      SEED_SEMENTE: ${SEED_SEMENTE:-buscapp-dev}
+      SEED_LIMPAR: ${SEED_LIMPAR:-false}
       SEED_SENHA_ADMIN: ${SEED_SENHA_ADMIN:-Admin123!}
       SEED_SENHA_PROF: ${SEED_SENHA_PROF:-Prof123!}
       SEED_SENHA_RESP: ${SEED_SENHA_RESP:-Resp123!}

@@ -2,6 +2,9 @@
 
 export const API_URL = process.env.API_URL ?? 'http://localhost:3001';
 
+/** Endereço do aplicativo sob teste; o script do contêiner repassa TEST_BASE_URL. */
+export const BASE_URL = process.env.TEST_BASE_URL ?? 'http://localhost:5173';
+
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) {
   throw new Error(

@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAutenticacao } from '@/composables/useAutenticacao';
 import { traduzirErro } from '@/utils/traduzirErro';
+import ModalSobre from '@/componentes/ModalSobre.vue';
 
 const router = useRouter();
 const route = useRoute();
@@ -14,6 +15,13 @@ const lembrar = ref(false);
 const mostrarSenha = ref(false);
 const carregando = ref(false);
 const erro = ref<string | null>(null);
+const sobreVisivel = ref(false);
+
+// O link oculto do index.html passa a apontar o domínio que serve a página.
+onMounted(() => {
+  const link = document.getElementById('llms-txt');
+  if (link) link.setAttribute('href', `${window.location.origin}/llms.txt`);
+});
 
 const homePorPapel: Record<string, string> = {
   professor: '/professor',
@@ -157,6 +165,37 @@ async function handleLogin(): Promise<void> {
         </div>
 
         <p class="mt-4 mb-1 text-body-secondary text-center" style="font-size: 0.75rem">v0.1.0</p>
+
+        <nav
+          aria-label="Projeto"
+          class="mt-2 d-flex flex-wrap justify-content-center column-gap-3 row-gap-1 small"
+        >
+          <a
+            href="https://github.com/eemtijca/buscapp"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="link-secondary text-decoration-none"
+          >
+            GitHub
+          </a>
+          <a
+            href="/api/docs"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="link-secondary text-decoration-none"
+          >
+            Documentação da API
+          </a>
+          <button
+            type="button"
+            class="btn btn-link btn-sm p-0 link-secondary text-decoration-none"
+            @click="sobreVisivel = true"
+          >
+            Sobre
+          </button>
+        </nav>
+
+        <ModalSobre v-model:visivel="sobreVisivel" />
       </form>
     </div>
   </div>

@@ -9,6 +9,7 @@ import { prefetchEssenciais } from '@/servicos/prefetch';
 import IndicadorConexao from '@/componentes/IndicadorConexao.vue';
 import CabecalhoNavegacao from '@/componentes/CabecalhoNavegacao.vue';
 import ModalSessoes from '@/componentes/ModalSessoes.vue';
+import ModalSobre from '@/componentes/ModalSobre.vue';
 import NotificacoesPopover from '@/componentes/NotificacoesPopover.vue';
 
 const router = useRouter();
@@ -61,6 +62,7 @@ const rotaInicio = () => {
 };
 
 const sessoesAbertas = ref(false);
+const sobreAberto = ref(false);
 
 const papelChat = () => {
   if (usuario.value?.papel === 'gestao' || usuario.value?.papel === 'responsavel')
@@ -134,6 +136,16 @@ const papelChat = () => {
               <button
                 type="button"
                 class="dropdown-item d-flex align-items-center gap-2"
+                @click="sobreAberto = true"
+              >
+                <i class="bi bi-info-circle" aria-hidden="true"></i>
+                Sobre
+              </button>
+            </li>
+            <li>
+              <button
+                type="button"
+                class="dropdown-item d-flex align-items-center gap-2"
                 @click="handleLogout"
               >
                 <i class="bi bi-box-arrow-right" aria-hidden="true"></i>
@@ -165,5 +177,6 @@ const papelChat = () => {
     </footer>
 
     <ModalSessoes v-model:visivel="sessoesAbertas" />
+    <ModalSobre v-model:visivel="sobreAberto" />
   </div>
 </template>

@@ -17,6 +17,7 @@ A especificação OpenAPI 3.1 é gerada dos schemas Zod das rotas e publicada em
 
 - A especificação em `/api/docs/openapi.json` é a fonte da verdade para modelos e agentes: operações, schemas, exemplos e erros.
 - O índice [../apps/web/public/llms.txt](../apps/web/public/llms.txt) é servido em `/llms.txt` e aponta o contrato, a referência e a orientação de uso seguro.
+- A raiz anônima publica o link oculto para `/llms.txt`, o `rel=alternate` no HTML e o cabeçalho `Link` da resposta, para o agente achar o índice antes de qualquer sessão.
 - Os `operationId` em português são estáveis e viram nome de ferramenta em geradores de SDK e de servidores MCP.
 
 ## Convenções

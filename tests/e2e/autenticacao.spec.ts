@@ -33,6 +33,25 @@ test.describe('Autenticação', () => {
     await expect(page.locator('input[type="email"]')).toBeVisible();
     await expect(page.locator('input[type="password"]')).toBeVisible();
     await expect(page.getByText('Solicitar código de acesso')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'GitHub' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Documentação da API' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Sobre' })).toBeVisible();
+    await expect(page.locator('#llms-txt')).toHaveAttribute('href', /\/llms\.txt$/);
+  });
+
+  test('CT06 - Sobre abre com os desenvolvedores', async ({ page }) => {
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Sobre' }).click();
+    const modal = page.getByRole('dialog');
+    await expect(modal).toContainText('Sobre o BuscApp');
+    await expect(modal.getByRole('link', { name: 'Emanuel Lázaro' })).toHaveAttribute(
+      'href',
+      'https://github.com/emanuellcs',
+    );
+    await expect(modal.getByRole('link', { name: 'Prof. Josué Cavalcante' })).toHaveAttribute(
+      'href',
+      'https://github.com/wolf9611',
+    );
   });
 
   test('CT02 - Login como gestão redireciona para /gestao', async ({ page }) => {

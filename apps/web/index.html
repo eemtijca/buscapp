@@ -5,6 +5,7 @@
     <link rel="icon" href="/favicon.ico" sizes="48x48" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="alternate" type="text/markdown" href="/llms.txt" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta
       name="description"
@@ -17,6 +18,8 @@
   </head>
   <body>
     <div id="app"></div>
+    <!-- Link oculto para agentes de IA: a raiz aponta o índice do projeto. -->
+    <a id="llms-txt" href="/llms.txt" hidden aria-hidden="true">llms.txt</a>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

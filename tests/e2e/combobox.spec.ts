@@ -9,9 +9,11 @@ test.describe('Combobox - todos os dropdowns viraram combobox', () => {
     await expect(page.locator('#campoTurma')).toBeVisible();
     await page.click('#campoTurma');
     await expect(page.locator('#campoTurma-lista [role="option"]').first()).toBeVisible();
-    // Filtra por "3ª"
+    // Filtra por "3ª"; a massa do seed tem as três letras da série.
     await page.fill('#campoTurma', '3ª');
-    await expect(page.locator('#campoTurma-lista [role="option"]')).toContainText('3ª');
+    const opcoes = page.locator('#campoTurma-lista [role="option"]');
+    await expect(opcoes.first()).toBeVisible();
+    await expect(opcoes.filter({ hasNotText: '3ª' })).toHaveCount(0);
     await page.keyboard.press('Escape');
   });
 

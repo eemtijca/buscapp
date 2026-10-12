@@ -46,6 +46,8 @@ export const rotasChat: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['chat'],
         summary: 'Lista as conversas visíveis para o usuário autenticado',
+        operationId: 'listarConversas',
+        description: 'Lista as conversas visíveis para o perfil, com paginação.',
         querystring: paginacaoSchema,
         response: { 200: z.object({ conversas: z.array(conversaSchema) }) },
       },
@@ -60,6 +62,9 @@ export const rotasChat: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['chat'],
         summary: 'Retorna a conversa do aluno ou cria uma nova',
+        operationId: 'obterOuCriarConversa',
+        description:
+          'Retorna a conversa do aluno ou cria uma nova, restrita aos participantes do vínculo.',
         body: criarConversaSchema,
         response: {
           200: z.object({ conversa: conversaSchema }),
@@ -81,6 +86,9 @@ export const rotasChat: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['chat'],
         summary: 'Lista as mensagens não deletadas de uma conversa (cursor para as anteriores)',
+        operationId: 'listarMensagens',
+        description:
+          'Lista as mensagens não removidas da conversa; use cursor para carregar as anteriores.',
         params: parametrosConversa,
         querystring: listarMensagensSchema,
         response: { 200: z.object({ mensagens: z.array(mensagemSchema) }) },
@@ -98,6 +106,9 @@ export const rotasChat: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['chat'],
         summary: 'Envia uma mensagem na conversa',
+        operationId: 'enviarMensagem',
+        description:
+          'Envia uma mensagem na conversa. O horário de envio do responsável é protegido pelo horário letivo e envios repetidos respondem 409.',
         params: parametrosConversa,
         body: enviarMensagemSchema,
         response: {
@@ -124,6 +135,8 @@ export const rotasChat: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['chat'],
         summary: 'Marca como lidas as mensagens recebidas na conversa',
+        operationId: 'marcarMensagensLidas',
+        description: 'Marca como lidas as mensagens recebidas na conversa.',
         params: parametrosConversa,
         response: { 200: marcarMensagensLidasRespostaSchema },
       },
@@ -140,6 +153,8 @@ export const rotasChat: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['chat'],
         summary: 'Oculta ou reexibe uma conversa',
+        operationId: 'atualizarConversa',
+        description: 'Oculta ou reexibe a conversa para o usuário, sem apagar o histórico.',
         params: parametrosConversa,
         body: atualizarConversaSchema,
         response: { 200: z.object({ conversa: conversaSchema }) },

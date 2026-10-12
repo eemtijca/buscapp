@@ -12,6 +12,9 @@ export const rotasAuditoria: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['auditoria'],
         summary: 'Lista os eventos de auditoria com filtros e paginação',
+        operationId: 'listarAuditoria',
+        description:
+          'Lista os eventos de auditoria com filtros de usuário, ação, entidade e período. Restrito à gestão.',
         querystring: listarAuditoriaSchema,
         response: { 200: z.object({ auditoria: z.array(auditoriaSchema) }) },
       },

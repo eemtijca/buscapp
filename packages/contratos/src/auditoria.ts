@@ -9,8 +9,9 @@ export const auditoriaSchema = z.object({
   acao: z.string(),
   entidade: z.string(),
   entidade_id: uuidSchema.nullable(),
-  dados_anteriores: z.unknown().nullable(),
-  dados_novos: z.unknown().nullable(),
+  // `z.unknown()` já aceita null; o `nullable()` extra gerava um `anyOf` vazio no JSON Schema.
+  dados_anteriores: z.unknown(),
+  dados_novos: z.unknown(),
   ip_origem: z.string().nullable(),
   created_at: z.string(),
 });

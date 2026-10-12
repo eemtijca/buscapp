@@ -55,6 +55,8 @@ export const rotasConfiguracoes: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['configuracoes'],
         summary: 'Retorna as configurações gerais do sistema (gestão)',
+        operationId: 'obterConfiguracoes',
+        description: 'Retorna as configurações gerais do sistema, restrito à gestão.',
         response: { 200: z.object({ configuracao: configuracaoSistemaSchema }) },
       },
     },
@@ -68,6 +70,9 @@ export const rotasConfiguracoes: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['configuracoes'],
         summary: 'Retorna o subconjunto de configurações visível a todos os perfis',
+        operationId: 'obterConfiguracoesPublicas',
+        description:
+          'Retorna o subconjunto de configurações visível a todos os perfis autenticados.',
         response: { 200: z.object({ configuracao: configuracaoPublicaSchema }) },
       },
     },
@@ -81,6 +86,9 @@ export const rotasConfiguracoes: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['configuracoes'],
         summary: 'Atualiza as configurações gerais do sistema',
+        operationId: 'atualizarConfiguracoes',
+        description:
+          'Atualiza as configurações gerais do sistema, como dados da escola, fuso, retenção de anexos e termômetro.',
         body: atualizarConfiguracaoSistemaSchema,
         response: { 200: z.object({ configuracao: configuracaoSistemaSchema }) },
       },
@@ -95,6 +103,8 @@ export const rotasConfiguracoes: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['configuracoes'],
         summary: 'Lista as opções de configuração (catálogo)',
+        operationId: 'listarOpcoes',
+        description: 'Lista as opções dos catálogos configuráveis, com filtros de tipo e busca.',
         querystring: listarOpcoesConfiguracaoSchema,
         response: { 200: z.object({ opcoes: z.array(opcaoConfiguracaoSchema) }) },
       },
@@ -109,6 +119,8 @@ export const rotasConfiguracoes: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['configuracoes'],
         summary: 'Cria uma opção de configuração',
+        operationId: 'criarOpcao',
+        description: 'Cria uma opção de catálogo; chave repetida para o mesmo tipo responde 409.',
         body: criarOpcaoConfiguracaoSchema,
         response: { 201: z.object({ opcao: opcaoConfiguracaoSchema }) },
       },
@@ -127,6 +139,8 @@ export const rotasConfiguracoes: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['configuracoes'],
         summary: 'Atualiza rótulo, ícone, ordem ou status de uma opção',
+        operationId: 'atualizarOpcao',
+        description: 'Atualiza rótulo, ícone, ordem ou situação da opção de catálogo.',
         params: parametrosOpcao,
         body: atualizarOpcaoConfiguracaoSchema,
         response: { 200: z.object({ opcao: opcaoConfiguracaoSchema }) },
@@ -142,6 +156,9 @@ export const rotasConfiguracoes: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['configuracoes'],
         summary: 'Reordena opções em uma única transação',
+        operationId: 'reordenarOpcoes',
+        description:
+          'Reordena as opções em uma única transação, recebendo a lista de identificadores na ordem desejada.',
         body: reordenarOpcoesConfiguracaoSchema,
         response: { 200: z.object({ opcoes: z.array(opcaoConfiguracaoSchema) }) },
       },
@@ -156,6 +173,9 @@ export const rotasConfiguracoes: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['configuracoes'],
         summary: 'Exclui uma opção não referenciada do catálogo',
+        operationId: 'excluirOpcao',
+        description:
+          'Exclui uma opção sem uso; opções referenciadas respondem 409 e devem ser desativadas.',
         params: parametrosOpcao,
         response: { 204: z.null() },
       },
@@ -173,6 +193,8 @@ export const rotasConfiguracoes: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['configuracoes'],
         summary: 'Lista os horários letivos',
+        operationId: 'listarHorarios',
+        description: 'Lista os horários letivos usados pelo chat e pelos limites de envio.',
         response: { 200: z.object({ horarios: z.array(horarioLetivoSchema) }) },
       },
     },
@@ -186,6 +208,8 @@ export const rotasConfiguracoes: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['configuracoes'],
         summary: 'Cria um horário letivo',
+        operationId: 'criarHorario',
+        description: 'Cria um horário letivo; dia e intervalo repetidos respondem 409.',
         body: criarHorarioLetivoSchema,
         response: { 201: z.object({ horario: horarioLetivoSchema }) },
       },
@@ -204,6 +228,8 @@ export const rotasConfiguracoes: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['configuracoes'],
         summary: 'Atualiza um horário letivo',
+        operationId: 'atualizarHorario',
+        description: 'Atualiza dia, intervalo ou situação do horário letivo.',
         params: parametrosHorario,
         body: atualizarHorarioLetivoSchema,
         response: { 200: z.object({ horario: horarioLetivoSchema }) },
@@ -219,6 +245,8 @@ export const rotasConfiguracoes: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['configuracoes'],
         summary: 'Ativa ou inativa um horário letivo',
+        operationId: 'atualizarStatusHorario',
+        description: 'Ativa ou inativa um horário letivo.',
         params: parametrosHorario,
         body: atualizarStatusHorarioLetivoSchema,
         response: { 200: z.object({ horario: horarioLetivoSchema }) },
@@ -236,6 +264,8 @@ export const rotasConfiguracoes: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['configuracoes'],
         summary: 'Exclui um horário letivo',
+        operationId: 'excluirHorario',
+        description: 'Exclui um horário letivo.',
         params: parametrosHorario,
         response: { 204: z.null() },
       },
@@ -253,6 +283,9 @@ export const rotasConfiguracoes: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['configuracoes'],
         summary: 'Lista as tags de comportamento',
+        operationId: 'listarTagsComportamento',
+        description:
+          'Lista as tags de comportamento do catálogo, com filtros de categoria e situação.',
         querystring: listarTagsComportamentoSchema,
         response: { 200: z.object({ tags: z.array(tagComportamentoCatalogoSchema) }) },
       },
@@ -267,6 +300,8 @@ export const rotasConfiguracoes: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['configuracoes'],
         summary: 'Cria uma tag de comportamento',
+        operationId: 'criarTagComportamento',
+        description: 'Cria uma tag de comportamento; nome repetido responde 409.',
         body: criarTagComportamentoSchema,
         response: { 201: z.object({ tag: tagComportamentoCatalogoSchema }) },
       },
@@ -285,6 +320,8 @@ export const rotasConfiguracoes: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['configuracoes'],
         summary: 'Atualiza uma tag de comportamento',
+        operationId: 'atualizarTagComportamento',
+        description: 'Atualiza a tag; renomear uma tag em uso responde 409.',
         params: parametrosTag,
         body: atualizarTagComportamentoSchema,
         response: { 200: z.object({ tag: tagComportamentoCatalogoSchema }) },
@@ -300,6 +337,8 @@ export const rotasConfiguracoes: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['configuracoes'],
         summary: 'Ativa ou inativa uma tag de comportamento',
+        operationId: 'atualizarStatusTagComportamento',
+        description: 'Ativa ou inativa uma tag de comportamento.',
         params: parametrosTag,
         body: atualizarStatusTagComportamentoSchema,
         response: { 200: z.object({ tag: tagComportamentoCatalogoSchema }) },
@@ -317,6 +356,9 @@ export const rotasConfiguracoes: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['configuracoes'],
         summary: 'Exclui uma tag de comportamento não referenciada',
+        operationId: 'excluirTagComportamento',
+        description:
+          'Exclui uma tag sem uso; tags referenciadas respondem 409 e devem ser desativadas.',
         params: parametrosTag,
         response: { 204: z.null() },
       },

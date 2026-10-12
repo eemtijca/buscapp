@@ -22,6 +22,9 @@ export const rotasAlunos: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['alunos'],
         summary: 'Lista os alunos visíveis para o usuário autenticado',
+        operationId: 'listarAlunos',
+        description:
+          'Lista os alunos visíveis para o perfil, com busca por nome e matrícula e filtro de status.',
         querystring: listarAlunosSchema,
         response: { 200: z.object({ alunos: z.array(alunoSchema) }) },
       },
@@ -36,6 +39,9 @@ export const rotasAlunos: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['alunos'],
         summary: 'Retorna um aluno visível para o usuário autenticado',
+        operationId: 'obterAluno',
+        description:
+          'Retorna um aluno visível para o perfil; registros fora do escopo respondem 404.',
         params: parametrosAluno,
         response: { 200: z.object({ aluno: alunoSchema }) },
       },
@@ -50,6 +56,8 @@ export const rotasAlunos: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['alunos'],
         summary: 'Cadastra um aluno',
+        operationId: 'criarAluno',
+        description: 'Cadastra um aluno. Matrícula repetida responde 409.',
         body: criarAlunoSchema,
         response: { 201: z.object({ aluno: alunoSchema }) },
       },
@@ -68,6 +76,9 @@ export const rotasAlunos: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['alunos'],
         summary: 'Atualiza um aluno',
+        operationId: 'atualizarAluno',
+        description:
+          'Atualiza os dados do aluno, incluindo situação, documentos recebidos e observações.',
         params: parametrosAluno,
         body: atualizarAlunoSchema,
         response: { 200: z.object({ aluno: alunoSchema }) },

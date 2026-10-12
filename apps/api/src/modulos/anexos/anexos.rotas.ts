@@ -44,6 +44,9 @@ export const rotasAnexos: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['anexos'],
         summary: 'Gera URL pré-assinada para envio direto de um anexo ao provedor',
+        operationId: 'iniciarUploadAnexo',
+        description:
+          'Gera URL pré-assinada para envio direto ao provedor de armazenamento. Limite de 20 envios por hora por usuário.',
         body: solicitacaoUploadAnexoSchema,
       },
     },
@@ -86,6 +89,9 @@ export const rotasAnexos: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['anexos'],
         summary: 'Confirma um anexo enviado direto ao provedor e registra os metadados',
+        operationId: 'confirmarUploadAnexo',
+        description:
+          'Confere o arquivo enviado direto ao provedor, registra os metadados e reencoda imagens para remover metadados embutidos.',
         body: confirmacaoUploadAnexoSchema,
       },
     },
@@ -202,6 +208,9 @@ export const rotasAnexos: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['anexos'],
         summary: 'Envia um anexo (imagem ou PDF)',
+        operationId: 'enviarAnexo',
+        description:
+          'Envia um anexo por multipart: imagem JPG, PNG ou WEBP, ou PDF, até 10 MB. Limite de 20 envios por hora por usuário.',
       },
     },
     async (pedido, resposta) => {
@@ -282,6 +291,9 @@ export const rotasAnexos: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['anexos'],
         summary: 'Baixa o conteúdo do anexo com autorização',
+        operationId: 'baixarAnexo',
+        description:
+          'Baixa o conteúdo do anexo com autorização de escopo, em streaming e sem cache.',
         params: z.object({ id: uuidSchema }),
       },
     },
@@ -324,6 +336,9 @@ export const rotasAnexos: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['anexos'],
         summary: 'Remove um anexo (compensação ou gestão)',
+        operationId: 'removerAnexo',
+        description:
+          'Remove o anexo do criador ou da gestão; o objeto no provedor é removido depois do registro.',
         params: z.object({ id: uuidSchema }),
         response: { 200: z.object({ ok: z.literal(true) }) },
       },

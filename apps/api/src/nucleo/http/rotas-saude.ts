@@ -15,6 +15,9 @@ export const rotasSaude: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['saude'],
         summary: 'Verifica a disponibilidade da API',
+        operationId: 'verificarSaude',
+        description:
+          'Responde com o status da API, a hora do servidor e a revisão implantada, sem consultar o banco. Para a prontidão com consulta ao banco use /api/saude/pronto.',
         response: {
           200: z.object({
             status: z.literal('ok'),
@@ -37,6 +40,9 @@ export const rotasSaude: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['saude'],
         summary: 'Readiness: confere a conexão com o banco',
+        operationId: 'verificarProntidao',
+        description:
+          'Consulta o banco de dados para confirmar a prontidão da API e responde 503 quando ele está indisponível.',
         response: {
           200: z.object({ status: z.literal('ok'), banco: z.literal('ok') }),
           503: z.object({ status: z.literal('indisponivel'), banco: z.literal('erro') }),
@@ -62,6 +68,9 @@ export const rotasSaude: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['saude'],
         summary: 'Resumo operacional de requisições e conexões SSE',
+        operationId: 'obterMetricas',
+        description:
+          'Resumo operacional de requisições, erros e conexões SSE ativas desde a partida, restrito à gestão.',
         response: {
           200: z.object({
             requisicoes: z.object({

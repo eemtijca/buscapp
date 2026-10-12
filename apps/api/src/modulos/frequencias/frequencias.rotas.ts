@@ -44,6 +44,9 @@ export const rotasFrequencias: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['frequencias'],
         summary: 'Lança as ausências de uma turma em um período (idempotente)',
+        operationId: 'registrarChamadaLote',
+        description:
+          'Lança as ausências da turma em um período. Idempotente por client_request_id: repetir a mesma chamada devolve 200 sem duplicar registros.',
         body: registrarLoteFrequenciaSchema,
         response: {
           200: z.object({ ok: z.literal(true), idempotente: z.literal(true) }),
@@ -68,6 +71,9 @@ export const rotasFrequencias: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['frequencias'],
         summary: 'Desfaz a chamada lançada para a turma, data, período e tipo informados',
+        operationId: 'desfazerChamadaLote',
+        description:
+          'Remove as ausências lançadas para a turma, data, período e tipo informados, desfazendo a chamada.',
         querystring: removerLoteFrequenciaSchema,
         response: { 200: z.object({ ok: z.literal(true), removidas: z.number().int() }) },
       },
@@ -85,6 +91,9 @@ export const rotasFrequencias: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['frequencias'],
         summary: 'Registra a ausência individual de um aluno em um período',
+        operationId: 'registrarFrequencia',
+        description:
+          'Registra a ausência individual de um aluno em um período. Idempotente por client_request_id.',
         body: criarFrequenciaSchema,
         response: {
           200: z.object({ frequencia: frequenciaSchema, idempotente: z.literal(true) }),
@@ -109,6 +118,9 @@ export const rotasFrequencias: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['frequencias'],
         summary: 'Resume ausências e justificativas por aluno para o monitoramento',
+        operationId: 'resumirFrequencias',
+        description:
+          'Resume faltas e justificativas por aluno para os painéis, com filtros de período, turma e série.',
         querystring: resumirFrequenciasSchema,
         response: { 200: z.object({ resumo: z.array(resumoAlunoFrequenciaSchema) }) },
       },
@@ -123,6 +135,9 @@ export const rotasFrequencias: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['frequencias'],
         summary: 'Retorna uma frequência visível para o usuário',
+        operationId: 'obterFrequencia',
+        description:
+          'Retorna uma frequência visível para o perfil; registros fora do escopo respondem 404.',
         params: z.object({ id: uuidSchema }),
         response: { 200: z.object({ frequencia: frequenciaSchema }) },
       },
@@ -137,6 +152,9 @@ export const rotasFrequencias: FastifyPluginAsyncZod = async (app) => {
       schema: {
         tags: ['frequencias'],
         summary: 'Lista as frequências visíveis para o usuário autenticado',
+        operationId: 'listarFrequencias',
+        description:
+          'Lista as frequências visíveis para o perfil com filtros de aluno, turma, data, status e tipo.',
         querystring: listarFrequenciasSchema,
         response: { 200: z.object({ frequencias: z.array(frequenciaSchema) }) },
       },

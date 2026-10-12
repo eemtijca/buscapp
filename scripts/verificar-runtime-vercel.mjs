@@ -59,6 +59,17 @@ try {
   await aguardarApi();
   await exigirStatus(`${base}/api/saude`, 200);
 
+  // A documentação interativa precisa ser servida no perfil sem SPA, por isso
+  // o runtime Vercel é conferido aqui: a interface e a especificação respondem.
+  const interfaceHtml = await exigirStatus(`${base}/api/docs`, 200);
+  if (!(await interfaceHtml.text()).includes('API do BuscApp')) {
+    throw new Error('A página de documentação não foi servida no perfil Vercel.');
+  }
+  const especificacao = await exigirStatus(`${base}/api/docs/openapi.json`, 200);
+  if (!String((await especificacao.json()).openapi ?? '').startsWith('3.1')) {
+    throw new Error('A especificação servida no perfil Vercel não é OpenAPI 3.1.');
+  }
+
   const preflight = await exigirStatus(`${base}/api/auth/login`, 204, {
     method: 'OPTIONS',
     headers: {

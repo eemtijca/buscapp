@@ -57,6 +57,10 @@ jobs:
           STORAGE_DRIVER: disco
         run: pnpm run test:unit
 
+      # Baixa a especificação publicada pela API no ar e aplica o lint do Redocly.
+      - name: Lint da especificação OpenAPI
+        run: pnpm run openapi:lint
+
       - name: Exibe os logs em caso de falha
         if: failure()
         run: docker compose logs

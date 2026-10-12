@@ -1,0 +1,14 @@
+# Regras do linter da especificação OpenAPI (Redocly CLI).
+# Documentação: https://redocly.com/docs/cli/rules/
+extends:
+  - recommended-strict
+
+rules:
+  # As sondas de saúde e a sonda de sessão sempre respondem 200, sem 4xx;
+  # a guarda documentacao.test.ts exige 4xx nas demais operações.
+  operation-4xx-response: warn
+
+  # /api/codigos/perfil/{perfilId} e /api/codigos/{id}/revogar são ambíguos no
+  # papel, mas o roteador do Fastify resolve o segmento estático primeiro;
+  # padronizar as rotas fica fora do escopo da documentação.
+  no-ambiguous-paths: warn

@@ -10,7 +10,8 @@
 | Executar localmente e configurar      | [ambiente.md](ambiente.md)                                        |
 | Entender o código e as camadas        | [arquitetura.md](arquitetura.md)                                  |
 | Trabalhar com o banco e migrações     | [banco.md](banco.md)                                              |
-| Consultar as rotas HTTP               | [api.md](api.md)                                                  |
+| Consultar as rotas HTTP               | [api.md](api.md) e a interface em `GET /api/docs`                 |
+| Consumir a API por agentes de IA      | [api.md](api.md) e [../apps/web/public/llms.txt](../apps/web/public/llms.txt) |
 | Conhecer entidades e vocabulário      | [modelo-de-dados.md](modelo-de-dados.md)                          |
 | Entender as regras de cada módulo     | [modulos.md](modulos.md)                                          |
 | Manter a interface e o design system  | [interface.md](interface.md)                                      |

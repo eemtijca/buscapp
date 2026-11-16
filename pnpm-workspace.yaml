@@ -14,6 +14,16 @@ allowBuilds:
   unrs-resolver: true
   vue-demi: true
 
+# Overrides de segurança para dependências transitivas cujos pais ainda não
+# declaram uma versão corrigida. Remover quando o pai passar a resolver a
+# versão corrigida por conta própria.
+overrides:
+  'fast-uri@>=3.0.0 <3.1.9': '3.1.9'
+  'fast-uri@>=4.0.0 <4.2.3': '4.2.3'
+  'glob@>=9.0.0 <=14.0.1': '14.0.4'
+  'ip-address@<10.7.4': '10.7.4'
+  'minimatch@>=7.0.0 <11.0.1': '11.0.5'
+
 # O npm executava pré-scripts (o pretest da API gera o cliente Prisma);
 # o pnpm os desliga por padrão desde a versão 7.
 enablePrePostScripts: true

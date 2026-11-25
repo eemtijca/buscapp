@@ -54,7 +54,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.65.1",
-    "@redocly/cli": "^2.78.0",
+    "@redocly/cli": "^2.82.0",
     "@tsconfig/node24": "^24.0.6",
     "@types/node": "^24.19.2",
     "@types/pg": "^8.23.1",
@@ -62,15 +62,15 @@
     "dotenv": "^17.4.2",
     "eslint": "^10.15.0",
     "eslint-config-prettier": "^10.1.8",
-    "eslint-plugin-oxlint": "~1.93.0",
+    "eslint-plugin-oxlint": "~1.94.0",
     "eslint-plugin-vue": "~10.12.1",
     "jiti": "^2.6.1",
     "npm-run-all2": "^8.0.4",
-    "oxlint": "~1.93.0",
+    "oxlint": "~1.94.0",
     "pg": "^8.23.1",
     "prettier": "3.10.1",
     "typescript": "~6.0.0",
-    "vitest": "^5.1.0",
+    "vitest": "^5.1.1",
     "vue-tsc": "^3.3.14"
   },
   "engines": {
